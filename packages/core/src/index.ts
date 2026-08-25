@@ -1,2 +1,62 @@
-// @modplayjs/core — public API (filled in by T2-T8)
-export {};
+// @modplayjs/core — public API
+//
+// Plugin contracts (T2), data-model types (T3). The Core implementation
+// lands in T4-T8.
+
+export type {
+  Core,
+  CoreConfig,
+  LoadCtx,
+  FormatPlugin,
+  EffectPlugin,
+  DspPlugin,
+  OutputPlugin,
+} from './types/index';
+
+export {
+  // enums / constants (T3)
+  CoreState,
+  Quirk,
+  QUIRKS_ST3,
+  QUIRKS_FT2,
+  QUIRKS_IT,
+  FlowFlag,
+  FLOW_MODE_GENERIC,
+  FLOW_MODE_ST2,
+  FLOW_MODE_ST3_301,
+  FLOW_MODE_ST3_321,
+  FLOW_MODE_IT_100,
+  FLOW_MODE_IT_104,
+  FLOW_MODE_IT_200,
+  FLOW_MODE_IT_210,
+  FLOW_MODE_MPT_116,
+  ReadEventType,
+  PeriodType,
+  Interp,
+  PluginKind,
+} from './model/constants';
+
+export {
+  // all FX constants
+  FX_ARPEGGIO, FX_PORTA_UP, FX_PORTA_DN, FX_TONEPORTA, FX_VIBRATO,
+  FX_TONE_VSLIDE, FX_VIBRA_VSLIDE, FX_TREMOLO, FX_OFFSET, FX_VOLSLIDE,
+  FX_JUMP, FX_VOLSET, FX_BREAK, FX_EXTENDED, FX_SPEED, FX_SETPAN,
+  FX_GLOBALVOL, FX_GVOL_SLIDE, FX_KEYOFF, FX_ENVPOS, FX_PANSLIDE,
+  FX_MULTI_RETRIG, FX_TREMOR, FX_XF_PORTA,
+  EX_FILTER, EX_F_PORTA_UP, EX_F_PORTA_DN, EX_GLISS, EX_VIBRATO_WF,
+  EX_FINETUNE, EX_PATTERN_LOOP, EX_TREMOLO_WF, EX_SETPAN, EX_RETRIG,
+  EX_F_VSLIDE_UP, EX_F_VSLIDE_DN, EX_CUT, EX_DELAY, EX_PATT_DELAY,
+  EX_INVLOOP, XX_XF_PORTA_UP, XX_XF_PORTA_DN,
+  FX_TRK_VOL, FX_TRK_VSLIDE, FX_TRK_FVSLIDE, FX_IT_INSTFUNC,
+  FX_FLT_CUTOFF, FX_FLT_RESN, FX_IT_BPM, FX_IT_ROWDELAY, FX_IT_PANSLIDE,
+  FX_PANBRELLO, FX_PANBRELLO_WF, FX_HIOFFSET, FX_IT_BREAK,
+  FX_MACRO_SET, FX_MACRO, FX_MACROSMOOTH,
+  FX_SURROUND, FX_REVERSE, FX_S3M_SPEED, FX_VOLSLIDE_2, FX_FINETUNE,
+  FX_S3M_BPM, FX_FINE_VIBRATO, FX_F_VSLIDE_UP, FX_F_VSLIDE_DN,
+  FX_F_PORTA_UP, FX_F_PORTA_DN, FX_PATT_DELAY, FX_S3M_ARPEGGIO,
+  FX_PANSL_NOMEM, FX_VSLIDE_UP_2, FX_VSLIDE_DN_2, FX_F_VSLIDE_UP_2,
+  FX_F_VSLIDE_DN_2,
+} from './model/fx';
+
+// Data-model types + model constants (T3)
+export * from './model/model';
