@@ -1,0 +1,13 @@
+modplayjs — License TBD
+=======================
+
+The license for this project is NOT yet decided. Do not assume a license.
+
+Ported material in this repository derives from the following reference
+projects, each under its own license (see NOTICE):
+
+  - OpenMPT (BSD-3-Clause)
+  - libxmp (MIT, © 1996-2026 Claudio Matsuoka & Hipolito Carraro Jr)
+  - Paula-Tracker (MIT)
+
+The per-reference licenses govern the code ported from each reference.

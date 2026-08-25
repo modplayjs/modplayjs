@@ -1,0 +1,10 @@
+=== T1 QA: npm install && npm run typecheck (happy) ===
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+install exit: 0
+> tsc -p tsconfig.json
+
+typecheck exit: 0
+
+=== T1 QA: failure (missing workspace dep) ===
+npm error 404 for @modplayjs/nonexistent-foo -> INSTALL_EXIT:1 (verified above, reverted)

@@ -1,0 +1,17 @@
+{
+  "name": "modplayjs",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Browser tracker player library (MOD/S3M/XM/IT), ported from OpenMPT/libxmp/Paula-Tracker",
+  "workspaces": [
+    "packages/*",
+    "demo"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2"
+  }
+}

@@ -1,0 +1,30 @@
+modplayjs — NOTICE
+==================
+
+This project contains code ported from the following reference projects.
+The ports mirror the structure and behavior of the originals; the original
+copyrights and licenses remain in force for that material.
+
+1. OpenMPT — BSD-3-Clause
+   Copyright (C) 2000-2024 OpenMPT developers (originals: Grimen,
+   Jarek Trzaska, and contributors)
+   Ported from: soundlib (MODTools.cpp and related), per-format quirks.
+   License: BSD-3-Clause.
+   https://github.com/OpenMPT/OpenMPT
+
+2. libxmp — MIT
+   Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr
+   Ported from: src/mixer.c, src/mix_all.c, src/effects.c, src/player.c,
+   src/read_event.c, src/flow.c, src/lfo.c, src/filter.c, src/virtual.c,
+   src/loaders/{mod,s3m,xm,it}_load.c, src/loaders/sample.c,
+   src/load_helpers.c, src/common.h, src/include/xmp.h.
+   License: MIT.
+   https://bitbucket.org/mpu32/libxmp
+
+3. Paula-Tracker — MIT
+   Copyright (C) 2024 Paula-Tracker authors
+   Ported from: paulalib/audio-engine.js (Paula sound engine),
+   paulalib/modloader.js, paulalib/sampleutils.js,
+   src/platform/audio-web.js.
+   License: MIT.
+   https://github.com/andrasbaktai/Paula-Tracker
