@@ -1,6 +1,7 @@
-=== T2 QA happy: dummy impls satisfy each interface (tsc) ===
-happy tsc exit: 0
-
-=== T2 QA failure: FormatPlugin missing required 'test' ===
-.omo/qa/t2-happy.ts(5,7): error TS2741: Property 'test' is missing in type '{ name: string; load(_bytes: Uint8Array<ArrayBufferLike>, _ctx: LoadCtx): ModuleData; readEvent(_core: Core, _chn: number, _row: number): void; }' but required in type 'FormatPlugin'.
-fail tsc exit (expected nonzero): 2
+=== T2 plugin interfaces ===
+happy: npm run typecheck -> exit 0
+npm run typecheck exit=0
+dummy impls (format/effect/dsp/output) against interfaces -> tsc exit 0
+dummy-impl tsc exit=0
+failure: DspPlugin missing reset() ->
+../../../tmp/t2-fail.ts(2,7): error TS2741: Property 'reset' is missing in type '{ name: string; channels: number; renderFrame: (_ctx: Core, _out: Float32Array, _ticks: number) => void; }' but required in type 'DspPlugin'.

@@ -1,10 +1,21 @@
-=== T1 QA: npm install && npm run typecheck (happy) ===
+=== T1 monorepo scaffold ===
+happy: npm install && npm run typecheck
 npm warn allow-scripts
 npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
-install exit: 0
+npm install exit=0
+
+> modplayjs@0.1.0 typecheck
 > tsc -p tsconfig.json
 
-typecheck exit: 0
-
-=== T1 QA: failure (missing workspace dep) ===
-npm error 404 for @modplayjs/nonexistent-foo -> INSTALL_EXIT:1 (verified above, reverted)
+npm run typecheck exit=0
+---
+npm error 404 Note that you can also install from a
+npm error 404 tarball, folder, http url, or git url.
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-08-26T00_59_18_100Z-debug-0.log
+npm install (missing-pkg) exit=0
+revert install exit=0
+failure QA: dependency @modplayjs/missing-pkg added to fmt-xm
+npm install exit=1 (expect nonzero: workspace wiring is real)
+npm error 404 tarball, folder, http url, or git url.
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-08-26T00_59_38_023Z-debug-0.log
+reverted; npm install exit=0 (expect 0)

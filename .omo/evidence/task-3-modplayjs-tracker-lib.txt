@@ -1,6 +1,6 @@
-=== T3 QA happy: ModuleData literal type-checks (tsc) ===
-happy tsc exit: 0
-
-=== T3 QA failure: ModuleData missing required fields ===
-.omo/qa/t3-fail.ts(9,7): error TS2740: Type '{ title: string; format: "mod"; comment: string; chn: number; pat: number; len: number; xxo: number[]; channels: { pan: number; vol: number; flg: number; }[]; patterns: { rows: number; tracks: { rows: number; event: { ...; }[]; }[]; }[]; instruments: never[]; samples: never[]; num_sequences: number; sequences: { ......' is missing the following properties from type 'ModuleData': restart, speed, bpm, volbase, and 11 more.
-fail tsc exit (expected nonzero): 2
+=== T3 data-model types ===
+npm run typecheck exit=0
+happy: ModuleData literals for mod/s3m/xm/it -> tsc exit
+t3-happy tsc exit=0
+failure: ModuleData missing 'orders' ->
+../../../tmp/t3-fail.ts(4,7): error TS2741: Property 'orders' is missing in type '{ title: string; format: "mod"; channels: number; patterns: { rows: { events: Event[]; }[]; }[]; sequences: never[]; ordInfo: never[]; instruments: never[]; samples: never[]; speed: number; bpm: number; restart: number; ... 8 more ...; md5: null; }' but required in type 'ModuleData'.

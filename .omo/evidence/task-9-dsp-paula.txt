@@ -1,0 +1,9 @@
+unity period: 80.4284
+ch0 L,R: 0.087500 0.037500 expect 0.087500 0.037500
+clip L: 1 R: 1
+(a) rate=1@PF/sr: PASS (b-loop-wraps) PASS (c-silence-after-end) PASS (d-pan) PASS (e-clamp-after-half) PASS
+clamp case L: 1 expect 1.0 PASS
+master x0.5: L=0.0875 = 0.25*0.7*(0.5) PASS (see d)
+
+fail case: degenerate loop (loopStart==loopEnd) → reference modulo by zero.
+degenerate loop: NaN=false Inf=false produced-samples=3528
