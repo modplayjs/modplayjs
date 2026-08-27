@@ -93,3 +93,8 @@ export const FX_VSLIDE_UP_2 = 0xc0;
 export const FX_VSLIDE_DN_2 = 0xc1;
 export const FX_F_VSLIDE_UP_2 = 0xc2;
 export const FX_F_VSLIDE_DN_2 = 0xc3;
+// Note-slide family (effects.h:132-135; player.c note_slide stage 1158)
+export const FX_NSLIDE_DN = 0x9c;
+export const FX_NSLIDE_UP = 0x9d;
+export const FX_F_NSLIDE_DN = 0x75;
+export const FX_F_NSLIDE_UP = 0x76;
