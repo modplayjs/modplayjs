@@ -1,0 +1,50 @@
+PASS volslide up 0x30 → +3
+PASS volslide memory recall
+PASS VOLPDN down wins for x0y form
+PASS DxF (LSN=f) fine up → vol.fslide=+3 no slide
+PASS DFy (MSN=f) fine dn → vol.fslide=-3
+PASS Cxx sets volume + NEW_VOL
+PASS S8x/XXX sets pan.val + rpv reset
+PASS PROTRACK blocks setpan
+PASS S8x EX_SETPAN: fxp 3 <<4 → 48
+PASS Pxy left(MSN) → pan.slide negative
+PASS P00 uses pan.memory recall (0)
+PASS IT PxF fine slide right
+PASS Ixy sets up/down counts
+PASS non-FT2 tremor nonzero stays / zero→++
+PASS FT2 keeps zeros on Ix0
+PASS E9x retrig count=val+1 limit RTONCE-off
+PASS ECx cut sets type 0x10
+PASS Qxy retrig val/type from nibbles
+PASS gvol clamps to gvolbase
+PASS gvol slide +2 stored
+PASS Kxx keyoff = fxp+1
+PASS Lxx sets v/p/f idx
+PASS S91 surround flag
+PASS F<0x20 sets speed
+PASS F≥0x20 non-VBLANK sets bpm w/ min
+PASS VBLANK flag forces F as speed
+PASS Axx sets speed
+PASS Txx sets bpm
+PASS T0x tempo slide down
+PASS S3M bpm floors at min_bpm 32
+PASS Bxx sets pbreak+jump
+PASS Dxx decodes BCD row 24
+PASS ST3 Bxx preserves jumpline
+PASS EE4 pattern delay
+PASS E60 marks loop start at row 4
+
+--- anchors ---
+FX_VOLSLIDE family effects.c:302-374 (FINEFX split :309-315, VOLPDN :340-343, Skaven D7 note)
+FX_VOLSET :379-388; FX_SETPAN/EX_SETPAN :279-283/:427-429 (PROTRACK gate :739-742)
+FX_PANSLIDE :645-661; FX_IT_PANSLIDE :662-682; FX_TREMOR :686-700 (non-FT2 zero→++)
+EX_RETRIG :430-437 (RTONCE limit); EX_CUT :446-453 (type 0x10 + NOTE_CUT)
+FX_MULTI_RETRIG :674-685 (note-gated count, EFFECT_MEMORY_S3M)
+FX_GLOBALVOL/GVOL_SLIDE :586-621 (clamp gvolbase; FINEFX gvol split :601-618)
+FX_KEYOFF :622-624 (+1); FX_ENVPOS :625-644 (FT2 aei SUS gates p_idx only)
+FX_SPEED :463-476 (NOBPM/VBLANK/<0x20 → s3m_speed); FX_S3M_SPEED/BPM :512-531 (min_bpm via m->time_factor)
+FX_IT_BPM T0x/T1x slide :533-548; FX_IT_ROWDELAY :549-553 (rowdelay_set ON|FIRST_FRAME)
+Bxx/Dxx via flow ports flow.c:138-171 with LOOP_DELAY_JUMP/BREAK + JUMP_NO_ROW_SET hacks
+EEx EX_PATT_DELAY ST3 delay-guard :505-512
+T12 regression suite re-run: 20 PASS.
+npm run typecheck: clean.

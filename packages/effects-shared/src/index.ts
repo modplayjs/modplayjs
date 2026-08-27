@@ -1,5 +1,6 @@
-// @modplayjs/effects-shared — quirk infra + note/pitch effects (T12).
+// @modplayjs/effects-shared — quirk infra + note/pitch/volume/pan/flow effects.
 export * from './helpers.js';
 export * from './state.js';
 export * from './fx.js';
+export * from './vfx.js';
 export * from './process.js';

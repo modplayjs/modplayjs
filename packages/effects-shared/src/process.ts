@@ -4,7 +4,7 @@
 // through the vfx/fxts modules (T13) which share this signature set.
 
 import type { Core, ChannelState, Event } from '@modplayjs/core';
-import { FX, Quirk } from '@modplayjs/core';
+import { FX, Quirk, PlayerFlag, FlowFlag } from '@modplayjs/core';
 import {
   MSN,
   LSN,
@@ -19,53 +19,55 @@ import {
   fxXfPortaUp,
   fxXfPortaDn,
 } from './fx.js';
+import {
+  fxVolSlide,
+  fxVslideUp2,
+  fxVolSet,
+  fxSetPan,
+  fxPanSlide,
+  fxItPanSlide,
+  fxTremor,
+  exRetrig,
+  exCut,
+  fxMultiRetrig,
+  fxGlobalVol,
+  fxGvolSlide,
+  fxKeyoff,
+  fxEnvPos,
+  fxS3mSpeed,
+  fxS3mBpm,
+  fxItBpm,
+  fxItRowDelay,
+  fxSurround,
+  fvslideUpShared,
+  fvslideDnShared,
+  XMP_MIN_BPM,
+} from './vfx.js';
 import { VolSlideFlag } from './state.js';
 
+/** Structural subset of ModuleData/FlowState used by inline flow fallbacks. */
+interface ModuleLike { flowMode: number; readEventType: number }
+interface FlowStateLike {
+  pbreak: number; jump: number; jumpline: number;
+  delay: number; rowdelay: number; rowdelay_set: number;
+  loop_dest: number;
+  loop: ({ start: number; count: number } | undefined)[];
+}
 const PERIOD_BASE = 13696.0;
 const NOTE_GLISSANDO_BIT = 1 << 9;
 
 
 /**
  * Flow-effect callbacks: EX_PATTERN_LOOP / FX_JUMP / FX_BREAK / FX_PATT_DELAY
- * are handled by flow.c in libxmp; the core owns those functions (flow.ts).
+ * mutate Core-owned FlowState (flow.c ports live in @modplayjs/core/flow).
+ * All optional: when absent, this module applies the generic port inline.
  */
 export interface FlowHooks {
-  patternLoop(core: Core, chn: number, row: number, fxp: number): void;
-  patternJump(core: Core, ord: number): void;
-  patternBreak(core: Core, row: number): void;
-  pattDelay(core: Core, xc: ChannelState, fxp: number): void;
+  patternLoop?(core: Core, chn: number, row: number, fxp: number): void;
+  patternJump?(core: Core, ord: number): void;
+  patternBreak?(core: Core, row: number): void;
+  pattDelay?(core: Core, xc: ChannelState, fxp: number): void;
 }
-
-/** Mutable effect sink for the T13 effects not yet ported (no-op default). */
-export interface VfxHooks {
-  volSlide(core: Core, xc: ChannelState, fxpIn: number): void;
-  volSet(core: Core, xc: ChannelState, fxp: number): void;
-  setPan(core: Core, xc: ChannelState, fxp: number): void;
-  panSlide(core: Core, xc: ChannelState, fxp: number, mem: boolean): void;
-  tremor(core: Core, xc: ChannelState, fxp: number): void;
-  multiRetrig(core: Core, xc: ChannelState, fxp: number, note: number): void;
-  globalVol(core: Core, fxp: number): void;
-  gvolSlide(core: Core, xc: ChannelState, fxpIn: number): void;
-  keyoff(xc: ChannelState, fxp: number): void;
-  envPos(core: Core, xc: ChannelState, fxp: number): void;
-  retrig(core: Core, xc: ChannelState, fxp: number): void;
-  cut(core: Core, xc: ChannelState, fxp: number): void;
-  fvslideUp(core: Core, xc: ChannelState, fxp: number): void;
-  fvslideDn(core: Core, xc: ChannelState, fxp: number): void;
-  speed(core: Core, fxp: number): void;
-  s3mSpeed(core: Core, fxp: number): void;
-  s3mBpm(core: Core, fxp: number): void;
-  itBpm(core: Core, xc: ChannelState, fxp: number): void;
-  itRowDelay(core: Core, fxp: number): void;
-  surround(xc: ChannelState, fxp: number): void;
-}
-
-const noopVfx: VfxHooks = {
-  volSlide() {}, volSet() {}, setPan() {}, panSlide() {}, tremor() {},
-  multiRetrig() {}, globalVol() {}, gvolSlide() {}, keyoff() {}, envPos() {},
-  retrig() {}, cut() {}, fvslideUp() {}, fvslideDn() {}, speed() {},
-  s3mSpeed() {}, s3mBpm() {}, itBpm() {}, itRowDelay() {}, surround() {},
-};
 
 /**
  * libxmp_process_fx (effects.c:108-1149).
@@ -78,7 +80,7 @@ export function processFx(
   chn: number,
   ev: Event,
   fnum: number,
-  hooks: { flow: FlowHooks; vfx?: VfxHooks },
+  hooks: FlowHooks = {},
 ): void {
   const mod = core.module!;
 
@@ -361,59 +363,171 @@ function processRest(
   fxt: number,
   fxpIn: number,
   note: number,
-  hooks: { flow: FlowHooks; vfx?: VfxHooks },
+  hooks: FlowHooks,
 ): void {
-  const vfx = hooks.vfx ?? noopVfx;
+  const mod = core.module!;
   let fxp = fxpIn;
 
   switch (fxt) {
     case FX.FX_VOLSLIDE:
-      vfx.volSlide(core, xc, fxp);
+      fxVolSlide(core, xc, fxp);
+      break;
+    /* OpenMPT VolColMemory.it: a/b/c/d share one memory NOT shared with Dxy.
+     * effects.c:560-572 gate these through vol.memory2 via the reader for IT;
+     * the arm itself applies directly. */
+    case FX.FX_VOLSLIDE_2:
+      fxVslideUp2(xc, fxp);
+      break;
+    case FX.FX_F_VSLIDE_UP_2:
+      if (fxp !== 0) {
+        xc.vol.memory2 = fxp;
+        SET(xc, VolSlideFlag.FINE_VOLS_2);
+        xc.vol.fslide2 = fxp;
+      }
+      break;
+    case FX.FX_F_VSLIDE_DN_2:
+      if (fxp !== 0) {
+        xc.vol.memory2 = fxp;
+        SET(xc, VolSlideFlag.FINE_VOLS_2);
+        xc.vol.fslide2 = -fxp;
+      }
       break;
     case FX.FX_JUMP:
-      hooks.flow.patternJump(core, fxp);
+      hooks.patternJump ? hooks.patternJump(core, fxp) : flowPatternJump(mod, core.ctx.p.flow, fxp);
       break;
     case FX.FX_VOLSET:
-      vfx.volSet(core, xc, fxp);
+      fxVolSet(core, xc, fxp);
       break;
     case FX.FX_BREAK:
-      hooks.flow.patternBreak(core, 10 * MSN(fxp) + LSN(fxp));
+      hooks.patternBreak
+        ? hooks.patternBreak(core, 10 * MSN(fxp) + LSN(fxp))
+        : flowPatternBreak(mod, core.ctx.p.flow, 10 * MSN(fxp) + LSN(fxp));
       break;
     case FX.FX_EXTENDED:
       extendedFx(core, xc, chn, ev, fxp, note, hooks);
       break;
+    case FX.FX_S3M_SPEED:
+      fxS3mSpeed(core, fxp);
+      break;
+    case FX.FX_S3M_BPM:
+      fxS3mBpm(core, fxp);
+      break;
+    case FX.FX_IT_BPM:
+      fxItBpm(core, xc, fxp);
+      break;
+    case FX.FX_IT_ROWDELAY:
+      fxItRowDelay(core, fxp);
+      break;
+    case FX.FX_SURROUND:
+      fxSurround(xc, fxp);
+      break;
     case FX.FX_SPEED:
-      vfx.speed(core, fxp);
+      speedArmImpl(core, fxp);
       break;
     case FX.FX_SETPAN:
       if (!hasQuirk(core, Quirk.PROTRACK)) {
-        vfx.setPan(core, xc, fxp);
+        setPanArmImpl(core, xc, fxp);
       }
       break;
     case FX.FX_GLOBALVOL:
-      vfx.globalVol(core, fxp);
+      fxGlobalVol(core, fxp);
       break;
     case FX.FX_GVOL_SLIDE:
-      vfx.gvolSlide(core, xc, fxp);
+      fxGvolSlide(core, xc, fxp);
       break;
     case FX.FX_KEYOFF:
-      vfx.keyoff(xc, fxp);
+      fxKeyoff(xc, fxp);
       break;
     case FX.FX_ENVPOS:
-      vfx.envPos(core, xc, fxp);
+      fxEnvPos(core, xc, fxp);
       break;
     case FX.FX_PANSLIDE:
-      vfx.panSlide(core, xc, fxp, true);
+      // IT pan-slide shares code via reader mapping in libxmp; here check type.
+      if (mod.readEventType === 3) {
+        fxItPanSlide(xc, fxp);
+      } else {
+        fxPanSlide(core, xc, fxp, true);
+      }
       break;
     case FX.FX_MULTI_RETRIG:
-      vfx.multiRetrig(core, xc, fxp, note);
+      fxMultiRetrig(core, xc, fxp, note);
       break;
     case FX.FX_TREMOR:
-      vfx.tremor(core, xc, fxp);
+      fxTremor(core, xc, fxp);
       break;
-    default:
       break;
   }
+}
+// Generic flow fallbacks (flow.c ports live in core/flow.ts as pure
+// functions over module+FlowState) -------------------------------------------
+
+function flowPatternJump(mod: ModuleLike, f: FlowStateLike, ord: number): void {
+  // flow.c:138-153
+  if ((mod.flowMode & FlowFlag.LOOP_DELAY_JUMP) !== 0 && f.loop_dest >= 0) return;
+  f.pbreak = 1;
+  f.jump = ord;
+  if ((mod.flowMode & FlowFlag.JUMP_NO_ROW_SET) === 0) f.jumpline = 0;
+}
+
+function flowPatternBreak(mod: ModuleLike, f: FlowStateLike, row: number): void {
+  // flow.c:155-171
+  if ((mod.flowMode & FlowFlag.LOOP_DELAY_BREAK) !== 0 && f.loop_dest >= 0) return;
+  f.pbreak = 1;
+  f.jumpline = row;
+}
+
+function flowPatternLoop(core: Core, chn: number, row: number, fxp: number): void {
+  // Delegates to Core's full port when running inside a real Core instance;
+  // unit-test cores without it get flagless loop semantics inline.
+  const anyCore = core as unknown as { applyPatternLoop?: (...a: unknown[]) => void };
+  if (typeof anyCore.applyPatternLoop === 'function') {
+    anyCore.applyPatternLoop.call(core, core, chn, row, fxp);
+    return;
+  }
+  const f = core.ctx.p.flow;
+  const lt = f.loop[chn];
+  if (!lt) return;
+  if (fxp === 0) {
+    lt.start = row;
+    lt.count = -1;
+  } else if (lt.count === -1 || lt.count > 0) {
+    lt.count = lt.count === -1 ? fxp : lt.count - 1;
+    if (lt.count > 0) f.loop_dest = lt.start;
+  }
+}
+
+function flowPattDelay(core: Core, fxp: number): void {
+  const f = core.ctx.p.flow;
+  if (core.module!.readEventType !== 2 /* READ_EVENT_ST3 */ || !f.delay) {
+    f.delay = fxp;
+  }
+}
+
+/** FX_SPEED arm (effects.c:463-476): NOBPM/VBLANK or <0x20 → s3m_speed. */
+function speedArmImpl(core: Core, fxp: number): void {
+  const vblank = (core.ctx.p.flags & PlayerFlag.VBLANK) !== 0;
+  if (hasQuirk(core, Quirk.NOBPM) || vblank || fxp < 0x20) {
+    s3mSpeedShared(core, fxp);
+    return;
+  }
+  s3mBpmShared(core, fxp);
+}
+
+function s3mSpeedShared(core: Core, fxp: number): void {
+  if (fxp) core.ctx.p.speed = fxp;
+}
+
+function s3mBpmShared(core: Core, fxpIn: number): void {
+  let fxp = fxpIn;
+  // Lower time factor in MED allows lower BPM values (effects.c:525).
+  const minBpm = Math.trunc(0.5 + (core.module!.time_factor ?? 10) * XMP_MIN_BPM / 10);
+  if (fxp < minBpm) fxp = minBpm;
+  core.ctx.p.bpm = fxp;
+}
+
+/** FX_SETPAN body (effects.c:279-283). */
+function setPanArmImpl(_core: Core, xc: ChannelState, fxp: number): void {
+  fxSetPan(xc, fxp);
 }
 
 function doToneportaCore(core: Core, xc: ChannelState, note: number): void {
@@ -461,9 +575,8 @@ function extendedFx(
   ev: Event,
   fxpRaw: number,
   note: number,
-  hooks: { flow: FlowHooks; vfx?: VfxHooks },
+  hooks: FlowHooks,
 ): void {
-  const vfx = hooks.vfx ?? noopVfx;
   // EFFECT_MEMORY_S3M (effects.c:389): applies to whole fxp before split
   let fxp = fxpRaw;
   if (hasQuirk(core, Quirk.ST3BUGS)) {
@@ -504,35 +617,43 @@ function extendedFx(
       }
       break;
     case FX.EX_PATTERN_LOOP:
-      hooks.flow.patternLoop(core, chn, core.ctx.p.row, fxp);
+      if (hooks.patternLoop) {
+        hooks.patternLoop(core, chn, core.ctx.p.row, fxp);
+      } else {
+        flowPatternLoop(core, chn, core.ctx.p.row, fxp);
+      }
       break;
     case FX.EX_TREMOLO_WF:
       lfoSetWaveform(xc.tremolo.lfo, fxp & 3);
       break;
     case FX.EX_SETPAN:
-      vfx.setPan(core, xc, fxp << 4);
+      setPanArmImpl(core, xc, fxp << 4);
       break;
     case FX.EX_RETRIG:
-      vfx.retrig(core, xc, fxp);
+      exRetrig(core, xc, fxp);
       break;
     case FX.EX_F_VSLIDE_UP:
       if (fxp === 0) fxp = xc.fine_vol.up_memory;
       else xc.fine_vol.up_memory = fxp;
-      vfx.fvslideUp(core, xc, fxp);
+      fvslideUpShared(core, xc, fxp);
       break;
     case FX.EX_F_VSLIDE_DN:
       if (fxp === 0) fxp = xc.fine_vol.down_memory;
       else xc.fine_vol.down_memory = fxp;
-      vfx.fvslideDn(core, xc, fxp);
+      fvslideDnShared(core, xc, fxp);
       break;
     case FX.EX_CUT:
-      vfx.cut(core, xc, fxp);
+      exCut(xc, fxp);
       break;
     case FX.EX_DELAY:
       /* computed at frame loop (read_row/check_delay) */
       break;
     case FX.EX_PATT_DELAY:
-      hooks.flow.pattDelay(core, xc, fxp);
+      if (hooks.pattDelay) {
+        hooks.pattDelay(core, xc, fxp);
+      } else {
+        flowPattDelay(core, fxp);
+      }
       break;
     case FX.EX_INVLOOP:
       xc.invloop.speed = fxp;
