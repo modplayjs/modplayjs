@@ -1,0 +1,10 @@
+PASS (a) rendered nonzero
+PASS (b) center is symmetric |L-R| small
+PASS (b2) left voice louder in L than R
+PASS (c) looped voice still audible after 25 ticks
+PASS (d) sustain vs released render differ
+PASS (e) no click spike (>0.6 jump)
+invalid-period: NaN=false rendered=silent (0)
+step@c5spd8363/p214: NaN = C4_PERIOD*8363/44100/214 (mixer.c:584)
+step = C4_PERIOD*c5spd/freq/period = 0.379274 (mixer.c:584)
+step unity check: period=C4_PERIOD(428) → step*freq = 8363 samples/sec = c5spd ✓

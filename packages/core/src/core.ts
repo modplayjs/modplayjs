@@ -190,7 +190,7 @@ export class Core implements CoreIface {
   }
 
   get channelStates(): readonly ChannelState[] { return this._xc; }
-  get voiceStates(): never[] { return []; }
+  get voiceStates(): readonly VoiceState[] { return this.virt.voices; }
   get sampleRate(): number { return this._s.freq; }
   get ticksize(): number { return this._s.ticksize; }
   get ctx() {
@@ -200,7 +200,7 @@ export class Core implements CoreIface {
       get s() { return self.mixerState; },
       get m() { return self._module!; },
       get channelStates() { return self._xc; },
-      get voiceStates(): readonly VoiceState[] { return []; },
+      get voiceStates(): readonly VoiceState[] { return self.virt.voices; },
       get state() { return self._state as CoreState; },
       get quirks() { return self.quirks; },
     };
