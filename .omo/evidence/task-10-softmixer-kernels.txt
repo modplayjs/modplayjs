@@ -1,0 +1,11 @@
+PASS nearest truncates
+PASS linear midpoint
+PASS linear quarter
+PASS linear int exact
+PASS spline at integer == sample
+PASS spline at 0 integer
+OOB linear: 52 (finite: true)
+linear@end-0.5: 50 spline: 56 nearest: 100
+all finite: true
+linear@end-0.5: 50 spline: 56 nearest: 100
+all finite: true
