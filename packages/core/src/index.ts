@@ -55,8 +55,12 @@ export {
   FX_S3M_BPM, FX_FINE_VIBRATO, FX_F_VSLIDE_UP, FX_F_VSLIDE_DN,
   FX_F_PORTA_UP, FX_F_PORTA_DN, FX_PATT_DELAY, FX_S3M_ARPEGGIO,
   FX_PANSL_NOMEM, FX_VSLIDE_UP_2, FX_VSLIDE_DN_2, FX_F_VSLIDE_UP_2,
-  FX_F_VSLIDE_DN_2,
+  FX_F_VSLIDE_DN_2, FX_OKT_ARP3, FX_OKT_ARP4, FX_OKT_ARP5,
+  FX_NSLIDE_DN, FX_NSLIDE_UP, FX_F_NSLIDE_DN, FX_F_NSLIDE_UP,
 } from './model/fx';
+
+import * as FX from './model/fx';
+export { FX };
 
 // Data-model types + model constants (T3)
 export * from './model/model';

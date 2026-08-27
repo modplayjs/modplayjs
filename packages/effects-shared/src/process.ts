@@ -1,0 +1,553 @@
+// libxmp_process_fx dispatcher (reference/libxmp/src/effects.c:108-1149).
+// T12 scope: note/pitch effects. The full switch is here so format readers
+// call exactly one function, like libxmp does; volume/pan/flow arms route
+// through the vfx/fxts modules (T13) which share this signature set.
+
+import type { Core, ChannelState, Event } from '@modplayjs/core';
+import { FX, Quirk } from '@modplayjs/core';
+import {
+  MSN,
+  LSN,
+  SET,
+  hasQuirk,
+  lfoSetWaveform,
+} from './helpers.js';
+import { setLfoNotzero } from './helpers.js';
+import {
+  fxFPortaUp,
+  fxFPortaDn,
+  fxXfPortaUp,
+  fxXfPortaDn,
+} from './fx.js';
+import { VolSlideFlag } from './state.js';
+
+const PERIOD_BASE = 13696.0;
+const NOTE_GLISSANDO_BIT = 1 << 9;
+
+
+/**
+ * Flow-effect callbacks: EX_PATTERN_LOOP / FX_JUMP / FX_BREAK / FX_PATT_DELAY
+ * are handled by flow.c in libxmp; the core owns those functions (flow.ts).
+ */
+export interface FlowHooks {
+  patternLoop(core: Core, chn: number, row: number, fxp: number): void;
+  patternJump(core: Core, ord: number): void;
+  patternBreak(core: Core, row: number): void;
+  pattDelay(core: Core, xc: ChannelState, fxp: number): void;
+}
+
+/** Mutable effect sink for the T13 effects not yet ported (no-op default). */
+export interface VfxHooks {
+  volSlide(core: Core, xc: ChannelState, fxpIn: number): void;
+  volSet(core: Core, xc: ChannelState, fxp: number): void;
+  setPan(core: Core, xc: ChannelState, fxp: number): void;
+  panSlide(core: Core, xc: ChannelState, fxp: number, mem: boolean): void;
+  tremor(core: Core, xc: ChannelState, fxp: number): void;
+  multiRetrig(core: Core, xc: ChannelState, fxp: number, note: number): void;
+  globalVol(core: Core, fxp: number): void;
+  gvolSlide(core: Core, xc: ChannelState, fxpIn: number): void;
+  keyoff(xc: ChannelState, fxp: number): void;
+  envPos(core: Core, xc: ChannelState, fxp: number): void;
+  retrig(core: Core, xc: ChannelState, fxp: number): void;
+  cut(core: Core, xc: ChannelState, fxp: number): void;
+  fvslideUp(core: Core, xc: ChannelState, fxp: number): void;
+  fvslideDn(core: Core, xc: ChannelState, fxp: number): void;
+  speed(core: Core, fxp: number): void;
+  s3mSpeed(core: Core, fxp: number): void;
+  s3mBpm(core: Core, fxp: number): void;
+  itBpm(core: Core, xc: ChannelState, fxp: number): void;
+  itRowDelay(core: Core, fxp: number): void;
+  surround(xc: ChannelState, fxp: number): void;
+}
+
+const noopVfx: VfxHooks = {
+  volSlide() {}, volSet() {}, setPan() {}, panSlide() {}, tremor() {},
+  multiRetrig() {}, globalVol() {}, gvolSlide() {}, keyoff() {}, envPos() {},
+  retrig() {}, cut() {}, fvslideUp() {}, fvslideDn() {}, speed() {},
+  s3mSpeed() {}, s3mBpm() {}, itBpm() {}, itRowDelay() {}, surround() {},
+};
+
+/**
+ * libxmp_process_fx (effects.c:108-1149).
+ * fnum: 0 = primary effect column, 1 = secondary (XM volume-column bridge
+ * happens in the readers themselves, mirroring read_event.c:430-431 order).
+ */
+export function processFx(
+  core: Core,
+  xc: ChannelState,
+  chn: number,
+  ev: Event,
+  fnum: number,
+  hooks: { flow: FlowHooks; vfx?: VfxHooks },
+): void {
+  const mod = core.module!;
+
+  /* key_porta is IT only (effects.c:116-119). */
+  if (mod.readEventType !== 3 /* READ_EVENT_IT */) {
+    xc.key_porta = xc.key;
+  }
+
+  const note = ev.note;
+  let fxt: number;
+  let fxp: number;
+  if (fnum === 0) {
+    fxt = ev.fxt;
+    fxp = ev.fxp;
+  } else {
+    fxt = ev.f2t;
+    fxp = ev.f2p;
+  }
+
+  switch (fxt) {
+    case FX.FX_ARPEGGIO:
+      // fx_arpeggio label (effects.c:134-141)
+      if (!hasQuirk(core, Quirk.ARPMEM) || fxp !== 0) {
+        xc.arpeggio.val[0] = 0;
+        xc.arpeggio.val[1] = MSN(fxp);
+        xc.arpeggio.val[2] = LSN(fxp);
+        xc.arpeggio.size = 3;
+      }
+      break;
+
+    case FX.FX_S3M_ARPEGGIO:
+      // EFFECT_MEMORY then goto fx_arpeggio
+      if (fxp === 0) {
+        fxp = hasQuirk(core, Quirk.ST3BUGS) ? xc.vol.memory : xc.arpeggio.memory;
+      } else if (hasQuirk(core, Quirk.ST3BUGS)) {
+        xc.vol.memory = fxp;
+        xc.arpeggio.memory = fxp;
+      } else {
+        xc.arpeggio.memory = fxp;
+      }
+      if (!hasQuirk(core, Quirk.ARPMEM) || fxp !== 0) {
+        xc.arpeggio.val[0] = 0;
+        xc.arpeggio.val[1] = MSN(fxp);
+        xc.arpeggio.val[2] = LSN(fxp);
+        xc.arpeggio.size = 3;
+      }
+      break;
+
+    case FX.FX_OKT_ARP3:
+      if (fxp !== 0) {
+        xc.arpeggio.val[0] = -MSN(fxp);
+        xc.arpeggio.val[1] = 0;
+        xc.arpeggio.val[2] = LSN(fxp);
+        xc.arpeggio.size = 3;
+      }
+      break;
+
+    case FX.FX_OKT_ARP4:
+      if (fxp !== 0) {
+        xc.arpeggio.val[0] = 0;
+        xc.arpeggio.val[1] = LSN(fxp);
+        xc.arpeggio.val[2] = 0;
+        xc.arpeggio.val[3] = -MSN(fxp);
+        xc.arpeggio.size = 4;
+      }
+      break;
+
+    case FX.FX_OKT_ARP5:
+      if (fxp !== 0) {
+        xc.arpeggio.val[0] = LSN(fxp);
+        xc.arpeggio.val[1] = LSN(fxp);
+        xc.arpeggio.val[2] = 0;
+        xc.arpeggio.size = 3;
+      }
+      break;
+
+    case FX.FX_PORTA_UP:
+      processPortaUp(core, xc, fxp, fnum);
+      break;
+
+    case FX.FX_PORTA_DN:
+      processPortaDn(core, xc, fxp, fnum);
+      break;
+
+    case FX.FX_TONEPORTA:
+      toneportaShared(core, xc, fxp, note);
+      break;
+
+    case FX.FX_VIBRATO:
+      vibratoShared(core, xc, fxp, false);
+      break;
+
+    case FX.FX_FINE_VIBRATO:
+      vibratoShared(core, xc, fxp, true);
+      break;
+
+    case FX.FX_TREMOLO:
+      tremoloShared(core, xc, fxp);
+      break;
+
+    case FX.FX_OFFSET: {
+      let val = fxp;
+      if (hasQuirk(core, Quirk.FT2BUGS)) {
+        /* FT2: only set memory when offset activates (ft2_offset_memory.xm). */
+        val = val ? val : xc.offset.memory;
+      } else if (val === 0) {
+        val = xc.offset.memory;
+      } else {
+        xc.offset.memory = val;
+      }
+      SET(xc, VolSlideFlag.OFFSET);
+      if (note) {
+        // effects.c:298-301 — clears low bits then ORs.
+        xc.offset.val &= ~0xffff;
+        xc.offset.val |= val << 8;
+        xc.offset.val2 = val << 8;
+      }
+      if (ev.ins) {
+        xc.offset.val2 = val << 8;
+      }
+      break;
+    }
+
+    case FX.FX_XF_PORTA: {
+      const h = MSN(fxp);
+      let fp = fxp & 0x0f;
+      switch (h) {
+        case 1: /* XX_XF_PORTA_UP */
+          // EFFECT_MEMORY(fxp, fine_porta.xf_up_memory) — note the reference
+          // applies memory BEFORE the label body (effects.c:733-735).
+          if (fp === 0) {
+            fp = xc.fine_porta.xf_up_memory;
+          } else {
+            xc.fine_porta.xf_up_memory = fp;
+          }
+          fxXfPortaUp(core, xc, fp);
+          break;
+        case 2: /* XX_XF_PORTA_DN */
+          if (fp === 0) {
+            fp = xc.fine_porta.xf_down_memory;
+          } else {
+            xc.fine_porta.xf_down_memory = fp;
+          }
+          fxXfPortaDn(core, xc, fp);
+          break;
+      }
+      break;
+    }
+
+    default:
+      // Remaining arms (volume/pan/flow/tempo/filters/IT-specific) belong to
+      // T13; registered via processFxBig below once implemented.
+      processRest(core, xc, chn, ev, fnum, fxt, fxp, note, hooks);
+      break;
+  }
+}
+
+// Shared goto-target bodies reused by dispatch above ------------------------
+
+function processPortaUp(core: Core, xc: ChannelState, fxpIn: number, fnum: number): void {
+  let fxp = fxpIn;
+  if (fxp === 0) {
+    fxp = xc.freq.memory;
+  } else {
+    xc.freq.memory = fxp;
+  }
+
+  if (hasQuirk(core, Quirk.FINEFX) && (fnum === 0 || !hasQuirk(core, Quirk.ITPOR))) {
+    switch (MSN(fxp)) {
+      case 0xf:
+        fxFPortaUp(core, xc, fxp & 0x0f);
+        return;
+      case 0xe:
+        fxXfPortaUp(core, xc, fxp & 0x0f);
+        return;
+    }
+  }
+
+  if (fxp !== 0) {
+    SET(xc, VolSlideFlag.PITCHBEND);
+    xc.freq.slide = -fxp;
+    if (hasQuirk(core, Quirk.UNISLD)) xc.porta.memory = fxp;
+  }
+}
+
+function processPortaDn(core: Core, xc: ChannelState, fxpIn: number, fnum: number): void {
+  let fxp = fxpIn;
+  if (hasQuirk(core, Quirk.FT2BUGS)) {
+    if (fxp === 0) fxp = xc.freq.down_memory;
+    else xc.freq.down_memory = fxp;
+  } else {
+    if (fxp === 0) fxp = xc.freq.memory;
+    else xc.freq.memory = fxp;
+  }
+
+  if (hasQuirk(core, Quirk.FINEFX) && (fnum === 0 || !hasQuirk(core, Quirk.ITPOR))) {
+    switch (MSN(fxp)) {
+      case 0xf:
+        fxFPortaDn(core, xc, fxp & 0x0f);
+        return;
+      case 0xe:
+        fxXfPortaDn(core, xc, fxp & 0x0f);
+        return;
+    }
+  }
+
+  if (fxp !== 0) {
+    SET(xc, VolSlideFlag.PITCHBEND);
+    xc.freq.slide = fxp;
+    if (hasQuirk(core, Quirk.UNISLD)) xc.porta.memory = fxp;
+  }
+}
+
+function toneportaShared(core: Core, xc: ChannelState, fxpIn: number, note: number): void {
+  let fxp = fxpIn;
+  // EFFECT_MEMORY_SETONLY(fxp, xc->porta.memory)
+  if (fxp === 0) {
+    fxp = xc.porta.memory;
+  } else {
+    xc.porta.memory = fxp;
+  }
+  if (hasQuirk(core, Quirk.ST3BUGS) && fxp !== 0) {
+    xc.vol.memory = fxp;
+  }
+
+  if (fxp !== 0) {
+    if (hasQuirk(core, Quirk.UNISLD)) xc.freq.memory = fxp;
+    xc.porta.slide += fxp;
+  }
+
+  if (hasQuirk(core, Quirk.IGSTPOR)) {
+    if (note === 0 && xc.porta.dir === 0) return;
+  }
+
+  if (!(xc.ins >= 0 && xc.ins < core.module!.instruments.length)) return;
+
+  doToneportaCore(core, xc, note);
+  SET(xc, VolSlideFlag.TONEPORTA);
+}
+
+function vibratoShared(core: Core, xc: ChannelState, fxpIn: number, fine: boolean): void {
+  let fxp = fxpIn;
+  if (fxp === 0) {
+    fxp = xc.vibrato.memory;
+  } else {
+    xc.vibrato.memory = fxp;
+  }
+  if (hasQuirk(core, Quirk.ST3BUGS) && fxp !== 0) {
+    xc.vol.memory = fxp;
+  }
+  SET(xc, VolSlideFlag.VIBRATO);
+  setLfoNotzero(
+    xc.vibrato.lfo,
+    fine ? LSN(fxp) : LSN(fxp) << 2,
+    MSN(fxp),
+  );
+}
+
+function tremoloShared(core: Core, xc: ChannelState, fxpIn: number): void {
+  let fxp = fxpIn;
+  if (fxp === 0) {
+    fxp = hasQuirk(core, Quirk.ST3BUGS) ? xc.vol.memory : xc.tremolo.memory;
+  } else if (hasQuirk(core, Quirk.ST3BUGS)) {
+    xc.vol.memory = fxp;
+    xc.tremolo.memory = fxp;
+  } else {
+    xc.tremolo.memory = fxp;
+  }
+  SET(xc, VolSlideFlag.TREMOLO);
+  setLfoNotzero(xc.tremolo.lfo, LSN(fxp), MSN(fxp));
+}
+
+/** E6x/Bxx/Cxx/Dxx/Fxx flow arm routing through flow hooks. */
+function processRest(
+  core: Core,
+  xc: ChannelState,
+  chn: number,
+  ev: Event,
+  _fnum: number,
+  fxt: number,
+  fxpIn: number,
+  note: number,
+  hooks: { flow: FlowHooks; vfx?: VfxHooks },
+): void {
+  const vfx = hooks.vfx ?? noopVfx;
+  let fxp = fxpIn;
+
+  switch (fxt) {
+    case FX.FX_VOLSLIDE:
+      vfx.volSlide(core, xc, fxp);
+      break;
+    case FX.FX_JUMP:
+      hooks.flow.patternJump(core, fxp);
+      break;
+    case FX.FX_VOLSET:
+      vfx.volSet(core, xc, fxp);
+      break;
+    case FX.FX_BREAK:
+      hooks.flow.patternBreak(core, 10 * MSN(fxp) + LSN(fxp));
+      break;
+    case FX.FX_EXTENDED:
+      extendedFx(core, xc, chn, ev, fxp, note, hooks);
+      break;
+    case FX.FX_SPEED:
+      vfx.speed(core, fxp);
+      break;
+    case FX.FX_SETPAN:
+      if (!hasQuirk(core, Quirk.PROTRACK)) {
+        vfx.setPan(core, xc, fxp);
+      }
+      break;
+    case FX.FX_GLOBALVOL:
+      vfx.globalVol(core, fxp);
+      break;
+    case FX.FX_GVOL_SLIDE:
+      vfx.gvolSlide(core, xc, fxp);
+      break;
+    case FX.FX_KEYOFF:
+      vfx.keyoff(xc, fxp);
+      break;
+    case FX.FX_ENVPOS:
+      vfx.envPos(core, xc, fxp);
+      break;
+    case FX.FX_PANSLIDE:
+      vfx.panSlide(core, xc, fxp, true);
+      break;
+    case FX.FX_MULTI_RETRIG:
+      vfx.multiRetrig(core, xc, fxp, note);
+      break;
+    case FX.FX_TREMOR:
+      vfx.tremor(core, xc, fxp);
+      break;
+    default:
+      break;
+  }
+}
+
+function doToneportaCore(core: Core, xc: ChannelState, note: number): void {
+  const mod = core.module!;
+  const instrument = mod.instruments[xc.ins];
+  if (!instrument) return;
+  let mappedXpo = 0;
+  let mapped = 0;
+  if (xc.key >= 0 && xc.key <= 119) {
+    mapped = instrument.map[xc.key] ?? 0;
+  }
+  if (mapped >= instrument.nsm) mapped = 0;
+  const sub = instrument.sub[mapped];
+  if (isValidNoteRange(note - 1) && xc.ins < mod.instruments.length) {
+    const n = note - 1;
+    if (xc.key_porta >= 0 && xc.key_porta <= 119) {
+      mappedXpo = instrument.mapXpo[xc.key_porta] ?? 0;
+    }
+    xc.porta.target = noteToPeriodMod(mod.periodType, n + (sub?.xpo ?? 0) + mappedXpo, xc.finetune, xc.per_adj);
+  }
+  xc.porta.dir = xc.period < xc.porta.target ? 1 : -1;
+}
+
+function isValidNoteRange(n: number): boolean {
+  return n >= 0 && n <= 119;
+}
+
+function noteToPeriodMod(periodType: number, n: number, f: number, adj: number): number {
+  const d = n + f / 128;
+  switch (periodType) {
+    case 2 /* LINEAR */:
+      return (240.0 - d) * 16;
+    case 3 /* CSPD */:
+      return (8363.0 * Math.pow(2, n / 12.0)) / 32 + f;
+    default:
+      return PERIOD_BASE / Math.pow(2, d / 12) * (adj > 0.1 ? adj : 1);
+  }
+}
+
+/** Extended effect sub-dispatch (effects.c:388-463). */
+function extendedFx(
+  core: Core,
+  xc: ChannelState,
+  chn: number,
+  ev: Event,
+  fxpRaw: number,
+  note: number,
+  hooks: { flow: FlowHooks; vfx?: VfxHooks },
+): void {
+  const vfx = hooks.vfx ?? noopVfx;
+  // EFFECT_MEMORY_S3M (effects.c:389): applies to whole fxp before split
+  let fxp = fxpRaw;
+  if (hasQuirk(core, Quirk.ST3BUGS)) {
+    if (fxp === 0) {
+      fxp = xc.vol.memory;
+    } else {
+      xc.vol.memory = fxp;
+    }
+  }
+
+  const fxt = fxp >> 4;
+  fxp &= 0x0f;
+  switch (fxt) {
+    case FX.EX_FILTER:
+      exFilterAmiga(core, fxp);
+      break;
+    case FX.EX_F_PORTA_UP:
+      if (fxp === 0) fxp = xc.fine_porta.up_memory;
+      else xc.fine_porta.up_memory = fxp;
+      fxFPortaUp(core, xc, fxp);
+      break;
+    case FX.EX_F_PORTA_DN:
+      if (fxp === 0) fxp = xc.fine_porta.down_memory;
+      else xc.fine_porta.down_memory = fxp;
+      fxFPortaDn(core, xc, fxp);
+      break;
+    case FX.EX_GLISS:
+      if (fxp) xc.note_flags |= NOTE_GLISSANDO_BIT;
+      else xc.note_flags &= ~NOTE_GLISSANDO_BIT;
+      break;
+    case FX.EX_VIBRATO_WF:
+      lfoSetWaveform(xc.vibrato.lfo, fxp & 3);
+      break;
+    case FX.EX_FINETUNE:
+      if (!hasQuirk(core, Quirk.FT2BUGS) || note > 0) {
+        const v = (fxp << 4) & 0xff;
+        xc.finetune = v >= 0x80 ? v - 0x100 : v;
+      }
+      break;
+    case FX.EX_PATTERN_LOOP:
+      hooks.flow.patternLoop(core, chn, core.ctx.p.row, fxp);
+      break;
+    case FX.EX_TREMOLO_WF:
+      lfoSetWaveform(xc.tremolo.lfo, fxp & 3);
+      break;
+    case FX.EX_SETPAN:
+      vfx.setPan(core, xc, fxp << 4);
+      break;
+    case FX.EX_RETRIG:
+      vfx.retrig(core, xc, fxp);
+      break;
+    case FX.EX_F_VSLIDE_UP:
+      if (fxp === 0) fxp = xc.fine_vol.up_memory;
+      else xc.fine_vol.up_memory = fxp;
+      vfx.fvslideUp(core, xc, fxp);
+      break;
+    case FX.EX_F_VSLIDE_DN:
+      if (fxp === 0) fxp = xc.fine_vol.down_memory;
+      else xc.fine_vol.down_memory = fxp;
+      vfx.fvslideDn(core, xc, fxp);
+      break;
+    case FX.EX_CUT:
+      vfx.cut(core, xc, fxp);
+      break;
+    case FX.EX_DELAY:
+      /* computed at frame loop (read_row/check_delay) */
+      break;
+    case FX.EX_PATT_DELAY:
+      hooks.flow.pattDelay(core, xc, fxp);
+      break;
+    case FX.EX_INVLOOP:
+      xc.invloop.speed = fxp;
+      break;
+  }
+  void ev;
+}
+
+function exFilterAmiga(core: Core, fxp: number): void {
+  const mod = core.module!;
+  if (
+    mod.readEventType === 0 &&
+    mod.periodType === 1
+  ) {
+    core.ctx.p.filter = fxp & 1 ? 0 : 1;
+  }
+}
+

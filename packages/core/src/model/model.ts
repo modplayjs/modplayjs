@@ -150,6 +150,8 @@ export interface Instrument {
   rls: number;
   /** Key map: 121 entries, key → sample index within the instrument. */
   map: number[];
+  /** Per-key transposition (xmp_map.xpo), defaults 0. Used by IT/MED. */
+  mapXpo: number[];
   /** Sub-instrument per key (121 entries), mirroring xmp_subinstrument fields used by the big four. */
   sub: SubInstrument[];
   /** Amplitude (volume) envelope. */
@@ -441,6 +443,10 @@ export interface ChannelState {
 
   /** Key for portamento target (IT xpo handling). */
   key_porta: number;
+  /** Channel finetune (EX_FINETUNE / FX_FINETUNE), int8 range <<4. */
+  finetune: number;
+  /** MED period/pitch adjustment factor hack (player.h:96). */
+  per_adj: number;
 
   // LFOs + memories
   vibrato: { lfo: LfoState; memory: number };
@@ -677,7 +683,18 @@ export interface PlayState {
   current_time: number;
   /** Filter (Amiga LED). */
   filter: number;
+  /** Player flags (XMP_FLAGS_*, e.g. VBLANK, FX9BUG). */
+  flags: number;
 }
+
+/** XMP_FLAGS player option bits (include/xmp.h:100-107). */
+export const PlayerFlag = {
+  VBLANK: 1 << 0,
+  FIXVOL: 1 << 2,
+  FX9BUG: 1 << 4,
+  A500: 1 << 6,
+  A500FILTER: 1 << 7,
+} as const;
 
 /**
  * Mixer state, mirroring struct mixer_data (common.h:654-672) reduced.

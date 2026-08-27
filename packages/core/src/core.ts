@@ -73,6 +73,7 @@ function makeChannelState(): ChannelState {
     mastervol: 0, delay: 0, keyoff: 0, fadeout: 0, ins_fade: 0,
     volume: 0, gvl: 0, rvv: 0, rpv: 0, split: 0, pair: 0,
     v_idx: 0, p_idx: 0, f_idx: 0, key_porta: 0,
+    finetune: 0, per_adj: 0,
     vibrato: { lfo: { type: 0, rate: 0, depth: 0, phase: 0 }, memory: 0 },
     tremolo: { lfo: { type: 0, rate: 0, depth: 0, phase: 0 }, memory: 0 },
     panbrello: { lfo: { type: 0, rate: 0, depth: 0, phase: 0 }, memory: 0 },
@@ -163,6 +164,7 @@ export class Core implements CoreIface {
       },
       current_time: 0,
       filter: 0,
+      flags: 0,
     };
     this._flow = this._p.flow;
   }

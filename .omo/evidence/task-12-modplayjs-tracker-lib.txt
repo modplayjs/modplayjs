@@ -1,0 +1,30 @@
+PASS arpeggio stores val[0..2] = 0/MSN/LSN
+PASS arpeggio size = 3
+PASS arp param 0 no-ARPMEM resets to zeros
+PASS ARPMEM holds on 0 param
+PASS porta up: freq.slide = -fxp, PITCHBEND set
+PASS porta dn: freq.slide = +fxp
+PASS porta up memory recall
+PASS FT2BUGS uses down_memory
+PASS FxF splits to fine porta up
+PASS ExE splits to extra-fine porta dn
+PASS toneporta computes target=note_to_period(note-1)
+PASS toneporta dir = 1 (slide up toward smaller freq/larger period)
+PASS toneporta walk reaches target from below
+PASS vibrato sets VIBRATO flag
+PASS vibrato depth<<2 rate MSN
+PASS vibrato LFO oscillates symmetric
+PASS fine vibrato depth not shifted
+PASS C-3(n48) amiga period = 856
+PASS linear n48 period = (240-48)*16 = 3072
+PASS failure scenario: arp 0 resets (no crash)
+
+--- anchors ---
+arpeggio storage/effects.c:133-149; ARPMEM hold path effects.c:134
+porta memory/slide FX_PORTA_UP/DN effects.c:173-217 (FT2BUGS separate down_memory :197-201)
+fine splits under QUIRK_FINEFX :180-190 (F=0xf → fine, E=0xe → xf)
+toneporta target do_toneporta effects.c:78-106, walk update_frequency player.c:1519-1541
+vibrato depth<<2 / fine unshifted effects.c:244-255; LFO waveforms lfo.c:39-137
+note_to_period period.c:167-196 (amiga PERIOD_BASE 13696, n48→856)
+failure scenario: arp param 0 without memory → resets to zeros, no crash (effects.c:134 gate).
+npm run typecheck: clean.

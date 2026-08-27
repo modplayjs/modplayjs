@@ -88,7 +88,12 @@ export const FX_PATT_DELAY = 0xb3; // MMD
 export const FX_S3M_ARPEGGIO = 0xb4;
 export const FX_PANSL_NOMEM = 0xb5; // XM volume column
 
-// IT volume column effects (dormant in v0.1)
+// Oktalyzer arpeggio variants (effects.h:58-60)
+export const FX_OKT_ARP3 = 0x70;
+export const FX_OKT_ARP4 = 0x71;
+export const FX_OKT_ARP5 = 0x72;
+
+// Note-slide family (effects.h:132-135; player.c note_slide stage 1158)
 export const FX_VSLIDE_UP_2 = 0xc0;
 export const FX_VSLIDE_DN_2 = 0xc1;
 export const FX_F_VSLIDE_UP_2 = 0xc2;
