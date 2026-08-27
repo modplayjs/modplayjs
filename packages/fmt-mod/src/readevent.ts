@@ -9,10 +9,12 @@ import type {
   ModuleData,
   SubInstrument,
 } from '@modplayjs/core';
-import { FX, Quirk, ReadEventType, XMP_KEY_OFF } from '@modplayjs/core';
+import { Quirk, ReadEventType, XMP_KEY_OFF } from '@modplayjs/core';
 import {
-  LSN,
-  MSN,
+  isToneportaFx,
+  isSfxPitch,
+  isModRetrig,
+  setPatch,
   NoteFlag,
   RESET,
   RESET_NOTE,
@@ -37,32 +39,15 @@ import {
   setPeriod,
 } from '@modplayjs/effects-shared';
 
-/** IS_TONEPORTA (read_event.c:254-257), non-CORE 5-command variant. */
-export const isToneportaFx = (x: number): boolean =>
-  x === FX.FX_TONEPORTA ||
-  x === FX.FX_TONE_VSLIDE ||
-  x === FX.FX_PER_TPORTA ||
-  x === FX.FX_ULT_TPORTA ||
-  x === FX.FX_FAR_TPORTA;
-
-/** IS_SFX_PITCH (read_event.c:253). */
-export const isSfxPitch = (x: number): boolean =>
-  x === FX.FX_PITCH_ADD || x === FX.FX_PITCH_SUB;
-
-/** IS_MOD_RETRIG (read_event.c:259-260). */
-export const isModRetrig = (x: number, p: number): boolean =>
-  x === FX.FX_EXTENDED && MSN(p) === 0x0e /* EX_RETRIG */ && LSN(p) !== 0;
-
-/** set_patch (read_event.c:262-263): libxmp_virt_setpatch(ctx, chn, ins, smp, note, 0,0,0,0). */
-export function setPatch(
-  core: Core,
-  chn: number,
-  ins: number,
-  smp: number,
-  note: number,
-): number {
-  return core.virt.setPatchSmp(chn, ins, smp, note);
-}
+// IS_TONEPORTA/IS_SFX_PITCH/IS_MOD_RETRIG + set_patch moved to
+// effects-shared (read_event.c is shared player code, needed by fmt-s3m
+// too); re-exported here for the MOD family.
+export {
+  isToneportaFx,
+  isSfxPitch,
+  isModRetrig,
+  setPatch,
+} from '@modplayjs/effects-shared';
 
 /**
  * libxmp_read_event (read_event.c:1624-1664): old_ins update + NOTE_END
@@ -99,10 +84,8 @@ export function readEventDispatch(core: Core, chn: number, row: number): void {
 }
 
 export { readEventFt2 } from './readevent-ft2.js';
-export { readEventSt3 } from './readevent-st3.js';
 import { readEventFt2 } from './readevent-ft2.js';
-import { readEventSt3 } from './readevent-st3.js';
-
+import { readEventSt3 } from '@modplayjs/effects-shared';
 /**
  * read_event_mod (read_event.c:267-475).
  */

@@ -2,26 +2,22 @@
 
 import type { ChannelState, Core, Event, SubInstrument } from '@modplayjs/core';
 import { Quirk } from '@modplayjs/core';
+import { RESET_NOTE, SET, SET_NOTE, TEST, isValidNote } from './helpers.js';
+import { NoteFlag, VolSlideFlag } from './state.js';
 import {
-  NoteFlag,
-  RESET_NOTE,
-  SET,
-  SET_NOTE,
-  TEST,
-  VolSlideFlag,
   getSubinstrument,
   getInstrument,
   isValidInstrument,
-  isValidNote,
   isValidSample,
-  processFx,
   resetEnvelopes,
   setChannelPan,
   setChannelVolume,
   setEffectDefaults,
   setPeriod,
-} from '@modplayjs/effects-shared';
-import { isToneportaFx, setPatch } from './readevent.js';
+  isToneportaFx,
+  setPatch,
+} from './readevent.js';
+import { processFx } from './process.js';
 
 export function readEventSt3(core: Core, e: Event, chn: number): void {
   const mod = core.module!;

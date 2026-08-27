@@ -11,12 +11,14 @@
 // non-empty sample buffer (SampleStore.get(id).length > 0).
 
 import type { Core } from '@modplayjs/core';
-import { EnvelopeFlags, type ChannelState, type Instrument, type SubInstrument } from '@modplayjs/core';
+import { EnvelopeFlags, FX, type ChannelState, type Instrument, type SubInstrument } from '@modplayjs/core';
 import {
   SET,
   RESET_NOTE,
   noteToPeriod,
   isValidNote,
+  MSN,
+  LSN,
 } from './helpers.js';
 import { Quirk } from '@modplayjs/core';
 import { VolSlideFlag } from './state.js';
@@ -25,6 +27,38 @@ import { VolSlideFlag } from './state.js';
 export function isValidInstrument(core: Core, ins: number): boolean {
   const mod = core.module!;
   return ins >= 0 && ins < mod.ins && (mod.instruments[ins]?.nsm ?? 0) > 0;
+}
+
+/**
+ * IS_TONEPORTA (read_event.c:254-257), non-CORE 5-command variant.
+ */
+export const isToneportaFx = (x: number): boolean =>
+  x === FX.FX_TONEPORTA ||
+  x === FX.FX_TONE_VSLIDE ||
+  x === FX.FX_PER_TPORTA ||
+  x === FX.FX_ULT_TPORTA ||
+  x === FX.FX_FAR_TPORTA;
+
+/** IS_SFX_PITCH (read_event.c:253). */
+export const isSfxPitch = (x: number): boolean =>
+  x === FX.FX_PITCH_ADD || x === FX.FX_PITCH_SUB;
+
+/** IS_MOD_RETRIG (read_event.c:259-260). */
+export const isModRetrig = (x: number, p: number): boolean =>
+  x === FX.FX_EXTENDED && MSN(p) === 0x0e /* EX_RETRIG */ && LSN(p) !== 0;
+
+/**
+ * set_patch (read_event.c:262-263):
+ * libxmp_virt_setpatch(ctx, chn, ins, smp, note, 0,0,0,0).
+ */
+export function setPatch(
+  core: Core,
+  chn: number,
+  ins: number,
+  smp: number,
+  note: number,
+): number {
+  return core.virt.setPatchSmp(chn, ins, smp, note);
 }
 
 /** IS_VALID_SAMPLE(x) (player.h:80) — "data != NULL" ⇔ stored sample non-empty. */

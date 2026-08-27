@@ -1,0 +1,140 @@
+T16 — fmt-s3m: S3M parser + event reader (softmixer DSP)
+=========================================================
+
+Scope decision
+--------------
+fmt-s3m is the LOADER only (s3m_load.c). The event reader
+(read_event_st3, read_event.c:736-933) moved to
+packages/effects-shared/src/readevent-st3.ts: read_event.c is shared
+player-core code in libxmp, owned by neither loader; the fmt-s3m package
+must not depend on fmt-mod. fmt-mod re-exports
+readEventSt3/isToneportaFx/isSfxPitch/isModRetrig/setPatch for the MOD
+family; its own readEventDispatch is unchanged in behavior. T17 will move
+readevent-ft2.ts the same way.
+
+ADLIB / OPL2 decision
+---------------------
+C s3m_load.c:572-608: buf[0] >= 2 with LIBXMP_CORE_PLAYER defined →
+goto err3 (hard load error). Non-core builds synthesize FM via OPL2
+emulation; there is no OPL synth in scope. Ported as typed ParseError
+"S3M: FM instrument not supported (i)". Corpus effect: 4 of 23
+openmpt s3m files contain real SCRI FM instruments
+(AdlibZeroVolumeNote, NOP, RetrigSlide, TonePortamentoWithAdlibNote —
+verified buf[0]=2 + magic SCRI at header+76 by od) → they throw
+ParseError at load, matching C CORE_PLAYER. test() still returns true
+for them (s3m_test only checks SCRM + 0x10@29).
+
+ffi / sample decode mapping
+---------------------------
+All 23 corpus files: ffi (offset 42) = 0x0002 → DecodeFlag.UNSIGNED
+(SAMPLE_FLAG_UNS) for every sample; pack==4 → ADPCM override
+(load_sample_flags, s3m_load.c:652-655). ST3 64000 clamp is #if 0 in C
+(:615-619) — not ported. length > MAX_SAMPLE_SIZE(0x10000000) → error.
+SCRS magic required iff buf[0]==1 (:634). EOF truncation handled by
+SampleStore.add (sample.c parity, T15-proven).
+
+mvol conversion (s3m_load.c:287-318)
+------------------------------------
+ffi==1 → mvol=((mv&0xf)+1)*0x10 clamp [0x10,0x7f], stereo=mv&0x10;
+mv==0x02||0x12 → 0x20; else mvol=mv&0x7f (0→48 default, <16→16),
+stereo=mv&0x80; mono → mvol=mvol*8/11. ModuleData has no mvol fields
+yet — computed and discarded; mixer consumption is a T18 wiring item
+(mixer.c:559-560 vol=vol*mvol/mvolbase with mvolbase=48).
+
+Version/tracker-name tree (s3m_load.c:397-474)
+----------------------------------------------
+default c4rate=8363, FLOW_MODE_ST3_321; version==0x1300 → Quirk.VSALL.
+switch(version>>12): 1 = MPT 1.17 / MPT 1.0 alpha / PlayerPRO /
+Velvet Studio / "Scream Tracker %d.%02x" + ST3BUGS (+ST3_301 flow when
+<0x1303); 2 = PlayerPRO(0x2013)/Imago Orpheus + FLOW_MODE_ORPHEUS;
+3 = Impulse Tracker variants + FLOW_MODE_IT_210; 4 = Schism string
+(common.c:546-580: s_ver<=0x50 → "0.s_ver", else epoch 2009-10-31 +
+(s_ver-0x50 or l_ver if 0xfff) days via OpenMPT date algorithm) unless
+version==0x4100 → BeRoTracker; 5 = Graoumf(0x5447)/OpenMPT 4-part (with
+rsvd2)/OpenMPT 2-part + ST3BUGS; 6 = BeRoTracker; default "unknown".
+Type = "<name> S3M" via libxmp_set_type(:470). Final
+quirk |= QUIRKS_ST3 | Quirk.ARPMEM; readEventType = ST3 (:687-688),
+success path only.
+
+Corpus tracker strings produced (harness PASS lines below):
+  OpenMPT 1.20/1.22/1.24/1.26/1.27/1.28/1.29 (case 5, rsvd2 build ids)
+  Scream Tracker 3.20 (0x1320 files failing the MPT-116 uc==0 test —
+  e.g. NOP.s3m has uc=0x10; faithful: C applies the same checks)
+  Note: PeriodLimitUpper/RetrigAfterNoteCut etc. are OpenMPT-authored
+  but 0x1320/flags≠0 → correctly identified "Scream Tracker 3.20".
+
+xlat_fx (s3m_load.c:129-205)
+----------------------------
+27-entry table; fxt>=27 → 0/0. S3M_BPM fxp<0x20 → drop. S→FX_EXTENDED
+per-h mapping (1 gliss, 2 finetune ((l-8)&0xf), 3 vib wf, 4 trem wf,
+5/6/7/9/a → 0, 8 → FX_SETPAN l<<4, b pattern loop, c==0 → 0).
+FX_SETPAN: 0xa4 → FX_SURROUND 1; else pan=fxp<<1 clamp 0xff.
+
+Patterns (s3m_load.c:478-540)
+-----------------------------
+pat = (max order <0xfe)+1 capped at sfh.patnum; ==0 → error. 64-row
+tracks allocated per pattern per channel (empty patterns pp_pat[i]==0
+kept, C parity). Row decode: b==0 → next row; channel c=b&0x1f, c>=chn
+→ dummy event discarded; note 255→0, 254→XMP_KEY_OFF(0x81), else
+13+12*MSN+LSN; vol=read8+1; fx pair → xlatFx. pat_len accounting
+exactly as C (2/1/2 byte decrements).
+
+Instruments (s3m_load.c:545-682)
+--------------------------------
+80-byte header; sub.pan=-1 (XMP_INST_NO_DEFAULT_PAN), sub.sid=i,
+sub.vol=buf[28]; c2spd→(xpo,fin) via libxmp_c2spd_to_note
+(period.c:251-264, Math.trunc on C int cast); data at
+(memseg|memsegHi<<16)*16; instrument maps calloc-zero (map[key]=0 →
+sub[0], getSubinstrument parity); nsm = length>0?1:0; every sample
+registered so store ids align sid=i.
+
+Header/channel facts
+--------------------
+chn = highest i+1 with chset[i]!=0xff (:330-338); stereo&&x<0x10 →
+pan = x<8?0x30:0xc0 else 0x80; dp==0xfc → (x&0x20) → pan=(x<<4)&0xff;
+mod.spd=buf[49], mod.bpm=buf[50], gvol=buf[48]; ordnum>256 → len=256
+with skip (TS reads first 256 of the buffer, no seek needed);
+sanity: ffi∈{1,2}, counts<=255, magic SCRM@44 (readmem32b).
+
+Plugin dispatch
+---------------
+plugin.readEvent ports the libxmp_read_event prologue
+(read_event.c:1624-1664) inline: scratch event, old_ins update,
+NOTE_SAMPLE_END → NOTE_END propagation, then readEventSt3 (S3M modules
+always dispatch ST3). No dependency on @modplayjs/fmt-mod.
+
+Gates
+-----
+npm run typecheck: 0 errors.
+t12 exit 0; t13 exit 0; t14 49/49 exit 0; t15 356/0 exit 0;
+t16 below: 25 passed / 0 failed (23 corpus + MOD-negative +
+truncated-negative), exit 0.
+
+--- t16-accept.mjs output ---
+PASS AdlibZeroVolumeNote.s3m: Adlib → ParseError: S3M: FM instrument not supported (0)
+PASS AmigaLimits.s3m: chn=2 len=2 pat=1 ins=1 spd=6 bpm=125 tracker="OpenMPT 1.20 S3M" 200 frames OK
+PASS FreqLimits.s3m: chn=1 len=2 pat=1 ins=1 spd=6 bpm=125 tracker="OpenMPT 1.20 S3M" 200 frames OK
+PASS LoopReset.s3m: chn=1 len=4 pat=3 ins=1 spd=6 bpm=125 tracker="OpenMPT 1.26 S3M" 200 frames OK
+PASS NOP.s3m: Adlib → ParseError: S3M: FM instrument not supported (0)
+PASS NoCombinedSlidesOnFirstTick-Fast.s3m: chn=2 len=2 pat=1 ins=2 spd=4 bpm=64 tracker="Scream Tracker 3.20 S3M" 200 frames OK
+PASS NoCombinedSlidesOnFirstTick-Normal.s3m: chn=2 len=2 pat=1 ins=2 spd=4 bpm=64 tracker="Scream Tracker 3.20 S3M" 200 frames OK
+PASS OffsetLoopWraparound.s3m: chn=16 len=2 pat=1 ins=2 spd=6 bpm=160 tracker="Scream Tracker 3.20 S3M" 200 frames OK
+PASS OffsetPastSampleEnd.s3m: chn=2 len=2 pat=1 ins=2 spd=6 bpm=125 tracker="OpenMPT 1.29 S3M" 200 frames OK
+PASS OxxMemory.s3m: chn=1 len=2 pat=1 ins=1 spd=6 bpm=55 tracker="OpenMPT 1.28 S3M" 200 frames OK
+PASS OxxMemoryWithRetrig.s3m: chn=2 len=2 pat=1 ins=1 spd=6 bpm=64 tracker="OpenMPT 1.29 S3M" 200 frames OK
+PASS ParamMemory.s3m: chn=2 len=2 pat=2 ins=2 spd=6 bpm=100 tracker="OpenMPT 1.22 S3M" 200 frames OK
+PASS PatternDelays.s3m: chn=4 len=2 pat=1 ins=3 spd=6 bpm=125 tracker="OpenMPT 1.20 S3M" 200 frames OK
+PASS PatternDelaysRetrig.s3m: chn=5 len=2 pat=1 ins=2 spd=6 bpm=125 tracker="OpenMPT 1.20 S3M" 200 frames OK
+PASS PeriodLimit.s3m: chn=2 len=2 pat=1 ins=1 spd=6 bpm=40 tracker="OpenMPT 1.24 S3M" 200 frames OK
+PASS PeriodLimitUpper.s3m: chn=2 len=2 pat=1 ins=4 spd=6 bpm=48 tracker="Scream Tracker 3.20 S3M" 200 frames OK
+PASS PortaAfterArp.s3m: chn=2 len=2 pat=1 ins=2 spd=6 bpm=125 tracker="OpenMPT 1.27 S3M" 200 frames OK
+PASS PortaSmpChange.s3m: chn=2 len=2 pat=1 ins=3 spd=6 bpm=125 tracker="OpenMPT 1.22 S3M" 200 frames OK
+PASS RetrigAfterNoteCut.s3m: chn=2 len=2 pat=1 ins=2 spd=6 bpm=125 tracker="Scream Tracker 3.20 S3M" 200 frames OK
+PASS RetrigSlide.s3m: Adlib → ParseError: S3M: FM instrument not supported (0)
+PASS TonePortamentoWithAdlibNote.s3m: Adlib → ParseError: S3M: FM instrument not supported (0)
+PASS VibratoTypeChange.s3m: chn=2 len=2 pat=1 ins=2 spd=6 bpm=100 tracker="Scream Tracker 3.20 S3M" 200 frames OK
+PASS weirdloop.s3m: chn=2 len=2 pat=1 ins=5 spd=6 bpm=33 tracker="OpenMPT 1.20 S3M" 200 frames OK
+PASS negative-mod: s3m.test() false on MOD
+PASS truncated: ParseError on truncated load: S3M: read error in pattern header
+
+25 passed, 0 failed (4 Adlib files → expect ParseError)
