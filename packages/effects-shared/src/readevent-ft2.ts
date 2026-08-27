@@ -11,26 +11,27 @@ import type {
 import { FX, Quirk, XMP_KEY_OFF } from '@modplayjs/core';
 import {
   MSN,
-  NoteFlag,
   RESET_NOTE,
   SET,
   SET_NOTE,
   TEST,
-  TREMOR_SUPPRESS,
-  VolSlideFlag,
+  isValidNote,
+} from './helpers.js';
+import { NoteFlag, VolSlideFlag } from './state.js';
+import {
   getSubinstrument,
   getInstrument,
   isValidInstrument,
-  isValidNote,
   isValidSample,
-  processFx,
   resetEnvelopes,
   setChannelPan,
   setChannelVolume,
   setEffectDefaults,
   setPeriodFt2,
   sustainCheckEnv,
-} from '@modplayjs/effects-shared';
+} from './readevent.js';
+import { processFx } from './process.js';
+import { TREMOR_SUPPRESS } from './tick.js';
 import { isToneportaFx, setPatch } from './readevent.js';
 
 /** FT2 note range (period.h:19-21). */

@@ -83,8 +83,8 @@ export function readEventDispatch(core: Core, chn: number, row: number): void {
   }
 }
 
-export { readEventFt2 } from './readevent-ft2.js';
-import { readEventFt2 } from './readevent-ft2.js';
+export { readEventFt2 } from '@modplayjs/effects-shared';
+import { readEventFt2 } from '@modplayjs/effects-shared';
 import { readEventSt3 } from '@modplayjs/effects-shared';
 /**
  * read_event_mod (read_event.c:267-475).
