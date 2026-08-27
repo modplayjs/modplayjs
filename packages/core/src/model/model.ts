@@ -86,6 +86,8 @@ export interface SampleData {
   volume: number;
   /** SampleFlags bitmask. */
   flags: SampleFlags;
+  /** C-5 playback rate in Hz (xmp_sample.xtra c5spd; mixer.c:406-422). */
+  c5spd?: number;
 }
 
 /** Raw sample bytes handed from a format plugin to the core sample store. */
@@ -101,6 +103,8 @@ export interface RawSample {
   finetune: number;
   volume: number;
   flags: SampleFlags;
+  /** C-5 playback rate in Hz (init_instrument c5spd = m->c4rate, common.c:36-66). */
+  c5spd?: number;
 }
 
 /**
@@ -352,6 +356,8 @@ export interface ModuleData {
   rrate: number;
   /** C4 replay rate (e.g. 8287 for MODRNG PAL). */
   c4rate: number;
+  /** compare_vblank (mod_load.c VBlank timing detection, non-CORE_PLAYER). */
+  compare_vblank?: boolean;
   /** Tracker version string (XM) / tracker id (other formats). */
   tracker: string;
 }
@@ -587,6 +593,10 @@ export interface VoiceState {
   /** Voice flags (VoiceFlag bits). */
   flags: number;
 
+  /** Queued sample for Protracker-style swap (mixer_voice.queued,
+   * mixer.c:909-919). smp=-1 = "stop after current loop" request. */
+  queued: { smp: number };
+
   /** IT filter biquad state (kept for v0.2 IT). */
   filter: {
     r1: number;
@@ -807,7 +817,7 @@ export const C4_PERIOD = 428.0;
  * Note number to note name helper table is intentionally NOT included:
  * note numbers are 1-based (1 = C-1) throughout, matching the references.
  */
-export const XMP_KEY_OFF = 0x80;
+export const XMP_KEY_OFF = 0x81;
 export const XMP_KEY_CUT = 0x82;
 export const XMP_KEY_FADE = 0x83;
 export const XMP_KEY_CUT_FADE = 0x84;

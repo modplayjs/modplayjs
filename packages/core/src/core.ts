@@ -17,7 +17,6 @@ import { ChannelFlags } from './model/model';
 import {
   RowDelay,
   EMPTY_EVENT,
-  XMP_KEY_OFF,
   type ChannelState,
   type Event,
   type ModuleData,
@@ -46,7 +45,7 @@ import { VirtualLayer } from './virtual';
 import { SampleStore } from './samples';
 import { Scanner, OrdInfo } from './scan';
 import { resetFlow, processPatternLoop, processPatternJump, processPatternBreak } from './flow';
-import { processTick } from '@modplayjs/effects-shared';
+import { processTick, VolSlideFlag } from '@modplayjs/effects-shared';
 
 const MSN = (v: number) => (v >> 4) & 0x0f;
 const LSN = (v: number) => v & 0x0f;
@@ -237,27 +236,29 @@ export class Core implements CoreIface {
 
     const mod = fmt.load(bytes, loaderCtx);
 
-    // Scan sequences (scan.c libxmp_scan_sequences entry point semantics).
+    // Scan sequences (libxmp_scan_sequences): scan[chain] carries the
+    // end point ord/row/num written by scan_module's end_module block.
     const sc = new Scanner();
     const res = sc.scan(mod);
     this.ordInfo = res.xxo_info;
+    this._sequenceControl = res.sequence_control;
     mod.num_sequences = res.num_sequences;
-    mod.sequences = res.sequences.filter(Boolean);
-    this.scanEnd = { ord: 0, row: 0, num: 0 };
-    const seq0 = res.sequences[0];
-    if (seq0 && res.sequence_control[seq0.entry_point] === 0) {
-      // End point comes from where scanning stopped for chain 0; scan.c
-      // stores it in p->scan[chain].ord/.row/.num — recovered here from
-      // sequence_control walk.
-      let endOrd = seq0.entry_point;
-      for (let i = seq0.entry_point; i < res.sequence_control.length; i++) {
-        if (res.sequence_control[i] !== 0) break;
-        endOrd = i;
-      }
-      this.scanEnd.ord = endOrd;
-      this.scanEnd.row = 0;
-      this.scanEnd.num = 1;
+    mod.sequences = [];
+    for (let i = 0; i < res.num_sequences; i++) {
+      const epOrd = res.entry_points[i] ?? 0;
+      mod.sequences.push({
+        ord: i,
+        entry_point: epOrd,
+        duration: Math.max(0, Math.min(res.scan[i]?.time ?? 0, 2147483647)),
+        time: res.scan[i]?.time ?? 0,
+        speed: res.xxo_info[epOrd]?.speed ?? 0,
+        bpm: res.xxo_info[epOrd]?.bpm ?? 0,
+        gvl: res.xxo_info[epOrd]?.gvl ?? -1,
+        start_row: res.xxo_info[epOrd]?.start_row ?? 0,
+      });
     }
+    const s0 = res.scan[0];
+    this.scanEnd = { ord: s0?.ord ?? 0, row: s0?.row ?? 0, num: s0?.num ?? 0 };
 
     this._module = mod;
     this._state = CoreState.LOADED;
@@ -308,7 +309,15 @@ export class Core implements CoreIface {
 
     this.updateFromOrdInfo();
 
+    this.virt.setSampleLookup((id) => this.samples.get(id));
+    this.virt.setModuleRef(() => this._module);
     this.virt.on(mod.chn);
+    // f->loop = calloc(virt_channels) (player.c:2004) — the player's flow
+    // state owns per-channel pattern-loop slots; scan uses its own copy.
+    this._flow.loop = Array.from({ length: this.virt.virtChannels }, () => ({
+      start: 0,
+      count: 0,
+    }));
     resetFlow(this._flow);
     this.resetChannels();
     this.recomputeTicksize();
@@ -463,8 +472,11 @@ export class Core implements CoreIface {
       }
     }
 
+    // player.c clears the KEY_OFF channel flag each tick (player.c clears
+    // xc->flags &= ~FLAG_KEY_OFF via the per-tick prologue), not the note
+    // marker constant.
     for (let i = 0; i < mod.chn; i++) {
-      this._xc[i]!.flags &= ~XMP_KEY_OFF;
+      this._xc[i]!.flags &= ~VolSlideFlag.KEY_OFF;
     }
 
     if (p.frame === 0) {
@@ -625,13 +637,7 @@ export class Core implements CoreIface {
           ((f.rowdelay_set & RowDelay.FIRST_FRAME) !== 0 && f.rowdelay > 0)
         ) {
           // Format plugin event reader (read_event_MOD/FT2/ST3/IT).
-          const fmtName = mod.format;
-          try {
-            this.registries.format(fmtName).readEvent(this, chn, row);
-          } catch (err) {
-            if (!(err instanceof StateError)) throw err;
-            // No plugin-bound reader installed yet (T15-T18 pending).
-          }
+          this.registries.format(mod.format).readEvent(this, chn, row);
         }
       } else if (mod.readEventType === 3 /* IT */) {
         xc.flags = 0;
@@ -682,14 +688,10 @@ export class Core implements CoreIface {
 
   /** Single-channel event application shared by inject_event + delayed events. */
   readSingleEvent(chn: number, ev: Event): void {
-    // The format plugin owns read_event_*; route through it when available.
+    // The format plugin owns read_event_*.
     const mod = this._module!;
     this.eventScratch[chn] = ev;
-    try {
-      this.registries.format(mod.format).readEvent(this, chn, 0);
-    } catch (err) {
-      if (!(err instanceof StateError)) throw err;
-    }
+    this.registries.format(mod.format).readEvent(this, chn, 0);
     this.eventScratch[chn] = undefined;
   }
 

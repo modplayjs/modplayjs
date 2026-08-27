@@ -371,8 +371,10 @@ export function setLfoNotzero(
 
 // Tone portamento (effects.c:78-106) --------------------------------------
 
-/** IS_VALID_NOTE macro equivalent (common.h). */
-export const isValidNote = (note: number): boolean => note >= 0 && note <= 119;
+/** IS_VALID_NOTE (player.h:82): (uint32)(x) < XMP_MAX_KEYS (121). */
+export const isValidNote = (note: number): boolean => (note >>> 0) < 121;
+/** IS_VALID_INSTRUMENT without mod access — callers with `core` must use
+ * readevent.isValidInstrument (player.h:79). Kept for local no-mod checks. */
 export const IS_VALID_INSTRUMENT = (ins: number): boolean => ins >= 0 && ins < 64;
 
 /**

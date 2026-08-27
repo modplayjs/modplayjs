@@ -23,15 +23,12 @@ import {
   VoiceFlag,
   Act,
   type VoiceState,
+  type SampleData,
 } from '@modplayjs/core';
 import { KERNELS, C4_PERIOD, type KernelName } from './kernels';
 
 /** mixer.c:36 DOWNMIX_SHIFT — float model keeps relative amplitude parity. */
 const SHRT_MAX = 0x7fff;
-
-interface ExtraSampleData {
-  c5spd?: number;
-}
 
 export class SoftMixer implements DspPlugin {
   readonly name = 'softmixer';
@@ -70,6 +67,7 @@ export class SoftMixer implements DspPlugin {
 
       // Per-voice loop (:527).
       const voices = this.activeVoices(core);
+      const xcArr = core.channelStates;
       for (const vi of voices) {
         if ((vi.flags & VoiceFlag.ANTICLICK) !== 0 && this.interp > 0) {
           // do_anticlick(ctx, voc, NULL, 0) discharges into the next tick's
@@ -81,18 +79,37 @@ export class SoftMixer implements DspPlugin {
 
         if (vi.act === Act.NONE) continue;
 
+        let xxsRef: SampleData;
+
         if (vi.period < 1) {
           // :546-550 — invalid period kills the voice.
           vi.act = Act.NONE;
           continue;
         }
 
+        // Sample is paused — skip channel unless a new sample is queued
+        // (mixer.c:572-582).
+        if ((vi.flags & VoiceFlag.SAMPLE_PAUSED) !== 0) {
+          if (
+            (vi.flags & VoiceFlag.SAMPLE_QUEUED) === 0 ||
+            vi.queued.smp < 0
+          ) {
+            vi.flags &= ~VoiceFlag.SAMPLE_QUEUED;
+            continue;
+          }
+          this.hotswap(vi, vi.queued.smp);
+          xxsRef = core.getSample(vi.smp);
+          this.adjustVoiceEnd(vi, xxsRef);
+          vi.pos = vi.start;
+        } else {
+          xxsRef = core.getSample(vi.smp);
+        }
+
         if (vi.pos < 0) vi.pos = 0;
         vi.pos0 = vi.pos;
 
-        let sampleId = vi.smp;
-        if (sampleId < 0) continue;
-        let xxs = core.getSample(sampleId);
+        if (vi.smp < 0) continue;
+        let xxs = xxsRef;
 
         // vol with S3M/IT global volume scaling (:556-560).
         let vol = vi.vol;
@@ -111,34 +128,15 @@ export class SoftMixer implements DspPlugin {
         }
 
         // get_current_sample → adjust_voice_end (:406-422, :333-355).
-        let sustainActive =
+        this.adjustVoiceEnd(vi, xxs);
+        const sustainActiveRef = { v: false };
+        sustainActiveRef.v =
           (xxs.flags & SampleFlags.SUSTAIN) !== 0 &&
           (~vi.flags & VoiceFlag.RELEASE) !== 0;
-        let start = 0, end = 0, bidir = false;
-        if (sustainActive) {
-          start = xxs.sustainStart;
-          end = xxs.sustainEnd;
-          bidir = (xxs.flags & SampleFlags.SUSTAIN_BIDIR) !== 0;
-        } else if ((xxs.flags & SampleFlags.LOOP) !== 0) {
-          start = xxs.loopStart;
-          if (
-            (xxs.flags & SampleFlags.LOOP_FULL) !== 0 &&
-            (~vi.flags & VoiceFlag.SAMPLE_LOOP) !== 0
-          ) {
-            end = xxs.length;
-          } else {
-            end = xxs.loopEnd;
-            bidir = (xxs.flags & SampleFlags.BIDIR) !== 0;
-          }
-        } else {
-          start = 0;
-          end = xxs.length;
-        }
-        if (bidir) vi.flags |= VoiceFlag.VOICE_BIDIR;
-        else vi.flags &= ~VoiceFlag.VOICE_BIDIR;
+        let start = vi.start, end = vi.end;
 
         // step (:584) + sanity (:586-588).
-        const c5spd = (xxs as ExtraSampleData).c5spd ?? mod.c4rate;
+        const c5spd = xxs.c5spd ?? mod.c4rate;
         const step = (C4_PERIOD * c5spd) / s.freq / vi.period;
         if (!Number.isFinite(step) || step < 0.001 || step > SHRT_MAX) {
           continue;
@@ -212,11 +210,19 @@ export class SoftMixer implements DspPlugin {
           vi.pos += stepDir * samples;
           size -= samples;
 
-          // One-shot end handling (:716-730).
-          const hasLoop = sustainActive || (xxs.flags & SampleFlags.LOOP) !== 0;
-          if (!hasLoop) {
+          // has_active_loop (mixer.c:326-330): LOOP flag OR active sustain
+          // loop — no lps<lpe guard (loop sanity is guaranteed at load).
+          const hasLoop = sustainActiveRef.v || (xxs.flags & SampleFlags.LOOP) !== 0;
+          // split_noloop (mixer.c:600-605): channel split forces loop split.
+          const splitNoloop =
+            vi.chn >= 0 && vi.chn < xcArr.length && xcArr[vi.chn]!.split !== 0;
+          // One-shot samples do not loop (:716-730); queued swap defers.
+          if (
+            (!hasLoop || splitNoloop) &&
+            (vi.flags & VoiceFlag.SAMPLE_QUEUED) === 0
+          ) {
             if (size > 0) {
-              // anticlick discharge to zero over remaining size.
+              // do_anticlick + set_sample_end(:197-226): mark end, ramp out.
               this.discharge(out, bufPos + (ticksize - size) * 2, size, vi);
               vi.flags |= VoiceFlag.ANTICLICK;
             }
@@ -231,7 +237,39 @@ export class SoftMixer implements DspPlugin {
             (!reverse && vi.pos >= end) ||
             (reverse && vi.pos <= start)
           ) {
-            this.loopReposition(vi, { start, end, bidir });
+            if ((vi.flags & VoiceFlag.SAMPLE_QUEUED) !== 0) {
+              // Protracker sample swap (:734-755).
+              if (size > 0) {
+                this.discharge(out, bufPos + (ticksize - size) * 2, size, vi);
+              }
+              if (
+                vi.queued.smp < 0 ||
+                (!hasLoop &&
+                  !((core.getSample(vi.queued.smp).flags & SampleFlags.LOOP) !== 0))
+              ) {
+                // Invalid/one-shot→one-shot swaps stop the voice; a looped
+                // current sample pauses instead (PTStoppedSwap.mod).
+                vi.flags &= ~VoiceFlag.SAMPLE_QUEUED;
+                vi.flags |= VoiceFlag.SAMPLE_PAUSED;
+                vi.act = Act.NONE;
+                vi.flags |= VoiceFlag.ANTICLICK;
+                size = 0;
+                continue;
+              }
+              this.hotswap(vi, vi.queued.smp);
+              const newXxs = core.getSample(vi.smp);
+              this.adjustVoiceEnd(vi, newXxs);
+              vi.pos = vi.start;
+              // Refresh local loop vars for the rest of this tick.
+              sustainActiveRef.v =
+                (newXxs.flags & SampleFlags.SUSTAIN) !== 0 &&
+                (~vi.flags & VoiceFlag.RELEASE) !== 0;
+              xxs = newXxs;
+              start = vi.start;
+              end = vi.end;
+              continue;
+            }
+            this.loopReposition(vi, xxs);
           }
         } // while size
 
@@ -243,27 +281,98 @@ export class SoftMixer implements DspPlugin {
     }
   }
 
-  /** loop_reposition (mixer.c:357-393). */
-  private loopReposition(
-    vi: VoiceState,
-    loop: { start: number; end: number; bidir: boolean },
-  ): void {
-    if (!loop.bidir) {
-      if ((vi.flags & VoiceFlag.VOICE_REVERSE) !== 0) {
-        vi.pos += loop.end - loop.start;
+  /**
+   * adjust_voice_end (mixer.c:333-355): recompute vi.start/end from the
+   * sample's loop state; clear/set VOICE_BIDIR.
+   */
+  private adjustVoiceEnd(vi: VoiceState, xxs: SampleData): void {
+    vi.flags &= ~VoiceFlag.VOICE_BIDIR;
+
+    const sustainActive =
+      (xxs.flags & SampleFlags.SUSTAIN) !== 0 &&
+      (~vi.flags & VoiceFlag.RELEASE) !== 0;
+    if (sustainActive) {
+      vi.start = xxs.sustainStart;
+      vi.end = xxs.sustainEnd;
+      if ((xxs.flags & SampleFlags.SUSTAIN_BIDIR) !== 0) {
+        vi.flags |= VoiceFlag.VOICE_BIDIR;
+      }
+    } else if ((xxs.flags & SampleFlags.LOOP) !== 0) {
+      vi.start = xxs.loopStart;
+      if (
+        (xxs.flags & SampleFlags.LOOP_FULL) !== 0 &&
+        (~vi.flags & VoiceFlag.SAMPLE_LOOP) !== 0
+      ) {
+        vi.end = xxs.length;
       } else {
-        vi.pos -= loop.end - loop.start;
+        vi.end = xxs.loopEnd;
+        if ((xxs.flags & SampleFlags.BIDIR) !== 0) {
+          vi.flags |= VoiceFlag.VOICE_BIDIR;
+        }
       }
     } else {
+      vi.start = 0;
+      vi.end = xxs.length;
+    }
+  }
+
+  /**
+   * hotswap_sample (mixer.c:393-404): replace the playing sample keeping
+   * vol/pan; forces SAMPLE_LOOP so the swap lands in the new sample's loop.
+   */
+  private hotswap(vi: VoiceState, smp: number): void {
+    const vol = vi.vol;
+    const pan = vi.pan;
+    vi.smp = smp;
+    vi.vol = 0;
+    vi.pan = 0;
+    vi.flags &= ~(
+      VoiceFlag.SAMPLE_LOOP |
+      VoiceFlag.SAMPLE_QUEUED |
+      VoiceFlag.SAMPLE_PAUSED |
+      VoiceFlag.VOICE_REVERSE |
+      VoiceFlag.VOICE_BIDIR
+    );
+    vi.fidx = 0;
+    vi.pos = 0;
+    vi.flags |= VoiceFlag.SAMPLE_LOOP;
+    vi.vol = vol;
+    vi.pan = pan;
+  }
+
+  /**
+   * loop_reposition (mixer.c:357-393): set SAMPLE_LOOP (recomputing the
+   * voice endpoints on first entry — matters for LOOP_FULL), then wrap or
+   * flip the position around vi.start/vi.end. Safety clamp is against the
+   * SAMPLE length + 1, not the loop end (:388-391).
+   */
+  private loopReposition(vi: VoiceState, xxs: SampleData): void {
+    const loopChanged = (vi.flags & VoiceFlag.SAMPLE_LOOP) === 0;
+    vi.flags |= VoiceFlag.SAMPLE_LOOP;
+    if (loopChanged) this.adjustVoiceEnd(vi, xxs);
+
+    if ((vi.flags & VoiceFlag.VOICE_BIDIR) === 0) {
+      // Reposition for next loop.
+      if ((vi.flags & VoiceFlag.VOICE_REVERSE) === 0) {
+        vi.pos -= vi.end - vi.start;
+      } else {
+        vi.pos += vi.end - vi.start;
+      }
+    } else {
+      // Bidirectional loop: switch directions.
       vi.flags ^= VoiceFlag.VOICE_REVERSE;
       if ((vi.flags & VoiceFlag.VOICE_REVERSE) !== 0) {
-        vi.pos = loop.end * 2 - this.bidirAdjust - vi.pos;
+        // OpenMPT Bidi-Loops.it: IT ping-pong loops are one sample shorter.
+        vi.pos = vi.end * 2 - this.bidirAdjust - vi.pos;
       } else {
-        vi.pos = loop.start * 2 - vi.pos;
+        vi.pos = vi.start * 2 - vi.pos;
       }
     }
-    // Safety (:388-391).
-    if (vi.pos > loop.end + 1) vi.pos = loop.end + 1;
+    // Safety check: pos should not be excessively past the sample end
+    // (:387-391). Only seems to happen with very low sample rates.
+    if (vi.pos > xxs.length + 1) {
+      vi.pos = xxs.length + 1;
+    }
   }
 
   /** Linear fade of the last held values across `count` frames. */

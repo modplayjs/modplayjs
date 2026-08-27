@@ -479,7 +479,7 @@ function flowPatternLoop(core: Core, chn: number, row: number, fxp: number): voi
   // unit-test cores without it get flagless loop semantics inline.
   const anyCore = core as unknown as { applyPatternLoop?: (...a: unknown[]) => void };
   if (typeof anyCore.applyPatternLoop === 'function') {
-    anyCore.applyPatternLoop.call(core, core, chn, row, fxp);
+    anyCore.applyPatternLoop.call(core, chn, row, fxp);
     return;
   }
   const f = core.ctx.p.flow;
@@ -541,7 +541,7 @@ function doToneportaCore(core: Core, xc: ChannelState, note: number): void {
   const sub = instrument.sub[mapped];
   if (isValidNoteRange(note - 1) && xc.ins < mod.instruments.length) {
     const n = note - 1;
-    if (xc.key_porta >= 0 && xc.key_porta <= 119) {
+    if (isValidNoteRange(xc.key_porta)) {
       mappedXpo = instrument.mapXpo[xc.key_porta] ?? 0;
     }
     xc.porta.target = noteToPeriodMod(mod.periodType, n + (sub?.xpo ?? 0) + mappedXpo, xc.finetune, xc.per_adj);
@@ -549,8 +549,9 @@ function doToneportaCore(core: Core, xc: ChannelState, note: number): void {
   xc.porta.dir = xc.period < xc.porta.target ? 1 : -1;
 }
 
+/** IS_VALID_NOTE (player.h:82). */
 function isValidNoteRange(n: number): boolean {
-  return n >= 0 && n <= 119;
+  return (n >>> 0) < 121;
 }
 
 function noteToPeriodMod(periodType: number, n: number, f: number, adj: number): number {

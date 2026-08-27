@@ -30,6 +30,13 @@ export {
   FLOW_MODE_IT_200,
   FLOW_MODE_IT_210,
   FLOW_MODE_MPT_116,
+  FLOW_MODE_ORPHEUS,
+  FLOW_MODE_LIQUID,
+  FLOW_MODE_LIQUID_COMPAT,
+  FLOW_MODE_OCTALYSER,
+  FLOW_MODE_DTM_2015,
+  C4_PAL_RATE,
+  C4_NTSC_RATE,
   ReadEventType,
   PeriodType,
   Interp,
@@ -70,6 +77,12 @@ export { ModplayError, UnknownFormatError, ParseError, PackedModuleError, StateE
 export { VirtualLayer, PastNote, VIRT_INVALID } from './virtual';
 export { SampleStore, DecodeFlag, adpcm4Decode } from './samples';
 export { Registries } from './registry';
-export { Scanner } from './scan';
+export {
+  Scanner,
+  applyScanToModule,
+  type ScanResult,
+  type ScanData,
+  type OrdInfo,
+} from './scan';
 export { resetFlow, processPatternLoop, processPatternJump, processPatternBreak, processLineJump } from './flow';
 export { Core as CorePlayer } from './core';

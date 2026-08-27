@@ -1,0 +1,124 @@
+task-15-modplayjs-tracker-lib — fmt-mod: MOD parser + event reader (Paula DSP)
+==============================================================================
+
+Scope decision (documented adaptation)
+--------------------------------------
+T15 delivers the full non-CORE_PLAYER libxmp mod_load variant plus all three
+event readers (MOD/PROTRACK, FT2, ST3) in fmt-mod. mod_load assigns
+READ_EVENT_FT2 for 6/8-channel + FT-magic MODs and READ_EVENT_ST3 for the
+SCREAMTRACKER3 id (mod_load.c:326-333), so the readers belong with the format,
+not with later tasks. T16/T17 (S3M/XM) are loader-only because their readers
+already exist here where shared.
+
+FULL-variant adaptations (no FS access in this environment)
+-----------------------------------------------------------
+- ptsong external-file branch (mod_load.c:695-747): sample metadata kept,
+  sample data skipped entirely. libxmp continues on missing external files;
+  we cannot open them, so data-less samples are the faithful observable
+  result.
+- XMP_FLAGS_FX9BUG is not exposed: OFFSET accumulate applies when
+  QUIRK_PROTRACK is set (common.c read_event path), matching the default
+  flag state.
+- XMP_FLAGS_VBLANK is not exposed: compare_vblank_scan gate is
+  `mod.compare_vblank && time >= 480000` (scan.c:746-750), matching the
+  default flag state (no forced VBlank).
+
+c5spd freeze (verified ordering)
+--------------------------------
+libxmp_init_instrument runs at mod_load.c:626 BEFORE the tracker switch sets
+m->c4rate (mod_load.c:1035+). Therefore every MOD sample freezes
+c5spd = C4_PAL_RATE (8287). softmixer reads `xxs.c5spd ?? mod.c4rate`.
+TS mod.ts passes c5spd: C4_PAL_RATE on every sample — faithful.
+
+SAMPLE_LOOP resolution (who sets what — all verified verbatim in C)
+-------------------------------------------------------------------
+- set_patch never sets SAMPLE_LOOP.
+- loop_reposition sets it on first entry into an active loop, together with
+  adjust_voice_end (mixer.c:326-348); bidir flip uses bidir_adjust; clamps
+  are against xxs.length + 1, NOT the loop end.
+- hotswap (mixer.c:395-405) forces it: saves vol/pan BEFORE set_patch, then
+  restores (set_patch takes a BOOLEAN force_loop in C; TS setPatchVoice
+  takes boolean — verified, not a number).
+- voicepos queued branch (mixer.c:789-838) forces it.
+All four sites ported in Virtual.ts/Softmixer this task.
+
+Scanner fixes
+-------------
+1. scan_cnt re-zero per scan_module call. C memsets scan_cnt[i] inside
+   scan_module (scan.c:84-88). TS built it once in scan(), so the
+   compare_vblank second pass ran with dirty counts: MangaPart1.mod
+   (26 orders, F21 present -> compare_vblank=1, first-scan time > 8 min in
+   VBlank mode) crossed the 480000 threshold, reran scan_module, and the
+   stale scan_cnt made the second pass bail with "no valid orders" at the
+   cross-boundary revisit guard (scan.c:220-223). Fixed by re-zeroing
+   scanCnt[0..len) at scanModule entry. C breaks the same revisit loop for
+   this module — with any_valid=1 — and returns a valid scan; TS now does
+   the same (break exits the outer loop, anyValid=1 -> valid end_module).
+2. Player flow.loop was never allocated: C calloc's f->loop for
+   virt_channels in xmp_start_player (player.c:2004) before reset_flow
+   (which clears loop[i].start/count for mod->chn, player.c:1920-1925).
+   TS _p.flow.loop stayed [] so the first E6x crashed with
+   "Cannot set properties of undefined". Allocated in startPlayer after
+   virt.on (player.c:2004 parity). Scan uses its own makeScanFlow copy
+   (C scan.c:69 uses a local pattern_loop array) — unchanged.
+
+effects-shared fixes
+--------------------
+- process.ts flowPatternLoop: applyPatternLoop.call passed a spurious `core`
+  as the first argument, shifting chn/row/fxp by one (first E6x passed the
+  Core object as chn). Removed the extra arg; call is now
+  `applyPatternLoop.call(core, chn, row, fxp)`.
+- setChannelPan added (read_event.c:179-189): `if (pan >= 0) { pan.val =
+  pan; pan.surround = 0; }`; exported via readevent.ts.
+
+readers (fmt-mod)
+-----------------
+- readevent.ts: readEventDispatch = libxmp_read_event (player.c:1624-1664):
+  ins -> old_ins, TEST_NOTE(SAMPLE_END) -> SET_NOTE(END), dispatch on
+  read_event_type, default MOD. readEventMod = mod read_event
+  (player.c:267-475) incl. PROTRACK swap/queue patch paths, SFX-pitch path
+  (FX_PITCH_ADD/SUB via noteToPeriod, non-CORE), 5-value IS_TONEPORTA.
+- readevent-ft2.ts: readEventFt2 (player.c:475-736): FT2 note table
+  (B-1=11, C0=12, AS9=130), p.frame >= p.speed gate, EX_DELAY key-memory
+  chain, FT2BUGS pan/echo hacks, K00 delete, ins_fade 0x80<<1, note-range
+  gate, keyoff envelope logic via sustainCheckEnv, fadeout reset +
+  resetEnvelopes + tremor TREMOR_SUPPRESS on (ev.ins && key != XMP_KEY_OFF)
+  || isDelayed, xc.offset.val = 0 always, processFx 1/0, setPeriodFt2,
+  TEST(NEW_VOL) -> tremor suppress, FT2BUGS offset memory + length check ->
+  resetchannel, voicePos(offset.val).
+- readevent-st3.ts: readEventSt3 (player.c:736-933): mapChannel<0 &&
+  ins != e.ins-1 -> toneporta off; not_same_ins logic; invalid ins ->
+  xc.flags = 0; toneporta+not_same_ins -> offset.val = 0; ST3BUGS &&
+  TEST(NEW_VOL) -> volume = volume * gvol / volbase.
+- mod.ts: modTest (mod_load.c:162-281) incl. UNIC rejection + pattern
+  validation (all patterns must read 1024 bytes; >2 invalid patterns
+  reject); modLoad (mod_load.c:473-1136) non-CORE variant: tracker
+  detection (get_tracker_id), VBlank pre-scan + compare_vblank, WOW/FLEX/
+  ptsong detection, DT one-time 4-byte skip, ADPCM pipeline
+  (SF_ADPCM + bytelen recompute), ptkloop -> SF_FULLREP, c5spd freeze,
+  addSample for every index 0..30 so sid = i; instrument map arrays filled
+  with 0 (C calloc) so getSubinstrument requires map[key] < nsm.
+
+Verification
+------------
+- npm run typecheck: 0 errors.
+- t12 harness (core): 20 PASS, exit 0.
+- t13 harness (effects-shared): 35 pass / 0 fail, exit 0.
+- t14 harness (mixer/virtual): 49/49, exit 0.
+- t15 parse-smoke (/tmp/t15-accept.mjs): 356 passed, 0 failed.
+  - All 45 corpus .mod files: header fields (chn/len/pat/31 ins/smp count),
+    sample lens vs bytes with sample.c:262-281 EOF truncation semantics,
+    200-frame play through readRow + softmixer dry run.
+  - test() polarity: false on .s3m/.xm/.it, true on .mod.
+  - test() false on Tinytune.mod: FLT4 = Startrekker, a separate libxmp
+    loader (flt_load.c:43-60) outside mod_load/mod_test — correctly
+    rejected, same as C without flt registered.
+  - truncated file (header + 100 bytes of pattern data): throws
+    ModplayError "unknown module format" — faithful: C mod_test validates
+    all pattern data (mod_load.c:265-273), truncated pattern data fails
+    test() -> XMP_ERROR_FORMAT, not a load-stage parse error.
+- Bugs fixed during t15 triage: scan_cnt re-zero (above), flow.loop
+  allocation (above), flowPatternLoop arg shift (above). No test-only
+  assertion was relaxed except the two harness expectations that were
+  provably wrong against the C reference (Tinytune FLT4 polarity,
+  truncated-file error type), each with the mechanical C explanation above.

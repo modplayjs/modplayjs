@@ -99,6 +99,27 @@ export const FLOW_MODE_IT_210: FlowMode = FLOW_MODE_IT_200 | FlowFlag.LOOP_END_A
 export const FLOW_MODE_MPT_116: FlowMode =
   FlowFlag.LOOP_ONE_AT_A_TIME | FLOW_LOOP_NO_BREAK_JUMP | FlowFlag.JUMP_NO_ROW_SET;
 
+/** Orpheus (common.h:393-396). */
+export const FLOW_MODE_ORPHEUS: FlowMode =
+  FlowFlag.LOOP_PATTERN_RESET | FlowFlag.LOOP_SHARED_BREAK |
+  FlowFlag.LOOP_UNSET_BREAK | FlowFlag.JUMP_THEN_BREAK;
+
+/** Liquid Tracker (common.h:402-404). */
+export const FLOW_MODE_LIQUID: FlowMode =
+  FlowFlag.LOOP_END_CANCELS | FlowFlag.LOOP_IGNORE_TARGET |
+  FlowFlag.LOOP_SHARED_BREAK;
+export const FLOW_MODE_LIQUID_COMPAT: FlowMode =
+  FLOW_MODE_LIQUID | FlowFlag.LOOP_PATTERN_RESET;
+
+/** Octalyser (common.h:431-434). */
+export const FLOW_MODE_OCTALYSER: FlowMode =
+  FLOW_LOOP_GLOBAL | FlowFlag.LOOP_IGNORE_TARGET |
+  FlowFlag.LOOP_END_CANCELS | FLOW_LOOP_NO_BREAK_JUMP;
+
+/** Digital Tracker 2015 (common.h:436-438). */
+export const FLOW_MODE_DTM_2015: FlowMode =
+  FLOW_LOOP_GLOBAL | FlowFlag.LOOP_FIRST_EFFECT | FLOW_LOOP_NO_BREAK_JUMP;
+
 /**
  * Event-reading semantics for the format plugin's readEvent.
  * Mirrors READ_EVENT_* in common.h:534-539.
@@ -149,3 +170,6 @@ export const PluginKind = {
   OUTPUT: 'output',
 } as const;
 export type PluginKind = (typeof PluginKind)[keyof typeof PluginKind];
+/** libxmp_mixer_get_current_sample default rates (common.h:137-138). */
+export const C4_PAL_RATE = 8287;
+export const C4_NTSC_RATE = 8363;

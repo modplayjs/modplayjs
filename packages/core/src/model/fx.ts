@@ -103,3 +103,17 @@ export const FX_NSLIDE_DN = 0x9c;
 export const FX_NSLIDE_UP = 0x9d;
 export const FX_F_NSLIDE_DN = 0x75;
 export const FX_F_NSLIDE_UP = 0x76;
+
+// Extra effects needed by the FULL (non-CORE) variant (effects.h).
+export const FX_PER_TPORTA = 0x7a; // effects.h:69
+export const FX_SPEED_CP = 0x7e; // effects.h:73
+export const FX_FAR_TPORTA = 0x67; // effects.h:86
+export const FX_ULT_TPORTA = 0x6f; // effects.h:97
+export const FX_FAR_TEMPO = 0x68; // effects.h:87
+export const FX_FAR_F_TEMPO = 0x69; // effects.h:88
+export const FX_ULT_TEMPO = 0x5f; // effects.h:96
+export const FX_ICE_SPEED = 0xa2; // effects.h:142
+export const FX_MED_HOLD = 0xb1; // effects.h:144
+export const FX_PITCH_ADD = 0xb8; // effects.h:148
+export const FX_PITCH_SUB = 0xb9; // effects.h:149
+export const FX_LINE_JUMP = 0xba; // effects.h:150

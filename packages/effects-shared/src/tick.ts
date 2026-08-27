@@ -1151,7 +1151,7 @@ export function processFrequency(core: Core, chn: number, act: number): void {
 }
 
 /** libxmp_note_to_period_mix (period.c:205-209). */
-function noteToPeriodMix(n: number, b: number): number {
+export function noteToPeriodMix(n: number, b: number): number {
   const d = n + b / 12800;
   return PERIOD_BASE / Math.pow(2, d / 12);
 }

@@ -209,6 +209,11 @@ function normalize(raw: RawSample, id: number): SampleData {
     flags &= ~(SampleFlags.SUSTAIN | SampleFlags.SUSTAIN_BIDIR);
   }
 
+  // FULLREP flag → LOOP_FULL after loop sanity (sample.c:400-406).
+  if ((raw.flags & 0x0200 /* SAMPLE_FLAG_FULLREP */) !== 0 && loopStart === 0 && len > loopEnd) {
+    flags |= SampleFlags.LOOP_FULL;
+  }
+
   return {
     id,
     data: floats,
@@ -219,6 +224,7 @@ function normalize(raw: RawSample, id: number): SampleData {
     sustainEnd: susE,
     finetune: raw.finetune,
     volume: raw.volume,
+    c5spd: raw.c5spd,
     flags: flags & 0xff, // keep only SampleFlags bits on stored samples
   };
 }
