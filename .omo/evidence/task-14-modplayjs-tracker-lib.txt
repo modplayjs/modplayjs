@@ -1,0 +1,142 @@
+T14 — Per-tick process stage (effects-shared/tick.ts)
+=====================================================
+
+Scope: full libxmp play_channel per-tick stage port.
+Reference: reference/libxmp/src/player.c (play_channel :1599-1712,
+update_* :1414-1597, process_* :971-1412, envelopes :70-330,
+tremor :882-927, delayed_keyoff :929-955, arpeggio :625-664,
+is_first_frame :666-681, reset_channels :683-742, check_delay :744-812,
+read_row FT2 reset :838-844, invloop :558-601, lfo.c, rng.c, filter.c,
+virt_cstat virtual.c:631-645, get_channel_vol player.c:858-876).
+
+PASS pan (49/49) — /tmp/t14-accept.mjs
+-----------------------------------------------------
+ticksize truncation/min-8; playFrame rowdelay FIRST_FRAME clear
+PASS rowdelay FIRST_FRAME cleared after tick loop
+PASS rowdelay persists without FIRST_FRAME
+current_time accumulation (player.c:1877-1884 + :2171)
+PASS current_time += time_factor*rrate/bpm per frame
+get_envelope int truncation (player.c:119)
+PASS envelope interpolation truncates before +y1
+update_envelope_generic sus==lpe dead-code revival (player.c:147-150)
+PASS sustain-loop release clears local has_sus
+update_volume coarse/fine arms (player.c:1414-1499)
+PASS volslide ramp frame%speed!=0
+PASS volslide memory recall frame 0
+PASS fine volslide on frame 0
+PASS fine volslide skipped frame 1
+PASS gvol slide +2 frame 1
+PASS gvol fslide on frame 0
+PASS gvol clamps at gvolbase
+update_frequency (player.c:1501-1577)
+PASS pitch bend slide every frame (PBALL off)
+PASS fine bend on frame 0
+PASS ST3 period<0.25 resetchannel (PastNote.CUT)
+PASS sanity floor period 0.1
+PASS ST3 final_period lower clamp ~16.239270
+PASS no ST3BUGS: clamp absent
+PASS glissando+toneporta quantizes bend to semitones
+PASS FT2BUGS arpeggio bend truncation
+PASS MOD arp wraparound decrements 3 octaves
+PASS arpeggio cycles val[] at size
+update_pan (player.c:1579-1597)
+PASS panslide ramps every frame
+process_volume (player.c:971-1129)
+PASS finalvol C-math truncation chain (GCC-verified /tmp/finalvol.c)
+PASS fadeout on keyoff+ENVFADE-less release
+PASS DOENV_RELEASE = NOTE_ENV_RELEASE || act==VIRT_ACTION_OFF
+PASS IT rvv scales volume (trunc)
+PASS tremolo adds lfo/64 (int div)
+process_pan (player.c:1348-1412)
+PASS pan envelope applies (0..255 result)
+PASS surround → 0x8000
+tremor (player.c:882-927)
+PASS FT2 tremor on/off gating by count
+PASS S3M tremor memory
+delayed_keyoff (player.c:929-955)
+PASS NOTE_RELEASE set on both arms
+delay expiry (player.c:1619-1623)
+PASS delayed event routed via core.readEvent (no row re-read)
+act mapping (virtual.c:631-645, virtual.h:6-12)
+PASS VIRT_INVALID → update_volume + no voice ops
+PASS VIRT_INVALID: gvol slides, no voice ops
+PASS VIRT_ACTIVE root track passes through
+PASS Act.KEY → VIRT_ACTION_OFF
+PASS Act.VOL → VIRT_ACTION_FADE
+PASS Act.NONE → VIRT_ACTION_CUT
+retrig (player.c:1657-1681, rval :52-58)
+PASS E60 retrig volume multiplier + counter
+invloop (player.c:558-601)
+PASS invloop inverts float sample once (data[lps+pos], -v-1/128)
+PASS invloop pos wraps at loop end
+filter_setup (filter.c:36-116)
+PASS filter a0 matches C math
+PASS filter b0 matches C math
+PASS filter b1 matches C math
+PASS filter clamps cutoff & fc≤fs/2
+PASS filter clamps inputs 0..255
+SUSEXIT (player.c:1704)
+PASS NOTE_SUSEXIT → NOTE_ENV_RELEASE
+info fields (player.c:1708, :1296-1298, :1401)
+PASS info_position mirrors voice pos
+PASS info_period = final_period*4096
+PASS info_finalpan = finalpan+0x80
+RNG (rng.c:29-42)
+PASS xorshift32 sequence matches C (seed 0x1234abcd: 467,1,329,505,140)
+lfo (lfo.c:40-144)
+PASS lfo ramp/square/sine shapes; FT2 vibrato-only flip; S3M unipolar square
+
+Fixes during T14 (all verified against C reference, none invented):
+1. get_envelope truncation order (player.c:119)
+2. sus==lpe dead-code revival (player.c:147-150) — clears LOCAL hasSus
+3. cstat root-track branch VIRT_ACTIVE (virtual.c:640-642) in core/virtual.ts
+4. Act→VIRT_ACTION explicit mapping in processTick
+5. delayed_keyoff: SET_NOTE(NOTE_RELEASE) both arms (player.h:74)
+6. readEvent delay arm uses stored delayed_event (player.c:1619-1623)
+7. playFrame rowdelay FIRST_FRAME clear (player.c:2170)
+8. current_time accumulation (player.c:1877-1884, :2171)
+9. finalvol chain truncation at every C division (player.c:1088-1096)
+10. tremolo lfo/64 int division (player.c:1076)
+11. xorshift32 RNG replaces Park-Miller (rng.c:29-42; GCC-verified)
+12. lfoGet/lfoUpdate verbatim vs lfo.c
+13. updateInvloop verbatim incl. len>=0 gate (player.c:562-601)
+14. resonance_table pow(10,-3i/320) — 128/128 fround-match C float32
+15. resetChannels verbatim (player.c:683-742)
+16. INVENTED mixer defaults fixed in core.ts:
+    mix 50 → DEFAULT_MIX 100 (common.h:144, mixer.c:1090)
+    numvoc 32 → SMIX_NUMVOC 128 (mixer.h:8, control.c:43)
+    pbase 6847 field deleted — commented out in libxmp (mixer.c:1091)
+17. cleanup: unused preKeyPorta wrapper removed (logic inlined in
+    process.ts:89); stale T13 TODO comment removed (process.ts default arm)
+
+Regression gates (this session):
+- /tmp/t12-accept.mjs: 20 PASS
+- /tmp/t13-accept.mjs: 35/35 PASS (check names identical to committed
+  task-13 evidence; the earlier "36" grep counted the trailing
+  "T12 regression suite re-run: 20 PASS" line)
+- /tmp/t14-accept.mjs: 49/49 PASS
+- npm run typecheck: exit 0
+- esbuild core + effects-shared bundles: both build
+
+Anchors
+-----------------------------------------------------
+play_channel player.c:1599-1712 (delay :1619-1623, act=cstat :1629,
+  VIRT_INVALID :1635-1639, frame-0 cut :1641-1649, RETRIG :1657-1681,
+  keyoff :1684-1687, update×3 :1692-1694, process×3 :1696-1698,
+  invloop :1700, SUSEXIT :1704, info_position :1708)
+play_frame call order :2162-2171
+update_volume :1414-1499; update_frequency :1501-1577; update_pan :1579-1597
+process_volume :971-1129; process_frequency :1131-1346; process_pan :1348-1412
+ST3 clamp :1288-1292 (final_period < 16.239270, QUIRK_ST3BUGS gate)
+envelopes :70-330; tremor :882-927; delayed_keyoff :929-955
+arpeggio :625-664; is_first_frame :666-681; reset_channels :683-742
+read_row FT2 reset :838-844; invloop :558-601; get_channel_vol :858-876
+lfo.c:40-144; rng.c:29-42; filter.c:36-116 (FILTER_SHIFT=22)
+period.c:167-196 (note_to_period), :205-209 (note_to_period_mix),
+  :223-243 (period_to_bend)
+mixer.c:1082-1094 (mixer_init defaults); common.h:143-144 (DEFAULT_*);
+  mixer.h:8 (SMIX_NUMVOC); control.c:42-43 (defpan, numvoc)
+HAS_QUIRK common.h:319; QUIRK_* common.h:286-317
+
+Known gap (deliberate, revisit at T18): update_midi_macro
+(player.c:494-537 + execute/apply :429-481) not ported — IT Zxx macros.

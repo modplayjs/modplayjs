@@ -306,6 +306,8 @@ export interface ModuleData {
   chn: number;
   /** Number of patterns. */
   pat: number;
+  /** Number of instruments. */
+  ins: number;
   /** Song length (orders). */
   len: number;
   /** Restart position. */
@@ -498,6 +500,24 @@ export interface ChannelState {
   /** IT filter state. */
   filter: { cutoff: number; resonance: number; envelope: number; can_disable: number };
 
+  /** IT midi macro state (channel_data.macro, LIBXMP_CORE_PLAYER off). */
+  macro: {
+    /** Current macro effect (use float for slides). */
+    val: number;
+    /** Current macro target (smooth macro). */
+    target: number;
+    /** Current macro slide (smooth macro). */
+    slide: number;
+    /** Current active parameterized macro. */
+    active: number;
+    /** Previous tick calculated volume (0-0x400). */
+    finalvol: number;
+    /** Previous tick note panning (0x80 center). */
+    notepan: number;
+  };
+
+  /** Note slide (libxmp channel_data.noteslide). */
+  noteslide: { slide: number; fslide: number; count: number; speed: number };
   /** Delayed event (EX_DELAY). */
   delayed_event: Event;
   /** Delayed instrument. */
@@ -527,7 +547,8 @@ export interface ChannelState {
 export interface VoiceState {
   /** Channel this voice belongs to. */
   chn: number;
-  /** Root note. */
+  /** Root channel this voice was allocated from (mixer_voice.root,
+   * virtual.c:271 — the CHANNEL, used by virt_getroot for channel vol). */
   root: number;
   /** Note number. */
   note: number;
@@ -671,6 +692,8 @@ export interface PlayState {
   gvol: number;
   /** Master volume (128). */
   master_vol: number;
+  /** Smix volume for channels >= mod.chn (smix.c; 100 = default). */
+  smix_vol: number;
   /** Per-channel volume overrides (0 = default). */
   channel_vol: number[];
   /** Per-channel mute flags. */
@@ -720,8 +743,6 @@ export interface MixerState {
   dtleft: number;
   /** Bidirectional loop adjustment (IT). */
   bidir_adjust: number;
-  /** Period base. */
-  pbase: number;
 }
 
 /**

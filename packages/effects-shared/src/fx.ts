@@ -21,13 +21,6 @@ import {
 } from './helpers.js';
 import { VolSlideFlag } from './state.js';
 
-/** key_porta update (effects.c:116-119): IT only keeps the current key. */
-export function preKeyPorta(core: Core, xc: ChannelState): void {
-  if (core.module!.readEventType !== ReadEventType.IT) {
-    xc.key_porta = xc.key;
-  }
-}
-
 /**
  * FX_ARPEGGIO / FX_S3M_ARPEGGIO (effects.c:133-149).
  * S3M arpeggio shares one memory slot via EFFECT_MEMORY; plain arpeggio only

@@ -46,6 +46,7 @@ import { VirtualLayer } from './virtual';
 import { SampleStore } from './samples';
 import { Scanner, OrdInfo } from './scan';
 import { resetFlow, processPatternLoop, processPatternJump, processPatternBreak } from './flow';
+import { processTick } from '@modplayjs/effects-shared';
 
 const MSN = (v: number) => (v >> 4) & 0x0f;
 const LSN = (v: number) => v & 0x0f;
@@ -71,6 +72,8 @@ function makeChannelState(): ChannelState {
     flags: 0, per_flags: 0, note_flags: 0, note: 0, key: 0,
     period: 0, finalPeriod: 0, ins: -1, old_ins: 0, smp: -1,
     mastervol: 0, delay: 0, keyoff: 0, fadeout: 0, ins_fade: 0,
+    macro: { val: 0, target: 0, slide: 0, active: 0, finalvol: 0, notepan: 0 },
+    noteslide: { slide: 0, fslide: 0, count: 0, speed: 0 },
     volume: 0, gvl: 0, rvv: 0, rpv: 0, split: 0, pair: 0,
     v_idx: 0, p_idx: 0, f_idx: 0, key_porta: 0,
     finetune: 0, per_adj: 0,
@@ -124,13 +127,12 @@ export class Core implements CoreIface {
     format: 0,
     interp: 1,
     amplify: 1,
-    mix: 50,
-    numvoc: 32,
+    mix: 100,
+    numvoc: 128,
     ticksize: 0,
     dtright: 0,
     dtleft: 0,
     bidir_adjust: 0,
-    pbase: 6847,
   };
 
   constructor(config?: CoreConfig) {
@@ -153,6 +155,7 @@ export class Core implements CoreIface {
       sequence_control: [],
       gvol: 64,
       master_vol: 100,
+      smix_vol: 100,
       channel_vol: [],
       channel_mute: [],
       inject_event: [],
@@ -471,6 +474,22 @@ export class Core implements CoreIface {
 
     this.injectEvent();
 
+    /* play_frame (player.c:2165-2168): per-channel per-tick stage. */
+    for (let i = 0; i < this.virt.virtChannels; i++) {
+      processTick(this, i);
+    }
+
+    /* player.c:2170 — clear after the per-channel loop. */
+    f.rowdelay_set &= ~RowDelay.FIRST_FRAME;
+
+    /* player.c:2171 — current_time += libxmp_get_frame_time (player.c:1877):
+     * scan_time_factor * rrate / bpm, 0 when bpm == 0. scan_time_factor is
+     * m.time_factor after scan (scan.c:788). */
+    if (p.bpm !== 0) {
+      const mod2 = this._module!;
+      p.current_time += (mod2.time_factor * mod2.rrate) / p.bpm;
+    }
+
     return 0;
   }
 
@@ -671,9 +690,35 @@ export class Core implements CoreIface {
     } catch (err) {
       if (!(err instanceof StateError)) throw err;
     }
-    void chn;
-    void ev;
     this.eventScratch[chn] = undefined;
+  }
+
+  /**
+   * play_channel delay arm (player.c:1619-1623):
+   * libxmp_read_event(ctx, &xc->delayed_event, chn) — the STORED delayed
+   * event, when the EDx count expires. No FT2 keyoff/tremor reset here; that
+   * happens only in read_row (player.c:838-844). The format plugin's
+   * readEvent() pulls the event from readEventScratch(chn).
+   */
+  readEvent(chn: number): void {
+    const xc = this._xc[chn]!;
+    this.readSingleEvent(chn, xc.delayed_event);
+  }
+
+  /** Event source for format readers: the delayed/injected scratch event. */
+  readEventScratch(chn: number): Event | undefined {
+    return this.eventScratch[chn];
+  }
+
+  /** Event source for format readers: pattern track cell (read_row path). */
+  readEventAt(patIdx: number, chn: number, row: number): Event {
+    const mod = this._module!;
+    const pat = mod.patterns[patIdx];
+    const track = pat?.tracks[chn];
+    if (track && row < track.rows) {
+      return track.event[row] ?? EMPTY_EVENT;
+    }
+    return EMPTY_EVENT;
   }
 
 

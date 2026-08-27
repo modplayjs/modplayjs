@@ -231,8 +231,6 @@ export function processFx(
     }
 
     default:
-      // Remaining arms (volume/pan/flow/tempo/filters/IT-specific) belong to
-      // T13; registered via processFxBig below once implemented.
       processRest(core, xc, chn, ev, fnum, fxt, fxp, note, hooks);
       break;
   }

@@ -4,3 +4,4 @@ export * from './state.js';
 export * from './fx.js';
 export * from './vfx.js';
 export * from './process.js';
+export * from './tick.js';

@@ -21,6 +21,8 @@ export const PastNote = {
 
 /** Returned by cstat/mapChannel when the channel holds no voice. */
 export const VIRT_INVALID = -1;
+/** virtual.h:11 — status of any live root-track channel (virt_cstat). */
+export const VIRT_ACTIVE = 0x100;
 
 /**
  * One entry per virtual channel: which voice (if any) is the channel's
@@ -199,7 +201,7 @@ export class VirtualLayer {
     v.smp = sub.sid;
     v.note = note;
     v.key = note;
-    v.root = note;
+    v.root = chn; /* root is the ROOT CHANNEL (virtual.c:271), not the note */
     v.act = Act.NOTE;
     v.flags = 0;
     v.pos = 0;
@@ -251,6 +253,25 @@ export class VirtualLayer {
     return true;
   }
 
+  /**
+   * libxmp_virt_seteffect (virtual.c:366-377) + libxmp_mixer_seteffect
+   * (mixer.c:1000-1024). Writes an IT filter parameter directly to the
+   * channel's voice. `type` is one of the DSP_EFFECT_* codes (common.h:447-451).
+   */
+  setEffect(chn: number, type: number, val: number): boolean {
+    const vi = this.mapChannel(chn);
+    if (vi === VIRT_INVALID) return false;
+    const f = this.voices[vi]!.filter;
+    switch (type) {
+      case 0x02: /* DSP_EFFECT_CUTOFF */ f.cutoff = val; break;
+      case 0x03: /* DSP_EFFECT_RESONANCE */ f.resonance = val; break;
+      case 0xb0: /* DSP_EFFECT_FILTER_A0 */ f.a0 = val; break;
+      case 0xb1: /* DSP_EFFECT_FILTER_B0 */ f.b0 = val; break;
+      case 0xb2: /* DSP_EFFECT_FILTER_B1 */ f.b1 = val; break;
+    }
+    return true;
+  }
+
   /** Seek the voice into the sample (virt_voicepos :590). */
   voicePos(chn: number, pos: number): boolean {
     const vi = this.mapChannel(chn);
@@ -261,11 +282,39 @@ export class VirtualLayer {
     return true;
   }
 
-  /** Voice status: Act.NOTE/etc when live, VIRT_INVALID when none (virt_cstat :631). */
+  /** Voice status (virt_cstat virtual.c:631-645): no voice → VIRT_INVALID;
+   * root tracks (< num_tracks) → always VIRT_ACTIVE; else the voice act. */
   cstat(chn: number): number {
     const vi = this.mapChannel(chn);
     if (vi === VIRT_INVALID) return VIRT_INVALID;
+    if (chn < this.numTracks) return VIRT_ACTIVE;
     return this.voices[vi]!.act;
+  }
+
+  /**
+   * libxmp_virt_release (virtual.c:330-340) + libxmp_mixer_release
+   * (mixer.c:958-981): set/clear the voice RELEASE flag. `rel` is the
+   * NOTE_SAMPLE_RELEASE test result (play_channel player.c:1683).
+   */
+  releaseFlag(chn: number, rel: number): void {
+    const vi = this.mapChannel(chn);
+    if (vi === VIRT_INVALID) return;
+    const v = this.voices[vi]!;
+    if (rel) {
+      v.flags |= VoiceFlag.RELEASE;
+    } else {
+      v.flags &= ~VoiceFlag.RELEASE;
+    }
+  }
+
+  /**
+   * libxmp_virt_getvoicepos (virtual.c:378-388) + libxmp_mixer_getvoicepos
+   * (mixer.c:840-855): current sample position of the channel's voice.
+   */
+  getVoicePos(chn: number): number {
+    const vi = this.mapChannel(chn);
+    if (vi === VIRT_INVALID) return 0;
+    return this.voices[vi]!.pos;
   }
 
   /** Direct voice access for the DSP mixer. */

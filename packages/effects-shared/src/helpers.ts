@@ -241,7 +241,7 @@ export function periodToBend(
     default: {
       /* Amiga */
       const d = noteToPeriod(periodType, n, 0, adj);
-      return libxmpRound(((1200.0 * (16.0 / M_LN2)) * Math.log(p / d)) % 1200);
+      return libxmpRound((100.0 * (1536.0 / M_LN2)) * Math.log(d / p));
     }
   }
 }
@@ -274,14 +274,21 @@ function getLfoMod(lfo: { type: number; rate: number; depth: number; phase: numb
   }
 }
 
-let rngSeed = 1;
+let rngSeed = 0x1234abcd;
 
-/** libxmp_get_random stand-in for LFO random waveform (mix_rv). */
+/**
+ * libxmp_get_random (rng.c:36-42): xorshift32 step then
+ * (range * state) >> 32. State lives module-wide here; libxmp seeds it with
+ * time(NULL) so exact values are nondeterministic by design.
+ */
 export function getRandom(range: number): number {
-  // Park-Miller as in libxmp src/hio.c rand(): seed = seed*16807 % 2147483647
-  rngSeed = (rngSeed * 16807) % 2147483647;
-  const r = rngSeed - 1;
-  return range <= 0 ? 0 : (r >> 16) % range;
+  let state = rngSeed | 0;
+  if (state === 0) state = 1;
+  state = (state ^ ((state << 13) | 0)) | 0;
+  state = (state ^ (state >>> 17)) | 0;
+  state = Math.imul(state, 32); /* state << 5, wraps like C unsigned */
+  rngSeed = state;
+  return Math.floor((range * (state >>> 0)) / 4294967296);
 }
 
 /** get_lfo_st3 (lfo.c:69-80): S3M square is unipolar. */

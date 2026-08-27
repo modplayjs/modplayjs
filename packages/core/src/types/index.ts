@@ -25,6 +25,7 @@ import type {
   RawSample,
   PlayStateView,
 } from '../model/model';
+import type { VirtualLayer } from '../virtual';
 
 // ---------------------------------------------------------------------------
 // Core interface (implemented by class Core in T4)
@@ -122,6 +123,15 @@ export interface Core {
   readonly ticksize: number;
   /** Internal context view (libxmp `context_data`). */
   readonly ctx: CoreContext;
+  /** Virtual channel layer (libxmp virt_*). */
+  readonly virt: VirtualLayer;
+  /** libxmp_read_event (read_event.c:1624-1664) — process one event cell
+   *  through the format reader (used for delayed events). */
+  readEvent(chn: number): void;
+  /** Delayed/injected event source for format readers. */
+  readEventScratch(chn: number): Event | undefined;
+  /** Pattern track event cell (read_row path). */
+  readEventAt(patIdx: number, chn: number, row: number): Event;
 }
 
 // ---------------------------------------------------------------------------
