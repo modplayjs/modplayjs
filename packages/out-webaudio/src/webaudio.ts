@@ -36,9 +36,18 @@ export class WebAudioOutput implements OutputPlugin {
   private copyPostedFrames = 0;
   /** copy-mode backpressure: last reported worklet FIFO depth (frames). */
   private copyDepth = 0;
+  private lastLoggedWrite = 0;
 
   /** Diagnostics for the demo status line (T22/T23). */
-  readonly debugInfo = { renderedFrames: 0, postedChunks: 0 };
+  readonly debugInfo = { renderedFrames: 0, postedChunks: 0, copyDepth: 0 };
+  /** Current transport ('sab' | 'copy') and AudioContext state. */
+  get transportMode(): 'sab' | 'copy' | 'idle' {
+    if (!this.running && this.node === null) return 'idle';
+    return this.header !== null ? 'sab' : 'copy';
+  }
+  get ctxState(): string {
+    return this.ctx?.state ?? 'no-context';
+  }
 
   // sab ring state (main-thread side)
   private header: Int32Array | null = null;
@@ -116,6 +125,7 @@ export class WebAudioOutput implements OutputPlugin {
         const m = ev.data as { mode: string; buffered?: number };
         if (m.mode === 'depth' && typeof m.buffered === 'number') {
           this.copyDepth = m.buffered;
+          this.debugInfo.copyDepth = m.buffered;
         }
       };
       this.node.port.postMessage({ mode: 'copy' });
@@ -199,6 +209,15 @@ export class WebAudioOutput implements OutputPlugin {
       this.writePos = write;
       this.debugInfo.renderedFrames = write;
       Atomics.store(header, 0, write);
+      // Sab diagnostics: report once per second of rendered audio.
+      if (write - this.lastLoggedWrite >= this.ctx!.sampleRate) {
+        this.lastLoggedWrite = write;
+        console.log('[webaudio] sab render', {
+          written: write,
+          read: Atomics.load(header, 1),
+          ctxState: this.ctx!.state,
+        });
+      }
       return;
     }
 
@@ -219,6 +238,14 @@ export class WebAudioOutput implements OutputPlugin {
     // the elapsed interval; the next 'depth' message corrects drift exactly.
     this.copyDepth += n / 2;
     this.debugInfo.renderedFrames = this.copyPostedFrames;
+    if (this.copyPostedFrames - this.lastLoggedWrite >= (this.ctx?.sampleRate ?? 44100)) {
+      this.lastLoggedWrite = this.copyPostedFrames;
+      console.log('[webaudio] copy render', {
+        postedFrames: this.copyPostedFrames,
+        workletDepth: this.copyDepth,
+        ctxState: this.ctxState,
+      });
+    }
     for (let off = 0; off + CHUNK_FRAMES * 2 <= n; off += CHUNK_FRAMES * 2) {
       const chunk = new Float32Array(CHUNK_FRAMES * 2);
       chunk.set(scratch.subarray(off, off + CHUNK_FRAMES * 2));

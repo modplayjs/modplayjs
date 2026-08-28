@@ -119,6 +119,10 @@ class ModPlayProcessor extends AudioWorkletProcessor implements WorkletProcessor
     }
   }
 
+  private processCalls = 0;
+  private underrunFrames = 0;
+  private lastLoggedFrame = 0;
+
   process(
     _inputs: Float32Array[][],
     outputs: Float32Array[][],
@@ -127,6 +131,14 @@ class ModPlayProcessor extends AudioWorkletProcessor implements WorkletProcessor
     const outL = outputs[0]?.[0];
     const outR = outputs[0]?.[1];
     if (!outL || !outR) return true;
+    this.processCalls++;
+    if (this.processCalls === 1) {
+      console.log('[worklet] first process', {
+        sampleRate,
+        currentFrame,
+        mode: this.mode,
+      });
+    }
 
     if (this.mode === 'sab' && this.header && this.data) {
       const header = this.header;
@@ -154,6 +166,15 @@ class ModPlayProcessor extends AudioWorkletProcessor implements WorkletProcessor
       // Graceful underrun: zero-fill the tail (no NaN).
       outL.fill(0, served);
       outR.fill(0, served);
+      if (served < need) this.underrunFrames += need - served;
+      if (read - this.lastLoggedFrame >= sampleRate) {
+        this.lastLoggedFrame = read;
+        console.log('[worklet] sab drain', {
+          drained: read,
+          underrunFrames: this.underrunFrames,
+          writePos: Atomics.load(header, 0),
+        });
+      }
       return true;
     }
 
@@ -161,6 +182,15 @@ class ModPlayProcessor extends AudioWorkletProcessor implements WorkletProcessor
     const drained = this.fifo.drain(outL, outR);
     outL.fill(0, drained);
     outR.fill(0, drained);
+    if (drained < outL.length) this.underrunFrames += outL.length - drained;
+    if (this.drainedFrames - this.lastLoggedFrame >= sampleRate) {
+      this.lastLoggedFrame = this.drainedFrames;
+      console.log('[worklet] copy drain', {
+        drained: this.drainedFrames,
+        underrunFrames: this.underrunFrames,
+        processCalls: this.processCalls,
+      });
+    }
     // Backpressure (copy mode): report FIFO depth to the main thread so it
     // renders exactly what the device consumed. Posted at most every ~10
     // process() quanta (~21ms at 128-frame quantum) to bound message rate.

@@ -62,6 +62,18 @@ fileInput.addEventListener('change', async () => {
       `format: ${mod.format.toUpperCase()} | DSP: ${core.dsp().name} | ` +
       `channels: ${mod.chn} | patterns: ${mod.pat} | tracker: ${mod.tracker}`,
     );
+    console.log('[demo] loaded', {
+      format: mod.format,
+      chn: mod.chn,
+      pat: mod.pat,
+      speed: mod.speed,
+      bpm: mod.bpm,
+      tracker: mod.tracker,
+      volbase: mod.volbase,
+      gvol: mod.gvol,
+      mvol: mod.mvol,
+      mvolbase: mod.mvolbase,
+    });
   } catch (err) {
     loaded = false;
     playBtn.disabled = true;
@@ -72,14 +84,27 @@ fileInput.addEventListener('change', async () => {
 
 playBtn.addEventListener('click', async () => {
   if (!loaded || playing) return;
+  const t0 = performance.now();
   try {
     // Device-rate matching (T22): render at the AudioContext rate --
     // otherwise 44.1k data drains at the device rate (48k) -> pitch-up +
     // periodic underruns (stutter/clack every ~2s).
     const deviceRate = await output.deviceSampleRate();
     core.setSampleRate(deviceRate);
+    console.log('[demo] play', {
+      deviceRate,
+      coreRate: core.sampleRate,
+      ticksize: core.ticksize,
+      mode: output.transportMode,
+      ctxState: output.ctxState,
+    });
     core.startPlayer();
     await output.start(core, workletUrl); // click handler = user gesture
+    console.log('[demo] started', {
+      ctxState: output.ctxState,
+      connected: output.connected,
+      transportMode: output.transportMode,
+    });
     playing = true;
     stopBtn.disabled = false;
     show(
@@ -95,6 +120,17 @@ playBtn.addEventListener('click', async () => {
         `playing | DSP: ${core.dsp().name} | rate: ${output.audioContextSampleRate} Hz | ` +
           `rendered: ${output.debugInfo.renderedFrames} frames | posted: ${output.debugInfo.postedChunks} chunks`,
       );
+      console.log('[demo] status', {
+        t: ((performance.now() - t0) / 1000).toFixed(1) + 's',
+        rate: output.audioContextSampleRate,
+        ctxState: output.ctxState,
+        mode: output.transportMode,
+        rendered: output.debugInfo.renderedFrames,
+        posted: output.debugInfo.postedChunks,
+        depth: output.debugInfo.copyDepth,
+        coreOrd: core.playState.ord,
+        coreRow: core.playState.row,
+      });
     }, 500);
   } catch (err) {
     const msg = err instanceof StateError || err instanceof Error ? err.message : String(err);
