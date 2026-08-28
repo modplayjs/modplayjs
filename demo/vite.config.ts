@@ -9,6 +9,21 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
+  server: {
+    headers: {
+      // Enable crossOriginIsolated → SharedArrayBuffer ring transport
+      // (out-webaudio uses the SAB ring with hardware-paced backpressure
+      // instead of message-chunk copy mode).
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
+  preview: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
   resolve: {
     alias: [
       { find: '@modplayjs/core', replacement: resolve(__dirname, '../packages/core/src/index.ts') },

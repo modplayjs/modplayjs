@@ -16,6 +16,7 @@ import { StateError } from '@modplayjs/core';
 const RING_FRAMES = 16384; // ~0.37s at 44.1kHz
 const HIGH_WATER_FRAMES = RING_FRAMES / 2; // stop rendering above this
 const CHUNK_FRAMES = 2048; // copy-mode chunk size (frames; >= one tick)
+const COPY_HIGH_WATER_FRAMES = 8820; // ~200ms of buffered audio at 44.1k
 
 interface WorkletInitMessage {
   mode: 'sab' | 'copy';
@@ -31,6 +32,10 @@ export class WebAudioOutput implements OutputPlugin {
   private node: AudioWorkletNode | null = null;
   private renderTimer: number | null = null;
   private running = false;
+  /** copy-mode pacing: frames handed to the worklet so far. */
+  private copyPostedFrames = 0;
+  /** copy-mode backpressure: last reported worklet FIFO depth (frames). */
+  private copyDepth = 0;
 
   /** Diagnostics for the demo status line (T22/T23). */
   readonly debugInfo = { renderedFrames: 0, postedChunks: 0 };
@@ -104,10 +109,22 @@ export class WebAudioOutput implements OutputPlugin {
       // Copy-mode scratch: 4 ticks of headroom (ticksize ≤ 2048 covers
       // 44.1kHz at BPM ≥ 54; playBuffer fills whole ticks only).
       this.renderScratch = new Float32Array(CHUNK_FRAMES * 2 * 4);
+      // Backpressure: the worklet reports its FIFO depth; renderAhead
+      // fills to the high-water mark. Prime the FIFO with ~150ms so the
+      // first quantum never underruns.
+      this.node.port.onmessage = (ev: MessageEvent) => {
+        const m = ev.data as { mode: string; buffered?: number };
+        if (m.mode === 'depth' && typeof m.buffered === 'number') {
+          this.copyDepth = m.buffered;
+        }
+      };
       this.node.port.postMessage({ mode: 'copy' });
+      this.copyDepth = 0;
     }
 
     this.running = true;
+    this.copyPostedFrames = 0;
+    this.copyDepth = 0; // worklet FIFO starts empty
     // Render-ahead loop: setInterval drives playBuffer; keeps the ring
     // between the low and high water marks (player.c:2178-2233 pull
     // model, timer-driven on the main thread).
@@ -133,6 +150,15 @@ export class WebAudioOutput implements OutputPlugin {
   /** The AudioContext sample rate — configure the core to match. */
   get audioContextSampleRate(): number {
     return this.ctx?.sampleRate ?? 0;
+  }
+
+  /** Create the AudioContext (no resume — safe pre-gesture) and return its
+   * device rate so the core can render at the same rate. */
+  async deviceSampleRate(): Promise<number> {
+    if (!this.ctx) {
+      this.ctx = new AudioContext();
+    }
+    return this.ctx.sampleRate;
   }
 
   /** Whether the node is currently connected. */
@@ -176,19 +202,27 @@ export class WebAudioOutput implements OutputPlugin {
       return;
     }
 
-    // copy mode: render a multi-tick scratch (4 × CHUNK_FRAMES frames),
-    // then split it into CHUNK_FRAMES-sized chunks for the worklet FIFO.
+    // copy mode: fill the worklet FIFO to the high-water mark based on its
+    // reported depth (exact backpressure — timer jitter cannot starve the
+    // device because the FIFO buffers ~200ms).
     const core2 = this.core;
     if (!core2) return;
-    const scratchFloats = CHUNK_FRAMES * 2 * 4;
-    const scratch = this.renderScratch ?? (this.renderScratch = new Float32Array(scratchFloats));
+    if (this.copyDepth > COPY_HIGH_WATER_FRAMES) return; // FIFO healthy
+    const needFrames = COPY_HIGH_WATER_FRAMES - this.copyDepth;
+    if (needFrames < CHUNK_FRAMES) return;
+    const scratchFloats = needFrames * 2;
+    const scratch = this.renderScratch ?? (this.renderScratch = new Float32Array(CHUNK_FRAMES * 2 * 4));
     const n = core2.playBuffer(scratch, scratchFloats, 1);
     if (n <= 0) return;
+    this.copyPostedFrames += n / 2;
+    // Depth decays as the device consumes: consume-rate ≈ device rate for
+    // the elapsed interval; the next 'depth' message corrects drift exactly.
+    this.copyDepth += n / 2;
+    this.debugInfo.renderedFrames = this.copyPostedFrames;
     for (let off = 0; off + CHUNK_FRAMES * 2 <= n; off += CHUNK_FRAMES * 2) {
       const chunk = new Float32Array(CHUNK_FRAMES * 2);
       chunk.set(scratch.subarray(off, off + CHUNK_FRAMES * 2));
       this.debugInfo.postedChunks++;
-      this.debugInfo.renderedFrames += n / 2;
       this.node?.port.postMessage({ mode: 'chunk', data: chunk }, [chunk.buffer]);
     }
   }

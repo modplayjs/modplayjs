@@ -161,11 +161,17 @@ class ModPlayProcessor extends AudioWorkletProcessor implements WorkletProcessor
     const drained = this.fifo.drain(outL, outR);
     outL.fill(0, drained);
     outR.fill(0, drained);
-    // Diagnostics (T22/T23): report drain activity to the main thread.
+    // Backpressure (copy mode): report FIFO depth to the main thread so it
+    // renders exactly what the device consumed. Posted at most every ~10
+    // process() quanta (~21ms at 128-frame quantum) to bound message rate.
     this.drainedFrames += drained;
-    this.framesSincePost += drained;
-    if (this.framesSincePost >= 44100) {
-      this.port.postMessage({ mode: 'stats', drainedFrames: this.drainedFrames });
+    this.framesSincePost++;
+    if (this.framesSincePost >= 10) {
+      this.port.postMessage({
+        mode: 'depth',
+        buffered: this.fifo.frames,
+        drained: this.drainedFrames,
+      });
       this.framesSincePost = 0;
     }
     return true;

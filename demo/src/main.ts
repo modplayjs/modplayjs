@@ -73,6 +73,11 @@ fileInput.addEventListener('change', async () => {
 playBtn.addEventListener('click', async () => {
   if (!loaded || playing) return;
   try {
+    // Device-rate matching (T22): render at the AudioContext rate --
+    // otherwise 44.1k data drains at the device rate (48k) -> pitch-up +
+    // periodic underruns (stutter/clack every ~2s).
+    const deviceRate = await output.deviceSampleRate();
+    core.setSampleRate(deviceRate);
     core.startPlayer();
     await output.start(core, workletUrl); // click handler = user gesture
     playing = true;
