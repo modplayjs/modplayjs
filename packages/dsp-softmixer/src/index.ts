@@ -245,14 +245,22 @@ export class SoftMixer implements DspPlugin {
             (!hasLoop || splitNoloop) &&
             (vi.flags & VoiceFlag.SAMPLE_QUEUED) === 0
           ) {
-            if (size > 0) {
-              // do_anticlick + set_sample_end(:197-226): mark end, ramp out.
-              this.discharge(out, bufPos + (ticksize - size) * 2, size, vi);
-              vi.flags |= VoiceFlag.ANTICLICK;
-            }
+          if (size > 0) {
+            // The sample ended WITHIN this tick (leftover tick space):
+            // C runs do_anticlick + set_sample_end(1) — the voice is
+            // retired with a ramp (mixer.c:716-726). The voice slot is
+            // marked dead but keeps its channel (C: chn stays set; the
+            // slot is only reusable after a full reset_voice).
+            this.discharge(out, bufPos + (ticksize - size) * 2, size, vi);
+            vi.flags |= VoiceFlag.ANTICLICK;
             vi.act = Act.NONE;
             size = 0;
             continue;
+          }
+          // size == 0: the sample filled the whole tick and is still
+          // mid-stream — the voice keeps playing (C: set_sample_end only
+          // runs when the tick has leftover space; the note continues).
+          break;
           }
 
           // Loop reposition / queued swap (:731-762).

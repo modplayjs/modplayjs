@@ -1210,6 +1210,8 @@ export function processPan(core: Core, chn: number, act: number): void {
   if (xc.pan.surround !== 0) {
     core.virt.setPan(chn, PAN_SURROUND);
   } else {
+    // finalpan here is ALREADY the signed offset ((absolute − 0x80) ×
+    // mix/100) — the mixer's vol_l/vol_r use (0x80 ± pan) around it.
     core.virt.setPan(chn, finalpan);
   }
 }

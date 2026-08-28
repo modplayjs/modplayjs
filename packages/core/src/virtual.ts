@@ -169,9 +169,13 @@ export class VirtualLayer {
     if (this.used < MAXVOICES && this.used >= this.voices.length) {
       this.voices.push(makeVoice(this.voices.length));
     }
-    // First preference: an ended slot.
+    // C criterion (virtual.c:261-263): a slot is free iff voice_array[i]
+    // .chn == FREE (reset_voice sets chn = FREE). A one-shot sample that
+    // ran to its end sets act = 0 but KEEPS its channel — that slot is
+    // NOT reusable (its channel's map still references it); reusing it
+    // would alias two channels onto one voice (stutter/lost notes).
     for (let i = 0; i < this.voices.length; i++) {
-      if (this.voices[i]!.act === Act.NONE) return i;
+      if (this.voices[i]!.chn === VIRT_INVALID) return i;
     }
     if (this.voices.length < MAXVOICES) {
       const idx = this.voices.length;
@@ -767,7 +771,6 @@ export class VirtualLayer {
     v.nnaAct = 0; // queuePatch keeps/starts a plain CUT-action voice
     v.act = Act.NOTE;
     v.key = note;
-
     return chn;
   }
 
