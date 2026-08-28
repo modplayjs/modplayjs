@@ -134,6 +134,18 @@ export class SoftMixer implements DspPlugin {
 
         // get_current_sample → adjust_voice_end (:406-422, :333-355).
         this.adjustVoiceEnd(vi, xxs);
+        // mixer.c:825-829: pos past end → clamp, and restart forward loops.
+        if (vi.pos >= vi.end) {
+          vi.pos = vi.end;
+          if (
+            (vi.flags & VoiceFlag.VOICE_REVERSE) === 0 &&
+            ((xxs.flags & SampleFlags.LOOP) !== 0 ||
+              ((xxs.flags & SampleFlags.SUSTAIN) !== 0 &&
+                (~vi.flags & VoiceFlag.RELEASE) !== 0))
+          ) {
+            this.loopReposition(vi, xxs);
+          }
+        }
         const sustainActiveRef = { v: false };
         sustainActiveRef.v =
           (xxs.flags & SampleFlags.SUSTAIN) !== 0 &&
@@ -188,10 +200,14 @@ export class SoftMixer implements DspPlugin {
 
           // Mix `samples` frames (:631-714), when audible.
           if (vi.vol !== 0) {
-            const lVolF = volL / 0x8000;
-            const rVolF = volR / 0x8000;
-            const lRampF = deltaL / 0x8000 / rampsize;
-            const rRampF = deltaR / 0x8000 / rampsize;
+            // C gain chain (mixer.c:686): kernels receive vol_l >> 8 and
+            // the fixed-point output is downshifted 11 bits, netting a
+            // per-channel float gain of vol/4096 over a ±1 sample.
+            // volL = vol × (0x80 − pan) → divisor 128 × 4096 = 0x80000.
+            const lVolF = volL / 0x80000;
+            const rVolF = volR / 0x80000;
+            const lRampF = deltaL / 0x80000 / rampsize;
+            const rRampF = deltaR / 0x80000 / rampsize;
             for (let n = 0; n < samples; n++) {
               const idx = bufPos + n * 2;
               const doRamp = rampLeft > 0;
@@ -220,7 +236,10 @@ export class SoftMixer implements DspPlugin {
           const hasLoop = sustainActiveRef.v || (xxs.flags & SampleFlags.LOOP) !== 0;
           // split_noloop (mixer.c:600-605): channel split forces loop split.
           const splitNoloop =
-            vi.chn >= 0 && vi.chn < xcArr.length && xcArr[vi.chn]!.split !== 0;
+            vi.chn >= 0 &&
+            xcArr !== undefined &&
+            vi.chn < xcArr.length &&
+            xcArr[vi.chn]!.split !== 0;
           // One-shot samples do not loop (:716-730); queued swap defers.
           if (
             (!hasLoop || splitNoloop) &&
@@ -387,8 +406,10 @@ export class SoftMixer implements DspPlugin {
     count: number,
     vi: VoiceState,
   ): void {
-    const sl = vi.sleft / 0x8000;
-    const sr = vi.sright / 0x8000;
+    // sleft/sright are captured from the mixed float output — already in
+    // the output domain; no fixed-point conversion.
+    const sl = vi.sleft;
+    const sr = vi.sright;
     vi.sleft = 0;
     vi.sright = 0;
     if (sl === 0 && sr === 0) return;

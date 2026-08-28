@@ -1339,6 +1339,7 @@ function loadItPattern(
         event.ins = lastevent[c]!.ins;
       }
       if (mask[c]! & 0x40) {
+        // C re-runs xlat_volfx on the raw lastevent byte here (:1130-1132).
         event.vol = lastevent[c]!.vol;
         xlatVolfx(event);
       }
