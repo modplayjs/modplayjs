@@ -1,0 +1,65 @@
+T20 — out-webaudio: AudioWorklet processor (audio thread)
+==========================================================
+packages/out-webaudio/src/worklet.ts: ModPlayProcessor. Tight drain of a
+render-ahead ring into outputs — no parsing/DSP on the audio thread
+(replaces ScriptProcessorNode, audio-web.js:25-50; render drive via
+playBuffer, player.c:2178-2233). Two transports:
+- 'sab': lock-free ring over SharedArrayBuffer. Int32 header
+  [writePos (main), readPos (audio)] monotonic frame counters;
+  Float32 data interleaved stereo. Drains min(need, available) frames
+  with modular wrap, publishes readPos via Atomics.store, zero-fills
+  the tail on underrun (no NaN, no crash).
+- 'copy': main thread posts transferable Float32Array chunks; internal
+  ChunkFifo drains them; underrun → silence.
+Ambient AudioWorkletGlobalScope declarations (AudioWorkletProcessor,
+registerProcessor, sampleRate/currentFrame/currentTime) are declared
+with real types — lib.dom/lib.webworker (TS 5.x) ship no worklet-global
+types; nothing degrades to `any`. Registration is guarded so headless
+node imports for testing work.
+
+Harness (/tmp/t20-accept.mjs) — 13 passed, 0 failed
+----------------------------------------------------
+Worklet globals stubbed (FakeBase + captured registerProcessor):
+registration name, copy-mode drain (L/R values, no NaN, returns true),
+copy underrun silence, chunk split across two drains (f32 epsilon
+compare), sab drain + readPos advance + ring wrap + underrun, and an
+integration run driving a real IT module: main thread playBuffer →
+ring publish → process() drain, 450560 frames drained, non-silent.
+
+T21 — out-webaudio: main-thread AudioContext + AudioWorkletNode API
+====================================================================
+packages/out-webaudio/src/webaudio.ts: WebAudioOutput OutputPlugin.
+start(core): create/resume AudioContext (user-gesture resume), create
+AudioWorkletNode('modplay-processor', {numberOfInputs:0,
+numberOfOutputs:1, outputChannelCount:[2]}) → connect(destination)
+(audio-web.js:25-76 shape), configure transport — SAB ring when
+crossOriginIsolated, else 'copy' chunk posting — and start the
+render-ahead loop (setInterval 25ms → playBuffer, keeping the ring
+below HIGH_WATER = RING_FRAMES/2). start() is idempotent (no duplicate
+nodes/loops). stop(): clear timer, disconnect node, suspend context.
+audioContextSampleRate getter exposes the context rate for core config.
+
+Harness (/tmp/t21-accept.mjs) — 15 passed, 0 failed
+----------------------------------------------------
+Browser APIs stubbed: node name + outputChannelCount, connect on start,
+SAB init posted, sampleRate exposure, render-ahead keeps the ring fed
+with a simulated drain (60%/tick), duplicate start() is a no-op (no
+double-resume/double-loop), stop() disconnects + suspends + clears,
+copy-mode fallback posts non-empty chunks.
+
+Browser verification note: the environment has no Chromium (browser
+tool launch fails: no chrome binary, no puppeteer cache), so the
+in-browser assertion (node connected in a real AudioContext) could not
+be exercised here. The headless harness verifies the identical wiring
+contract (connect/disconnect, port messages, render-ahead loop, ring
+watermarks); the remaining browser-only risk is real-audio-thread
+timing, which T22/T23 (demo + e2e) will exercise.
+
+Core fix required by T21
+------------------------
+Core interface playBuffer gained the optional `loop` parameter
+(types/index.ts) matching the T19 core implementation.
+
+Gates (exit 0): t10-t13, t14 (49), t15 (356/0), t16 (25/0),
+t17 (94/0), t18 (2826/0), t19 (14/0), t20 (13/0), t21 (15/0).
+npm run typecheck clean.

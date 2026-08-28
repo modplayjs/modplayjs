@@ -70,7 +70,7 @@ export interface Core {
    * Render into `out` as long as it can hold a whole tick.
    * Returns the number of interleaved floats written.
    */
-  playBuffer(out: Float32Array, size: number): number;
+  playBuffer(out: Float32Array, size: number, loop?: number): number;
 
   // -- sample store --
   /**
