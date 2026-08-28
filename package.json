@@ -13,5 +13,8 @@
   },
   "devDependencies": {
     "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "stb-vorbis": "^0.0.6"
   }
 }

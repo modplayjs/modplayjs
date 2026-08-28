@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@modplayjs/core": "*",
-    "@modplayjs/effects-shared": "*"
+    "@modplayjs/effects-shared": "*",
+    "stb-vorbis": "^0.0.6"
   }
 }

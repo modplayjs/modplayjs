@@ -1,0 +1,189 @@
+T17 — fmt-xm: XM loader + event reader (FT2 envelope)
+=====================================================
+
+Scope
+-----
+packages/fmt-xm is the LOADER only (xm_load.c, non-CORE_PLAYER variant:
+Ogg Vorbis + MPT extras INCLUDED). The event reader (read_event_ft2,
+read_event.c) lives in packages/effects-shared/src/readevent-ft2.ts
+(moved in T16's refactor, commit cf99380); fmt-xm's plugin.readEvent is
+the libxmp_read_event prologue (read_event.c:1624-1664: scratch event,
+old_ins update, TEST_NOTE(SAMPLE_END) → SET_NOTE(END)) + dispatch to
+readEventFt2. No fmt-mod dependency. Ported from
+reference/libxmp/src/loaders/xm_load.c with file:line grounding.
+
+stb-vorbis dependency
+---------------------
+XM Ogg Vorbis sample support (is_ogg_sample/oggdec, xm_load.c:355-421)
+uses stb-vorbis@0.0.6 (npm). Added to root package.json AND
+packages/fmt-xm/package.json. Sync API: StbVorbis.decode(Uint8Array) →
+{sampleRate, channels: Float32Array[]}; eager WASM init via static
+ready side effect at module load; esbuild bundles the WASM base64
+inline (xm bundle 181K).
+
+Ogg sample decision (xm_load.c:355-421)
+---------------------------------------
+isOggSample(bytes, pos, frames): len check is on the HALVED
+xxs->len (frames), not raw sh.length (C :358). Sniff: size dword LE
+at pos, 'OggS' BE at pos+4 (readmem32b). oggDecode: skip 4 size
+bytes, decode len-4; channels != 1 → ParseError (C oggdec -1 → " XM
+sample error"); !16BIT flag → pcm[i] = pcm16[i] >> 8 (8-bit);
+STEREO → n >>= 1 (unreachable since mono-only, kept for parity);
+sets raw.length = frames, raw.flags &= ~DIFF (NOLOAD raw PCM, no
+DIFF decode). totalSampleSize += sh.length (RAW) for ogg and
+non-ogg alike (C sums xsh[j].length).
+
+ADPCM decision (xm_load.c:731-736)
+----------------------------------
+sample header reserved field == 0xad → DecodeFlag.ADPCM; data =
+16-byte table + nibbles (SampleStore.normalize feeds adpcm4Decode
+with tab=null reading the table from the data head, matching C
+libxmp_load_sample ADPCM path). totalSampleSize adds
+16 + ((length + 1) >> 1).
+
+Corpus note: 0 of the 84 corpus .xm files contain 'OggS' samples
+(verified by byte scan) — the Ogg path ships exercised only by code
+review against C, not by the harness.
+
+Bugs found and fixed during bring-up (each verified against C)
+--------------------------------------------------------------
+1. Order table at offset 80, NOT 60: C reads the 80-byte fixed
+   header FIRST, then len = headersz - 0x14 order bytes
+   (xm_load.c:843-852). Original code read orders from offset 60,
+   overlapping the header fields → garbage orders → "scan was not
+   able to find any valid orders" on ~80 files. Fixed: order =
+   bytes[80 .. 80+len), loader resume pos = 80 + len = 60 +
+   headersz (xm_load.c:920 hio_seek(start + xfh.headersz + 60)).
+2. Instrument advance 29 + 212 = 241, not 245: XM_INST_SIZE (212)
+   INCLUDES the 4-byte sh_size extension; file consumed per full
+   instrument = 33 (header) + 208 (body) = 241, then seek
+   xihSize - 241. Original 29 + 4 + 212 double-counted the +4.
+3. Pattern advance p += phLength + ds: C's file pointer after a
+   pattern header+data is start + length + datasize
+   (xm_load.c:279-330 loop); NOT max(phLength, headsize) + ds.
+4. pattern.rows = r: libxmp_alloc_pattern_tracks sets xxp->rows
+   (misc.c); loadXmPattern now takes the Pattern object and sets
+   rows + resizes every channel track. Without it the scanner read
+   stale 64-row shells.
+5. Sample-data bytelen = raw.length * framelen (frames × frame
+   size), NOT sh.length * framelen: sh.length is the raw in-file
+   byte length; sh.length * framelen double-counted the 16-bit
+   factor (delay2.xm: instrument 1 pos drifted 14790 past 0x3b7b).
+   C: bytelen = xxs->len * framesize where xxs->len is the
+   post-halving frame count (sample.c:218-228); equals raw bytes
+   except odd 16-bit lengths, fixed by the final reposition
+   pos = instrPos + xihSize + 40*nsm + totalSampleSize
+   (xm_load.c:759-763).
+6. xsh[j].length must KEEP the raw length (C halves xxs->len only);
+   the ogg branch and totalSampleSize sum read the raw value. An
+   early draft overwrote it with the halved length → reposition
+   landed mid-file.
+7. MPT 'text' chunk fall-through (xm_load.c:943-974): C runs
+   `if (known && claims_ft2) is_mpt_116 = 1;` after the switch for
+   EVERY chunk including 'text'; the 'text' case consumes
+   8 + sz bytes (hio_read consumed the comment; sz reset to 0). A
+   draft did `continue` past the check and left p before the
+   comment. Fixed: p += 8 + sz, fall through. Also ported C's
+   `sz > hio_size(f)` whole-loop break.
+
+Truncation tolerance (faithful to C)
+------------------------------------
+load_instruments `break`s on a short instrument-header read
+(xm_load.c:465-471; comment documents MOD2XM/XMLiTE truncated
+files) and libxmp_load_sample zero-fills sample data past EOF
+(sample.c:355-360). Harness: 70% cut of 3xxins.xm LOADS with
+ins=3/smp=3 (all 33-byte headers fit below the cut; sample 3
+partially zero-filled) — verified faithful, expectation flipped
+from ParseError to tolerant-load with instrument-count check.
+30-byte cut (order table incomplete) → ParseError, matching C
+hio_read(order) != 1 → -5 (xm_load.c:849-854).
+
+Synthetic-test corrections (mechanically explained)
+---------------------------------------------------
+- Old mpt_ins_headers test patched instr 1 of 3xxins.xm to nsm=0/
+  sh_size=0: C would ALSO land mid-sample-data (real instr 2 at
+  0x36a, patched advance stops at 0x1b1) → test premise invalid.
+  No corpus file carries genuine MPT instrument headers (verified
+  by full-corpus scan: 0 hits for size==0x107 && nsm==0 &&
+  sh_size==0). Replaced with appended 'text' extension chunk +
+  FastTracker claims_ft2 → "ModPlug Tracker 1.16" + comment read;
+  negative test: same chunk without claims_ft2 keeps plain type.
+- Old headersz=0x0113 test patched a 21-byte-header file: len
+  becomes 255, C seeks headersz+60=335 — inside pattern data on
+  this file → C fails identically. Replaced with empty-tracker →
+  "Digitrakker" + FT2BUGS-cleared spot check (xm_load.c:880-883).
+
+Version ordering / legacy sample data
+-------------------------------------
+version <= 0x0103: instruments load BEFORE patterns
+(xm_load.c:895-919); sample data for 1.02-style files is a
+sequential tail read with DIFF after both (xm_load.c:921-930).
+version > 0x0103: patterns then instruments, sample data inline
+in loadInstruments.
+
+MPT-116 detection
+-----------------
+claims_ft2 (strncmp "FastTracker v2.00", 17) AND (known extension
+chunk: 'text'/'MIDI'/'PNAM'/'CNAM'/'CHFX'/'XTPM' or (ext &
+0xffff0000) == 'FX..' — C MAGIC4 fall-through) OR mpt_ins_headers
+(size==0x107 && samples==0 && sh_size==0 tell) →
+"ModPlug Tracker 1.16 XM %d.%02d", ~FT2BUGS,
+flowMode = FLOW_MODE_MPT_116. mvolbase/mvol/preamp NOT applied:
+ModuleData has no mvol fields (same decision as T16 S3M; wiring
+deferred). is_mpt_old ("FastTracker v 2.00" → "old ModPlug
+Tracker") also clears FT2BUGS + sets MPT_116 flow mode.
+
+Tracker-name tree (xm_load.c:864-911)
+-------------------------------------
+"FastTracker v2.00" (17) → FT2BUGS; "Fasttracker II clone" (20) →
+FT2BUGS; "OpenMPT " (8) → FT2BUGS; headersz 0x0113 → "unknown
+tracker", ~FT2BUGS; empty → "Digitrakker", ~FT2BUGS; "MED2XM by
+J.Pynnone" (19) + bpm <= 10 → bpm = trunc((125 * (0x35 - bpm*2)) /
+33), ~FT2BUGS (harness: bpm 5 → 121); "FastTracker v 2.00" (18)
+→ "old ModPlug Tracker", ~FT2BUGS, is_mpt_old; "Skale Tracker"/
+"Sk@le Tracker" → flowMode |= (1<<30) FLOW_JUMP_NO_ROW_SET.
+Name build: 20 raw chars, cut at NUL then trailing-space trim
+(equivalent to C snprintf %-20.20s + space-nulling loop). type =
+"<name> XM %d.%02d".
+
+Prologue/quirks
+---------------
+quirk |= QUIRKS_FT2 (mask 0) | Quirk.FT2ENV; readEventType =
+ReadEventType.FT2; periodType = flags&1 ? LINEAR : AMIGA;
+c4rate = C4_NTSC_RATE (8363); channels[] = {pan 0x80, vol 0x40,
+flg 0} (xm_load.c:1017-1019). MED2XM tempo sanity exception:
+tempo >= 32 || bpm < 32 || bpm > 1000 throws UNLESS tracker
+starts "MED2XM" (memcmp 6, xm_load.c:822-834). Preamp table not
+applied (no ModuleData field — T18 wiring, same as S3M).
+
+Pattern loader details (load_xm_pattern, xm_load.c:70-289)
+----------------------------------------------------------
+headsize = version > 0x0102 ? 9 : 8; rows = version > 0x0102 ?
+readmem16l : readmem8 + 1; rows > 256 → ParseError; rows == 0 →
+0x100; datasize == 0 → early return (tracks zero-filled); pos
+advance += xphLength - headsize may REWIND (C hio_seek allows);
+early_pattern_end when packed cursor hits datasize BEFORE the
+event stream ends (C "WARNING: Early end of pattern data");
+fxt blacklist {18,19,22,23,24,26,28,30,31,32} → 0, fxt > 34 → 0;
+note 0x61 → XMP_KEY_OFF, note > 0 → +12; EX_FINETUNE (0x5?) fxp
+(5<<4)|((LSN-8)&0xf), 0x43/0x73 → fxp--; XF_PORTA MSN 9 → LSN
+0/1 → FX_SURROUND, 0xe/0xf → FX_REVERSE fxp = LSN-0xe; volume
+column 0x10..0x50 → vol-0x0f; full v-column switch per C
+:244-275 (0x6/0x7 → FX_VOLSLIDE_2, 0x8/0x9 → EX_F_VSLIDE
+DN/UP, 0xa/0xb → FX_VIBRATO, 0xc → FX_SETPAN, 0xd/0xe →
+FX_PANSL_NOMEM, 0xf → FX_TONEPORTA).
+
+Harness
+-------
+/tmp/t17-accept.mjs: 84-file openmpt xm corpus with independent
+expectHeader from raw bytes (chn/len/pat=patterns+1/ins/spd/bpm/
+restart/periodType), structure checks (patterns.length,
+instruments.length, samples.length == sum(nsm), pans 0x80),
+200-frame playback each; negative tests (MOD/S3M test() false);
+tracker-patch synthetics (FT2, MPT-old, Digitrakker, MED2XM bpm
+recovery, MPT-116 chunk + negative); truncation pair (tolerant
+70% load, 30-byte ParseError). RESULT: 94 passed, 0 failed.
+
+Regression gates after final build: t12 20 PASS, t13 35 PASS,
+t14 49 PASS, t15 356 passed/0 failed, t16 25 passed/0 failed;
+npm run typecheck clean.
