@@ -586,6 +586,7 @@ function loadInstruments(
         vra: 0,
         vsw: 0,
         sid: 0,
+        rvv: 0,
         nna: 0,
         dct: 0,
         dca: 0,

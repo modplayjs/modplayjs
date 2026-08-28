@@ -70,7 +70,6 @@ export interface SampleData {
   id: number;
   /** Decoded mono float samples, normalized to [-1, 1]. */
   data: Float32Array;
-  /** Number of samples. */
   length: number;
   /** Loop start (samples). 0 if not looping. */
   loopStart: number;
@@ -190,6 +189,9 @@ export interface SubInstrument {
   /** IT initial filter cutoff/resonance. */
   ifc: number;
   ifr: number;
+  /** IT random volume/pan variation: low byte = volume swing 0..100,
+   *  high byte = pan swing 0..64 (struct xmp_subinstrument rvv, it.h). */
+  rvv: number;
 }
 
 /** New note action, mirroring XMP_INST_NNA_* in xmp.h:195-198. */
@@ -298,6 +300,18 @@ export interface Sequence {
 }
 
 /**
+ * IT MIDI macro configuration (struct midi_macro_info via
+ * load_it_midi_config, it_load.c:640-684): 16 parameter macros + 128
+ * fixed macros, each a NUL-terminated 32-byte string.
+ */
+export interface MidiConfig {
+  /** 16 parameter macros (Z0..ZF). */
+  param: Uint8Array[];
+  /** 128 fixed macros (F0F0z selection via Z value >= 0x80). */
+  fixed: Uint8Array[];
+}
+
+/**
  * The normalized module, mirroring struct xmp_module (xmp.h:251-283) +
  * module_data (common.h:514-556).
  */
@@ -358,6 +372,12 @@ export interface ModuleData {
   c4rate: number;
   /** compare_vblank (mod_load.c VBlank timing detection, non-CORE_PLAYER). */
   compare_vblank?: boolean;
+  /** IT master volume (it_load.c:1528-1530, m->mvol = ifh.mv) and its
+   *  base (48). MPT-116 preamp transforms mvol. 0/undefined = no scaling. */
+  mvol?: number;
+  mvolbase?: number;
+  /** IT MIDI macro configuration (load_it_midi_config, it_load.c:640-684). */
+  midi?: MidiConfig;
   /** Tracker version string (XM) / tracker id (other formats). */
   tracker: string;
 }
@@ -556,6 +576,10 @@ export interface VoiceState {
   /** Root channel this voice was allocated from (mixer_voice.root,
    * virtual.c:271 — the CHANNEL, used by virt_getroot for channel vol). */
   root: number;
+  /** NNA action tag of the note that started this voice
+   * (mixer_voice.act, virtual.c:543 — 0 CUT, 1 CONT, 2 OFF, 3 FADE;
+   * nonzero = the voice keeps sounding after its channel is reused). */
+  nnaAct: number;
   /** Note number. */
   note: number;
   /** Pan (0x00..0xff; PAN_SURROUND 0x8000 flag). */

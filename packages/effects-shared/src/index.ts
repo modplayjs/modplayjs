@@ -8,3 +8,5 @@ export * from './tick.js';
 export * from './readevent.js';
 export * from './readevent-st3.js';
 export * from './readevent-ft2.js';
+export * from './readevent-it.js';
+export * from './midi-macro.js';

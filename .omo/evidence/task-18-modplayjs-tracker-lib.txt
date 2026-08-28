@@ -1,0 +1,124 @@
+T18 — fmt-it: IT loader + event reader (NNA, filter)
+=====================================================
+
+Scope
+-----
+1:1 port of reference/libxmp/src/loaders/it_load.c (it_test :46-55,
+xlat_fx :97-181, xlat_volfx :186-232, fix_name :234-249,
+load_it_midi_config :261-285, read_envelope :287-350, identify_tracker
+:346-437, load_old_it_instrument :448-571, load_new_it_instrument
+:573-770, force_sample_length :772-786, unpack_it_sample :788-823,
+load_it_sample :825-1030, load_it_pattern :1032-1170, it_load
+:1172-1551) plus libxmp_schism_tracker_string/schism_tracker_date
+(common.c:528-580), libxmp_apply_mpt_preamp (common.c:596-613),
+libxmp_copy_adjust (loaders/common.c:237-256), libxmp_c2spd_to_note
+(period.c:251-264). Event reading via effects-shared/readevent-it.ts
+(read_event_it read_event.c:933-1371), FX_MACRO via process.ts +
+midi-macro.ts (player.c:328-545, effects.c:822-836).
+
+Also fixed in this task (core infrastructure required by IT):
+- packages/core/src/model/model.ts: SubInstrument.rvv (random volume
+  variation, struct xmp_subinstrument rvv), ModuleData.mvol/mvolbase/
+  midi (MidiConfig param[16]/fixed[128] — it_load.c:261-285),
+  VoiceState.nnaAct (C mixer_voice.act NNA action tag 0..3).
+- packages/effects-shared/src/readevent.ts: sustainCheckEnv used
+  env.x[env.sus] semantics fix (envelope sustain index clamps).
+- packages/core/src/virtual.ts: setPatch reshaped to the C contract —
+  returns the (possibly re-homed) CHANNEL not a voice index
+  (virtual.c:484-546); check_dct applied to the channel's current voice
+  with C ordering (nna==CUT hard reset → act=nna → dct-gated DCA,
+  virtual.c:434-471); NNA overflow channels: virt_on grows
+  virt_channels by the mixer voice pool when QUIRK_VIRTUAL is set
+  (virtual.c:107-114) so re-homed NNA voices land on overflow channels
+  (virtual.c:515-517, --chn edge case ported verbatim).
+- packages/core/src/core.ts: virt.on passes QUIRK_VIRTUAL.
+- packages/dsp-softmixer/src/index.ts: mvol/mvolbase seeded from
+  module (mixer.c mixer_prepare); scaling already at :116-117.
+- packages/effects-shared/src/tick.ts: updateMidiMacro per tick when
+  module has MIDI config (player.c:1625-1628).
+- packages/fmt-s3m/src/s3m.ts: mvolbase=48/mvol populated
+  (s3m_load.c:714-715); the *8/11 non-stereo adjust kept.
+
+Key decisions (file:line grounded)
+----------------------------------
+- volbase: IT does NOT override the load_helpers.c:303 default 0x40.
+- identify_tracker called ONCE after pp tables are read (it_load.c:1382),
+  needs pat_before_smp. The MPT-116 branches rewrite cmwt
+  (sample_mode ? 0x100 : 0x214/0x200) — only the tracker label uses the
+  rewritten value; new/old instrument choice reads ifh.cmwt directly
+  (it_load.c:588).
+- pp pointer tables: C reads mod->ins entries where mod->ins is STILL
+  ifh.insnum (sample-mode rewrite mod->ins = mod->smp happens later,
+  it_load.c:1309-1310). File layout = insnum + smpnum + patnum u32s.
+- Pattern header: pat_len u16 + num_rows u16 + 2 reserved u16 = payload
+  at +8 (it_load.c:1024-1029 load, :1393-1396 scan).
+- load_it_sample fills mod->xxs[i] directly (it_load.c:820
+  xxs = &mod->xxs[i]); instrument name vs sample name per sample_mode
+  (it_load.c:880); c5spd scan over ALL instrument subs with sid == i
+  (it_load.c:906-918).
+- Compressed samples: left = file_len - (long)ish.sample_ptr — NO
+  `start +` (C bug-compatible, it_load.c:~955); left < min_size →
+  force_sample_length(left << 3); itsex decompressor errors ignored
+  (void in C); ADPCM/UNS decode bits travel on raw.flags (DecodeFlag
+  numeric parity with samples.ts); stereo decompressed data is planar —
+  no INTERLEAVED flag (matches C convert_stereo_interleaved).
+- copyAdjust stops at NUL (strncpy semantics) — IT-specific; s3m.ts
+  version differs (fixed-width), intentionally untouched.
+- Old IT instruments: map[j] = 0 (not 0xff) for unbound keys;
+  enode[50] OOB guard: k>=25 short-circuits first (it_load.c:519-522).
+- Song message: \r → \n, non-printables (except \n \t) → '.'.
+- Quirks: |= ARPMEM|INSVOL; LINK_GXX → PRENV else UNISLD; new_fx →
+  VIBHALF|VIBINV else ~VIBALL|ITOLDFX; sample_mode → ~VIRTUAL|~RSTCHN
+  (it_load.c:1506-1524).
+- OpenMPT label: "OpenMPT %d.%02x" with major = (cwt & 0x0f00) >> 8;
+  " (compat.)" appended iff rsvd != "OMPT" (it_load.c:425-431).
+
+Bugs found while porting (fixed in this task)
+---------------------------------------------
+1. sustainCheckEnv indexed env.x[env.sus] incorrectly — fixed
+   (readevent.ts:194-205).
+2. SubInstrument lacked rvv (IT volume/pan swing) — added.
+3. setPatch returned a voice index and never re-homed NNA tails —
+   C returns the root/overflow CHANNEL (virtual.c:566 return chn);
+   reworked + overflow channel pool + nnaAct tag.
+4. zeroSub pan: C calloc gives pan=0; NO_DEFAULT_PAN (-1) set
+   explicitly by the loaders — corrected.
+5. copyAdjust must stop at NUL (strncpy), not skip — IT name fields
+   are NUL-padded.
+6. pp_ins read count: initial draft skipped the table in sample mode;
+   C reads mod->ins entries (= header insnum at that point).
+7. Pattern payload offset: initial draft read at +4/+2; C skips 8
+   bytes of header (2 u16 fields + 2 reserved u16).
+8. loadItSample wrote into a local RawSample; C writes into
+   mod->xxs[i] — harness caught via sample length checks.
+
+Corpus notes (reference/libxmp/test-dev/openmpt/it, 119 files)
+--------------------------------------------------------------
+- cwt: 103x 0x217, 15x 0x51xx (OpenMPT 5.x), 1x 0x214.
+- cmwt: 108x 0x214, 11x 0x216. No old-format instruments (still ported).
+- flags seen: 0x9 0x49 0xd 0x4d 0x89 0x8d 0xcd 0x6d 0x1049.
+- 31 files carry a song message; 1 planar stereo sample
+  (PanbrelloHold.it smp1); 19 sustain loops; compressed (IT_SMP_COMP)
+  decompress exercised via itsex (110 COMP headers corpus-wide, only
+  convert=0x01 observed, 0 ADPCM).
+
+Harness (/tmp/t18-accept.mjs)
+-----------------------------
+2826 passed, 0 failed over the 119-file corpus. Per file: header
+expectations decoded independently from raw bytes (ordnum/insnum/
+smpnum/patnum/cwt/cmwt/flags/special/gv/mv/is/it/msglen/msgofs/rsvd),
+scan-derived channel count mirrored from C (per-channel mask,
+payload +8), 19 structural checks (chn/pat/smp/ins/len/spd/bpm/format/
+readEventType/volbase/gvolbase/gvol/mvolbase/mvol/c4rate/defpan/rrate/
+periodType/numseq), quirk bit checks (PRENV vs UNISLD, VIBHALF|VIBINV
+vs ITOLDFX, ~VIRTUAL|RSTCHN in sample mode, ARPMEM/INSVOL/FILTER),
+tracker-name spot checks, song message presence, sample data
+non-emptiness, 200 playFrame per file. Plus: compressed-truncation
+tolerance (tail -4096 loads), cross-format discrimination (IT vs
+MOD/S3M/XM both directions), byte-patched synthetic trackers (MPT-116,
+Chibi, unmo3, munch.py, OpenMPT 1.17, Schism, OpenMPT 5.10 compat).
+
+Gates (exit 0)
+--------------
+t10 t11 t12 t13 t14 (49/49) t15 (356/0) t16 (25/0) t17 (94/0)
+t18 (2826/0). npm run typecheck clean.

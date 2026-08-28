@@ -453,6 +453,20 @@ function processRest(
     case FX.FX_TREMOR:
       fxTremor(core, xc, fxp);
       break;
+    case FX.FX_MACRO_SET:
+      xc.macro.active = LSN(fxp);
+      break;
+    case FX.FX_MACRO:
+      SET(xc, VolSlideFlag.MIDI_MACRO);
+      xc.macro.val = fxp;
+      xc.macro.slide = 0;
+      break;
+    case FX.FX_MACROSMOOTH:
+      if (core.ctx.p.speed !== 0 && xc.macro.val < 0x80) {
+        SET(xc, VolSlideFlag.MIDI_MACRO);
+        xc.macro.target = fxp;
+        xc.macro.slide = (fxp - xc.macro.val) / core.ctx.p.speed;
+      }
       break;
   }
 }

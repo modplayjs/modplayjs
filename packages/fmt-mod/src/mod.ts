@@ -390,6 +390,7 @@ export function modLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
       vra: 0,
       vsw: 0,
       sid: i,
+      rvv: 0,
       nna: 0,
       dct: 0,
       dca: 0,

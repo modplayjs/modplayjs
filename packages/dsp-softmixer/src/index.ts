@@ -48,6 +48,11 @@ export class SoftMixer implements DspPlugin {
     const mod = core.module!;
     const s = core.ctx.s;
 
+    // mixer_prepare (mixer.c): mvol/mvolbase come from the module (IT
+    // it_load.c:1528-1530; S3M s3m_load.c:714-715). 0 = no scaling.
+    this.mvol = mod.mvol ?? 0;
+    this.mvolbase = mod.mvolbase ?? 0;
+
     const kernelName: KernelName =
       this.interp === 0 ? 'nearest' : this.interp === 2 ? 'spline' : 'linear';
     const kernel = KERNELS[kernelName];

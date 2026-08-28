@@ -311,7 +311,7 @@ export class Core implements CoreIface {
 
     this.virt.setSampleLookup((id) => this.samples.get(id));
     this.virt.setModuleRef(() => this._module);
-    this.virt.on(mod.chn);
+    this.virt.on(mod.chn, (mod.quirks & Quirk.VIRTUAL) !== 0);
     // f->loop = calloc(virt_channels) (player.c:2004) — the player's flow
     // state owns per-channel pattern-loop slots; scan uses its own copy.
     this._flow.loop = Array.from({ length: this.virt.virtChannels }, () => ({

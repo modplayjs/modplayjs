@@ -187,8 +187,9 @@ export function setChannelPan(xc: ChannelState, pan: number): void {
 }
 
 /**
- * Sustain check against a port Envelope (x/y point arrays instead of C's
- * flat data[] pairs): idx equals the sustain point's x value.
+ * C sustain_check (read_event.c:466-473) reads the flat data[] pair
+ * array: data[sus << 1] is the X COORDINATE of node `sus`. My Envelope
+ * stores per-node x[], so the equivalent is x[sus].
  */
 export function sustainCheckEnv(
   env: { flags: number; sus: number; x: number[] } | null | undefined,
@@ -199,7 +200,7 @@ export function sustainCheckEnv(
     env.flags & EnvelopeFlags.ON &&
     env.flags & EnvelopeFlags.SUS &&
     ~env.flags & EnvelopeFlags.LOOP &&
-    idx === env.x[env.sus << 1]
+    idx === env.x[env.sus]
   );
 }
 

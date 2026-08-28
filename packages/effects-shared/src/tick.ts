@@ -68,6 +68,7 @@ import {
   NOTE_GLISSANDO,
   NOTE_SAMPLE_RELEASE,
 } from './helpers.js';
+import { updateMidiMacro } from './midi-macro.js';
 
 // player.h:164-165
 export const TREMOR_ON = 0x80;
@@ -1240,6 +1241,12 @@ export function processTick(core: Core, chn: number): void {
     if (--xc.delay === 0) {
       core.readEvent(chn);
     }
+  }
+
+  /* IT MIDI macros need to update regardless of the current voice state
+   * (player.c:1625-1628). */
+  if (core.module!.midi) {
+    updateMidiMacro(core, chn);
   }
 
   /* Map our VoiceState.act (Act.* codes) onto libxmp's VIRT_ACTION_* codes

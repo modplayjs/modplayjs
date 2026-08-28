@@ -1,2 +1,1 @@
-// @modplayjs/fmt-it — public API stub
-export {};
+export { itTest, itLoad, plugin } from './it.js';

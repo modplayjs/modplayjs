@@ -446,8 +446,7 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   let chn = 0;
 
   // Mix volume and stereo flag conversion (s3m_load.c:287-318).
-  // mvolbase = 48 in C; no ModuleData field yet, so conversion is computed
-  // and discarded (mixer reads mod.mvol/mod.mvolbase — wired in T18).
+  // mvolbase = 48 in C; stored on ModuleData (mixer.c mixer_prepare).
   let mvol: number;
   let stereo: number;
 
@@ -474,8 +473,6 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   if (!stereo) {
     mvol = Math.trunc((mvol * 8) / 11);
   }
-  void mvol;
-
   // Channel settings → mod.chn + default pans (s3m_load.c:320-333)
   const channels: Channel[] = [];
   for (let i = 0; i < 32; i++) {
@@ -752,6 +749,7 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
       vra: 0,
       vsw: 0,
       sid: i,
+      rvv: 0,
       nna: 0,
       dct: 0,
       dca: 0,
@@ -904,6 +902,9 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     time_factor: 10,
     rrate: 250,
     c4rate,
+    // Mix volume (s3m_load.c:714-715: m->mvolbase = 48; m->mvol = mvol).
+    mvolbase: 48,
+    mvol,
     tracker: type,
   };
 
