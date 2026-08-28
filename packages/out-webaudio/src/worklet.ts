@@ -81,8 +81,10 @@ class ChunkFifo {
   }
 }
 
-class ModPlayProcessor implements WorkletProcessorBase {
-  readonly port: MessagePort;
+class ModPlayProcessor extends AudioWorkletProcessor implements WorkletProcessorBase {
+  // `port` comes from the runtime base via super() (audio thread) or the
+  // headless stub (tests). Declared for the type system only.
+  declare readonly port: MessagePort;
 
   private mode: 'sab' | 'copy' = 'copy';
   private header: Int32Array | null = null;
@@ -92,13 +94,8 @@ class ModPlayProcessor implements WorkletProcessorBase {
   private framesSincePost = 0;
 
   constructor() {
-    // AudioWorkletProcessor supplies `port` on instances. The constructor
-    // of the base binds it; TS cannot see that, so we bridge the runtime
-    // value after super-construction via the ambient base call below.
-    const base = new AudioWorkletProcessor() as unknown as {
-      port: MessagePort;
-    };
-    this.port = base.port;
+    super();
+    // AudioWorkletProcessor binds `port` in its constructor.
     this.port.onmessage = (ev: MessageEvent) => this.onMessage(ev.data);
     this.port.start();
   }
@@ -175,9 +172,8 @@ class ModPlayProcessor implements WorkletProcessorBase {
   }
 }
 
-// Register ModPlayProcessor directly: its constructor composes the runtime
-// base (bridging `port`), so no subclass/prototype grafting is needed.
-// Guarded: headless node imports have no worklet scope.
+// Register the processor. Guarded: headless node imports have no worklet
+// scope (tests set the globals and drive the class directly).
 if (typeof AudioWorkletProcessor !== 'undefined') {
   registerProcessor('modplay-processor', ModPlayProcessor as unknown as unknown);
 }
