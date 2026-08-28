@@ -792,9 +792,13 @@ export class VirtualLayer {
     if (!v || v.act === Act.NONE) return;
     switch (action) {
       case PastNote.CUT:
+        // C: VIRT_ACTION_CUT → libxmp_virt_resetvoice(ctx, voc, 1) —
+        // the slot becomes fully reusable (chn = FREE).
         v.act = Act.NONE;
         v.vol = 0;
         v.flags |= VoiceFlag.ANTICLICK;
+        v.chn = VIRT_INVALID;
+        if (this.map[v.root]?.voice === vi) this.map[v.root]!.voice = VIRT_INVALID;
         break;
       case PastNote.OFF:
         v.act = Act.KEY;
