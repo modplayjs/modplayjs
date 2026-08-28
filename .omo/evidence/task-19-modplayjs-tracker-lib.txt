@@ -1,0 +1,40 @@
+T19 — out-pcm (PCM/WAV output plugin)
+======================================
+
+Scope
+-----
+packages/out-pcm/src/pcm.ts: PcmOutput OutputPlugin. start(core) renders
+the whole module offline via Core.playBuffer (xmp_play_buffer pull loop,
+player.c:2178-2233) into an internal buffer; getPcm() returns
+interleaved stereo; getWav() encodes 16-bit PCM WAV per
+reference/Paula-Tracker/paulalib/sampleutils.js:102-144 extended to 2
+channels (44-byte RIFF/WAVE, fmt chunk PCM/1/2ch/rate/16-bit, data
+chunk; samples clamped to [-1,1], scaled floor(x*32767), little-endian).
+Sample rate = core.sampleRate (the core's output rate). stop() halts.
+encodeWavStereo() exported standalone.
+
+Core fix required by T19 (found while rendering to module end)
+--------------------------------------------------------------
+Core.playBuffer had NO end-of-replay signal: it looped frames forever
+because checkEndOfModule increments _p.loop_count at the scan end row
+and the module restarts (nothing returned -1). Ported xmp_play_buffer
+(player.c:2178-2233) verbatim: loop parameter (default 1); after each
+frame the check `ret < 0 || (loop > 0 && loop_count >= loop)` runs
+BEFORE copying the frame — the crossing frame is discarded; when
+nothing has been filled the call returns -1 (end of replay), otherwise
+the buffer is short and the NEXT call returns -1. Previously the check
+ran after adding the frame to the output, which made every call return
+a full buffer and never signal the end.
+
+Harness (/tmp/t19-accept.mjs) — 14 passed, 0 failed
+---------------------------------------------------
+Render ~43s of GlobalVolume-Macro.it through out-pcm: length >= 1s,
+non-silent PCM (peak 8.104 — pre-clamp float peak >1 is expected from
+the mixer; WAV clamps), WAV header fields asserted independently
+(RIFF/WAVE/fmt /data, fmt size 16, PCM format 1, 2 channels,
+sampleRate 44100 = core rate, 16-bit, data size = frames×2×2, RIFF
+size consistent with file length). Edge: getWav() with 0 frames
+rendered yields a valid header with data size 0 (not a corrupt file).
+
+Gates (exit 0): t10 t11 t12 t13 t14 t15 (356/0) t16 (25/0)
+t17 (94/0) t18 (2826/0) t19 (14/0). npm run typecheck clean.

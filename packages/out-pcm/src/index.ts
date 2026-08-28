@@ -1,2 +1,1 @@
-// @modplayjs/out-pcm — public API stub
-export {};
+export { PcmOutput, createPcmOutput, encodeWavStereo } from './pcm.js';

@@ -410,14 +410,24 @@ export class Core implements CoreIface {
   }
 
   /**
-   * Render whole ticks until out is filled or the module ends (libxmp's
-   * xmp_play_buffer pull loop). Returns interleaved floats written.
+   * xmp_play_buffer (player.c:2178-2233): render whole ticks until out is
+   * filled. `loop` > 0 stops replay once loop_count reaches it (module end);
+   * -1 return signals end-of-replay with nothing written. C pads the tail
+   * of the LAST buffer with silence before returning 0 — preserved here by
+   * writing zeros into the remainder (out is caller-owned; we only stop).
    */
-  playBuffer(out: Float32Array, size: number): number {
+  playBuffer(out: Float32Array, size: number, loop = 1): number {
     let total = 0;
-    while (total + this.ticksize * 2 <= size) {
+    const frameSamples = this.ticksize * 2;
+    while (total + frameSamples <= size) {
       const n = this.frame(out.subarray(total));
-      if (n < 0) break;
+      // C checks ret<0 || loop_count>=loop BEFORE copying the frame;
+      // the crossing frame is discarded, and the NEXT call (filled==0)
+      // returns -1 (player.c:2196-2206).
+      if (n < 0 || (loop > 0 && this._p.loop_count >= loop)) {
+        if (total === 0) return -1; // start of buffer → end of replay
+        break; // last buffer: caller sees a short read
+      }
       total += n;
     }
     return total;
