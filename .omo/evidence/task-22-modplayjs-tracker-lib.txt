@@ -1,0 +1,48 @@
+T22 — demo playback page (verification vehicle)
+================================================
+demo/ Vite app: file input (accept .mod/.s3m/.xm/.it), Play/Stop buttons,
+status line (format, DSP, channels, patterns, tracker name; sample rate
+on play). On file select: File API → ArrayBuffer → register all plugins →
+loadModule → setDsp per format (Paula for MOD, softmixer for the rest —
+after loadModule, before startPlayer) → status. Play (in the click
+handler — user gesture): startPlayer → out.start(core, workletUrl).
+Stop: output.stop(). No tracker GUI, no auto-play. Unsupported/corrupt
+files produce "unsupported or corrupt file: <message>" with Play left
+disabled — no crash.
+
+Wiring details
+--------------
+- demo/vite.config.ts: workspace packages have no dist artifacts, so
+  @modplayjs/* resolve straight to TypeScript sources via aliases;
+  worker.format 'es' so the AudioWorklet asset loads as a module script.
+- Worklet URL: AudioWorklet requires a same-origin module URL —
+  demo/src/worklet-url.ts + worklet-url-impl.ts use Vite's
+  `?worker&url` to emit the transpiled worklet as a hashed JS asset
+  (raw `?url` would ship untransformed TS, which browsers cannot run).
+  packages/out-webaudio/src/webaudio.ts: start(core, workletUrl?) calls
+  audioWorklet.addModule(url) once per node.
+- Restart-after-stop fix in out-webaudio: WebAudioOutput.start re-connects
+  the surviving node on subsequent starts (stop() disconnects; the node
+  is reused, matching the demo's load-then-play-then-stop-then-play
+  cycle).
+
+Harness (/tmp/t22-accept.mjs) — 34 passed, 0 failed
+----------------------------------------------------
+Real demo/src/main.ts bundled (esbuild, source aliases) against stubbed
+DOM + browser audio. For each format (MOD AmigaLimitsFinetune.mod,
+S3M AmigaLimits.s3m, XM first corpus file, IT GlobalVolume-Macro.it):
+format label shown, DSP label correct (paula/softmixer, read back via
+core.dsp().name), Play enabled after load, playing status, node
+connected, stopped status, node disconnected after stop. Unsupported
+file (.txt): friendly message + Play stays disabled, no crash. Play
+gating before a gesture: Play disabled until a module loads.
+
+Browser note: no Chromium in this environment (browser tool cannot
+launch), so the visual page was verified through the stubbed-DOM harness
+above plus `vite build` (dist assets emitted, worklet asset is
+transformed ES JS with registerProcessor). Real-audio-thread A/B happens
+at T23 on the user's machine (XMPlay comparison).
+
+Gates (exit 0): t10-t13, t14, t15 (356/0), t16 (25/0), t17 (94/0),
+t18 (2826/0), t19 (14/0), t20 (13/0), t21 (15/0), t22 (34/0).
+npm run typecheck clean (root + demo).

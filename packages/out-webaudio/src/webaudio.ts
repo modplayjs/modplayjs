@@ -11,6 +11,7 @@
 // Float32Array chunks posted to the node port ('copy' mode).
 
 import type { Core, OutputPlugin } from '@modplayjs/core';
+import { StateError } from '@modplayjs/core';
 
 const RING_FRAMES = 16384; // ~0.37s at 44.1kHz
 const HIGH_WATER_FRAMES = RING_FRAMES / 2; // stop rendering above this
@@ -38,8 +39,10 @@ export class WebAudioOutput implements OutputPlugin {
   private renderScratch: Float32Array | null = null;
 
   /** Create/resume the AudioContext and the worklet node. Must be called
-   * from a user gesture the first time (resume() needs it). */
-  async start(core: Core): Promise<void> {
+   * from a user gesture the first time (resume() needs it). `workletUrl`
+   * must point at the transpiled worklet module (audioWorklet.addModule
+   * requires a same-origin URL — e.g. Vite's `?url` import of worklet.js). */
+  async start(core: Core, workletUrl?: string): Promise<void> {
     if (this.running) return; // idempotent — no duplicate nodes
     this.core = core;
 
@@ -51,6 +54,15 @@ export class WebAudioOutput implements OutputPlugin {
     }
 
     if (!this.node) {
+      if (!workletUrl) {
+        throw new StateError(
+          'WebAudioOutput.start requires a workletUrl (transpiled worklet module) on first start',
+        );
+      }
+      await this.ctx.audioWorklet.addModule(workletUrl);
+    }
+
+    if (!this.node) {
       const node = new AudioWorkletNode(this.ctx, 'modplay-processor', {
         numberOfInputs: 0,
         numberOfOutputs: 1,
@@ -58,6 +70,10 @@ export class WebAudioOutput implements OutputPlugin {
       });
       node.connect(this.ctx.destination);
       this.node = node;
+    } else {
+      // Restart after stop(): the node survived (module already loaded);
+      // re-connect it and re-post the transport config.
+      this.node.connect(this.ctx.destination);
     }
 
     // Configure the transport (sab ring when shared memory is allowed).

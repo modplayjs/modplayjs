@@ -11,7 +11,11 @@
   "dependencies": {
     "@modplayjs/core": "*",
     "@modplayjs/effects-shared": "*",
+    "@modplayjs/fmt-mod": "*",
+    "@modplayjs/fmt-s3m": "*",
     "@modplayjs/fmt-xm": "*",
+    "@modplayjs/fmt-it": "*",
+    "@modplayjs/dsp-paula": "*",
     "@modplayjs/dsp-softmixer": "*",
     "@modplayjs/out-webaudio": "*",
     "@modplayjs/out-pcm": "*"

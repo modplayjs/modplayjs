@@ -4,9 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>modplayjs demo</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 640px; margin: 4rem auto; padding: 0 1rem; }
+      h1 { font-size: 1.25rem; }
+      input, button { font-size: 1rem; margin-right: 0.5rem; }
+      button { padding: 0.4rem 1.2rem; }
+      button:disabled { opacity: 0.4; }
+      pre { background: #f4f4f4; padding: 0.75rem; border-radius: 4px; min-height: 1.2em; white-space: pre-wrap; }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <h1>modplayjs demo</h1>
+    <p>Load a MOD / S3M / XM / IT module, then press Play. Paula mixer for MOD, softmixer for the rest.</p>
+    <input type="file" id="file" accept=".mod,.s3m,.xm,.it" />
+    <button id="play" disabled>Play</button>
+    <button id="stop" disabled>Stop</button>
+    <pre id="status">no file loaded</pre>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -5,10 +5,23 @@
       "ES2022",
       "DOM",
       "DOM.Iterable"
-    ]
+    ],
+    "baseUrl": "..",
+    "paths": {
+      "@modplayjs/core": ["packages/core/src/index.ts"],
+      "@modplayjs/effects-shared": ["packages/effects-shared/src/index.ts"],
+      "@modplayjs/fmt-mod": ["packages/fmt-mod/src/index.ts"],
+      "@modplayjs/fmt-s3m": ["packages/fmt-s3m/src/index.ts"],
+      "@modplayjs/fmt-xm": ["packages/fmt-xm/src/index.ts"],
+      "@modplayjs/fmt-it": ["packages/fmt-it/src/index.ts"],
+      "@modplayjs/dsp-paula": ["packages/dsp-paula/src/index.ts"],
+      "@modplayjs/dsp-softmixer": ["packages/dsp-softmixer/src/index.ts"],
+      "@modplayjs/out-webaudio": ["packages/out-webaudio/src/index.ts"],
+      "@modplayjs/out-pcm": ["packages/out-pcm/src/index.ts"],
+      "worklet-url-impl": ["demo/src/worklet-url-impl.ts"]
+    }
   },
   "include": [
-    "src/**/*.ts",
-    "vite.config.ts"
+    "src/**/*.ts"
   ]
 }
