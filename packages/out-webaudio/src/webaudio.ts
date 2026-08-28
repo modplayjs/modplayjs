@@ -32,6 +32,9 @@ export class WebAudioOutput implements OutputPlugin {
   private renderTimer: number | null = null;
   private running = false;
 
+  /** Diagnostics for the demo status line (T22/T23). */
+  readonly debugInfo = { renderedFrames: 0, postedChunks: 0 };
+
   // sab ring state (main-thread side)
   private header: Int32Array | null = null;
   private ring: Float32Array | null = null;
@@ -168,6 +171,7 @@ export class WebAudioOutput implements OutputPlugin {
         s += 2;
       }
       this.writePos = write;
+      this.debugInfo.renderedFrames = write;
       Atomics.store(header, 0, write);
       return;
     }
@@ -183,6 +187,8 @@ export class WebAudioOutput implements OutputPlugin {
     for (let off = 0; off + CHUNK_FRAMES * 2 <= n; off += CHUNK_FRAMES * 2) {
       const chunk = new Float32Array(CHUNK_FRAMES * 2);
       chunk.set(scratch.subarray(off, off + CHUNK_FRAMES * 2));
+      this.debugInfo.postedChunks++;
+      this.debugInfo.renderedFrames += n / 2;
       this.node?.port.postMessage({ mode: 'chunk', data: chunk }, [chunk.buffer]);
     }
   }

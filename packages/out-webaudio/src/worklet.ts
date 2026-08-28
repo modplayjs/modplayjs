@@ -88,6 +88,8 @@ class ModPlayProcessor implements WorkletProcessorBase {
   private header: Int32Array | null = null;
   private data: Float32Array | null = null;
   private readonly fifo = new ChunkFifo();
+  private drainedFrames = 0;
+  private framesSincePost = 0;
 
   constructor() {
     // AudioWorkletProcessor supplies `port` on instances. The constructor
@@ -101,16 +103,21 @@ class ModPlayProcessor implements WorkletProcessorBase {
     this.port.start();
   }
 
+
   private onMessage(
     msg:
       | { mode: 'sab'; header: Int32Array; data: Float32Array }
+      | { mode: 'copy' }
       | { mode: 'chunk'; data: Float32Array },
   ): void {
     if (msg.mode === 'sab') {
       this.mode = 'sab';
       this.header = msg.header;
       this.data = msg.data;
-    } else {
+    } else if (msg.mode === 'copy') {
+      // Copy-mode INIT: switch transport, no payload (webaudio.ts start()).
+      this.mode = 'copy';
+    } else if (msg.data) {
       this.fifo.push(msg.data);
     }
   }
@@ -157,28 +164,22 @@ class ModPlayProcessor implements WorkletProcessorBase {
     const drained = this.fifo.drain(outL, outR);
     outL.fill(0, drained);
     outR.fill(0, drained);
+    // Diagnostics (T22/T23): report drain activity to the main thread.
+    this.drainedFrames += drained;
+    this.framesSincePost += drained;
+    if (this.framesSincePost >= 44100) {
+      this.port.postMessage({ mode: 'stats', drainedFrames: this.drainedFrames });
+      this.framesSincePost = 0;
+    }
     return true;
   }
 }
 
-// Bridge the ambient base: instances expose `port` from the runtime base
-// class. We register a subclass so `new AudioWorkletProcessor()` inside the
-// constructor runs the runtime base (which defines `port`). Guarded: in a
-// headless node import there is no worklet scope — registration is skipped
-// and ModPlayProcessor can be exercised directly (tests set the globals).
-interface ModPlayProcessorCtor {
-  new (): ModPlayProcessor;
-}
-let Registered: ModPlayProcessorCtor | null = null;
+// Register ModPlayProcessor directly: its constructor composes the runtime
+// base (bridging `port`), so no subclass/prototype grafting is needed.
+// Guarded: headless node imports have no worklet scope.
 if (typeof AudioWorkletProcessor !== 'undefined') {
-  Registered = class ModPlayProcessorImpl extends (AudioWorkletProcessor as unknown as new () => { port: MessagePort }) {
-    constructor() {
-      super();
-    }
-  } as unknown as ModPlayProcessorCtor;
-  Object.setPrototypeOf(Registered.prototype, ModPlayProcessor.prototype);
-  registerProcessor('modplay-processor', Registered as unknown as unknown);
+  registerProcessor('modplay-processor', ModPlayProcessor as unknown as unknown);
 }
-
 
 export { ModPlayProcessor, ChunkFifo };

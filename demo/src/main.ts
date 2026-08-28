@@ -80,6 +80,17 @@ playBtn.addEventListener('click', async () => {
     show(
       `playing | DSP: ${core.dsp().name} | sample rate: ${output.audioContextSampleRate} Hz`,
     );
+    // Live status: posted/diagnose silent output.
+    const tick = window.setInterval(() => {
+      if (!playing) {
+        window.clearInterval(tick);
+        return;
+      }
+      show(
+        `playing | DSP: ${core.dsp().name} | rate: ${output.audioContextSampleRate} Hz | ` +
+          `rendered: ${output.debugInfo.renderedFrames} frames | posted: ${output.debugInfo.postedChunks} chunks`,
+      );
+    }, 500);
   } catch (err) {
     const msg = err instanceof StateError || err instanceof Error ? err.message : String(err);
     const secureHint =
