@@ -35,6 +35,13 @@ function show(msg: string): void {
   status.textContent = msg;
 }
 
+if (typeof window !== 'undefined' && !window.isSecureContext) {
+  show(
+    'WARNING: this page is not in a secure context (HTTPS or localhost). ' +
+      'AudioWorklet is unavailable — open via http://localhost:<port> instead.',
+  );
+}
+
 fileInput.addEventListener('change', async () => {
   const file = fileInput.files?.[0];
   if (!file) return;
@@ -75,7 +82,11 @@ playBtn.addEventListener('click', async () => {
     );
   } catch (err) {
     const msg = err instanceof StateError || err instanceof Error ? err.message : String(err);
-    show(`play failed: ${msg}`);
+    const secureHint =
+      typeof window !== 'undefined' && !window.isSecureContext
+        ? ' — serve the demo over HTTPS or http://localhost (AudioWorklet is unavailable on plain http://<ip>)'
+        : '';
+    show(`play failed: ${msg}${secureHint}`);
   }
 });
 

@@ -59,6 +59,15 @@ export class WebAudioOutput implements OutputPlugin {
           'WebAudioOutput.start requires a workletUrl (transpiled worklet module) on first start',
         );
       }
+      // AudioWorklet requires a SECURE context (HTTPS or localhost). On
+      // plain http://<LAN-IP> the AudioContext exists but its
+      // .audioWorklet property is absent — fail with a clear message.
+      if (!this.ctx.audioWorklet) {
+        throw new StateError(
+          'AudioWorklet unavailable: the page must be served over HTTPS or localhost ' +
+            '(insecure contexts do not expose AudioContext.audioWorklet)',
+        );
+      }
       await this.ctx.audioWorklet.addModule(workletUrl);
     }
 
