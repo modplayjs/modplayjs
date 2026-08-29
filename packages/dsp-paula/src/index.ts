@@ -67,15 +67,31 @@ export class Paula implements DspPlugin {
     this.muted[channel] = !this.muted[channel];
   }
 
+  /**
+   * Per-row hook (T8 DspPlugin.onRow): a note on this channel restarts
+   * the paula's sample position — the core's voice pos was reset by
+   * setpatch, and the paula's own accumulator must follow.
+   */
+  onRow(_core: CoreIface, chn: number, ev: { note: number }): void {
+    if (chn < 4 && ev.note !== 0) {
+      this.states[chn]!.samplePos = 0;
+    }
+  }
+
   renderFrame(core: CoreIface, out: Float32Array, ticks: number): void {
     const sr = core.sampleRate;
     const ticksize = core.ticksize;
     let o = 0;
     for (let t = 0; t < ticks; t++) {
+      for (let ch = 0; ch < 4 && ch < core.channels; ch++) {
+        // Per-tick channel state (the C paula simulator reads the same
+        // xc fields: info_period, info_finalvol, info_position, smp).
+        this.syncFromCore(core, ch);
+      }
       for (let i = 0; i < ticksize; i++) {
         let left = 0;
         let right = 0;
-        for (let ch = 0; ch < 4; ch++) {
+        for (let ch = 0; ch < 4 && ch < core.channels; ch++) {
           if (this.muted[ch]) continue;
           const sample = this.getChannelSample(core, ch, sr);
           // Amiga stereo panning: channels 0,3 left, 1,2 right (:748-755)
@@ -94,20 +110,41 @@ export class Paula implements DspPlugin {
     }
   }
 
+  /** Sync one Amiga channel from the core's player state (per tick). */
+  private syncFromCore(core: CoreIface, ch: number): void {
+    const xc = core.channelStates[ch];
+    const st = this.states[ch]!;
+    if (!xc) {
+      st.instrument = 0;
+      st.period = 0;
+      return;
+    }
+    // xc.smp = the sample id the channel plays (player.c info: c->smp).
+    st.instrument = xc.smp;
+    // xc.period = the raw amiga period (MOD periods 108..907).
+    st.period = xc.period > 0 ? xc.period : 0;
+    // info_finalvol = the player's per-tick final volume (0..1024 scale;
+    // /16 → 0..64 for the paula's volume/64 mixing).
+    st.volume = Math.max(0, Math.min(64, Math.round(xc.info_finalvol / 16)));
+  }
+
   /**
    * getChannelSample port (:769-846). Reads by sample ID from the core
-   * store so hot-swap works.
+   * store; the position comes from the core's info_position (the voice's
+   * fractional sample position, advanced by the mixer/player per tick).
    */
   private getChannelSample(core: CoreIface, ch: number, sr: number): number {
-    const state = this.states[ch]!;
-    if (state.period === 0 || state.instrument <= 0) return 0;
+    const st = this.states[ch]!;
+    if (st.period === 0 || st.instrument <= 0) return 0;
 
-    const smp = core.getSample(state.instrument);
+    const smp = core.getSample(st.instrument);
     const data = smp.data;
-    // periodToRate :208-211 — per-FRAME advance of the fractional position.
-    state.samplePos += periodToRate(state.period, sr);
+    if (!data || data.length === 0) return 0;
 
-    const pos = state.samplePos;
+    // Paula self-advances the fractional position per output frame
+    // (audio-engine.js: the samplePos accumulator).
+    st.samplePos += periodToRate(st.period, sr ?? 44100);
+    const pos = st.samplePos;
     const intPos = Math.floor(pos);
     const frac = pos - intPos;
 
@@ -137,9 +174,9 @@ export class Paula implements DspPlugin {
     const sample = sample1 + (sample2 - sample1) * frac;
 
     // Tremolo pre-scale (:822-825)
-    let volume = state.volume;
-    if (state.tremoloValue !== undefined) {
-      volume = Math.max(0, Math.min(64, volume + state.tremoloValue));
+    let volume = st.volume;
+    if (st.tremoloValue !== undefined) {
+      volume = Math.max(0, Math.min(64, volume + st.tremoloValue));
     }
 
     return sample * (volume / 64);

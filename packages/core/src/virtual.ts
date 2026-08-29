@@ -169,13 +169,36 @@ export class VirtualLayer {
     if (this.used < MAXVOICES && this.used >= this.voices.length) {
       this.voices.push(makeVoice(this.voices.length));
     }
-    // C criterion (virtual.c:261-263): a slot is free iff voice_array[i]
-    // .chn == FREE (reset_voice sets chn = FREE). A one-shot sample that
-    // ran to its end sets act = 0 but KEEPS its channel — that slot is
-    // NOT reusable (its channel's map still references it); reusing it
-    // would alias two channels onto one voice (stutter/lost notes).
+    // Free slots: reset voices (chn = FREE).
     for (let i = 0; i < this.voices.length; i++) {
       if (this.voices[i]!.chn === VIRT_INVALID) return i;
+    }
+    // Garbage-collect dead slots: act cleared but the slot still bound
+    // to a channel whose map has moved on (one-shot samples that ran to
+    // their end keep chn set in C until reset — but C recycles them via
+    // free_voice when the pool runs dry). A slot whose channel's map no
+    // longer references it is unreachable and safe to reuse.
+    for (let i = 0; i < this.voices.length; i++) {
+      const v = this.voices[i]!;
+      if (v.act === Act.NONE && v.chn >= 0 && v.chn < this.map.length && this.map[v.chn]!.voice !== i) {
+        this.resetVoice(i, false);
+        return i;
+      }
+    }
+    // C free_voice (virtual.c:241-282): no free slot — steal the
+    // background voice (chn >= num_tracks) with the lowest volume.
+    let steal = -1;
+    let stealVol = Number.MAX_VALUE;
+    for (let i = this.numTracks; i < this.voices.length; i++) {
+      const v = this.voices[i]!;
+      if (v.chn >= this.numTracks && v.vol < stealVol) {
+        stealVol = v.vol;
+        steal = i;
+      }
+    }
+    if (steal >= 0) {
+      this.resetVoice(steal, false);
+      return steal;
     }
     if (this.voices.length < MAXVOICES) {
       const idx = this.voices.length;
@@ -726,26 +749,12 @@ export class VirtualLayer {
     // dct is 0 for every MOD/S3M call site of set_patch — no duplicate
     // check needed (read_event_mod/read_event_st3 pass 0/0).
 
+    // C setpatch flow (virtual.c:500-546): the channel's CURRENT voice
+    // slot is reused in place — a fresh allocation happens only when the
+    // channel had no voice (map empty). The old note is simply
+    // overwritten (MOD NNA = CUT), so the pool never exhausts.
     let voc = this.map[chn]!.voice;
-    if (voc > VIRT_INVALID) {
-      if (this.voices[voc]!.act !== Act.NONE) {
-        // NNA split path: MOD/ST3 set_patch callers never set nna, and
-        // player-side set_patch uses key/act from xc — for the loader-side
-        // helpers this branch is unreachable (voice would be act==NOTE
-        // with a live map). Fall back to stealing the current voice slot
-        // after releasing it (CUT), matching alloc_voice failure-free path
-        // for the single-voice-per-channel MOD case.
-        const old = voc;
-        this.release(old, 0 /* CUT */);
-        voc = this.allocVoice();
-        if (voc === VIRT_INVALID) {
-          // restore mapping semantics: old voice gone, channel free
-          return VIRT_INVALID;
-        }
-        this.map[chn]!.voice = voc;
-        void old;
-      }
-    } else {
+    if (voc <= VIRT_INVALID) {
       voc = this.allocVoice();
       if (voc === VIRT_INVALID) return VIRT_INVALID;
       this.map[chn]!.voice = voc;

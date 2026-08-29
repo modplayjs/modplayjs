@@ -201,6 +201,10 @@ export interface DspPlugin {
   readonly channels: number;
   /** Render `ticks` ticks into `out` (interleaved stereo). */
   renderFrame(core: Core, out: Float32Array, ticks: number): void;
+  /** Optional per-row hook: called after the format event reader for each
+   * channel (implementations that need retrigger notification, e.g. the
+   * paula sample-position reset). */
+  onRow?(core: Core, chn: number, ev: Event): void;
   /** Reset internal state (called on start/stop). */
   reset(): void;
 }
