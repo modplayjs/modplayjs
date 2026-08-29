@@ -295,6 +295,7 @@ export class Core implements CoreIface {
       p.channel_mute[i] = (mod.channels[i]?.flg ?? 0) & 0x04 /* MUTE */ ? true : false;
       p.channel_vol[i] = 100;
     }
+    this.virt.setChannelMute(p.channel_mute);
 
     // Skip invalid patterns at start (player.c:1986-1992).
     while (p.ord < mod.len && (mod.xxo[p.ord] ?? Infinity) >= mod.pat) {

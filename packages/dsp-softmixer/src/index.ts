@@ -44,6 +44,8 @@ export class SoftMixer implements DspPlugin {
   mvolbase = 0;
   /** IT bidirectional loop shortened by one sample (mixer.c:520-523). */
   private bidirAdjust = 0;
+  /** ticksize >> ANTICLICK_SHIFT — do_anticlick's tail length (:150). */
+  private dischargeFrames = 0;
 
   reset(): void { /* per-voice state lives in the virtual layer */ }
 
@@ -64,9 +66,9 @@ export class SoftMixer implements DspPlugin {
     this.bidirAdjust = mod.readEventType === 3 /* IT */ ? 1 : 0;
 
     // mixer_prepare: our Core already computed s.ticksize via getTicksize.
-
     // out holds ticks * ticksize * 2 interleaved frames.
     const ticksize = s.ticksize;
+    this.dischargeFrames = ticksize >> 3 /* ANTICLICK_SHIFT */;
     let bufPos = 0;
 
     for (let t = 0; t < ticks; t++) {
@@ -171,6 +173,9 @@ export class SoftMixer implements DspPlugin {
 
         let size = ticksize;
         let rampLeft = rampsize;
+        // Frames of the anti-click ramp already consumed this tick — the
+        // ramp level is old_vl + delta × (frames into the ramp).
+        let rampDone = 0;
         const reverse = (vi.flags & VoiceFlag.VOICE_REVERSE) !== 0;
 
         while (size > 0) {
@@ -211,28 +216,54 @@ export class SoftMixer implements DspPlugin {
             // volL = vol × (0x80 − pan) → divisor 128 × 4096 = 0x80000.
             const lVolF = volL / 0x80000;
             const rVolF = volR / 0x80000;
-            const lRampF = deltaL / 0x80000 / rampsize;
-            const rRampF = deltaR / 0x80000 / rampsize;
+            // C MIX_STEREO_AC (mix_all.c:153-157): the ramp starts at the
+            // voice's OLD level (old_vl) and steps delta per frame toward
+            // vol_l — the anti-click fade between the previous and new
+            // gain. The mix output must use the RAMPED level, not volL.
+            const oldVlF = vi.old_vl / 0x80000;
+            const oldVrF = vi.old_vr / 0x80000;
+            const lRampF = deltaL / 0x80000;
+            const rRampF = deltaR / 0x80000;
+            // Hipolito anticlick capture (mixer.c:647-653): the buffer
+            // value just BEFORE this chunk — other voices' contributions
+            // at that point (zero at a tick boundary, the buffer is
+            // cleared per tick). Subtracting it after the chunk leaves the
+            // voice's OWN last output in sleft/sright.
+            // C advances buf_pos by mix_size per chunk (mixer.c:690): each
+            // loop-wrap segment writes into ITS OWN slice of the tick. A
+            // tick-base cursor would make every chunk overwrite the tick's
+            // first frames, leaving only the last segment audible.
+            const chunkPos = bufPos + (ticksize - size) * 2;
+            const prevL = chunkPos >= 2 ? (out[chunkPos - 2] ?? 0) : 0;
+            const prevR = chunkPos >= 1 ? (out[chunkPos - 1] ?? 0) : 0;
+            // C LOOP_AC / LOOP split (mix_all.c:90,92): within a chunk the
+            // ramped macro runs for `ramp` frames and the plain macro for
+            // the rest; the level starts at old_vl and steps delta per
+            // frame — it never runs past the ramp budget (that would keep
+            // multiplying delta by the frame index and blow the gain up).
+            const rampFrames = Math.min(samples, rampLeft);
             for (let n = 0; n < samples; n++) {
-              const idx = bufPos + n * 2;
-              const doRamp = rampLeft > 0;
+              const idx = chunkPos + n * 2;
               const lSmp = kernel(xxs.data, vi.pos);
+              const gainL = n < rampFrames ? oldVlF + lRampF * (rampDone + n) : lVolF;
+              const gainR = n < rampFrames ? oldVrF + rRampF * (rampDone + n) : rVolF;
               // stereo output (always interleaved stereo here).
-              out[idx] = (out[idx] ?? 0) + lSmp * (lVolF + (doRamp ? lRampF * n : 0));
-              out[idx + 1] = (out[idx + 1] ?? 0) + lSmp * (rVolF + (doRamp ? rRampF * n : 0));
+              out[idx] = (out[idx] ?? 0) + lSmp * gainL;
+              out[idx + 1] = (out[idx + 1] ?? 0) + lSmp * gainR;
               // Fractional accumulator UPDATE_POS (mix_all.c:94-98) — runs
               // once per frame for audible AND silent voices (C's no-op
               // mixer fn still advances pos).
               vi.pos += stepDir;
             }
-            if (rampLeft >= samples) rampLeft -= samples;
-            else rampLeft = 0;
+            rampDone += rampFrames;
+            rampLeft -= rampFrames;
             vi.old_vl += samples * deltaL;
             vi.old_vr += samples * deltaR;
-            // Anticlick bookkeeping: last-sample deltas (:708-712).
-            const lastIdx = bufPos + (samples - 1) * 2;
-            vi.sleft = (out[lastIdx] ?? 0) - 0;
-            vi.sright = (out[lastIdx + 1] ?? 0) - 0;
+            // Anticlick bookkeeping (mixer.c:708-712): buffer delta across
+            // the chunk = the voice's own last contribution.
+            const lastIdx = chunkPos + (samples - 1) * 2;
+            vi.sleft = (out[lastIdx] ?? 0) - prevL;
+            vi.sright = (out[lastIdx + 1] ?? 0) - prevR;
           } else {
             // Inaudible voice: C's zero-gain mixer fn still advances pos.
             vi.pos += stepDir * samples;
@@ -318,6 +349,17 @@ export class SoftMixer implements DspPlugin {
         vi.old_vl = volL;
         vi.old_vr = volR;
       } // voices
+
+      // Render final frame (mixer.c:764-784 downmix_int_*): C clamps every
+      // frame to LIM16_HI/LIM16_LO (±32767) — the float model clamps ±1.0.
+      // Without it our unbounded float sum drives the browser's output
+      // device into hard clipping (audible distortion).
+      const end = bufPos + ticksize * 2;
+      for (let i = bufPos; i < end && i < out.length; i++) {
+        const v = out[i]!;
+        if (v > 1) out[i] = 1;
+        else if (v < -1) out[i] = -1;
+      }
 
       bufPos += ticksize * 2;
     }
@@ -417,7 +459,13 @@ export class SoftMixer implements DspPlugin {
     }
   }
 
-  /** Linear fade of the last held values across `count` frames. */
+  /**
+   * do_anticlick (mixer.c:148-195): fade the voice's last level out over
+   * at most `ticksize >> ANTICLICK_SHIFT` frames. C clamps count to that
+   * discharge length (a full-tail request would otherwise smear one note's
+   * level across most of a tick and stack against the live mix) and fades
+   * with a SQUARED slope (stepmul_sq), not a linear ramp.
+   */
   private discharge(
     out: Float32Array,
     at: number,
@@ -431,8 +479,15 @@ export class SoftMixer implements DspPlugin {
     vi.sleft = 0;
     vi.sright = 0;
     if (sl === 0 && sr === 0) return;
+    const dischargeMax = this.dischargeFrames;
+    if (count > dischargeMax) count = dischargeMax;
+    if (count <= 0) return;
     for (let n = 0; n < count; n++) {
-      const k = 1 - n / count;
+      // C: stepmul counts DOWN from 1.0 in 1/count steps and the gain is
+      // (stepmul >> (FPSHIFT-16))^2 / 2^32 — i.e. a squared decay from the
+      // stored level to zero.
+      const stepmul = 1 - n / count;
+      const k = stepmul * stepmul;
       const idx = at + n * 2;
       out[idx] = (out[idx] ?? 0) + sl * k;
       out[idx + 1] = (out[idx + 1] ?? 0) + sr * k;

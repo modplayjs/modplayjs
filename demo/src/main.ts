@@ -54,8 +54,10 @@ fileInput.addEventListener('change', async () => {
     core.loadModule(bytes);
     const mod = core.module;
     if (!mod) throw new StateError('module did not load');
-    // DSP by format (T22 contract): Paula for MOD, softmixer otherwise.
-    core.setDsp(mod.format === 'mod' ? 'paula' : 'softmixer');
+    // A/B test against XMPlay: route EVERYTHING through softmixer (the
+    // libxmp-parity mixer). Paula disabled until its MOD mixing chain is
+    // verified line-by-line against the C reference.
+    core.setDsp('softmixer');
     loaded = true;
     playBtn.disabled = false;
     show(

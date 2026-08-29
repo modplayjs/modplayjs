@@ -368,8 +368,28 @@ export class VirtualLayer {
   /** Set final volume on the channel's voice, 0..volbase (virt_setvol :309). */
   setVol(chn: number, vol: number): boolean {
     const vi = this.mapChannel(chn);
-    this.voices[vi]!.vol = vol;
+    if (vi === VIRT_INVALID) return false;
+    const v = this.voices[vi];
+    if (!v) return false;
+    // virt_setvol (virtual.c:311-325): a muted ROOT channel is silenced at
+    // the mixer input; background voices of a muted root die when they hit 0.
+    const root = v.root;
+    if (root >= 0 && root < this.channelMute.length && this.channelMute[root]) {
+      vol = 0;
+    }
+    v.vol = vol;
+    if (vol === 0 && chn >= this.numTracks) {
+      this.resetVoice(vi, true);
+    }
     return true;
+  }
+
+  /** PlayState.channel_mute, mirrored by Core before startPlayer. */
+  channelMute: readonly boolean[] = [];
+
+  /** Install the mute table (Core wires this at startPlayer). */
+  setChannelMute(mute: readonly boolean[]): void {
+    this.channelMute = mute;
   }
 
   /** Set pan 0..255 on the channel's voice. */
