@@ -820,13 +820,18 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     if (sih.flags & S3M_SAMP_16BIT) {
       xflg |= SampleFlags.BITS16;
     }
+    // Decode flags ride on raw.flags high bits (xm.ts parity); the store's
+    // normalize() applies them (loaders/sample.c load_sample_flags).
     raw.flags = xflg;
-
-    // load_sample_flags (s3m_load.c:653-656)
+    // load_sample_flags (s3m_load.c:653-656): old-format files (ffi==1)
+    // store signed data; ffi==2 files store unsigned PCM (SAMPLE_FLAG_UNS).
+    // ADPCM (pack === 4) overrides. These are DecodeFlag bits consumed by
+    // SampleStore.normalize (convert_signal / itsex).
     let loadSampleFlags = sfh.ffi === 1 ? 0 : SAMPLE_FLAG_UNS;
     if (sih.pack === 4) {
       loadSampleFlags = SAMPLE_FLAG_ADPCM;
     }
+    raw.flags |= loadSampleFlags;
 
     sub.vol = sih.vol;
 
@@ -856,7 +861,6 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     instruments.push(xxi);
     rawSamples.push(raw);
 
-    void loadSampleFlags;
   }
 
   // Final quirks (s3m_load.c:687-688)
