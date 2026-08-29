@@ -460,11 +460,13 @@ export class SoftMixer implements DspPlugin {
   }
 
   /**
-   * do_anticlick (mixer.c:148-195): fade the voice's last level out over
-   * at most `ticksize >> ANTICLICK_SHIFT` frames. C clamps count to that
+   * do_anticlick (mixer.c:148-195): fade the voice's last level out over at
+   * most `ticksize >> ANTICLICK_SHIFT` frames. C clamps count to that
    * discharge length (a full-tail request would otherwise smear one note's
-   * level across most of a tick and stack against the live mix) and fades
-   * with a SQUARED slope (stepmul_sq), not a linear ramp.
+   * level across most of a tick and stack against the live mix), and
+   * decrements stepmul BEFORE each sample (:181-187) — so the first frame
+   * written carries (1 - 1/count)^2 and the full-level sample is dropped
+   * (the last mixed frame already contains it). The slope is squared.
    */
   private discharge(
     out: Float32Array,
@@ -479,16 +481,12 @@ export class SoftMixer implements DspPlugin {
     vi.sleft = 0;
     vi.sright = 0;
     if (sl === 0 && sr === 0) return;
-    const dischargeMax = this.dischargeFrames;
-    if (count > dischargeMax) count = dischargeMax;
+    if (count > this.dischargeFrames) count = this.dischargeFrames;
     if (count <= 0) return;
-    for (let n = 0; n < count; n++) {
-      // C: stepmul counts DOWN from 1.0 in 1/count steps and the gain is
-      // (stepmul >> (FPSHIFT-16))^2 / 2^32 — i.e. a squared decay from the
-      // stored level to zero.
+    for (let n = 1; n <= count; n++) {
       const stepmul = 1 - n / count;
       const k = stepmul * stepmul;
-      const idx = at + n * 2;
+      const idx = at + (n - 1) * 2;
       out[idx] = (out[idx] ?? 0) + sl * k;
       out[idx + 1] = (out[idx + 1] ?? 0) + sr * k;
     }
