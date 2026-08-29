@@ -814,15 +814,16 @@ export class VirtualLayer {
       return chn;
     }
 
-    // libxmp_mixer_setpatch + libxmp_mixer_setnote + ins/act/key assigns.
-    this.setPatchVoice(voc, smp, true);
     // C virt_setpatch (virtual.c:531): vi->chn = chn — the voice is bound
-    // to its virtual channel. Without this the voice looks FREE to
-    // allocVoice (chn = VIRT_INVALID from a reset) and the next note steals
-    // a live voice (two channels aliased on one slot).
+    // to its virtual channel BEFORE mixer_setpatch runs (alloc_voice set
+    // voice_array[i].chn inside alloc_voice). The binding must precede
+    // setPatchVoice: its set_sample_end(0) hook clears the channel's
+    // NOTE_SAMPLE_END via v.chn — with a stale chn the fresh note would
+    // inherit the previous one-shot's SAMPLE_END mute.
     const v = this.voices[voc]!;
     v.chn = chn;
     v.root = chn;
+    this.setPatchVoice(voc, smp, true);
     // mixer_setnote: clamp note > 149 (mixer.c:920-935).
     const clampedNote = note > 149 ? 149 : note;
     v.note = clampedNote;
