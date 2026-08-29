@@ -224,18 +224,15 @@ export class SoftMixer implements DspPlugin {
             const oldVrF = vi.old_vr / 0x80000;
             const lRampF = deltaL / 0x80000;
             const rRampF = deltaR / 0x80000;
-            // Hipolito anticlick capture (mixer.c:647-653): the buffer
-            // value just BEFORE this chunk — other voices' contributions
-            // at that point (zero at a tick boundary, the buffer is
-            // cleared per tick). Subtracting it after the chunk leaves the
-            // voice's OWN last output in sleft/sright.
-            // C advances buf_pos by mix_size per chunk (mixer.c:690): each
-            // loop-wrap segment writes into ITS OWN slice of the tick. A
-            // tick-base cursor would make every chunk overwrite the tick's
-            // first frames, leaving only the last segment audible.
+            // Hipolito anticlick capture (mixer.c:645-653): C samples the
+            // buffer at buf_pos[mix_size-1] — the LAST frame of this chunk,
+            // not the frame before it — then subtracts that pre-mix value
+            // from the post-mix value (buf_pos[-1]) to isolate the voice's
+            // own contribution.
             const chunkPos = bufPos + (ticksize - size) * 2;
-            const prevL = chunkPos >= 2 ? (out[chunkPos - 2] ?? 0) : 0;
-            const prevR = chunkPos >= 1 ? (out[chunkPos - 1] ?? 0) : 0;
+            const probeIdx = chunkPos + samples * 2 - 1;
+            const prevL = out[probeIdx - 1] ?? 0;
+            const prevR = out[probeIdx] ?? 0;
             // C LOOP_AC / LOOP split (mix_all.c:90,92): within a chunk the
             // ramped macro runs for `ramp` frames and the plain macro for
             // the rest; the level starts at old_vl and steps delta per
