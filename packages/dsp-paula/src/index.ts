@@ -14,6 +14,7 @@
 // :223-511) is deliberately NOT ported — MOD sequencing is the Core's job.
 
 import type { Core as CoreIface, DspPlugin } from '@modplayjs/core';
+import { NoteFlag } from '@modplayjs/core';
 
 /** PAL colorburst / 2 (audio-engine.js:83). */
 export const PAULA_FREQUENCY = 7093789.2 / 2;
@@ -158,6 +159,10 @@ export class Paula implements DspPlugin {
         pos2 = pos1 + 1;
         if (pos2 >= smp.loopEnd) pos2 = smp.loopStart;
       } else {
+        // One-shot exhausted: C set_sample_end(ctx, voc, 1) (mixer.c:711)
+        // — mark the channel so process_volume zeroes info_finalvol and
+        // play_channel propagates NOTE_END.
+        this.setSampleEnd(core, ch);
         return 0; // No loop, silence
       }
     } else if (pos2 >= smp.length) {
@@ -180,6 +185,18 @@ export class Paula implements DspPlugin {
     }
 
     return sample * (volume / 64);
+  }
+
+  /**
+   * set_sample_end (mixer.c:197-217, end=1): mark the channel's
+   * NOTE_SAMPLE_END when a one-shot sample runs out. With QUIRK_RSTCHN
+   * (set for S3M/XM/IT, not MOD) C also frees the voice slot; MOD keeps
+   * the channel bound like C's paula path.
+   */
+  private setSampleEnd(core: CoreIface, ch: number): void {
+    const xc = core.channelStates[ch];
+    if (!xc) return;
+    xc.note_flags |= NoteFlag.SAMPLE_END;
   }
 }
 

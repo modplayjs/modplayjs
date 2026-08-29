@@ -22,8 +22,11 @@ import {
   SampleFlags,
   VoiceFlag,
   Act,
+  Quirk,
+  NoteFlag,
   type VoiceState,
   type SampleData,
+  type ChannelState,
 } from '@modplayjs/core';
 import { KERNELS, C4_PERIOD, type KernelName } from './kernels';
 
@@ -73,7 +76,8 @@ export class SoftMixer implements DspPlugin {
       // Per-voice loop (:527).
       const voices = this.activeVoices(core);
       const xcArr = core.channelStates;
-      for (const vi of voices) {
+      for (let idx = 0; idx < voices.length; idx++) {
+        const vi = voices[idx]!;
         if ((vi.flags & VoiceFlag.ANTICLICK) !== 0 && this.interp > 0) {
           // do_anticlick(ctx, voc, NULL, 0) discharges into the next tick's
           // ramp start; float model folds this into old_vl/old_vr already 0.
@@ -85,10 +89,11 @@ export class SoftMixer implements DspPlugin {
         if (vi.act === Act.NONE) continue;
 
         let xxsRef: SampleData;
-
         if (vi.period < 1) {
-          // :546-550 — invalid period kills the voice.
-          vi.act = Act.NONE;
+          // :546-550 — invalid period kills the voice via a FULL
+          // virt_resetvoice: act wipe alone would leave the voice's map
+          // slot bound (stale alias) while the slot gets re-allocated.
+          core.virt?.resetVoice(idx, true);
           continue;
         }
 
@@ -215,7 +220,9 @@ export class SoftMixer implements DspPlugin {
               // stereo output (always interleaved stereo here).
               out[idx] = (out[idx] ?? 0) + lSmp * (lVolF + (doRamp ? lRampF * n : 0));
               out[idx + 1] = (out[idx + 1] ?? 0) + lSmp * (rVolF + (doRamp ? rRampF * n : 0));
-              // Fractional accumulator UPDATE_POS (mix_all.c:94-98).
+              // Fractional accumulator UPDATE_POS (mix_all.c:94-98) — runs
+              // once per frame for audible AND silent voices (C's no-op
+              // mixer fn still advances pos).
               vi.pos += stepDir;
             }
             if (rampLeft >= samples) rampLeft -= samples;
@@ -226,9 +233,11 @@ export class SoftMixer implements DspPlugin {
             const lastIdx = bufPos + (samples - 1) * 2;
             vi.sleft = (out[lastIdx] ?? 0) - 0;
             vi.sright = (out[lastIdx + 1] ?? 0) - 0;
+          } else {
+            // Inaudible voice: C's zero-gain mixer fn still advances pos.
+            vi.pos += stepDir * samples;
           }
 
-          vi.pos += stepDir * samples;
           size -= samples;
 
           // has_active_loop (mixer.c:326-330): LOOP flag OR active sustain
@@ -253,7 +262,7 @@ export class SoftMixer implements DspPlugin {
             // slot is only reusable after a full reset_voice).
             this.discharge(out, bufPos + (ticksize - size) * 2, size, vi);
             vi.flags |= VoiceFlag.ANTICLICK;
-            vi.act = Act.NONE;
+            this.setSampleEnd(core, vi, 1);
             size = 0;
             continue;
           }
@@ -284,6 +293,7 @@ export class SoftMixer implements DspPlugin {
                 vi.flags &= ~VoiceFlag.SAMPLE_QUEUED;
                 vi.flags |= VoiceFlag.SAMPLE_PAUSED;
                 vi.act = Act.NONE;
+                this.setSampleEnd(core, vi, 1);
                 vi.flags |= VoiceFlag.ANTICLICK;
                 size = 0;
                 continue;
@@ -426,6 +436,27 @@ export class SoftMixer implements DspPlugin {
       const idx = at + n * 2;
       out[idx] = (out[idx] ?? 0) + sl * k;
       out[idx + 1] = (out[idx + 1] ?? 0) + sr * k;
+    }
+  }
+
+  /**
+   * set_sample_end (mixer.c:197-217). `end` = 1: mark the channel's
+   * NOTE_SAMPLE_END (process_volume zeroes info_finalvol for it, and
+   * play_channel propagates NOTE_END); with QUIRK_RSTCHN the voice slot
+   * is fully freed (virt_resetvoice). `end` = 0: clear the flag — runs on
+   * every voice start (mixer.c:878).
+   */
+  private setSampleEnd(core: CoreIface, vi: VoiceState, end: 0 | 1): void {
+    const xcArr = core.channelStates;
+    if (xcArr === undefined || vi.chn < 0 || vi.chn >= xcArr.length) return;
+    const xc: ChannelState = xcArr[vi.chn]!;
+    if (end) {
+      xc.note_flags |= NoteFlag.SAMPLE_END;
+      if ((core.module?.quirks ?? 0) & Quirk.RSTCHN) {
+        core.virt?.resetVoice(core.voiceStates.indexOf(vi), false);
+      }
+    } else {
+      xc.note_flags &= ~NoteFlag.SAMPLE_END;
     }
   }
 

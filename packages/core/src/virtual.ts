@@ -3,10 +3,12 @@
 // A "virtual channel" is a player channel slot the effects run on
 import {
   Act,
+  NoteFlag,
   SampleFlags,
   VoiceFlag,
-  type Instrument,
   type VoiceState,
+  type ChannelState,
+  type Instrument,
 } from './model/model';
 
 /** PERIOD_BASE (period.h:6) — C0 period for note_to_period_mix. */
@@ -189,7 +191,7 @@ export class VirtualLayer {
     // background voice (chn >= num_tracks) with the lowest volume.
     let steal = -1;
     let stealVol = Number.MAX_VALUE;
-    for (let i = this.numTracks; i < this.voices.length; i++) {
+    for (let i = 0; i < this.voices.length; i++) {
       const v = this.voices[i]!;
       if (v.chn >= this.numTracks && v.vol < stealVol) {
         stealVol = v.vol;
@@ -228,36 +230,49 @@ export class VirtualLayer {
     if (chn < 0 || chn >= this.virtChannels) return VIRT_INVALID;
     if (ins.nsm === 0) smp = -1; /* C: ins < 0 → smp = -1; invalid ins has no subs */
     const curVoice = this.map[chn]!.voice;
-    // check_dct (virtual.c:434-471) applied to the channel's current voice
-    // (v0.1: the multi-voice sweep reduces to map[chn]; overflow voices
-    // checked in the re-home loop below). C order matters: first the
-    // nna==CUT hard reset, then act = nna, then the dct-gated DCA.
-    // C's mixer_voice.act is the NNA action tag (0..3) — mirrored here as
-    // voice.nnaAct; the player-facing `act` field stays TS-encoded.
-    if (curVoice !== VIRT_INVALID) {
-      const v = this.voices[curVoice]!;
-      if (v.root === chn && v.ins === insKey(ins)) {
+    // check_dct (virtual.c:434-471) — C sweeps ALL voice slots
+    // (virt_setpatch :499-506 loops i over maxvoc), matching each voice
+    // whose ROOT is this channel and instrument matches; it also catches
+    // leaked voices whose map entry was overwritten by a later note.
+    // C order matters: first the nna==CUT hard reset, then act = nna,
+    // then the dct-gated DCA.
+    if (dct !== 0 || nna === 0 /* XMP_INST_NNA_CUT */) {
+      for (let i = 0; i < this.voices.length; i++) {
+        const v = this.voices[i]!;
+        if (v.root !== chn || v.ins !== insKey(ins)) continue;
         if (nna === 0 /* XMP_INST_NNA_CUT */) {
-          this.resetVoice(curVoice, true);
-        } else {
-          v.nnaAct = nna;
-          let match = false;
-          switch (dct) {
-            case 3 /* DCT_INST */: match = true; break;
-            case 2 /* DCT_SMP  */: match = v.smp === smp; break;
-            case 1 /* DCT_NOTE */: match = v.key === key; break;
+          this.resetVoice(i, true);
+          continue;
+        }
+        // C: vi->act = nna (virtual.c:511) — the NNA action BECOMES the
+        // voice's act. Map NNA codes onto the player-facing Act enum so
+        // cstat reports OFF/FADE for background voices and process_volume
+        // actually fades them (VIRT_ACTION_OFF/FADE paths).
+        v.nnaAct = nna;
+        if (nna === 2 /* NNA_OFF */) v.act = Act.KEY;
+        else if (nna === 3 /* NNA_FADE */) v.act = Act.VOL;
+        let match = false;
+        switch (dct) {
+          case 3 /* DCT_INST */: match = true; break;
+          case 2 /* DCT_SMP  */: match = v.smp === smp; break;
+          case 1 /* DCT_NOTE */: match = v.key === key; break;
+        }
+        if (match) {
+          if (nna === 2 /* NNA_OFF */ && dca === 3 /* DCA_FADE */) {
+            v.nnaAct = 2; // VIRT_ACTION_OFF
+            v.act = Act.KEY;
+          } else if (dca !== 0) {
+            // C: i != voc || vi->act — the mapped voice has act set by the
+            // line above; background voices have i != voc.
+            v.nnaAct = dca;
+            if (dca === 2 /* DCA_OFF */) v.act = Act.KEY;
+            else if (dca === 3 /* DCA_FADE */) v.act = Act.VOL;
+            else v.act = Act.NOTE; // DCA_CONT
+          } else {
+            this.resetVoice(i, true);
           }
-          if (match) {
-            if (nna === 2 /* NNA_OFF */ && dca === 3 /* DCA_FADE */) {
-              v.nnaAct = 2; // VIRT_ACTION_OFF
-            } else if (dca !== 0) {
-              // i != voc || vi->act — the channel voice IS voc here with
-              // act just set, so the condition holds.
-              v.nnaAct = dca;
-            } else {
-              this.resetVoice(curVoice, true);
-            }
-            if (dca === 1 /* DCA_CONT */) this.map[chn]!.tail = curVoice;
+          if (dca === 1 /* DCA_CONT */ && i === (this.map[chn]!.voice)) {
+            this.map[chn]!.tail = i;
           }
         }
       }
@@ -267,8 +282,10 @@ export class VirtualLayer {
     // overflow channel and setpatch returns THAT channel (the local `chn`
     // is reassigned by the re-home loop, virtual.c:505-517, 546 return chn).
     const oldVoice = curVoice;
+    // C tests the voice's CURRENT act (virtual.c:512): any live voice —
+    // NOTE/KEY/VOL — is re-homed, not just one with an NNA queued.
     const oldActive =
-      oldVoice !== VIRT_INVALID && this.voices[oldVoice]!.nnaAct !== 0;
+      oldVoice !== VIRT_INVALID && this.voices[oldVoice]!.act !== Act.NONE;
     const vidx = this.allocVoice();
     if (vidx === VIRT_INVALID) return VIRT_INVALID;
     // alloc_voice (virtual.c:225) increments virt_used on allocation.
@@ -281,11 +298,18 @@ export class VirtualLayer {
       // (virtual.c:515-517). C's loop leaves `chn` at virt_channels when no
       // free slot exists, so --chn lands on the LAST channel — port that
       // edge case exactly.
+      // C: for (chn = num_tracks; chn < virt_channels &&
+      //        virt_channel[chn++].map > FREE;) ; — the slot is TESTED,
+      // then chn increments REGARDLESS. On exit chn is one PAST the free
+      // slot (or virt_channels when the pool is full), so --chn lands ON
+      // the free slot (or the last channel). Port the post-increment.
       let hunt = this.numTracks;
-      while (hunt < this.virtChannels && this.map[hunt]!.voice !== VIRT_INVALID) {
-        hunt++;
+      while (
+        hunt < this.virtChannels &&
+        this.map[hunt++]!.voice !== VIRT_INVALID
+      ) {
       }
-      to = hunt - 1; // C: --chn after the loop
+      to = hunt - 1;
       const ov = this.voices[oldVoice]!;
       ov.chn = to;
       this.map[to]!.voice = oldVoice;
@@ -306,6 +330,12 @@ export class VirtualLayer {
     v.smp = smp;
     v.note = note;
     v.key = key;
+    // mixer_setpatch tail (mixer.c:878): set_sample_end(ctx, voc, 0) —
+    // clear the channel's NOTE_SAMPLE_END on every voice start so a fresh
+    // note isn't muted by the previous one-shot's end mark.
+    this.channelStatesHook?.(chn, (xc) => {
+      xc.note_flags &= ~NoteFlag.SAMPLE_END;
+    });
     v.root = chn; /* root is the ROOT CHANNEL (virtual.c:271), not the note */
     v.act = Act.NOTE;
     v.nnaAct = nna;
@@ -577,13 +607,11 @@ export class VirtualLayer {
    * Wipes the voice but preserves anticlick decay (sleft/sright + ANTICLICK
    * flag). `mute` ramps volume to 0 through the mixer first.
    */
-  private resetVoice(vi: number, mute: boolean): void {
+  resetVoice(vi: number, mute: boolean): void {
     if (vi < 0 || vi >= this.voices.length) return;
     const v = this.voices[vi]!;
     if (mute) {
       v.vol = 0;
-    }
-    if (v.act !== Act.NONE && this.used > 0) {
       this.used--;
     }
     if (v.root >= 0 && v.root < this.map.length && this.map[v.root]) {
@@ -690,6 +718,26 @@ export class VirtualLayer {
         }
       }
     }
+    // set_sample_end(ctx, voc, 0) (mixer.c:878): every voice start clears
+    // the channel's NOTE_SAMPLE_END so process_volume reports/mixes it.
+    this.channelStatesHook?.(v.chn, (xc) => {
+      xc.note_flags &= ~NoteFlag.SAMPLE_END;
+    });
+  }
+
+  /**
+   * Channel-state hook installed by Core (avoids an import cycle). Used by
+   * setPatchVoice to mirror mixer.c:878 set_sample_end(ctx, voc, 0).
+   * Returns false when the channel index is out of range.
+   */
+  private channelStatesHook:
+    | ((chn: number, fn: (xc: ChannelState) => void) => boolean)
+    | null = null;
+
+  setChannelStatesHook(
+    fn: (chn: number, apply: (xc: ChannelState) => void) => boolean,
+  ): void {
+    this.channelStatesHook = fn;
   }
 
   /** Sample lookup hook installed by Core (avoids import cycle). */
@@ -768,7 +816,13 @@ export class VirtualLayer {
 
     // libxmp_mixer_setpatch + libxmp_mixer_setnote + ins/act/key assigns.
     this.setPatchVoice(voc, smp, true);
+    // C virt_setpatch (virtual.c:531): vi->chn = chn — the voice is bound
+    // to its virtual channel. Without this the voice looks FREE to
+    // allocVoice (chn = VIRT_INVALID from a reset) and the next note steals
+    // a live voice (two channels aliased on one slot).
     const v = this.voices[voc]!;
+    v.chn = chn;
+    v.root = chn;
     // mixer_setnote: clamp note > 149 (mixer.c:920-935).
     const clampedNote = note > 149 ? 149 : note;
     v.note = clampedNote;
@@ -802,12 +856,15 @@ export class VirtualLayer {
     switch (action) {
       case PastNote.CUT:
         // C: VIRT_ACTION_CUT → libxmp_virt_resetvoice(ctx, voc, 1) —
-        // the slot becomes fully reusable (chn = FREE).
+        // the slot becomes fully reusable (chn = FREE). C clears
+        // virt_channel[vi->chn].map BEFORE wiping the voice (the chn
+        // must still be valid when the map slot is unlinked).
+        if (this.map[v.chn]?.voice === vi) this.map[v.chn]!.voice = VIRT_INVALID;
         v.act = Act.NONE;
         v.vol = 0;
         v.flags |= VoiceFlag.ANTICLICK;
-        v.chn = VIRT_INVALID;
         if (this.map[v.root]?.voice === vi) this.map[v.root]!.voice = VIRT_INVALID;
+        v.chn = VIRT_INVALID;
         break;
       case PastNote.OFF:
         v.act = Act.KEY;

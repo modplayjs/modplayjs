@@ -4,7 +4,7 @@
 // check_invalid_sample, fix_period, is_same_sid.
 
 import type { ChannelState, Core, Event, SubInstrument } from '@modplayjs/core';
-import { EnvelopeFlags, Quirk } from '@modplayjs/core';
+import { Quirk } from '@modplayjs/core';
 import {
   RESET_NOTE,
   SET,
@@ -420,20 +420,14 @@ export function readEventIt(core: Core, e: Event, chn: number): void {
       if (isValidInstrument(core, xc.ins)) {
         env = mod.instruments[xc.ins]!.aei;
       }
-      if (env !== null && (env.flags & EnvelopeFlags.ON) !== 0) {
-        if (sustainCheckEnv(env, xc.v_idx)) {
-          /* See OpenMPT EnvOff.xm. In certain cases a release event is
-           * effective only in the next frame (read_event.c:637-642). */
-          SET_NOTE(xc, NoteFlag.SUSEXIT);
-        } else {
-          SET_NOTE(xc, NoteFlag.RELEASE);
-        }
+      /* C calls sustain_check(env, v_idx) directly: it returns 0 for a
+       * null envelope or one without ON/SUS — and the else branch then
+       * sets NOTE_RELEASE (read_event.c:1139-1143). No outer guard. */
+      if (sustainCheckEnv(env, xc.v_idx)) {
+        SET_NOTE(xc, NoteFlag.SUSEXIT);
       } else {
-        /* No volume envelope -> cut volume to 0 (read_event.c:644-646). */
-        xc.volume = 0;
+        SET_NOTE(xc, NoteFlag.RELEASE);
       }
-      /* Keyoff always begins fadeout (read_event.c:647). */
-      SET_NOTE(xc, NoteFlag.FADEOUT);
       SET(xc, VolSlideFlag.KEY_OFF);
       /* Use instrument volume if an instrument was explicitly
        * provided on this row (see OpenMPT NoteOffInstr.it row 4).

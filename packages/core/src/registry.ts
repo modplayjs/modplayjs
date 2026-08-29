@@ -58,6 +58,11 @@ export class Registries {
     return this.effectList;
   }
 
+  /** Registered DSPs in registration order. */
+  dspPlugins(): readonly DspPlugin[] {
+    return this.dspList;
+  }
+
   format(name: string): FormatPlugin {
     const p = this.formats.get(name);
     if (!p) throw new PluginNotFoundError(`no format plugin '${name}'`);

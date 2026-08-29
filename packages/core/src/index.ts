@@ -41,6 +41,7 @@ export {
   PeriodType,
   Interp,
   PluginKind,
+  NoteFlag,
 } from './model/constants';
 
 export {

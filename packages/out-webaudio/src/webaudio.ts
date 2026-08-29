@@ -13,8 +13,8 @@
 import type { Core, OutputPlugin } from '@modplayjs/core';
 import { StateError } from '@modplayjs/core';
 
-const RING_FRAMES = 16384; // ~0.37s at 44.1kHz
-const HIGH_WATER_FRAMES = RING_FRAMES / 2; // stop rendering above this
+const RING_FRAMES = 65536; // ~1.4s at 44.1kHz — survives main-thread hiccups
+const HIGH_WATER_FRAMES = RING_FRAMES / 2; // stop rendering above this (~0.7s buffered)
 const CHUNK_FRAMES = 2048; // copy-mode chunk size (frames; >= one tick)
 const COPY_HIGH_WATER_FRAMES = 8820; // ~200ms of buffered audio at 44.1k
 

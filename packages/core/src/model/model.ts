@@ -6,6 +6,7 @@
 
 import type { CoreState, Quirks, ReadEventType, PeriodType, FlowMode, Interp } from './constants';
 
+export { NoteFlag } from './constants';
 // ---------------------------------------------------------------------------
 // Module data (parsed, static)
 // ---------------------------------------------------------------------------

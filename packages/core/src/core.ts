@@ -45,7 +45,12 @@ import { VirtualLayer } from './virtual';
 import { SampleStore } from './samples';
 import { Scanner, OrdInfo } from './scan';
 import { resetFlow, processPatternLoop, processPatternJump, processPatternBreak } from './flow';
-import { processTick, VolSlideFlag } from '@modplayjs/effects-shared';
+import {
+  processTick,
+  VolSlideFlag,
+  TREMOR_FLAG,
+  RESET_PER,
+} from '@modplayjs/effects-shared';
 
 const MSN = (v: number) => (v >> 4) & 0x0f;
 const LSN = (v: number) => v & 0x0f;
@@ -311,6 +316,12 @@ export class Core implements CoreIface {
 
     this.virt.setSampleLookup((id) => this.samples.get(id));
     this.virt.setModuleRef(() => this._module);
+    this.virt.setChannelStatesHook((chn, apply) => {
+      const xc = this._xc[chn];
+      if (xc === undefined) return false;
+      apply(xc);
+      return true;
+    });
     this.virt.on(mod.chn, (mod.quirks & Quirk.VIRTUAL) !== 0);
     // f->loop = calloc(virt_channels) (player.c:2004) — the player's flow
     // state owns per-channel pattern-loop slots; scan uses its own copy.
@@ -396,16 +407,18 @@ export class Core implements CoreIface {
   // rendering
   // ------------------------------------------------------------------
 
-  /**
-   * Render exactly one tick into out (play_frame → softmixer). Returns
-   * interleaved floats written, or -1 at end-of-module.
-   */
+  /** Render exactly one tick into out (play_frame → softmixer). Returns
+   * interleaved floats written, or -1 at end-of-module. ticksize is
+   * recomputed EVERY tick (mixer.c:525 libxmp_mixer_prepare → :456
+   * get_ticksize) so a tempo change on the current row applies to the
+   * current tick's mix. */
   frame(out: Float32Array): number {
     if (this._state < CoreState.PLAYING) {
       throw new StateError('player not started');
     }
     const rc = this.playFrame();
     if (rc < 0) return rc;
+    this.recomputeTicksize();
     return this.mixTick(out);
   }
 
@@ -636,9 +649,12 @@ export class Core implements CoreIface {
       }
 
       if (isFt2) {
-        // Reset Kxx even if delayed (ft2_kxx.xm); reset tremor likewise.
+        // Reset Kxx even if delayed (ft2_kxx.xm); reset tremor FLAG likewise
+        // (player.c:829-832: RESET(TREMOR) clears per_flags, NOT tremor.count
+        // — zeroing the count would gate every post-note row's volume to 0
+        // in tremorFt2).
         xc.keyoff = 0;
-        xc.tremor.count = 0;
+        RESET_PER(xc, TREMOR_FLAG);
       }
 
       if (!this.checkDelay(event, chn)) {
@@ -648,6 +664,15 @@ export class Core implements CoreIface {
         ) {
           // Format plugin event reader (read_event_MOD/FT2/ST3/IT).
           this.registries.format(mod.format).readEvent(this, chn, row);
+          // Effect AND dsp plugin per-row hook (T8 contract: DspPlugin.onRow).
+          // The paula DSP needs onRow to restart its sample accumulator on
+          // new notes (its position lives outside the core voice state).
+          for (const ep of this.registries.effectPlugins()) {
+            ep.onRow?.(this, chn, event);
+          }
+          for (const dp of this.registries.dspPlugins()) {
+            dp.onRow?.(this, chn, event);
+          }
         }
       } else if (mod.readEventType === 3 /* IT */) {
         xc.flags = 0;
@@ -798,11 +823,14 @@ export class Core implements CoreIface {
     this._s.ticksize = ts > 0 ? ts : 1 << ANTICLICK_SHIFT;
   }
 
-  /** Render one tick worth of audio via the active DSP. */
+  /** Render one tick worth of audio via the active DSP (fixed ticksize return). */
   private mixTick(out: Float32Array): number {
-    const dsp = this.dsp();
-    dsp.renderFrame(this as unknown as CoreIface, out, 1);
-    return out.length;
+    this.dsp().renderFrame(this as unknown as CoreIface, out, 1);
+    // C xmp_play_buffer advances by fi.buffer_size = ticksize × chn × sample_size —
+    // the FIXED per-tick byte count, not the caller's buffer length. Returning
+    // out.length here made playBuffer believe one tick filled the whole buffer
+    // (5× stretched output with an uninitialized tail).
+    return this.ticksize * 2;
   }
 
   // Internal accessors used by DSP/effect plumbing.

@@ -37,6 +37,26 @@ export const Quirk = {
 
 export type Quirks = number;
 
+/**
+ * Note flags (player.h:59-70). Shared by core, DSP, and effects layers —
+ * declared here so the mixer's set_sample_end port can reach them without
+ * inverting the package layering (C: mixer.c:29 includes player.h).
+ */
+export const NoteFlag = {
+  FADEOUT: 1 << 0,
+  ENV_RELEASE: 1 << 1,
+  END: 1 << 2,
+  CUT: 1 << 3,
+  ENV_END: 1 << 4,
+  SAMPLE_END: 1 << 5,
+  SET: 1 << 6,
+  SUSEXIT: 1 << 7,
+  KEY_CUT: 1 << 8,
+  GLISSANDO: 1 << 9,
+  SAMPLE_RELEASE: 1 << 10,
+  RELEASE: (1 << 1) | (1 << 10),
+} as const;
+
 /** Format quirk bundles, mirroring QUIRKS_ST3 / QUIRKS_FT2 / QUIRKS_IT. */
 export const QUIRKS_ST3: Quirks =
   Quirk.S3MLOOP | Quirk.VOLPDN | Quirk.FINEFX | Quirk.S3MRTG | Quirk.MARKER | Quirk.RSTCHN;
