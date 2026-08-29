@@ -91,6 +91,50 @@ export function fxVolSet(core: Core, xc: ChannelState, fxp: number): void {
   }
 }
 
+/** FX_TRK_VSLIDE (effects.c:731-763): IT "N" channel-volume slide. */
+export function fxTrkVSlide(core: Core, xc: ChannelState, fxpIn: number): void {
+  let fxp = fxpIn;
+
+  if (fxp === 0) {
+    const mem = xc.trackvol.memory;
+    if (mem === 0) return;
+    fxp = mem;
+  }
+
+  if (hasQuirk(core, Quirk.FINEFX)) {
+    const h = MSN(fxp);
+    const l = LSN(fxp);
+    if (h === 0xf && l !== 0) {
+      xc.trackvol.memory = fxp;
+      fxTrkFVSlide(xc, fxp & 0x0f);
+      return;
+    } else if (l === 0xf && h !== 0) {
+      xc.trackvol.memory = fxp;
+      fxTrkFVSlide(xc, fxp & 0xf0);
+      return;
+    }
+  }
+
+  SET(xc, VolSlideFlag.TRK_VSLIDE);
+  if (fxp) {
+    const h = MSN(fxp);
+    const l = LSN(fxp);
+    xc.trackvol.memory = fxp;
+    if (hasQuirk(core, Quirk.VOLPDN)) {
+      xc.trackvol.slide = l ? -l : h;
+    } else {
+      xc.trackvol.slide = h ? h : -l;
+    }
+  }
+}
+
+/** FX_TRK_FVSLIDE (effects.c:764-772): IT channel-volume fine slide. */
+export function fxTrkFVSlide(xc: ChannelState, fxp: number): void {
+  SET(xc, VolSlideFlag.TRK_FVSLIDE);
+  if (fxp) {
+    xc.trackvol.fslide = MSN(fxp) - LSN(fxp);
+  }
+}
 // -- pan ----------------------------------------------------------------------
 
 /** FX_SETPAN body incl. EX_SETPAN target (effects.c:279-283). */

@@ -19,8 +19,8 @@ function noteToPeriodMix(n: number, b: number): number {
   return PERIOD_BASE / Math.pow(2, (n + b / 12800) / 12);
 }
 
-/** maxvoc: maximum simultaneous voices (libxmp default 64). */
-const MAXVOICES = 64;
+/** SMIX_NUMVOC (mixer.h:8) — libxmp's default softmixer voice count. */
+const MAXVOICES = 128;
 
 /** Reason codes passed to virt_release, mirroring read_event.c pastnote usage. */
 export const PastNote = {
@@ -166,14 +166,16 @@ export class VirtualLayer {
     return this.used;
   }
 
-  /** Find a free voice slot; none → VIRT_INVALID (graceful silence, no OOB). */
   private allocVoice(): number {
     if (this.used < MAXVOICES && this.used >= this.voices.length) {
       this.voices.push(makeVoice(this.voices.length));
     }
     // Free slots: reset voices (chn = FREE).
     for (let i = 0; i < this.voices.length; i++) {
-      if (this.voices[i]!.chn === VIRT_INVALID) return i;
+      if (this.voices[i]!.chn === VIRT_INVALID) {
+        this.used++; /* alloc_voice (virtual.c:225): virt_used++ */
+        return i;
+      }
     }
     // Garbage-collect dead slots: act cleared but the slot still bound
     // to a channel whose map has moved on (one-shot samples that ran to
@@ -184,6 +186,7 @@ export class VirtualLayer {
       const v = this.voices[i]!;
       if (v.act === Act.NONE && v.chn >= 0 && v.chn < this.map.length && this.map[v.chn]!.voice !== i) {
         this.resetVoice(i, false);
+        this.used++; /* slot recycled: alloc_voice's virt_used++ */
         return i;
       }
     }
@@ -200,11 +203,13 @@ export class VirtualLayer {
     }
     if (steal >= 0) {
       this.resetVoice(steal, false);
+      this.used++; /* slot recycled: alloc_voice's virt_used++ */
       return steal;
     }
     if (this.voices.length < MAXVOICES) {
       const idx = this.voices.length;
       this.voices.push(makeVoice(idx));
+      this.used++; /* alloc_voice (virtual.c:225): virt_used++ */
       return idx;
     }
     return VIRT_INVALID;
@@ -288,8 +293,6 @@ export class VirtualLayer {
       oldVoice !== VIRT_INVALID && this.voices[oldVoice]!.act !== Act.NONE;
     const vidx = this.allocVoice();
     if (vidx === VIRT_INVALID) return VIRT_INVALID;
-    // alloc_voice (virtual.c:225) increments virt_used on allocation.
-    this.used++;
     this.map[chn]!.voice = vidx;
 
     let to = chn;
@@ -630,9 +633,12 @@ export class VirtualLayer {
   resetVoice(vi: number, mute: boolean): void {
     if (vi < 0 || vi >= this.voices.length) return;
     const v = this.voices[vi]!;
+    // virt_resetvoice (:79-97): virt_used-- on EVERY reset; `mute` only
+    // ramps the volume first. Gating the decrement on `mute` leaked the
+    // pool counter, which then steered allocVoice differently from C.
+    this.used--;
     if (mute) {
       v.vol = 0;
-      this.used--;
     }
     if (v.root >= 0 && v.root < this.map.length && this.map[v.root]) {
       // virt_channel[vi->root].count-- — the TS map has no per-root count;
@@ -826,7 +832,6 @@ export class VirtualLayer {
       voc = this.allocVoice();
       if (voc === VIRT_INVALID) return VIRT_INVALID;
       this.map[chn]!.voice = voc;
-      this.used++;
     }
 
     if (smp < 0) {
@@ -876,17 +881,11 @@ export class VirtualLayer {
     if (!v || v.act === Act.NONE) return;
     switch (action) {
       case PastNote.CUT:
-        // C: VIRT_ACTION_CUT → libxmp_virt_resetvoice(ctx, voc, 1) —
-        // the slot becomes fully reusable (chn = FREE). C clears
-        // virt_channel[vi->chn].map BEFORE wiping the voice (the chn
-        // must still be valid when the map slot is unlinked).
-        if (this.map[v.chn]?.voice === vi) this.map[v.chn]!.voice = VIRT_INVALID;
-        v.act = Act.NONE;
-        v.vol = 0;
-        v.flags |= VoiceFlag.ANTICLICK;
-        if (this.map[v.root]?.voice === vi) this.map[v.root]!.voice = VIRT_INVALID;
-        v.chn = VIRT_INVALID;
-        break;
+        // C: VIRT_ACTION_CUT → libxmp_virt_resetvoice(ctx, voc, 1) — the
+        // slot becomes fully reusable (chn = FREE) and virt_used drops.
+        // Wiping the fields inline skipped the reset, leaking pool slots.
+        this.resetVoice(vi, true);
+        return;
       case PastNote.OFF:
         v.act = Act.KEY;
         v.flags |= VoiceFlag.RELEASE | VoiceFlag.ANTICLICK;

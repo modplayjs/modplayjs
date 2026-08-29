@@ -23,6 +23,8 @@ import {
   fxVolSlide,
   fxVslideUp2,
   fxVolSet,
+  fxTrkVSlide,
+  fxTrkFVSlide,
   fxSetPan,
   fxPanSlide,
   fxItPanSlide,
@@ -395,6 +397,17 @@ function processRest(
       break;
     case FX.FX_VOLSET:
       fxVolSet(core, xc, fxp);
+      break;
+    case FX.FX_TRK_VOL: /* Track volume setting (effects.c:726-730) */
+      if (fxp <= mod.volbase) {
+        xc.mastervol = fxp;
+      }
+      break;
+    case FX.FX_TRK_VSLIDE: /* Track volume slide (effects.c:731-763) */
+      fxTrkVSlide(core, xc, fxp);
+      break;
+    case FX.FX_TRK_FVSLIDE: /* Track fine volume slide (effects.c:764-772) */
+      fxTrkFVSlide(xc, fxp);
       break;
     case FX.FX_BREAK:
       hooks.patternBreak
