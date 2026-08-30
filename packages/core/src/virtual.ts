@@ -127,6 +127,12 @@ export class VirtualLayer {
       this.map.push({ voice: VIRT_INVALID, tail: VIRT_INVALID });
     }
     this.used = 0;
+    // virtual.c:119-126: C calloc's ALL maxvoc slots upfront so alloc_voice
+    // always finds a free slot instead of having to lazily grow the pool.
+    for (let i = 0; i < MAXVOICES; i++) {
+      this.voices.push(makeVoice(i));
+    }
+    this.setChannelMute([]);
   }
 
   /** Free everything (virt_off, virtual.c:170). */
