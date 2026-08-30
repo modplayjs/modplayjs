@@ -791,8 +791,9 @@ export function modLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   // Channel defaults (load_helpers.c:294-339): pan LRLR, vol 0x40, flg 0.
   const channels: Channel[] = [];
   for (let i = 0; i < chn; i++) {
-    const pan = (((i + 1) / 2) % 2) * 0xff;
-    channels.push({ pan: 0x80 + (pan - 0x80), vol: 0x40, flg: 0 }); // defpan=100
+    // C integer division: (i+1)/2 truncates. ch0/ch3 → 0, ch1/ch2 → 255.
+    const pan = Math.floor((i + 1) / 2) % 2 * 0xff;
+    channels.push({ pan: Math.min(255, Math.max(0, 0x80 + (pan - 0x80))), vol: 0x40, flg: 0 });
   }
 
   const mod: ModuleData = {
