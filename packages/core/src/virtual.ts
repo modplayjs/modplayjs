@@ -463,9 +463,9 @@ export class VirtualLayer {
     const xxs = this.getSampleFor(v.smp);
     if (!xxs) return true;
 
-    v.pos = Math.floor(pos);
-    v.frac = Math.round((pos - Math.floor(pos)) * (1 << 16)) & 0xffff;
-    v.pos0 = v.pos;
+    v.pos = pos; // mixer_voicepos double pos (mixer.c:821)
+    v.frac = pos - Math.trunc(pos); // round-trip only; mixer re-derives
+    v.pos0 = Math.trunc(pos);
     this.adjustVoiceEndV(v, xxs);
 
     if (v.pos >= v.end) {

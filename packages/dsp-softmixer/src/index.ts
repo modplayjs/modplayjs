@@ -159,14 +159,14 @@ export class SoftMixer implements DspPlugin {
           (~vi.flags & VoiceFlag.RELEASE) !== 0;
         let start = vi.start, end = vi.end;
 
-        // step (:584) + sanity (:586-588). C converts the float step to
-        // 16.16 fixed point: step_dir × (1 << SMIX_SHIFT) (mixer.c:704).
+        // step (:584) + sanity (:586-588). C keeps the double step for the
+        // chunk-boundary pos commit (mixer.c:703) and converts to fixed
+        // point per chunk (mix_fn int parameter truncation).
         const c5spd = xxs.c5spd ?? mod.c4rate;
         const stepFloat = (C4_PERIOD * c5spd) / s.freq / vi.period;
         if (!Number.isFinite(stepFloat) || stepFloat < 0.001 || stepFloat > SHRT_MAX) {
           continue;
         }
-        const stepFixed = Math.trunc(stepFloat * (1 << SMIX_SHIFT));
 
         // Ramp setup (anticlick, :590-591 + :759-760 tail).
         const rampsize = ticksize >> 3 /* ANTICLICK_SHIFT */;
@@ -180,35 +180,41 @@ export class SoftMixer implements DspPlugin {
         let rampDone = 0;
         const reverse = (vi.flags & VoiceFlag.VOICE_REVERSE) !== 0;
 
+        let usmp = ticksize;
         while (size > 0) {
-          // Samples until loop break/end (:604-629).
+          // Samples until loop break/end (:604-629). C keeps vi->pos as a
+          // DOUBLE in the voice struct (mixer.h:27) and advances it per
+          // chunk with the double step (mixer.c:703).
           let samples: number;
           let stepDir: number;
           if (!reverse) {
             if (vi.pos >= end) {
               samples = 0;
-              size--;
-              if (size <= 0) break;
-              continue;
+              if (--usmp <= 0) break;
             } else {
               let c = Math.ceil((end - vi.pos) / stepFloat);
               if (c > size) c = size;
               samples = c;
             }
-            stepDir = stepFixed;
+            stepDir = stepFloat;
           } else {
             if (vi.pos <= start) {
               samples = 0;
-              size--;
-              if (size <= 0) break;
-              continue;
+              if (--usmp <= 0) break;
             } else {
               let c = Math.ceil((vi.pos - start) / stepFloat);
               if (c > size) c = size;
               samples = c;
             }
-            stepDir = -stepFixed;
+            stepDir = -stepFloat;
           }
+
+          // VAR_NORM (mix_all.c:181-184): convert the double pos into the
+          // chunk-local integer pos + 16-bit frac. C resets this at every
+          // mix_fn call — the integer accumulation never crosses chunks.
+          let posInt = Math.trunc(vi.pos);
+          let frac = Math.round((vi.pos - posInt) * (1 << SMIX_SHIFT));
+          const stepFixed = Math.trunc(stepDir * (1 << SMIX_SHIFT));
 
           // Mix `samples` frames (:631-714), when audible.
           if (vi.vol !== 0) {
@@ -243,19 +249,21 @@ export class SoftMixer implements DspPlugin {
             const rampFrames = Math.min(samples, rampLeft);
             for (let n = 0; n < samples; n++) {
               const idx = chunkPos + n * 2;
-              const lSmp = kernel(xxs.data, vi.pos, vi.frac);
+              const lSmp = kernel(xxs.data, posInt, frac);
               const gainL = n < rampFrames ? oldVlF + lRampF * (rampDone + n) : lVolF;
               const gainR = n < rampFrames ? oldVrF + rRampF * (rampDone + n) : rVolF;
               // stereo output (always interleaved stereo here).
               out[idx] = (out[idx] ?? 0) + lSmp * gainL;
               out[idx + 1] = (out[idx + 1] ?? 0) + lSmp * gainR;
               // UPDATE_POS (mix_all.c:94-98): frac += step; pos += frac>>16;
-              // frac &= 0xFFFF. Runs once per frame for audible AND silent
-              // voices (C's no-op mixer fn still advances pos).
-              vi.frac += stepDir;
-              vi.pos += vi.frac >> SMIX_SHIFT;
-              vi.frac &= SMIX_MASK;
+              // frac &= SMIX_MASK. Chunk-local integer accumulation.
+              frac += stepFixed;
+              posInt += frac >> SMIX_SHIFT;
+              frac &= SMIX_MASK;
             }
+            // Commit back to the double pos (mixer.c:703): pos += step_dir
+            // × samples. The int/frac pair is discarded here.
+            vi.pos += stepDir * samples;
             rampDone += rampFrames;
             rampLeft -= rampFrames;
             vi.old_vl += samples * deltaL;
@@ -266,12 +274,9 @@ export class SoftMixer implements DspPlugin {
             vi.sleft = (out[lastIdx] ?? 0) - prevL;
             vi.sright = (out[lastIdx + 1] ?? 0) - prevR;
           } else {
-            // Inaudible voice: C's zero-gain mixer fn still advances pos.
-            for (let n = 0; n < samples; n++) {
-              vi.frac += stepDir;
-              vi.pos += vi.frac >> SMIX_SHIFT;
-              vi.frac &= SMIX_MASK;
-            }
+            // Inaudible voice: C's zero-gain mixer fn still advances pos
+            // (mixer.c:703 — same double commit, no buffer writes).
+            vi.pos += stepDir * samples;
           }
 
           size -= samples;

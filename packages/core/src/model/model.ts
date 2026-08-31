@@ -589,9 +589,11 @@ export interface VoiceState {
   vol: number;
   /** Current period (float). */
   period: number;
-  /** Position in sample (integer, 16.16 fixed-point: integer part). */
+  /** Position in sample (C mixer_voice.pos — DOUBLE; the mixer converts
+   * to chunk-local int pos + frac per mix_fn call, VAR_NORM). */
   pos: number;
-  /** Fractional position accumulator (0..0xFFFF, C mixer_voice.frac). */
+  /** Fractional part of pos as fixed-point (C derives it per chunk; kept
+   * here only for voicePos()/getVoicePos() round-trips). */
   frac: number;
   /** Position before this tick's mixing. */
   pos0: number;

@@ -384,7 +384,7 @@ export function modLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
       gvl: 0,
       pan: -1, // XMP_INST_NO_DEFAULT_PAN
       xpo: 0,
-      fin: (hins.finetune << 4) & 0xff, // (int8)((uint8)finetune << 4)
+      fin: (((hins.finetune << 4) & 0xff) << 24) >> 24, // (int8)((uint8)finetune << 4)
       vwf: 0,
       vde: 0,
       vra: 0,

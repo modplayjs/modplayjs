@@ -152,10 +152,11 @@ function normalize(raw: RawSample, id: number): SampleData {
 
   if (is16bit && (df & DecodeFlag.BIGEND)) convertEndian(bytes, len * (stereo ? 2 : 1));
 
+  // DecodeFlag.DIFF (0x100) only. NOTE: 0x200 is SAMPLE_FLAG_FULLREP (loader.h:20) —
+  // it is a load-behaviour flag, NOT a decode flag; it must never trigger convertDelta.
+  // C's SAMPLE_FLAG_8BDIFF (0x0004) is unused by any ported loader; no DIFF8 branch.
   if (df & DecodeFlag.DIFF) {
     convertDelta(bytes, len, is16bit, stereo ? 2 : 1);
-  } else if (df & DecodeFlag.DIFF8) {
-    convertDelta(bytes, is16bit ? len * 2 : len, false, stereo ? 2 : 1);
   }
 
   if (df & DecodeFlag.UNSIGNED) convertSignal(bytes, len * (stereo ? 2 : 1) * (is16bit ? 2 : 1), is16bit);
@@ -176,9 +177,14 @@ function normalize(raw: RawSample, id: number): SampleData {
     bytes = out;
   }
 
-  // Normalize to Float32 mono-or-stereo interleaved [-1,1).
+  // Reads past `length` must yield 0. libxmp allocates guard bytes
+  // (sample.c:309-318, 408-417) but the empirical render (C ch2 solo, Vegas
+  // tick 0 f581-591) shows the mixer interpolating toward ZERO past the
+  // last frame — the tail guard never reaches the mixed output. The
+  // Float32Array's zero-fill provides exactly that; do NOT replicate the
+  // last frame into the tail.
   const chnCount = stereo ? 2 : 1;
-  const floats = new Float32Array(len * chnCount);
+  const floats = new Float32Array(len * chnCount + 4 * chnCount);
   if (is16bit) {
     const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     for (let i = 0; i < len * chnCount; i++) floats[i] = clamp16(dv.getInt16(i * 2, true)) / 32768;
