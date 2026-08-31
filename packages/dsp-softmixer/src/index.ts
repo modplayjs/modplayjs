@@ -28,7 +28,7 @@ import {
   type SampleData,
   type ChannelState,
 } from '@modplayjs/core';
-import { KERNELS, C4_PERIOD, type KernelName } from './kernels';
+import { KERNELS, C4_PERIOD, SMIX_SHIFT, SMIX_MASK, type KernelName } from './kernels';
 
 /** mixer.c:36 DOWNMIX_SHIFT — float model keeps relative amplitude parity. */
 const SHRT_MAX = 0x7fff;
@@ -159,12 +159,14 @@ export class SoftMixer implements DspPlugin {
           (~vi.flags & VoiceFlag.RELEASE) !== 0;
         let start = vi.start, end = vi.end;
 
-        // step (:584) + sanity (:586-588).
+        // step (:584) + sanity (:586-588). C converts the float step to
+        // 16.16 fixed point: step_dir × (1 << SMIX_SHIFT) (mixer.c:704).
         const c5spd = xxs.c5spd ?? mod.c4rate;
-        const step = (C4_PERIOD * c5spd) / s.freq / vi.period;
-        if (!Number.isFinite(step) || step < 0.001 || step > SHRT_MAX) {
+        const stepFloat = (C4_PERIOD * c5spd) / s.freq / vi.period;
+        if (!Number.isFinite(stepFloat) || stepFloat < 0.001 || stepFloat > SHRT_MAX) {
           continue;
         }
+        const stepFixed = Math.trunc(stepFloat * (1 << SMIX_SHIFT));
 
         // Ramp setup (anticlick, :590-591 + :759-760 tail).
         const rampsize = ticksize >> 3 /* ANTICLICK_SHIFT */;
@@ -189,11 +191,11 @@ export class SoftMixer implements DspPlugin {
               if (size <= 0) break;
               continue;
             } else {
-              let c = Math.ceil((end - vi.pos) / step);
+              let c = Math.ceil((end - vi.pos) / stepFloat);
               if (c > size) c = size;
               samples = c;
             }
-            stepDir = step;
+            stepDir = stepFixed;
           } else {
             if (vi.pos <= start) {
               samples = 0;
@@ -201,11 +203,11 @@ export class SoftMixer implements DspPlugin {
               if (size <= 0) break;
               continue;
             } else {
-              let c = Math.ceil((vi.pos - start) / step);
+              let c = Math.ceil((vi.pos - start) / stepFloat);
               if (c > size) c = size;
               samples = c;
             }
-            stepDir = -step;
+            stepDir = -stepFixed;
           }
 
           // Mix `samples` frames (:631-714), when audible.
@@ -241,16 +243,18 @@ export class SoftMixer implements DspPlugin {
             const rampFrames = Math.min(samples, rampLeft);
             for (let n = 0; n < samples; n++) {
               const idx = chunkPos + n * 2;
-              const lSmp = kernel(xxs.data, vi.pos);
+              const lSmp = kernel(xxs.data, vi.pos, vi.frac);
               const gainL = n < rampFrames ? oldVlF + lRampF * (rampDone + n) : lVolF;
               const gainR = n < rampFrames ? oldVrF + rRampF * (rampDone + n) : rVolF;
               // stereo output (always interleaved stereo here).
               out[idx] = (out[idx] ?? 0) + lSmp * gainL;
               out[idx + 1] = (out[idx + 1] ?? 0) + lSmp * gainR;
-              // Fractional accumulator UPDATE_POS (mix_all.c:94-98) — runs
-              // once per frame for audible AND silent voices (C's no-op
-              // mixer fn still advances pos).
-              vi.pos += stepDir;
+              // UPDATE_POS (mix_all.c:94-98): frac += step; pos += frac>>16;
+              // frac &= 0xFFFF. Runs once per frame for audible AND silent
+              // voices (C's no-op mixer fn still advances pos).
+              vi.frac += stepDir;
+              vi.pos += vi.frac >> SMIX_SHIFT;
+              vi.frac &= SMIX_MASK;
             }
             rampDone += rampFrames;
             rampLeft -= rampFrames;
@@ -263,7 +267,11 @@ export class SoftMixer implements DspPlugin {
             vi.sright = (out[lastIdx + 1] ?? 0) - prevR;
           } else {
             // Inaudible voice: C's zero-gain mixer fn still advances pos.
-            vi.pos += stepDir * samples;
+            for (let n = 0; n < samples; n++) {
+              vi.frac += stepDir;
+              vi.pos += vi.frac >> SMIX_SHIFT;
+              vi.frac &= SMIX_MASK;
+            }
           }
 
           size -= samples;

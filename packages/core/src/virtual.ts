@@ -77,6 +77,7 @@ function makeVoice(chn: number): VoiceState {
     vol: 0,
     period: 0,
     pos: 0,
+    frac: 0,
     pos0: 0,
     fidx: 0,
     ins: -1,
@@ -462,9 +463,9 @@ export class VirtualLayer {
     const xxs = this.getSampleFor(v.smp);
     if (!xxs) return true;
 
-    v.pos = pos;
-    v.pos0 = pos;
-
+    v.pos = Math.floor(pos);
+    v.frac = Math.round((pos - Math.floor(pos)) * (1 << 16)) & 0xffff;
+    v.pos0 = v.pos;
     this.adjustVoiceEndV(v, xxs);
 
     if (v.pos >= v.end) {

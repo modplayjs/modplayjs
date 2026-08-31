@@ -589,8 +589,10 @@ export interface VoiceState {
   vol: number;
   /** Current period (float). */
   period: number;
-  /** Position in sample (float, fractional). */
+  /** Position in sample (integer, 16.16 fixed-point: integer part). */
   pos: number;
+  /** Fractional position accumulator (0..0xFFFF, C mixer_voice.frac). */
+  frac: number;
   /** Position before this tick's mixing. */
   pos0: number;
   /** Mixer function index (kernel + stereo flags). */
