@@ -41,6 +41,11 @@ export class WebAudioOutput implements OutputPlugin {
 
   /** Diagnostics for the demo status line (T22/T23). */
   readonly debugInfo = { renderedFrames: 0, postedChunks: 0, copyDepth: 0 };
+  /** Fired once when the module's playback reaches the end of the last
+   * order (playBuffer returns -1 with an empty buffer). The transport has
+   * been stopped by the time this fires; the player state remains. */
+  onEnded: (() => void) | null = null;
+  private endedFired = false;
   /** Current transport ('sab' | 'copy') and AudioContext state. */
   get transportMode(): 'sab' | 'copy' | 'idle' {
     if (!this.running && this.node === null) return 'idle';
@@ -139,6 +144,7 @@ export class WebAudioOutput implements OutputPlugin {
     }
 
     this.running = true;
+    this.endedFired = false;
     this.copyPostedFrames = 0;
     this.copyDepth = 0; // worklet FIFO starts empty
     // Render-ahead loop: setInterval drives playBuffer; keeps the ring
@@ -239,7 +245,20 @@ export class WebAudioOutput implements OutputPlugin {
       // request must never exceed it (playBuffer would write past the end).
       const frames = Math.min(space, CHUNK_FRAMES * 4);
       const n = core.playBuffer(scratch, frames * 2, 1);
-      if (n <= 0) return; // module ended; keep the ring as-is
+      if (n <= 0) {
+        // Module ended (playBuffer -1: start-of-buffer end-of-replay).
+        // The ring still holds ~150ms of rendered audio; let the worklet
+        // drain it before stopping the transport (suspending now would cut
+        // the final frames).
+        if (!this.endedFired) {
+          this.endedFired = true;
+          window.setTimeout(() => {
+            this.stop();
+            this.onEnded?.();
+          }, 250);
+        }
+        return;
+      }
       let s = 0;
       while (s < n) {
         const idx = write % capacity;
@@ -274,7 +293,18 @@ export class WebAudioOutput implements OutputPlugin {
     const scratchFloats = needFrames * 2;
     const scratch = this.renderScratch ?? (this.renderScratch = new Float32Array(CHUNK_FRAMES * 2 * 4));
     const n = core2.playBuffer(scratch, scratchFloats, 1);
-    if (n <= 0) return;
+    if (n <= 0) {
+      // Copy mode: the worklet FIFO still holds posted chunks; drain before
+      // stopping (same rationale as the SAB path).
+      if (!this.endedFired) {
+        this.endedFired = true;
+        window.setTimeout(() => {
+          this.stop();
+          this.onEnded?.();
+        }, 250);
+      }
+      return;
+    }
     this.copyPostedFrames += n / 2;
     // Depth decays as the device consumes: consume-rate ≈ device rate for
     // the elapsed interval; the next 'depth' message corrects drift exactly.

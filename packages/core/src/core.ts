@@ -227,6 +227,12 @@ export class Core implements CoreIface {
    */
   loadModule(bytes: Uint8Array): void {
     if (this._state === CoreState.PLAYING) this.stopPlayer();
+    // xmp_load_module releases the previous module first (load.c:584-604):
+    // its samples are freed. Our store keys samples by a running ID, so
+    // without this a second load's voices resolve STALE samples from the
+    // previous module (wrong pitch / wrong data — the demo file-switch
+    // regression). Reset the ID counter too.
+    this.samples.clear();
     const fmt = this.registries.formatFor(bytes);
     if (!fmt) {
       // Match unknown-format error semantics of libxmp_load_module.
@@ -366,6 +372,18 @@ export class Core implements CoreIface {
   setSampleRate(hz: number): void {
     this._s.freq = hz;
     this.recomputeTicksize();
+  }
+
+  /** Stereo mixing / pan separation (xmp_set_player XMP_PLAYER_MIX,
+   * control.c:446 → s->mix). 100 = full stereo field as panned; 0 =
+   * mono downmix; values above 100 push the field wider. Consumed in
+   * process_pan (player.c:1402): finalpan = (finalpan - 0x80) × mix / 100. */
+  setPanSeparation(v: number): void {
+    this._s.mix = Math.max(0, Math.min(v, 200));
+  }
+
+  getPanSeparation(): number {
+    return this._s.mix;
   }
 
   setTempoFactor(f: number): void {

@@ -19,6 +19,8 @@ const playBtn = document.getElementById('play') as HTMLButtonElement;
 const pauseBtn = document.getElementById('pause') as HTMLButtonElement;
 const stopBtn = document.getElementById('stop') as HTMLButtonElement;
 const followChk = document.getElementById('follow') as HTMLInputElement;
+const panSep = document.getElementById('pansep') as HTMLInputElement;
+const panSepV = document.getElementById('pansepv') as HTMLSpanElement;
 const status = document.getElementById('status') as HTMLPreElement;
 const infoEl = document.getElementById('info') as HTMLDivElement;
 const ordEl = document.getElementById('ordlist') as HTMLDivElement;
@@ -37,6 +39,23 @@ core.registries.registerDsp(createPaulaPlugin());
 core.registries.registerDsp(createSoftMixerPlugin());
 
 const output = new WebAudioOutput();
+
+panSep.addEventListener('input', () => {
+  const v = Number(panSep.value);
+  core.setPanSeparation(v);
+  panSepV.textContent = String(v);
+});
+
+// end-of-track: reset the transport buttons (the output stops itself and
+// fires onEnded after the final ring drains)
+output.onEnded = () => {
+  playing = false;
+  paused = false;
+  stopBtn.disabled = true;
+  pauseBtn.disabled = true;
+  pauseBtn.textContent = 'Pause';
+  show('end of track');
+};
 
 let loaded = false;
 let playing = false;
@@ -241,6 +260,7 @@ fileInput.addEventListener('change', async () => {
     core.setDsp('softmixer');
     loaded = true;
     playBtn.disabled = false;
+    playBtn.textContent = 'Play';
     pauseBtn.disabled = true;
     stopBtn.disabled = true;
 
@@ -286,7 +306,6 @@ playBtn.addEventListener('click', async () => {
     paused = false;
     pauseBtn.disabled = false;
     stopBtn.disabled = false;
-    playBtn.textContent = 'Restart';
     show(
       'playing | DSP: ' + core.dsp().name + ' | rate: ' +
       output.audioContextSampleRate + ' Hz',
@@ -323,6 +342,7 @@ stopBtn.addEventListener('click', () => {
   paused = false;
   stopBtn.disabled = true;
   pauseBtn.disabled = true;
+  playBtn.textContent = 'Play';
   pauseBtn.textContent = 'Pause';
   show('stopped');
 });
