@@ -798,6 +798,7 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     xxi.nsm = sih.length > 0 ? 1 : 0;
 
     const raw: RawSample = {
+      name: name, // copyAdjust(sih.name, 28)
       data: new Uint8Array(0),
       length: sih.length,
       loopStart: sih.loopbeg,

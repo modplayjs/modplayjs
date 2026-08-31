@@ -67,6 +67,8 @@ export type SampleFlags = number;
  * Mirrors struct xmp_sample (xmp.h:233-244).
  */
 export interface SampleData {
+  /** Sample name from the file header. */
+  name: string;
   /** Stable sample id (index into ModuleData.samples); voices reference by ID. */
   id: number;
   /** Decoded mono float samples, normalized to [-1, 1]. */
@@ -92,6 +94,8 @@ export interface SampleData {
 
 /** Raw sample bytes handed from a format plugin to the core sample store. */
 export interface RawSample {
+  /** Sample name from the file header (xxs->name, libxmp_copy_adjust). */
+  name?: string;
   /** Mono byte data (stereo already downmixed by the loader, or STEREO flag set). */
   data: Uint8Array;
   /** Length in samples (for STEREO, frames per channel). */

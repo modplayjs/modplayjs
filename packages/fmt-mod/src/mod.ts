@@ -404,6 +404,7 @@ export function modLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     instruments.push(ins);
 
     rawSamples.push({
+      name, // libxmp_copy_adjust(xxs->name, ish.name, 22) — the slot name
       data: new Uint8Array(0), // filled below; meta fields kept on raw
       length: xlen,
       loopStart: lps,

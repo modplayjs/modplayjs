@@ -10,6 +10,7 @@ export default defineConfig({
     format: 'es',
   },
   server: {
+    allowedHosts:["stockier-deacon-nonintelligently.ngrok-free.dev"],
     headers: {
       // Enable crossOriginIsolated → SharedArrayBuffer ring transport
       // (out-webaudio uses the SAB ring with hardware-paced backpressure

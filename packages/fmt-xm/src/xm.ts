@@ -742,6 +742,9 @@ function loadInstruments(
       sub.sid = sampleNum;
 
       const raw: RawSample = {
+        // C: libxmp_copy_adjust(xxs->name, xi.name, 22) — the sample name is
+        // the instrument name in XM (xm_load.c:708).
+        name,
         data: new Uint8Array(0),
         length,
         loopStart,

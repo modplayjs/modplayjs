@@ -222,6 +222,7 @@ function normalize(raw: RawSample, id: number): SampleData {
 
   return {
     id,
+    name: raw.name ?? '',
     data: floats,
     length: len,
     loopStart,

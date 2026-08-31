@@ -32,6 +32,7 @@ export class WebAudioOutput implements OutputPlugin {
   private node: AudioWorkletNode | null = null;
   private renderTimer: number | null = null;
   private running = false;
+  private paused = false;
   /** copy-mode pacing: frames handed to the worklet so far. */
   private copyPostedFrames = 0;
   /** copy-mode backpressure: last reported worklet FIFO depth (frames). */
@@ -60,6 +61,11 @@ export class WebAudioOutput implements OutputPlugin {
    * must point at the transpiled worklet module (audioWorklet.addModule
    * requires a same-origin URL — e.g. Vite's `?url` import of worklet.js). */
   async start(core: Core, workletUrl?: string): Promise<void> {
+    if (this.running && this.paused) {
+      // start() while paused = resume (idempotent — no node rebuild).
+      await this.resume();
+      return;
+    }
     if (this.running) return; // idempotent — no duplicate nodes
     this.core = core;
 
@@ -142,9 +148,12 @@ export class WebAudioOutput implements OutputPlugin {
     this.renderAhead();
   }
 
-  /** Stop output: halt the render loop, disconnect, suspend the context. */
+  /** Stop output: halt the render loop, disconnect, suspend the context.
+   * Player state (order/row/voices) is preserved — the next start() resumes
+   * the song from where it stopped. */
   stop(): void {
     this.running = false;
+    this.paused = false;
     if (this.renderTimer !== null) {
       window.clearInterval(this.renderTimer);
       this.renderTimer = null;
@@ -155,6 +164,39 @@ export class WebAudioOutput implements OutputPlugin {
     if (this.ctx && this.ctx.state === 'running') {
       void this.ctx.suspend();
     }
+  }
+
+  /** Pause playback: freeze the render loop and mute the output while
+   * keeping the player's song position and voice state intact. The
+   * AudioContext suspends too, so device power draw drops. */
+  pause(): void {
+    if (!this.running || this.paused) return;
+    this.paused = true;
+    if (this.renderTimer !== null) {
+      window.clearInterval(this.renderTimer);
+      this.renderTimer = null;
+    }
+    if (this.ctx && this.ctx.state === 'running') {
+      void this.ctx.suspend();
+    }
+  }
+
+  /** Resume from pause(): restart the render loop and the context. The
+   * worklet node stays connected, so no transport reconfiguration is
+   * needed. Resuming the context requires a user gesture. */
+  async resume(): Promise<void> {
+    if (!this.running || !this.paused) return;
+    this.paused = false;
+    if (this.ctx) {
+      await this.ctx.resume();
+    }
+    this.renderTimer = window.setInterval(() => this.renderAhead(), 25);
+    this.renderAhead();
+  }
+
+  /** True while playback is paused (started, but the render loop frozen). */
+  get pausedState(): boolean {
+    return this.paused;
   }
 
   /** The AudioContext sample rate — configure the core to match. */

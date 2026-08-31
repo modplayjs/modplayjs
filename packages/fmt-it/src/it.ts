@@ -958,10 +958,10 @@ function loadItSample(
     // libxmp_instrument_name(mod, i, ish.name, 25): name on the instrument.
     xxi.name = name;
   } else {
-    // libxmp_copy_adjust(xxs->name, ish.name, 25): name lives on the
-    // sample; our RawSample has no name field (metadata only) — dropped.
-    void name;
+    // libxmp_copy_adjust(xxs->name, ish.name, 25): name lives on the sample.
+    raw.name = name;
   }
+  raw.name = name;
   raw.volume = vol;
 
   // Convert C5SPD to relnote/finetune (it_load.c:919-949): a sample can be
