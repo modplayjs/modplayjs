@@ -369,6 +369,27 @@ function processRest(
   let fxp = fxpIn;
 
   switch (fxt) {
+    /* Dual effects. C (effects.c:257-267):
+     *   Lxy TONE_VSLIDE: EFFECT_MEMORY_GET(porta.memory); porta.slide += l;
+     *     do_toneporta; SET(TONEPORTA); goto fx_volslide (full fxp).
+     *   6xy VIBRA_VSLIDE: SET(VIBRATO) only — no LFO update, no memory —
+     *     then goto fx_volslide (full fxp).
+     * The volslide label runs the shared FX_VOLSLIDE body with the whole
+     * parameter (both nibbles: x = up, y = down). */
+    case FX.FX_TONE_VSLIDE: {
+      const l = hasQuirk(core, Quirk.ST3BUGS) ? xc.vol.memory : LSN(fxp);
+      xc.porta.slide += l;
+      if (xc.ins >= 0 && xc.ins < mod.instruments.length) {
+        doToneportaCore(core, xc, note);
+        SET(xc, VolSlideFlag.TONEPORTA);
+      }
+      fxVolSlide(core, xc, fxp);
+      break;
+    }
+    case FX.FX_VIBRA_VSLIDE:
+      SET(xc, VolSlideFlag.VIBRATO);
+      fxVolSlide(core, xc, fxp);
+      break;
     case FX.FX_VOLSLIDE:
       fxVolSlide(core, xc, fxp);
       break;

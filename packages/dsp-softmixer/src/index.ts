@@ -141,18 +141,10 @@ export class SoftMixer implements DspPlugin {
 
         // get_current_sample → adjust_voice_end (:406-422, :333-355).
         this.adjustVoiceEnd(vi, xxs);
-        // mixer.c:825-829: pos past end → clamp, and restart forward loops.
-        if (vi.pos >= vi.end) {
-          vi.pos = vi.end;
-          if (
-            (vi.flags & VoiceFlag.VOICE_REVERSE) === 0 &&
-            ((xxs.flags & SampleFlags.LOOP) !== 0 ||
-              ((xxs.flags & SampleFlags.SUSTAIN) !== 0 &&
-                (~vi.flags & VoiceFlag.RELEASE) !== 0))
-          ) {
-            this.loopReposition(vi, xxs);
-          }
-        }
+        // NOTE: C's soft_mixer does NOT clamp pos past end per tick — the
+        // clamp + forward-loop restart live only in mixer_voicepos
+        // (mixer.c:821-833), i.e. on explicit position changes. A voice
+        // whose pos is past end is handled by the chunk logic below.
         const sustainActiveRef = { v: false };
         sustainActiveRef.v =
           (xxs.flags & SampleFlags.SUSTAIN) !== 0 &&
