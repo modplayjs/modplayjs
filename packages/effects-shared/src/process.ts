@@ -4,7 +4,7 @@
 // through the vfx/fxts modules (T13) which share this signature set.
 
 import type { Core, ChannelState, Event } from '@modplayjs/core';
-import { FX, Quirk, PlayerFlag, FlowFlag } from '@modplayjs/core';
+import { FX, Quirk, PlayerFlag, FlowFlag, PastNote, VoiceFlag } from '@modplayjs/core';
 import {
   MSN,
   LSN,
@@ -13,6 +13,8 @@ import {
   lfoSetWaveform,
 } from './helpers.js';
 import { setLfoNotzero } from './helpers.js';
+import { fxPanbrello, fxPanbrelloWf } from './fx.js';
+import { VolSlideFlag as VF } from './state.js';
 import {
   fxFPortaUp,
   fxFPortaDn,
@@ -473,13 +475,97 @@ function processRest(
     case FX.FX_ENVPOS:
       fxEnvPos(core, xc, fxp);
       break;
-    case FX.FX_PANSLIDE:
-      // IT pan-slide shares code via reader mapping in libxmp; here check type.
-      if (mod.readEventType === 3) {
-        fxItPanSlide(xc, fxp);
-      } else {
-        fxPanSlide(core, xc, fxp, true);
+    case FX.FX_IT_PANSLIDE:
+      // it.ts emits FX_IT_PANSLIDE directly for IT Pxx (it_load.c:78).
+      fxItPanSlide(xc, fxp);
+      break;
+    case FX.FX_IT_INSTFUNC:
+      // S7x instrument functions (effects.c:773-813).
+      switch (LSN(fxp)) {
+        case 0: // Past note cut
+          core.virt.releaseChannel(chn, PastNote.CUT);
+          break;
+        case 1: // Past note off
+          core.virt.releaseChannel(chn, PastNote.OFF);
+          break;
+        case 2: // Past note fade
+          core.virt.releaseChannel(chn, PastNote.FADE);
+          break;
+        case 3: // Set NNA to note cut
+          core.virt.setNna(chn, 0);
+          break;
+        case 4: // Set NNA to continue
+          core.virt.setNna(chn, 1);
+          break;
+        case 5: // Set NNA to note off
+          core.virt.setNna(chn, 2);
+          break;
+        case 6: // Set NNA to note fade
+          core.virt.setNna(chn, 3);
+          break;
+        case 7: // Turn off volume envelope
+          SET(xc, VF.VENV_PAUSE);
+          break;
+        case 8: // Turn on volume envelope
+          xc.per_flags &= ~VF.VENV_PAUSE;
+          break;
+        case 9: // Turn off pan envelope
+          SET(xc, VF.PENV_PAUSE);
+          break;
+        case 0xa: // Turn on pan envelope
+          xc.per_flags &= ~VF.PENV_PAUSE;
+          break;
+        case 0xb: // Turn off pitch envelope
+          SET(xc, VF.FENV_PAUSE);
+          break;
+        case 0xc: // Turn on pitch envelope
+          xc.per_flags &= ~VF.FENV_PAUSE;
+          break;
       }
+      break;
+    case FX.FX_PANSLIDE:
+      // XM/IT Pxx: IT files emit FX_IT_PANSLIDE (handled above); the generic
+      // FX_PANSLIDE is emitted by the XM loader (xm_load.c maps Pxx directly).
+      fxPanSlide(core, xc, fxp, true);
+      break;
+    case FX.FX_PANBRELLO:
+      fxPanbrello(core, xc, fxp);
+      break;
+    case FX.FX_PANBRELLO_WF:
+      fxPanbrelloWf(xc, fxp);
+      break;
+    case FX.FX_REVERSE: {
+      // S9E/S9F (MPT): play sample forward/reverse. mixer_reverse
+      // (mixer.c:981-997): reverse only affects samples that have not
+      // already ended. voc is the channel's mapped voice.
+      const voc = core.virt.mapChannel(chn);
+      if (voc >= 0) {
+        const v = core.virt.voiceAt(voc)!;
+        // Don't reverse samples that have already ended (smp < 0 = ended).
+        if (v.smp >= 0) {
+          if (fxp === 1) {
+            v.flags |= VoiceFlag.VOICE_REVERSE;
+            // Reverse restart: pos maps to end (mixer_reverse does not
+            // reposition; reverse plays pos downward from where it is).
+          } else {
+            v.flags &= ~VoiceFlag.VOICE_REVERSE;
+          }
+        }
+      }
+      break;
+    }
+    case FX.FX_HIOFFSET: {
+      // SAy (effects.c:844-847): high bits of the sample offset. No
+      // immediate reposition — the offset applies at the next note.
+      xc.offset.val = (xc.offset.val & 0xffff) | (fxp << 16);
+      break;
+    }
+    case FX.FX_IT_BREAK:
+      // it.ts emits FX_IT_BREAK for IT Cxx; identical flow semantics to
+      // FX_BREAK (fxp = row, decimal).
+      hooks.patternBreak
+        ? hooks.patternBreak(core, 10 * MSN(fxp) + LSN(fxp))
+        : flowPatternBreak(mod, core.ctx.p.flow, 10 * MSN(fxp) + LSN(fxp));
       break;
     case FX.FX_MULTI_RETRIG:
       fxMultiRetrig(core, xc, fxp, note);

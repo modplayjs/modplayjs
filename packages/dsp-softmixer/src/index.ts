@@ -81,11 +81,13 @@ export class SoftMixer implements DspPlugin {
       for (let idx = 0; idx < voices.length; idx++) {
         const vi = voices[idx]!;
         if ((vi.flags & VoiceFlag.ANTICLICK) !== 0 && this.interp > 0) {
-          // do_anticlick(ctx, voc, NULL, 0) discharges into the next tick's
-          // ramp start; float model folds this into old_vl/old_vr already 0.
+          // do_anticlick(ctx, voc, NULL, 0) (mixer.c:166-168): buf == NULL
+          // means the discharge writes into s->buf32 (the NEXT tick's
+          // buffer start), count = discharge = ticksize >> 3. The cut
+          // voice's last sample values decay over the first frames of the
+          // new tick — NOT zeroed.
+          this.discharge(out, bufPos, this.dischargeFrames, vi);
           vi.flags &= ~VoiceFlag.ANTICLICK;
-          vi.sleft = 0;
-          vi.sright = 0;
         }
 
         if (vi.act === Act.NONE) continue;
