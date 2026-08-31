@@ -1004,7 +1004,10 @@ export function processFrequency(core: Core, chn: number, act: number): void {
     /* OpenMPT VibratoReset.mod */
     if (!isFirstFrame(core) || !hasQuirk(core, Quirk.PROTRACK)) {
       const shift = hasQuirk(core, Quirk.VIBHALF) ? 10 : 9;
-      const vib = lfoGet(m.readEventType, xc.vibrato.lfo, true) / (1 << shift);
+      // C: 'int vib = libxmp_lfo_get(...) / (1 << shift)' — integer
+      // division; the truncation shifts the mixer period by up to a full
+      // LFO step (frame-accurate diff vs libxmp, Vegas T1729).
+      const vib = Math.trunc(lfoGet(m.readEventType, xc.vibrato.lfo, true) / (1 << shift));
 
       if (hasQuirk(core, Quirk.VIBINV)) {
         vibrato -= vib;
@@ -1178,7 +1181,8 @@ export function processPan(core: Core, chn: number, act: number): void {
   const panEnvelope = getEnvelope(instrument.pei, xc.p_idx, 32);
 
   if (TEST(xc, PANBRELLO) !== 0) {
-    panbrello = lfoGet(m.readEventType, xc.panbrello.lfo, false) / 512;
+    // C: 'int panbrello' — integer division (player.c:1369).
+    panbrello = Math.trunc(lfoGet(m.readEventType, xc.panbrello.lfo, false) / 512);
     if (isFirstFrame(core)) {
       lfoUpdate(xc.panbrello.lfo);
     }
