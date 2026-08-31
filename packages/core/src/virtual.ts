@@ -246,9 +246,11 @@ export class VirtualLayer {
     // (virt_setpatch :499-506 loops i over maxvoc), matching each voice
     // whose ROOT is this channel and instrument matches; it also catches
     // leaked voices whose map entry was overwritten by a later note.
-    // C order matters: first the nna==CUT hard reset, then act = nna,
-    // then the dct-gated DCA.
-    if (dct !== 0 || nna === 0 /* XMP_INST_NNA_CUT */) {
+    // C order matters: check_dct runs only when the new note's
+    // instrument has a duplicate-check type (virtual.c:499 'if (dct)'),
+    // then per voice: the nna==CUT hard reset, 'vi->act = nna', and the
+    // dct-gated DCA adjustments.
+    if (dct !== 0 /* XMP_INST_DCT_OFF */) {
       for (let i = 0; i < this.voices.length; i++) {
         const v = this.voices[i]!;
         if (v.root !== chn || v.ins !== insKey(ins)) continue;
@@ -347,7 +349,14 @@ export class VirtualLayer {
       xc.note_flags &= ~NoteFlag.SAMPLE_END;
     });
     v.root = chn; /* root is the ROOT CHANNEL (virtual.c:271), not the note */
-    v.act = Act.NOTE;
+    // C virtual.c:547: voice_array[voc].act = nna — the voice's act IS its
+    // NNA code from allocation. For a root-track voice cstat reports
+    // VIRT_ACTIVE regardless, but once the voice is re-homed to an
+    // overflow channel (new note on its root), play_channel sees this act:
+    // NNA_OFF → VIRT_ACTION_OFF (fadeout), NNA_FADE → VIRT_ACTION_FADE.
+    // Map NNA onto our Act enum: CONT→NOTE (cstat default → ACTIVE),
+    // OFF→KEY, FADE→VOL.
+    v.act = nna === 2 /* NNA_OFF */ ? Act.KEY : nna === 3 /* NNA_FADE */ ? Act.VOL : Act.NOTE;
     v.nnaAct = nna;
     v.flags = 0;
     v.pos = 0;
