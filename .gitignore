@@ -2,3 +2,6 @@ node_modules/
 dist/
 *.tsbuildinfo
 reference/
+*.wav
+testfiles/
+.omp/
