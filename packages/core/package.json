@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/core",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
@@ -12,9 +12,11 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@modplayjs/effects-shared": "*"
-  }
+  },
+  "license": "BSD-3-Clause"
 }
