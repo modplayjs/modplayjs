@@ -57,6 +57,15 @@ Estimated only — nothing implemented yet except where noted.
 | Change | ~10 lines: virtual.ts `init()` reads `s.numvoc` for the overflow pool; Core setter |
 | Side effects | Low - default 128 unchanged; raising raises memory (slots pre-allocated); lowering below the IT root count could starve NNA voices on dense modules (C clamps identically) |
 
+### StarTrekker FLT4/FLT8 loader (missing format)
+
+| | |
+|---|---|
+| Found by | tools/compare-mixer-data.mjs over reference/libxmp/test-dev/data (8 flt_am_*.mod fixtures FAIL: unsupported module type) |
+| What | StarTrekker Audio Setup (.mod with FLT4/FLT8 magic) — separate C loader `flt_load.c`, not ported. Uses Amiga low-pass filter effects (the flt_am_* fixtures test exactly that) |
+| Change | ~300-400 lines: port flt_load.c (pattern format is MOD-like, effects are MOD effects; the FLTx-specific part is the audio setup) |
+| Side effects | None — additive new format support |
+
 ### Remaining (unchanged from first pass)
 
 - Universal Y/Z (XM/S3M) - moderate; dispatch ready, loader mapping + quirk needed
