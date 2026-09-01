@@ -6,11 +6,11 @@ The ports mirror the structure and behavior of the originals; the original
 copyrights and licenses remain in force for that material.
 
 1. OpenMPT — BSD-3-Clause
-   Copyright (C) 2000-2024 OpenMPT developers (originals: Grimen,
-   Jarek Trzaska, and contributors)
+   Copyright (C) 2004-2026, OpenMPT Project Developers and Contributors
+   Copyright (C) 1997-2003, Olivier Lapicque (original ModPlug Tracker)
    Ported from: soundlib (MODTools.cpp and related), per-format quirks.
    License: BSD-3-Clause.
-   https://github.com/OpenMPT/OpenMPT
+   https://github.com/OpenMPT/openmpt
 
 2. libxmp — MIT
    Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr
@@ -19,12 +19,12 @@ copyrights and licenses remain in force for that material.
    src/loaders/{mod,s3m,xm,it}_load.c, src/loaders/sample.c,
    src/load_helpers.c, src/common.h, src/include/xmp.h.
    License: MIT.
-   https://bitbucket.org/mpu32/libxmp
+   https://github.com/libxmp/libxmp
 
 3. Paula-Tracker — MIT
-   Copyright (C) 2024 Paula-Tracker authors
+   Copyright (C) 2025 Michael Binder
    Ported from: paulalib/audio-engine.js (Paula sound engine),
    paulalib/modloader.js, paulalib/sampleutils.js,
    src/platform/audio-web.js.
    License: MIT.
-   https://github.com/andrasbaktai/Paula-Tracker
+   https://github.com/RednibCoding/Paula-Tracker
