@@ -20,6 +20,14 @@ reference WAVs:
 | Knetus — UltraEdit-32 | XM | 0.9995 |
 | MANtiCORE — IRLink 3 | S3M | 0.9980 |
 
+## Plugin APIs
+
+Contributors writing mixers, format loaders or outputs: the core's plugin
+contracts are documented in [docs/](docs/) —
+[DSP plugin API](docs/plugin-api-dsp.md),
+[Format plugin API](docs/plugin-api-format.md),
+[Output plugin API](docs/plugin-api-output.md).
+
 ## Packages
 
 | Package | Purpose |
