@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Project-original code.
 // out-webaudio AudioWorklet processor (audio thread).
 //
 // Runs inside an AudioWorkletGlobalScope. Drains a render-ahead ring fed

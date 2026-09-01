@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp loader/effect registry (load.c, format.h).
 // Plugin registries. One registry each for format/effect/dsp/output plugins.
 // Mirrors libxmp's static loader table (load.c:/players/ + add_loaders())
 // generalized; lookup by name, first-match format probing.

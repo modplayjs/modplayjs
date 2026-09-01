@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp struct xmp_module / module_data / mixer_voice (common.h, xmp.h).
 // Core data-model types: the normalized module data produced by format
 // plugins (mirrors struct xmp_module / module_data) plus the per-playback
 // runtime state (mirrors player_data / channel_data / mixer_voice).

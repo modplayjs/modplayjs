@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/loaders/itsex.c.
 // IT sample decompressor. Verbatim port of reference/libxmp/src/loaders/
 // itsex.c (itsex_decompress8 :100-192, itsex_decompress16 :194-288) with
 // the buffered bit stream (it_stream/read_bits :23-96, init_block :98-119).

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/loaders/xm_load.c.
 // XM loader. Verbatim port of reference/libxmp/src/loaders/xm_load.c
 // xm_test (:66-79), load_xm_pattern (:81-277), load_patterns (:279-330),
 // load_instruments (:433-760), xm_load (:762-1024) — non-CORE_PLAYER

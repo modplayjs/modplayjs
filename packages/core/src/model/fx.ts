@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/effects.h.
 // Effect type constants, mirroring reference/libxmp/src/effects.h.
 // Core player effects (the big four: MOD/S3M/XM/IT) plus the shared
 // extended-effect subcodes. Values are the canonical libxmp numbers.

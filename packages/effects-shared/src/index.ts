@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Project-original code.
 // @modplayjs/effects-shared — quirk infra + note/pitch/volume/pan/flow effects.
 export * from './helpers.js';
 export * from './state.js';

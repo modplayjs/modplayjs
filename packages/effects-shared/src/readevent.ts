@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/read_event.c (READ_EVENT_MOD).
 // Shared read-event helpers. Verbatim port of reference/libxmp/src/
 // read_event.c:34-246 (get_subinstrument, reset_envelopes,
 // set_effect_defaults, set_channel_volume/pan, set_period, set_period_ft2)

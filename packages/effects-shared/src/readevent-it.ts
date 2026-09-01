@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/read_event.c (READ_EVENT_IT).
 // read_event_it (reference/libxmp/src/read_event.c:933-1371) plus the
 // IT-only static helpers it depends on (read_event.c:76-131 and :860-931):
 // reset_envelope_volume, reset_envelopes_carry, copy_channel, check_fadeout,

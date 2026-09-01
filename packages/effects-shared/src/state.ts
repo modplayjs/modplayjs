@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp struct channel_data (common.h) + player.h flags.
 // Persistent effect flag bits, mirroring player.h:38-65. Re-declared here as
 // a grouped const so the per-tick stage and format readers share one source.
 

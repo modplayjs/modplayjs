@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/read_event.c (READ_EVENT_FT2).
 // read_event_ft2 (reference/libxmp/src/read_event.c:475-736).
 
 import type {

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/player.c (play_channel/process_* stages).
 // Per-tick channel process stage: play_channel (player.c:1599-1697) and its
 // helpers — envelopes (player.c:70-330), tremor (:880-927), arpeggio
 // (:625-664), is_first_frame (:666-681), update_volume (:1414-1499),

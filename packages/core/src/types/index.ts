@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Project-original code.
 // Plugin contracts (the four plugin kinds) + the Core interface.
 // Mirrors libxmp `struct format_loader` (format.h:9-13) generalized into
 // four kinds, with the DSP render mirroring libxmp_mixer_softmixer and the

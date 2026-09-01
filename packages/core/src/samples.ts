@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/loaders/sample.c (libxmp_load_sample + convert_*).
 // Swappable sample store. Mirrors the conversion pipeline of
 // reference/libxmp/src/loaders/sample.c libxmp_load_sample (:181-427) and
 // provides runtime hot-swap (mixer.c:395-404 queued-swap semantics).

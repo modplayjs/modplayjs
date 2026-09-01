@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/read_event.c (READ_EVENT_MOD).
 // Shared event-reader prologue + per-format readers for MOD-family modules.
 // Port of reference/libxmp/src/read_event.c libxmp_read_event (:1624-1664)
 // and read_event_mod (:267-475). FT2/ST3 readers live in sibling files.

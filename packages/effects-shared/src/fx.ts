@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/effects.c (process_fx arms).
 // libxmp_process_fx port (reference/libxmp/src/effects.c:108-1149).
 // T12 scope: quirk infrastructure + note/pitch effects. Volume/pan/flow
 // effects live in vfx.ts (T13); this module also carries the EX_* extended

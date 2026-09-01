@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/loaders/mod_load.c (get_tracker_id).
 // Tracker detection helpers. Verbatim port of reference/libxmp/src/
 // loaders/mod_load.c:55-436 (non-CORE_PLAYER): TRACKER_* enum, mod_magic
 // table, tracker_is_vblank, flip_word_bytes, validate_pattern, is_st_ins,

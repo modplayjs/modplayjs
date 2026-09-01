@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: Paula-Tracker paulalib/audio-engine.js.
 // @modplayjs/dsp-paula — Paula sound engine for MOD.
 //
 // Ported 1:1 from the Paula-Tracker mixing kernel ONLY

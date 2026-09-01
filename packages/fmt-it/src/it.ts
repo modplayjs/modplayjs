@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/loaders/it_load.c.
 // IT loader. Verbatim port of reference/libxmp/src/loaders/it_load.c
 // (it_test :46-55, xlat_fx :97-181, xlat_volfx :186-232, fix_name
 // :234-249, load_it_midi_config :261-285, read_envelope :287-350,

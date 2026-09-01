@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/virtual.c.
 // Virtual channel / voice layer. Mirrors reference/libxmp/src/virtual.c.
 //
 // A "virtual channel" is a player channel slot the effects run on

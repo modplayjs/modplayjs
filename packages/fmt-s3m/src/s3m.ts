@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/loaders/s3m_load.c.
 // S3M loader. Verbatim port of reference/libxmp/src/loaders/s3m_load.c
 // s3m_test (:78-92) and s3m_load (:207-698), non-CORE_PLAYER variant,
 // plus helpers: xlat_fx (:129-205), the version>>12 tracker-name tree

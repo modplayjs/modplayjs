@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/mixer.c (libxmp_mixer_softmixer).
 // Softmixer — multi-voice mixer for S3M/XM/IT (+ MOD via generic path).
 //
 // Port of libxmp libxmp_mixer_softmixer (reference/libxmp/src/mixer.c:474-787):

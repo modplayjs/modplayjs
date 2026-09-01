@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/effects.c (volume/pan/flow/tempo arms).
 // Volume / pan / flow / tempo effect arms of libxmp_process_fx
 // (reference/libxmp/src/effects.c). These complete the processFx switch
 // started in fx.ts (T12): FX_VOLSLIDE family, tremor, retrig, pan, gvol,

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/mix_all.c (NEAREST/LINEAR/SPLINE + UPDATE_POS).
 // Resampling kernels for the softmixer, mirroring libxmp mix_all.c
 // NEAREST/LINEAR/SPLINE macros (:40-88) and UPDATE_POS (mix_all.c:94-98,
 // SMIX_SHIFT=16 mixer.h:9-10).

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp precomp_lut (cubic spline table).
 // Cubic spline LUTs, verbatim from reference/libxmp/src/precomp_lut.h
 // (SPLINE_QUANTBITS=14, SPLINE_FRACBITS=10 → 1024 entries per table).
 export const cubic_spline_lut0 = new Int16Array([

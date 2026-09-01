@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/flow.c.
 // Pattern flow processing. Verbatim port of reference/libxmp/src/flow.c:
 // libxmp_process_pattern_loop (:35-136), process_pattern_jump (:138-153),
 // process_pattern_break (:155-171), process_line_jump (:173-192), and

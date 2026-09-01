@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/mix_paula.c + it_load.c MIDI macro config.
 // IT MIDI macro machinery (reference/libxmp/src/player.c:328-545):
 // midi_nibble, midi_byte, apply_midi_macro_effect, execute_midi_macro,
 // update_midi_macro. Update is hooked into the per-tick channel stage

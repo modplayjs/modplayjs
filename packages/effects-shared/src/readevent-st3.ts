@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/read_event.c (READ_EVENT_ST3).
 // read_event_st3 (reference/libxmp/src/read_event.c:736-933).
 
 import type { ChannelState, Core, Event, SubInstrument } from '@modplayjs/core';

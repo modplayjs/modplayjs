@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/common.h (QUIRK_*/FLOW_*/PERIOD_*/READ_EVENT_*).
 // Quirk flags, flow modes, period types and read-event types.
 // Mirrors reference/libxmp/src/common.h (QUIRK_*, FLOW_*, PERIOD_*, READ_EVENT_*).
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/player.c (play_channel/process_fx) + effects.c (process_fx).
 // libxmp_process_fx dispatcher (reference/libxmp/src/effects.c:108-1149).
 // T12 scope: note/pitch effects. The full switch is here so format readers
 // call exactly one function, like libxmp does; volume/pan/flow arms route

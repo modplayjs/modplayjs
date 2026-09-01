@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Project-original code.
 // Typed errors thrown by the core. All are subclasses of ModplayError so
 // callers can catch one family; each case has its own class for precise
 // programmatic handling.

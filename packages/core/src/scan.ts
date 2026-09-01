@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/scan.c.
 // Sequence scanner. Verbatim port of reference/libxmp/src/scan.c:
 // scan_module (:46-665), compare_vblank_scan (:672-706), and
 // libxmp_scan_sequences (:733-820). The flow handlers delegate to the

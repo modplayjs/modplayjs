@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Project-original code.
 // @modplayjs/core — public API
 //
 // Plugin contracts (T2), data-model types (T3). The Core implementation

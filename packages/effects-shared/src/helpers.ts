@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp src/common.h helpers, lfo.c, period.c, filter.c.
 // Effect helpers shared by all format event readers and the per-tick stage.
 // Direct port of reference/libxmp/src/lfo.c (LFO) and parts of
 // player.c/effects.c that operate on ChannelState between rows/ticks.

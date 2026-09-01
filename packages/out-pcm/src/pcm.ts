@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Project-original code.
 // out-pcm: offline PCM capture + 16-bit WAV encoder.
 //
 // start(core) drives the core through playBuffer (xmp_play_buffer pull

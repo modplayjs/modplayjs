@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Project-original code.
 // modplayjs demo — load + play/pause/stop, file info, instrument/sample lists,
 // and a realtime pattern view with the active row highlighted.
 // File input (MOD/S3M/XM/IT) → loadModule → softmixer → out-webaudio.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 Bitti09 — modplayjs contributors
+// Ported from: libxmp player.c (frame loop) + control.c (lifecycle).
 // Core player. Ports libxmp's context lifecycle and frame loop:
 // - xmp_start_player (player.c:1940-2054)
 // - xmp_play_frame (player.c:2064-2176) incl. next_order (:1736-1813),
