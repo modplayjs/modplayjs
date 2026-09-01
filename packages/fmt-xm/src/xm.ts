@@ -565,9 +565,14 @@ function loadInstruments(
 
     if (xihSamples === 0) {
       // Reserved data space after header even with 0 samples
-      // (xm_load.c:504-520): seek xih.size - (29+4).
-      pos += Math.max(0, xihSize - (XM_INST_HEADER_SIZE + 4));
-      pos += XM_INST_HEADER_SIZE + 4;
+      // (xm_load.c:504-520): hio_seek(xih.size - (29 + 4), SEEK_CUR) — a
+      // RELATIVE seek from the stream position, which in C is already past
+      // the 33-byte header read. C allows it to go NEGATIVE when
+      // xih.size < 33 (ABAKUS Indian Mission instrument 3, size 29):
+      // net advance = instrPos + xihSize. Clamping the negative part to
+      // zero advanced the stream +4 per such instrument, landing every
+      // later instrument header on garbage ('header size 0').
+      pos = instrPos + xihSize;
       instruments.push(xxi);
       continue;
     }
