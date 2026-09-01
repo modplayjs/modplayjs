@@ -86,7 +86,14 @@ Sample names from the file are available per sample:
 
 ## How it was verified
 
-A minimal C harness links libxmp from the reference sources and dumps its
+A ready-made harness runs this comparison for any module file:
+
+```sh
+tools/build-ref-libxmp.sh /tmp/libxmp4.a   # once: build the reference lib
+tools/correlate.mjs <module-file> [--seconds n]
+```
+
+Internally, a minimal C harness links libxmp from the reference sources and dumps its
 internal mixer voice state (`voice_array`: per-voice channel/root/sample/
 position/volume/pan/note) once per frame. Our player emits the same state
 stream; a diff pinpoints bugs at exact C ticks — this is how the fixed
