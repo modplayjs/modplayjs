@@ -43,3 +43,33 @@ export function dumpMixerState(core, maxLines, maxTimeMs = Infinity) {
   }
   return lines;
 }
+
+// Channel_info-based dump matching the test_effect_*.c golden format
+// (time row frame chan period volume ins pan): C's xmp_get_frame_info
+// populates channel_info for EVERY player channel from xc_data each frame
+// (player.c:2337-2356) — period = info_period, volume = info_finalvol >> 4,
+// pan = info_finalpan, instrument = xc.ins.
+export function dumpChannelInfo(core, maxLines, maxTimeMs = Infinity) {
+  const out = new Float32Array(core.ticksize * 2 + 4096);
+  const lines = [];
+  let maxRow = 0;
+  for (let f = 0; lines.length < maxLines; f++) {
+    if (core.playState.timeMs > maxTimeMs) break;
+    const row = core.playState.row;
+    if (row < maxRow) break;
+    if (row > maxRow) maxRow = row;
+    let n = 0;
+    try { n = core.frame(out.subarray(0, core.ticksize * 2)); } catch { break; }
+    if (n <= 0) break;
+    const ps = core.playState;
+    for (let ch = 0; ch < core.channels; ch++) {
+      const xc = core._xc ? core._xc[ch] : null;
+      if (!xc) continue;
+      lines.push(
+        `${Math.round(ps.timeMs)} ${ps.row} ${ps.frame} ${ch} ` +
+        `${Math.round(xc.info_period ?? 0)} ${xc.info_finalvol >> 4} ` +
+        `${xc.ins} ${xc.info_finalpan}`);
+    }
+  }
+  return lines;
+}

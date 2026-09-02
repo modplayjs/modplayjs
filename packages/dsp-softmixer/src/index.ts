@@ -177,6 +177,28 @@ export class SoftMixer implements DspPlugin {
         let rampDone = 0;
         const reverse = (vi.flags & VoiceFlag.VOICE_REVERSE) !== 0;
 
+        // IT lowpass biquad (mix_all.c FILTER_LEFT/FILTER_RIGHT :219-233,
+        // applied inside the _filter mixers selected by FLAG_FILTER set at
+        // mixer_setpatch :886-887 when QUIRK_FILTER && DSP_LOWPASS).
+        // mixer.c:659-663: cutoff >= 0xfe with resonance 0 bypasses it
+        // (See OpenMPT env-flt-max.it). a0/b0/b1 == 0 means the player tick
+        // hasn't computed coefficients yet — bypass rather than silence
+        // (C always runs filter_setup before the mixer for cutoff < 0xfe).
+        const useFilter =
+          (mod.quirks & Quirk.FILTER) !== 0 &&
+          !(vi.filter.cutoff >= 0xfe && vi.filter.resonance === 0) &&
+          (vi.filter.a0 !== 0 || vi.filter.b0 !== 0 || vi.filter.b1 !== 0);
+        // Filter state (C keeps l1/l2/fl and r1/r2/fr per voice across
+        // chunks; SAVE_FILTER_* at chunk end — our mono-source path matches
+        // C's stereoout-mono filtered mixers, which use only the L state).
+        // PREAMP_BITS = 15 (mix_all.c:102); FILTER_SHIFT = 22 (mixer.h:12).
+        let fl1 = 0, fl2 = 0;
+        if (useFilter) {
+          fl1 = vi.filter.l1;
+          fl2 = vi.filter.l2;
+        }
+        const sampleScale = (xxs.flags & SampleFlags.BITS16) !== 0 ? 32768 : 128;
+
         let usmp = ticksize;
         while (size > 0) {
           // Samples until loop break/end (:604-629). C keeps vi->pos as a
@@ -246,9 +268,29 @@ export class SoftMixer implements DspPlugin {
             const rampFrames = Math.min(samples, rampLeft);
             for (let n = 0; n < samples; n++) {
               const idx = chunkPos + n * 2;
-              const lSmp = kernel(xxs.data, posInt, frac);
+              let lSmp = kernel(xxs.data, posInt, frac);
               const gainL = n < rampFrames ? oldVlF + lRampF * (rampDone + n) : lVolF;
               const gainR = n < rampFrames ? oldVrF + rRampF * (rampDone + n) : rVolF;
+              if (useFilter) {
+                // FILTER_LEFT (mix_all.c:219-227) in the C integer domain:
+                // smp_in is the interpolated sample in native sample units
+                // (±32768 16-bit / ±128 8-bit — our float × sampleScale).
+                // a0 * (smp << PREAMP_BITS) + b0*fl1 + b1*fl2, >> 22, clamp,
+                // shift history, then >> 15 back to sample units.
+                const smpC = Math.round(lSmp * sampleScale);
+                const sl64 =
+                  (vi.filter.a0 * (smpC * 32768) + vi.filter.b0 * fl1 +
+                    vi.filter.b1 * fl2) / (1 << 22);
+                let sl = sl64;
+                const FILTER_MIN = -65536 * 32768;
+                const FILTER_MAX = 65535 * 32768;
+                if (sl < FILTER_MIN) sl = FILTER_MIN;
+                else if (sl > FILTER_MAX) sl = FILTER_MAX;
+                sl = Math.trunc(sl);
+                fl2 = fl1;
+                fl1 = sl;
+                lSmp = sl / 32768 / sampleScale;
+              }
               // stereo output (always interleaved stereo here).
               out[idx] = (out[idx] ?? 0) + lSmp * gainL;
               out[idx + 1] = (out[idx + 1] ?? 0) + lSmp * gainR;
@@ -257,6 +299,14 @@ export class SoftMixer implements DspPlugin {
               frac += stepFixed;
               posInt += frac >> SMIX_SHIFT;
               frac &= SMIX_MASK;
+            }
+            if (useFilter) {
+              // SAVE_FILTER_MONO (mix_all.c:232-238): persist L state;
+              // C copies fl1/fl2 into r1/r2 "just in case" for mono sources.
+              vi.filter.l1 = fl1;
+              vi.filter.l2 = fl2;
+              vi.filter.r1 = fl1;
+              vi.filter.r2 = fl2;
             }
             // Commit back to the double pos (mixer.c:703): pos += step_dir
             // × samples. The int/frac pair is discarded here.

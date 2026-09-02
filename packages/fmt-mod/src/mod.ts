@@ -46,7 +46,7 @@ const SF_ADPCM = 0x4000;
 const XMP_MAX_CHANNELS = 64;
 
 /** libxmp_period_to_note (period.c:213-220). */
-function periodToNote(p: number): number {
+export function periodToNote(p: number): number {
   if (p <= 0) return 0;
   return Math.round(12.0 * Math.log(PERIOD_BASE / p) / Math.LN2) + 1;
 }
@@ -223,7 +223,7 @@ interface TrackerState {
 }
 
 /** Parse one 4-byte MOD event cell (noisetracker/protracker variants). */
-function decodeEvent(dst: Event, modEvent: Uint8Array, off: number, trackerId: number): void {
+export function decodeEvent(dst: Event, modEvent: Uint8Array, off: number, trackerId: number): void {
   // libxmp_decode_noisetracker_event / libxmp_decode_protracker_event
   // (common.c:366-412).
   dst.note = periodToNote((LSN(modEvent[off]!) << 8) | modEvent[off + 1]!);

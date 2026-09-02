@@ -564,11 +564,11 @@ function processRest(
       break;
     }
     case FX.FX_IT_BREAK:
-      // it.ts emits FX_IT_BREAK for IT Cxx; identical flow semantics to
-      // FX_BREAK (fxp = row, decimal).
+      // it.ts emits FX_IT_BREAK for IT Cxx: break with HEX parameter
+      // (effects.c:580-582 passes fxp raw, no BCD conversion like FX_BREAK).
       hooks.patternBreak
-        ? hooks.patternBreak(core, 10 * MSN(fxp) + LSN(fxp))
-        : flowPatternBreak(mod, core.ctx.p.flow, 10 * MSN(fxp) + LSN(fxp));
+        ? hooks.patternBreak(core, fxp)
+        : flowPatternBreak(mod, core.ctx.p.flow, fxp);
       break;
     case FX.FX_MULTI_RETRIG:
       fxMultiRetrig(core, xc, fxp, note);

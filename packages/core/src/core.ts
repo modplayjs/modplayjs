@@ -531,8 +531,15 @@ export class Core implements CoreIface {
 
     this.injectEvent();
 
-    /* play_frame (player.c:2165-2168): per-channel per-tick stage. */
+    /* play_frame (player.c:2165-2168): per-channel per-tick stage.
+     * C runs libxmp_play_extras at the START of play_channel (player.c:1646,
+     * before process_volume) — EffectPlugin.onTick gets the same ordering:
+     * its volume writes survive into the mixer (processTick ends in
+     * virt_setVol). */
     for (let i = 0; i < this.virt.virtChannels; i++) {
+      for (const ep of this.registries.effectPlugins()) {
+        ep.onTick?.(this, i);
+      }
       processTick(this, i);
     }
 
