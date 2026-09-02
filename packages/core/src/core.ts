@@ -14,7 +14,7 @@
 // bpm / 1000), truncated, min 1<<ANTICLICK_SHIFT = 8 (mixer.h:13).
 // time_factor=10 (DEFAULT_TIME_FACTOR), rrate=250 (PAL_RATE).
 
-import { CoreState, Quirk } from './model/constants';
+import { CoreState, FlowFlag, Quirk } from './model/constants';
 import { ChannelFlags } from './model/model';
 
 import {
@@ -599,7 +599,7 @@ export class Core implements CoreIface {
     p.pos = p.ord;
     p.frame = 0;
 
-    if ((this._module!.flowMode & 0x40 /* FLOW_LOOP_PATTERN_RESET */) !== 0) {
+    if ((this._module!.flowMode & FlowFlag.LOOP_PATTERN_RESET) !== 0) {
       f.loop_start = -1;
       f.loop_count = 0;
       for (let i = 0; i < mod.chn; i++) {

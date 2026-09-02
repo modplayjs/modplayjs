@@ -127,7 +127,7 @@ const reports = [];
 const cursor = new Map(); // chan → next index into ours
 for (const g of golden) {
   let i = cursor.get(g.chan) ?? 0;
-  while (i < ours.length && ours[i].chan === g.chan && ours[i].time < g.time - 2) i++;
+  while (i < ours.length && (ours[i].chan !== g.chan || ours[i].time < g.time - 2)) i++;
   cursor.set(g.chan, i);
   const p = ours[i];
   if (!p || p.chan !== g.chan || Math.abs(p.time - g.time) > 2) {
