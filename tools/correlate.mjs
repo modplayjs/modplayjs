@@ -185,6 +185,6 @@ process.exit(corr >= 0.99 ? 0 : 1);
 const r = spawnSync(process.execPath, [cmpScript, oursWav, refWav, name],
   { stdio: 'inherit' });
 if (!keep) {
-  try { require('node:fs').rmSync(oursWav); require('node:fs').rmSync(refWav); } catch {}
+  // keep wavs for debugging
 }
 process.exit(r.status ?? 1);

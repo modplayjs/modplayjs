@@ -382,7 +382,10 @@ function processRest(
      * The volslide label runs the shared FX_VOLSLIDE body with the whole
      * parameter (both nibbles: x = up, y = down). */
     case FX.FX_TONE_VSLIDE: {
-      const l = hasQuirk(core, Quirk.ST3BUGS) ? xc.vol.memory : LSN(fxp);
+      // EFFECT_MEMORY_GET(l, xc->porta.memory) (effects.c:257-258):
+      // ST3BUGS reads the shared vol.memory; others read porta.memory
+      // (the Gxx memory), not the Lxy parameter.
+      const l = hasQuirk(core, Quirk.ST3BUGS) ? xc.vol.memory : xc.porta.memory;
       xc.porta.slide += l;
       if (xc.ins >= 0 && xc.ins < mod.instruments.length) {
         doToneportaCore(core, xc, note);
@@ -444,6 +447,11 @@ function processRest(
       extendedFx(core, xc, chn, ev, fxp, note, hooks);
       break;
     case FX.FX_S3M_SPEED:
+      // EFFECT_MEMORY_S3M (effects.c:513): ST3 Axx shares vol.memory.
+      if (hasQuirk(core, Quirk.ST3BUGS)) {
+        if (fxp === 0) fxp = xc.vol.memory;
+        else xc.vol.memory = fxp;
+      }
       fxS3mSpeed(core, fxp);
       break;
     case FX.FX_S3M_BPM:

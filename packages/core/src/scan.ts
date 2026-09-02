@@ -734,6 +734,10 @@ export class Scanner {
       rowCount = 0;
     }
 
+    // scan.c:633 — after the order loop, the row resumes from jumpline
+    // (a break-to-row targeting the final pattern).
+    row = f.jumpline;
+
     // end_module (scan.c:609-625).
     if (!anyValid) {
       return -1;

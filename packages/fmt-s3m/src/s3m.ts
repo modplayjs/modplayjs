@@ -476,8 +476,20 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   if (!stereo) {
     mvol = Math.trunc((mvol * 8) / 11);
   }
-  // Channel settings → mod.chn + default pans (s3m_load.c:320-333)
+  // Channel settings → mod.chn + default pans (s3m_load.c:320-333).
+  // C's load prologue (load_helpers.c:331-338) pre-fills all 64 channels:
+  // pan LRLR alternating (defpan=100 → 0x00/0xff), vol 0x40, flg 0. The
+  // S3M loader only OVERWRITES pan for active (non-OFF) channels, so
+  // inactive channels keep the alternating default.
   const channels: Channel[] = [];
+  for (let i = 0; i < 32; i++) {
+    const dpan = Math.floor((i + 1) / 2) % 2 * 0xff;
+    channels.push({
+      pan: Math.min(255, Math.max(0, 0x80 + (dpan - 0x80))),
+      vol: 0x40,
+      flg: 0,
+    });
+  }
   for (let i = 0; i < 32; i++) {
     if (sfh.chset[i] === S3M_CH_OFF) {
       continue;
@@ -486,16 +498,11 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     chn = i + 1;
 
     const x = sfh.chset[i]! & S3M_CH_NUMBER;
-    let pan: number;
     if (stereo && x < S3M_CH_ADLIB) {
-      pan = x < S3M_CH_RIGHT ? 0x30 : 0xc0;
+      channels[i]!.pan = x < S3M_CH_RIGHT ? 0x30 : 0xc0;
     } else {
-      pan = 0x80;
+      channels[i]!.pan = 0x80;
     }
-
-    // xxc entries are calloc'd; only pan is set here. Channels array is
-    // finalized after chn is known (below), preserving i-indexed pan.
-    channels[i] = { pan, vol: 0x40, flg: 0 };
   }
 
   // Order list (s3m_load.c:335-350)
@@ -550,12 +557,7 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     for (let i = 0; i < 32; i++) {
       const x = bytes[pos + i]!;
       if (x & S3M_PAN_SET) {
-        const pan = (x << 4) & 0xff;
-        if (channels[i]) {
-          channels[i]!.pan = pan;
-        } else {
-          channels[i] = { pan, vol: 0x40, flg: 0 };
-        }
+        channels[i]!.pan = (x << 4) & 0xff;
       }
     }
     pos += 32;
@@ -871,14 +873,8 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   quirk |= QUIRKS_ST3 | Quirk.ARPMEM;
   const readEventType = ReadEventType.ST3;
 
-  // Channels array: fill holes for channels never seen in chset (S3M files
-  // can set dp pan for channel i < 32 with chset[i] == 0xff). chn is the
-  // highest i+1 with chset[i] != 0xff, so holes can only exist at i < chn.
-  for (let i = 0; i < chn; i++) {
-    if (!channels[i]) {
-      channels[i] = { pan: 0x80, vol: 0x40, flg: 0 };
-    }
-  }
+  // chn is the highest i+1 with chset[i] != 0xff; the prologue pre-filled
+  // every slot, so just trim to the used count.
   channels.length = chn;
 
   const mod: ModuleData = {

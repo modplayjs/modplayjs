@@ -140,6 +140,6 @@ export function readEventSt3(core: Core, e: Event, chn: number): void {
   }
 
   if ((core.quirks & Quirk.ST3BUGS) !== 0 && TEST(xc, VolSlideFlag.NEW_VOL) !== 0) {
-    xc.volume = (xc.volume * core.ctx.p.gvol) / mod.volbase;
+    xc.volume = Math.trunc((xc.volume * core.ctx.p.gvol) / mod.volbase);
   }
 }

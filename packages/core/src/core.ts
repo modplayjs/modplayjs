@@ -198,6 +198,7 @@ export class Core implements CoreIface {
       speed: this._p.speed,
       bpm: this._p.bpm,
       timeMs: this._p.current_time,
+      loopCount: this._p.loop_count,
     };
   }
 

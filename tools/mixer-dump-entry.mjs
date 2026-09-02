@@ -11,16 +11,16 @@ export function dumpMixerState(core, maxLines, maxTimeMs = Infinity) {
   const out = new Float32Array(core.ticksize * 2 + 4096);
   const lines = [];
   let ended = false;
-  let maxRow = 0;
   for (let f = 0; lines.length < maxLines && !ended; f++) {
     if (core.playState.timeMs > maxTimeMs) break;
-    // Stop at the first loop (row wraps back after having advanced)
-    const row = core.playState.row;
-    if (row < maxRow) break;
-    if (row > maxRow) maxRow = row;
+    // Stop at the first module loop — C generators use
+    // `if (fi.loop_count > 0) break;`. Rows may legitimately revisit
+    // earlier values after pattern jumps/loops, so a maxRow heuristic
+    // would truncate the dump mid-stream.
     let n = 0;
     try { n = core.frame(out.subarray(0, core.ticksize * 2)); } catch { break; }
     if (n <= 0) break;
+    if ((core.playState.loopCount ?? 0) > 0) break; // after play, like C
     const ps = core.playState;
     for (let ch = 0; ch < core.channels; ch++) {
       const voc = core.virt.mapChannel(ch);
@@ -33,7 +33,7 @@ export function dumpMixerState(core, maxLines, maxTimeMs = Infinity) {
       const xc = core._xc ? core._xc[ch] : null;
       // C skips channels with NOTE_SAMPLE_END
       const noteFlags = xc ? xc.note_flags : 0;
-      if (noteFlags & 4) continue; // NOTE_SAMPLE_END
+      if (noteFlags & 32) continue; // NOTE_SAMPLE_END (1 << 5)
       lines.push(
         `${Math.round(ps.timeMs)} ${ps.row} ${ps.frame} ${ch} ` +
         `${Math.round(xc?.info_period ?? 0)} ${v.note} ${v.ins - 1} ${v.vol} ` +
@@ -52,15 +52,12 @@ export function dumpMixerState(core, maxLines, maxTimeMs = Infinity) {
 export function dumpChannelInfo(core, maxLines, maxTimeMs = Infinity) {
   const out = new Float32Array(core.ticksize * 2 + 4096);
   const lines = [];
-  let maxRow = 0;
   for (let f = 0; lines.length < maxLines; f++) {
     if (core.playState.timeMs > maxTimeMs) break;
-    const row = core.playState.row;
-    if (row < maxRow) break;
-    if (row > maxRow) maxRow = row;
     let n = 0;
     try { n = core.frame(out.subarray(0, core.ticksize * 2)); } catch { break; }
     if (n <= 0) break;
+    if ((core.playState.loopCount ?? 0) > 0) break; // after play, like C
     const ps = core.playState;
     for (let ch = 0; ch < core.channels; ch++) {
       const xc = core._xc ? core._xc[ch] : null;

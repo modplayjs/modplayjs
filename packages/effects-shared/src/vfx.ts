@@ -7,7 +7,7 @@
 // flow jumps and tempo.
 
 import type { Core, ChannelState } from '@modplayjs/core';
-import { Quirk } from '@modplayjs/core';
+import { Quirk, FLOW_MODE_ORPHEUS } from '@modplayjs/core';
 import { MSN, LSN, SET, hasQuirk, effectMemoryS3m, NOTE_CUT } from './helpers.js';
 import { VolSlideFlag } from './state.js';
 
@@ -54,7 +54,10 @@ export function fxVolSlide(core: Core, xc: ChannelState, fxpIn: number): void {
       xc.vol.memory = fxp;
       const h = MSN(fxp);
       const l = LSN(fxp);
-      if (hasQuirk(core, Quirk.VOLPDN)) {
+      if (core.ctx.m.flowMode === FLOW_MODE_ORPHEUS) {
+        // Imago Orpheus uses (x - y) (effects.c:342-345, test_effect_finefx_imf).
+        xc.vol.slide = h - l;
+      } else if (hasQuirk(core, Quirk.VOLPDN)) {
         xc.vol.slide = l ? -l : h;
       } else {
         xc.vol.slide = h ? h : -l;

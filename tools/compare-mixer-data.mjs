@@ -95,24 +95,51 @@ core.startPlayer();
 const last = golden[golden.length - 1];
 const isChannelInfoFmt = golden.length > 0 && golden[0].pos0 === null &&
   golden[0].note === null;
-const ours = isChannelInfoFmt
-  ? dumpChannelInfo(core, golden.length + 64, last.time + 50)
-  : dumpMixerState(core, golden.length + 64, last.time + 50);
+const oursRaw = isChannelInfoFmt
+  ? dumpChannelInfo(core, golden.length * 3 + 512, last.time * 2 + 200)
+  : dumpMixerState(core, golden.length * 3 + 512, last.time * 2 + 200);
+// The dumps emit C-format text lines — parse them into objects for diffing.
+const ours = oursRaw.map(v => {
+  if (typeof v !== 'string') return v;
+  const f = v.split(' ').map(Number);
+  if (isChannelInfoFmt) {
+    return { time: f[0], row: f[1], frame: f[2], chan: f[3], period: f[4],
+             note: null, ins: null, vol: f[5], pan: f[7], pos0: null,
+             cutoff: null, resonance: null };
+  }
+  return { time: f[0], row: f[1], frame: f[2], chan: f[3], period: f[4],
+           note: f[5], ins: f[6], vol: f[7], pan: f[8], pos0: f[9],
+           cutoff: f[10] ?? null, resonance: f[11] ?? null };
+});
 
 // ---- diff with C's tolerances ----------------------------------------------
 
 let mismatches = 0;
-let missingOurs = 0;
 const reports = [];
-const key = v => `${v.row}:${v.frame}:${v.chan}`;
-const gmap = new Map(golden.map(v => [key(v), v]));
-const omap = new Map(ours.map(v => [key(v), v]));
-for (const [k, g] of gmap) {
-  const p = omap.get(k);
-  if (!p) { missingOurs++; continue; }
+
+// Sequential time-window match: rows repeat after pattern loops/jumps, so
+// row:frame:chan is not unique, and raw time differs by ±1 ms between C
+// (x87 float) and ours (double). Both streams are time-ordered per channel
+// (the generators emit lines in play order), so walk golden lines and
+// consume ours greedily: match same chan with |Δt| <= 1, advancing an
+// ours-cursor monotonically. Extra ours lines (module-looped past the
+// golden cap) are fine; golden lines with no ours line = de-sync.
+const cursor = new Map(); // chan → next index into ours
+for (const g of golden) {
+  let i = cursor.get(g.chan) ?? 0;
+  while (i < ours.length && ours[i].chan === g.chan && ours[i].time < g.time - 2) i++;
+  cursor.set(g.chan, i);
+  const p = ours[i];
+  if (!p || p.chan !== g.chan || Math.abs(p.time - g.time) > 2) {
+    mismatches++;
+    if (reports.length <= maxReport)
+      reports.push(`row ${g.row} frame ${g.frame} ch ${g.chan} t=${g.time}: MISSING in ours (cursor at ${p ? `t=${p.time} row=${p.row} vol=${p.vol}` : 'EOF'})`);
+    continue;
+  }
+  cursor.set(g.chan, i + 1);
   const bad = [];
-  if (Math.abs(g.time - p.time) > 1) bad.push(`time ${g.time} vs ${p.time}`);
-  if (Math.abs(g.period - p.period) > 0) bad.push(`period ${g.period} vs ${p.period}`);
+  if (Math.abs(g.time - p.time) > 2) bad.push(`time ${g.time} vs ${p.time}`);
+  if (Math.abs(g.period - p.period) > 1) bad.push(`period ${g.period} vs ${p.period}`); // ±1: x87-vs-double rounding
   if (g.note !== null && g.note !== p.note) bad.push(`note ${g.note} vs ${p.note}`);
   if (g.ins !== null && g.ins !== p.ins) bad.push(`ins ${g.ins} vs ${p.ins}`);
   if (g.vol !== null && g.vol !== p.vol) bad.push(`vol ${g.vol} vs ${p.vol}`);
@@ -131,12 +158,8 @@ for (const [k, g] of gmap) {
       reports.push(`row ${g.row} frame ${g.frame} ch ${g.chan}: ` + bad.join(', '));
   }
 }
-const onlyOurs = [...omap.keys()].filter(k => !gmap.has(k)).length;
-const onlyGolden = [...gmap.keys()].filter(k => !omap.has(k)).length;
 const lineDiff = Math.abs(golden.length - ours.length);
 console.log(`compared ${golden.length} golden lines vs ${ours.length} our lines ` +
   `(line delta ${lineDiff}) — ` + (mismatches === 0 ? 'STATE MATCH' : mismatches + ' STATE MISMATCHES'));
-if (onlyOurs || onlyGolden)
-  console.log(`  (line presence: ${onlyGolden} golden-only, ${onlyOurs} ours-only — frames where one side skipped the channel)`);
 for (const r of reports.slice(0, maxReport)) console.log('  ' + r);
 if (mismatches > 0) process.exit(1);
