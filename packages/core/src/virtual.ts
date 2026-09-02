@@ -58,16 +58,24 @@ interface VirtChannelEntry {
   tail: number;
 }
 
-/** Instrument identity token for DCT match comparisons. */
+/** Instrument identity token for DCT match comparisons. Keys are
+ * assigned lazily; keyInstruments() pins them to index+1 so v.ins
+ * equals the 0-based instrument index + 1 (C's mixer_voice.ins). */
 const insKeys = new WeakMap<Instrument, number>();
 let nextInsKey = 1;
-function insKey(ins: Instrument): number {
+export function insKey(ins: Instrument): number {
   let k = insKeys.get(ins);
   if (k === undefined) {
     k = nextInsKey++;
     insKeys.set(ins, k);
   }
   return k;
+}
+
+/** Pre-assign instrument keys in module order (call after load) so
+ * insKey(ins) === insNum + 1 deterministically. */
+export function keyInstruments(instruments: Instrument[]): void {
+  for (const ins of instruments) insKey(ins);
 }
 
 function makeVoice(chn: number): VoiceState {

@@ -78,7 +78,7 @@ export * from './model/model';
 
 // Core implementation (T4-T8)
 export { ModplayError, UnknownFormatError, ParseError, PackedModuleError, StateError, PluginNotFoundError, SampleError } from './errors';
-export { VirtualLayer, PastNote, VIRT_INVALID } from './virtual';
+export { VirtualLayer, PastNote, VIRT_INVALID, keyInstruments } from './virtual';
 export { SampleStore, DecodeFlag, adpcm4Decode } from './samples';
 export { Registries } from './registry';
 export {

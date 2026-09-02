@@ -44,7 +44,7 @@ import {
   StateError,
 } from './errors';
 import { Registries } from './registry';
-import { VirtualLayer } from './virtual';
+import { VirtualLayer, keyInstruments } from './virtual';
 import { SampleStore } from './samples';
 import { Scanner, OrdInfo } from './scan';
 import { resetFlow, processPatternLoop, processPatternJump, processPatternBreak } from './flow';
@@ -275,6 +275,8 @@ export class Core implements CoreIface {
     const s0 = res.scan[0];
     this.scanEnd = { ord: s0?.ord ?? 0, row: s0?.row ?? 0, num: s0?.num ?? 0 };
 
+    // Pin instrument identity keys to index+1 (C mixer_voice.ins).
+    keyInstruments(mod.instruments);
     this._module = mod;
     this._state = CoreState.LOADED;
   }

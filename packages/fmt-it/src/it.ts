@@ -442,7 +442,7 @@ function readEnvelope(
   if (num > 0 && num <= 25 /* XMP_MAX_ENV_POINTS */) {
     for (let i = 0; i < num; i++) {
       ei.x[i] = readmem16l(buf, 7 + i * 3);
-      ei.y[i] = buf[6 + i * 3]!;
+      ei.y[i] = (buf[6 + i * 3]! << 24) >> 24; // int8 (it.h it_envelope_node.y)
     }
   } else {
     ei.flags &= ~EnvelopeFlags.ON;
