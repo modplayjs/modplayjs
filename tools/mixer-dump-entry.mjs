@@ -22,7 +22,9 @@ export function dumpMixerState(core, maxLines, maxTimeMs = Infinity) {
     if (n <= 0) break;
     if ((core.playState.loopCount ?? 0) > 0) break; // after play, like C
     const ps = core.playState;
-    for (let ch = 0; ch < core.channels; ch++) {
+    // C generators iterate p->virt.virt_channels (NNA overflow channels
+    // included), not mod->chn.
+    for (let ch = 0; ch < core.virt.virtChannels; ch++) {
       const voc = core.virt.mapChannel(ch);
       if (voc < 0) continue;
       const v = core.virt.voiceAt(voc);
@@ -59,7 +61,7 @@ export function dumpChannelInfo(core, maxLines, maxTimeMs = Infinity) {
     if (n <= 0) break;
     if ((core.playState.loopCount ?? 0) > 0) break; // after play, like C
     const ps = core.playState;
-    for (let ch = 0; ch < core.channels; ch++) {
+    for (let ch = 0; ch < core.virt.virtChannels; ch++) {
       const xc = core._xc ? core._xc[ch] : null;
       if (!xc) continue;
       lines.push(

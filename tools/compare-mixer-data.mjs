@@ -133,9 +133,11 @@ for (const g of golden) {
   if (!p || p.chan !== g.chan || Math.abs(p.time - g.time) > 2) {
     mismatches++;
     if (reports.length <= maxReport)
-      reports.push(`row ${g.row} frame ${g.frame} ch ${g.chan} t=${g.time}: MISSING in ours (cursor at ${p ? `t=${p.time} row=${p.row} vol=${p.vol}` : 'EOF'})`);
+      reports.push(`row ${g.row} frame ${g.frame} ch ${g.chan} t=${g.time}: MISSING in ours (cursor at ${p ? `t=${p.time} row=${p.row} vol=${p.vol} pos0=${p.pos0}` : 'EOF'})`);
     continue;
   }
+  if (reports.length <= maxReport && g.row === 0 && g.frame === 0)
+    reports.push(`DBG fr0: g.pos0=${g.pos0} p.pos0=${p.pos0} p.t=${p.time} p.chan=${p.chan}`);
   cursor.set(g.chan, i + 1);
   const bad = [];
   if (Math.abs(g.time - p.time) > 2) bad.push(`time ${g.time} vs ${p.time}`);
