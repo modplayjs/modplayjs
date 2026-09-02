@@ -23,3 +23,12 @@ Debug assets:
   /tmp/dbgflow2.c   — C flow trace per row
   /tmp/dbgpan9.c    — C pan envelope probe
   /tmp/regen-all/   — regenerated goldens from the checkout C
+
+
+UPDATE (session 2): leading hypothesis for GROUP A — notes WITHOUT an
+ins# (using old_ins memory) after the previous voice hit NOTE_SAMPLE_END
+are skipped by our readEventIt (setPatch never runs, v.note stays
+stale). Verified: it_sample_porta row4 (note=67 no ins#) — our v.note
+stays 60; the map/sub data is correct, so the gate is in readEventIt's
+note-path conditions (suspect: newInvalidIns/old_ins handling or the
+check_invalid_sample path zeroing the event).
