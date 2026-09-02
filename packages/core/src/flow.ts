@@ -39,6 +39,7 @@ export function resetFlow(f: FlowState): void {
  */
 export function processPatternLoop(mod: ModuleData, f: FlowState, chn: number, row: number, fxp: number): void {
   const fm = mod.flowMode;
+  let looped = 0;
   let start = refOf(() => f.loop[chn]!.start, (v) => { f.loop[chn]!.start = v; });
   let count = refOf(() => f.loop[chn]!.count, (v) => { f.loop[chn]!.count = v; });
 
@@ -73,6 +74,7 @@ export function processPatternLoop(mod: ModuleData, f: FlowState, chn: number, r
       count.set(next);
       if (next !== 0) {
         f.loop_dest = start.get();
+        looped = 1;
       } else {
         // S3M and IT: loop termination advances the loop target past SBx.
         if ((fm & FlowFlag.LOOP_END_ADVANCES) !== 0) start.set(row + 1);
@@ -91,11 +93,13 @@ export function processPatternLoop(mod: ModuleData, f: FlowState, chn: number, r
       count.set(fxp);
       f.loop_dest = start.get();
       f.loop_active_num++;
+      looped = 1;
     }
   }
 
-  // Hacks for loop jumps altering prior position jumps/breaks.
-  const looped = f.loop_dest >= 0;
+  // Hacks for loop jumps altering prior position jumps/breaks. C uses a
+  // LOCAL `looped` flag set only when THIS call set loop_dest — a sticky
+  // loop_dest from an earlier row/channel must not re-apply the hacks.
   if (looped && f.pbreak !== 0) {
     // Many implementations use the same variable for both the jump/break
     // destination row and the loop destination row.
