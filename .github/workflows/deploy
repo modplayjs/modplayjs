@@ -1,0 +1,42 @@
+name: Deploy static content to Pages
+
+on:
+  push:
+    branches: ['main'] # Change to 'master' if your default branch is master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+          cache-dependency-path: apps/demo/package-lock.json # Point to lockfile if in apps/demo
+      - name: Install dependencies
+        working-directory: ./apps/demo
+        run: npm ci
+      - name: Build
+        working-directory: ./apps/demo
+        run: npm run build
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './apps/demo/dist' # Point artifact to the nested dist folder
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
