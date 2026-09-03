@@ -126,14 +126,15 @@ export class VirtualLayer {
   /** QUIRK_VIRTUAL — module requests NNA overflow channels. */
   extChannels = false;
 
+
   /** Allocate/reset for a new module + play session (virt_on, virtual.c:100). */
   on(numTracks: number, quirkVirtual = false): void {
     this.off();
     this.numTracks = numTracks;
-    this.extChannels = quirkVirtual;
-    // virtual.c:107-114: virt_channels = num_tracks, plus the mixer voice
-    // pool as overflow channels when QUIRK_VIRTUAL is set (IT). C uses the
-    // mixer's voice count; our pool cap is MAXVOICES (64).
+    // C virtual.c:107-126: virt_channels = num_tracks (+maxvoc if VIRTUAL),
+    // then maxvoc = min(num, SMIX_NUMVOC). C's pool holds maxvoc voices —
+    // the extra overflow slots ARE the voice pool, so the pool cap is
+    // MAXVOICES for VIRTUAL modules and every pre-made slot is free.
     this.virtChannels = numTracks + (quirkVirtual ? MAXVOICES : 0);
     for (let i = 0; i < this.virtChannels; i++) {
       this.map.push({ voice: VIRT_INVALID, tail: VIRT_INVALID });
@@ -142,7 +143,7 @@ export class VirtualLayer {
     // virtual.c:119-126: C calloc's ALL maxvoc slots upfront so alloc_voice
     // always finds a free slot instead of having to lazily grow the pool.
     for (let i = 0; i < MAXVOICES; i++) {
-      this.voices.push(makeVoice(i));
+      this.voices.push(makeVoice(VIRT_INVALID));
     }
     this.setChannelMute([]);
   }
@@ -307,15 +308,18 @@ export class VirtualLayer {
     // overflow channel and setpatch returns THAT channel (the local `chn`
     // is reassigned by the re-home loop, virtual.c:505-517, 546 return chn).
     const oldVoice = curVoice;
-    // C tests the voice's CURRENT act (virtual.c:512): any live voice —
-    // NOTE/KEY/VOL — is re-homed, not just one with an NNA queued.
+    // C tests the voice's CURRENT act (virtual.c:511): any live voice —
+    // NOTE/KEY/VOL — is re-homed, not just one with an NNA queued. An
+    // INACTIVE old voice (act == 0, e.g. a finished one-shot) is REUSED
+    // in place — virtual.c:511 'if (voice_array[voc].act)' guards the
+    // alloc/rehome; the false path keeps `voc` and just re-patches it.
     const oldActive =
       oldVoice !== VIRT_INVALID && this.voices[oldVoice]!.act !== Act.NONE;
-    const vidx = this.allocVoice();
-    if (vidx === VIRT_INVALID) return VIRT_INVALID;
-    this.map[chn]!.voice = vidx;
-
     let to = chn;
+    const vidx =
+      oldVoice !== VIRT_INVALID && !oldActive ? oldVoice : this.allocVoice();
+    if (vidx === VIRT_INVALID) return VIRT_INVALID;
+    if (vidx !== oldVoice) this.map[chn]!.voice = vidx;
     if (oldVoice !== VIRT_INVALID && oldActive) {
       // Re-home the old voice: first overflow channel with map <= FREE
       // (virtual.c:515-517). C's loop leaves `chn` at virt_channels when no
