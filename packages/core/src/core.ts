@@ -52,7 +52,7 @@ import {
   processTick,
   VolSlideFlag,
   TREMOR_FLAG,
-  RESET_PER,
+  RESET,
 } from '@modplayjs/effects-shared';
 
 const MSN = (v: number) => (v >> 4) & 0x0f;
@@ -682,11 +682,11 @@ export class Core implements CoreIface {
 
       if (isFt2) {
         // Reset Kxx even if delayed (ft2_kxx.xm); reset tremor FLAG likewise
-        // (player.c:829-832: RESET(TREMOR) clears per_flags, NOT tremor.count
-        // — zeroing the count would gate every post-note row's volume to 0
-        // in tremorFt2).
+        // (player.c:836-838: RESET(TREMOR) clears the bit in xc->flags that
+        // SET(TREMOR) sets in fxTremor — NOT tremor.count; zeroing the count
+        // would gate every post-note row's volume to 0 in tremorFt2).
         xc.keyoff = 0;
-        RESET_PER(xc, TREMOR_FLAG);
+        RESET(xc, TREMOR_FLAG);
       }
 
       if (!this.checkDelay(event, chn)) {

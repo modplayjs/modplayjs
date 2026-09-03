@@ -3,7 +3,7 @@
 Suite: `sh tools/run-mixer-data-tests.sh` — compares against the
 committed goldens in `reference/libxmp/test-dev/data/*.data`.
 
-**Current state: 92 passed / 13 failed** (65 fixtures without .data).
+**Current state: 94 passed / 11 failed** (65 fixtures without .data).
 
 ## Current failures (13), grouped by symptom
 
@@ -36,11 +36,12 @@ every loop pass, ours is not.
 - `it_smooth_macro.it` — fixed (float32 macro accumulation, matching
   C's float fields in player.h:251-253).
 
-### Tremor (1)
-- `ft2_tremor_delay.xm` — 13, `row 25 frame 2: vol 0 vs 1024` (tremor
-  onset/delay timing)
+### Tremor (fixed this session)
+- `ft2_tremor_delay.xm` — fixed: `read_row`'s FT2 tremor reset used
+  RESET_PER (per_flags) while C's RESET(TREMOR) clears the bit in
+  xc->flags that SET(TREMOR) sets (player.c:836-838).
 
-## Session 3 results (92/13, from 90/15)
+## Session 3 results (94/11, from 90/15)
 
 Root causes found and fixed:
 1. **setPatch NNA rehome** (`3493228`) — C's `alloc_voice`
@@ -48,8 +49,13 @@ Root causes found and fixed:
    act is inactive, and only allocs + re-homes the old voice to a free
    overflow channel when it is still active. Ported: `oldActive` gate,
    `vidx = oldVoice` reuse path, `to = hunt - 1` re-home. Fixed
-   `it_fade_env_reset`, `it_fade_env_reset_carry`, `it_note_delay_nna`,
-   `it_sample_porta` (direct runs).
+   `it_fade_env_reset`, `it_fade_env_reset_carry`, `it_note_delay_nna`.
+2. **IT smooth macro float32** — C stores macro val/target/slide as
+   float; round the slide and each accumulation with Math.fround.
+   Fixed `it_smooth_macro`.
+3. **FT2 tremor row reset** — read_row clears the tremor flag in
+   xc->flags (player.c:836-838), not per_flags. Fixed
+   `ft2_tremor_delay.xm`.
 
 ## Session 2 results (90/15, from 73/32)
 
