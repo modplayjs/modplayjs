@@ -183,14 +183,15 @@ export function updateMidiMacro(core: Core, chn: number): void {
   const midicfg = mod.midi;
 
   if (TEST(xc, VolSlideFlag.MIDI_MACRO) !== 0 && hasQuirk(core, Quirk.FILTER)) {
+    // C accumulates val/slide in float32 (channel_data.macro, player.h:251-253).
     if (xc.macro.slide > 0) {
-      xc.macro.val += xc.macro.slide;
+      xc.macro.val = Math.fround(xc.macro.val + xc.macro.slide);
       if (xc.macro.val > xc.macro.target) {
         xc.macro.val = xc.macro.target;
         xc.macro.slide = 0;
       }
     } else if (xc.macro.slide < 0) {
-      xc.macro.val += xc.macro.slide;
+      xc.macro.val = Math.fround(xc.macro.val + xc.macro.slide);
       if (xc.macro.val < xc.macro.target) {
         xc.macro.val = xc.macro.target;
         xc.macro.slide = 0;

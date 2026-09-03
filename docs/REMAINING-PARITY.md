@@ -7,8 +7,12 @@ committed goldens in `reference/libxmp/test-dev/data/*.data`.
 
 ## Current failures (13), grouped by symptom
 
-### Loop re-entry pos0 (4 fixtures — likely one root cause)
-Sample position resets to 0 when a pattern loops; C continues it.
+### Loop re-entry pos0 (5 fixtures — likely one root cause)
+Sample position resets/drifts when a pattern or bidi loop wraps; C
+continues it. `portamento_sustain.it` belongs here too: its reported
+period ±5 drift (`3123816 vs 3123821`) is the porta slide seeing a
+drifted pos0 at loop re-entry — the golden's period is identical on
+every loop pass, ours is not.
 - `pattern_loop_it100.it` — 74 mismatches, `row 1 frame 1: pos0 10 vs 0`
 - `pattern_loop_it104.it` — 44, `row 5 frame 1: pos0 9 vs 0`
 - `pattern_loop_it210.it` — 31, `row 5 frame 1: pos0 9 vs 0`
@@ -24,15 +28,13 @@ Sample position resets to 0 when a pattern loops; C continues it.
 - `portamento_nna_sample.it` — 84 mismatches, line delta 1584 (912
   golden vs 2496 ours — we allocate a flood of extra overflow voices)
 - `it_multi_retrigger.it` — 7, Qxx volume ramp (`row 5: vol 0 vs 16`)
-- `duplicate_check_transpose.it` — 67, flow divergence (golden at
-  row 4 while our cursor is at row 8)
 - `it_sample_porta.it` — 8, tail of row 3 missing in ours (voice cut
   at t=500, golden plays to t=480); passes in direct runs — flaky
   under the suite's parallel load
 
-### Envelope / rounding (2)
-- `it_smooth_macro.it` — 4, cutoff `236 vs 238` (smooth-macro LFO)
-- `portamento_sustain.it` — 4, period `3123816 vs 3123821`
+### Envelope / rounding (fixed this session)
+- `it_smooth_macro.it` — fixed (float32 macro accumulation, matching
+  C's float fields in player.h:251-253).
 
 ### Tremor (1)
 - `ft2_tremor_delay.xm` — 13, `row 25 frame 2: vol 0 vs 1024` (tremor

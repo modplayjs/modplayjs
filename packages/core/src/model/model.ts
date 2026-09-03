@@ -536,11 +536,11 @@ export interface ChannelState {
 
   /** IT midi macro state (channel_data.macro, LIBXMP_CORE_PLAYER off). */
   macro: {
-    /** Current macro effect (use float for slides). */
+    /** Current macro effect — C float32. */
     val: number;
-    /** Current macro target (smooth macro). */
+    /** Current macro target (smooth macro) — C float32. */
     target: number;
-    /** Current macro slide (smooth macro). */
+    /** Current macro slide (smooth macro) — C float32. */
     slide: number;
     /** Current active parameterized macro. */
     active: number;

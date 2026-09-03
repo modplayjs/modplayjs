@@ -596,7 +596,10 @@ function processRest(
       if (core.ctx.p.speed !== 0 && xc.macro.val < 0x80) {
         SET(xc, VolSlideFlag.MIDI_MACRO);
         xc.macro.target = fxp;
-        xc.macro.slide = (fxp - xc.macro.val) / core.ctx.p.speed;
+        // C: slide is float32 ((float)fxp - val) / speed (effects.c:834).
+        xc.macro.slide = Math.fround(
+          Math.fround(fxp - xc.macro.val) / core.ctx.p.speed,
+        );
       }
       break;
   }
