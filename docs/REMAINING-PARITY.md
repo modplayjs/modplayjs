@@ -36,40 +36,37 @@ against whatever is in the working tree).
   non-×m/d steps mid-ramp (retrig × volume-envelope interplay).
   Needs a C-side per-tick trace of xc->volume + vol env idx.
 
-## Fixed this session
+## Fixed this session (session 3)
 - `it_fade_env_reset`, `it_fade_env_reset_carry`, `it_note_delay_nna`
-  — setPatch NNA rehome (below).
-- `it_smooth_macro` — float32 macro accumulation (below).
-- `ft2_tremor_delay.xm` — FT2 tremor row reset (below).
+  — setPatch NNA rehome (fix 1 below).
 - `it_sample_porta` — NOT a port bug: the golden carried frozen
   pos0 lines (row3 f3-f5, row8 f1-f2) that pristine C does not emit
   (NOTE_SAMPLE_END is set as soon as the mixer exhausts the sample,
   so the dump skips those frames). Regenerated
   `it_sample_porta.data` with a pristine-C genmix build; our player
   matches it exactly.
+- `it_smooth_macro` — float32 macro accumulation (fix 2 below).
+- `ft2_tremor_delay.xm` — FT2 tremor row reset (fix 3 below).
+- `pattern_loop_it210`, `pattern_loop_it104`, `pattern_loop_it100`,
+  `it_sus_after_loop_bidi`, `reverse_xm.xm` — stale VOICE_REVERSE
+  across mix chunks (fix 4 below).
 
-## Session 3 results (100/5, from 90/15)
-
-Root causes found and fixed:
+Session-3 fix list:
 1. **setPatch NNA rehome** (`3493228`) — C's `alloc_voice`
    (virtual.c:509-517) reuses the channel's voice in place when its
    act is inactive, and only allocs + re-homes the old voice to a free
    overflow channel when it is still active. Ported: `oldActive` gate,
-   `vidx = oldVoice` reuse path, `to = hunt - 1` re-home. Fixed
-   `it_fade_env_reset`, `it_fade_env_reset_carry`, `it_note_delay_nna`.
-2. **IT smooth macro float32** — C stores macro val/target/slide as
-   float; round the slide and each accumulation with Math.fround.
-   Fixed `it_smooth_macro`.
-3. **FT2 tremor row reset** — read_row clears the tremor flag in
-   xc->flags (player.c:836-838), not per_flags. Fixed
-   `ft2_tremor_delay.xm`.
-4. **Stale VOICE_REVERSE across mix chunks** — C re-reads
+   `vidx = oldVoice` reuse path, `to = hunt - 1` re-home.
+2. **IT smooth macro float32** (`3c7ded2`) — C stores macro
+   val/target/slide as float; round the slide and each accumulation
+   with Math.fround.
+3. **FT2 tremor row reset** (`54467da`) — read_row clears the tremor
+   flag in xc->flags (player.c:836-838), not per_flags.
+4. **Stale VOICE_REVERSE across mix chunks** (`22cc966`) — C re-reads
    `vi->flags & VOICE_REVERSE` per mix-loop iteration; loop_
    reposition's bidi XOR (mixer.c:375) flips direction mid-tick,
    and our cached const kept mixing in the old direction after the
-   first flip. Fixed `pattern_loop_it210/104/100`,
-   `it_sus_after_loop_bidi`, and `reverse_xm` (its ins3 bidi+reverse
-   case was the same root cause).
+   first flip.
 
 ## Session 2 results (90/15, from 73/32)
 
