@@ -31,14 +31,14 @@ export function dumpMixerState(core, maxLines, maxTimeMs = Infinity) {
       // Skip idle voices (never played / one-shot dead): C's map_channel
       // returns < 0 for channels whose voice slot is FREE, so those lines
       // never appear in the golden dump.
-      if (!v || v.smp < 0 || v.act === 0) continue;
+      if (!v || v.smp < 0) continue;
       const xc = core._xc ? core._xc[ch] : null;
       // C skips channels with NOTE_SAMPLE_END
       const noteFlags = xc ? xc.note_flags : 0;
       if (noteFlags & 32) continue; // NOTE_SAMPLE_END (1 << 5)
       lines.push(
-        `${Math.round(ps.timeMs)} ${ps.row} ${ps.frame} ${ch} ` +
-        `${Math.round(xc?.info_period ?? 0)} ${v.note} ${v.ins - 1} ${v.vol} ` +
+        `${Math.trunc(ps.timeMs)} ${ps.row} ${ps.frame} ${ch} ` +
+        `${Math.trunc(xc?.info_period ?? 0)} ${v.note} ${v.ins - 1} ${v.vol} ` +
         `${v.pan} ${Math.round(v.pos0 ?? 0)} ${v.filter?.cutoff ?? 255} ` +
         `${v.filter?.resonance ?? 0}`);
     }

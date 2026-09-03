@@ -93,7 +93,10 @@ export class SoftMixer implements DspPlugin {
           vi.flags &= ~VoiceFlag.ANTICLICK;
         }
 
-        if (vi.act === Act.NONE) continue;
+        // C's mixer: no act check — mixes all FLAG_ACTIVE voices.
+        // FLAG_ACTIVE is set at setpatch and cleared at reset; our
+        // equivalent is v.smp >= 0 (the voice has a sample to play).
+        if (vi.smp < 0) continue;
 
         let xxsRef: SampleData;
         if (vi.period < 1) {

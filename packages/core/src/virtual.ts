@@ -365,9 +365,9 @@ export class VirtualLayer {
     // VIRT_ACTIVE regardless, but once the voice is re-homed to an
     // overflow channel (new note on its root), play_channel sees this act:
     // NNA_OFF → VIRT_ACTION_OFF (fadeout), NNA_FADE → VIRT_ACTION_FADE.
-    // Map NNA onto our Act enum: CONT→NOTE (cstat default → ACTIVE),
-    // OFF→KEY, FADE→VOL.
-    v.act = nna === 2 /* NNA_OFF */ ? Act.KEY : nna === 3 /* NNA_FADE */ ? Act.VOL : Act.NOTE;
+    // Map NNA onto our Act enum: CUT→NONE (C: act=0, the voice is dead
+    // for the next setpatch's alloc check), CONT→NOTE, OFF→KEY, FADE→VOL.
+    v.act = nna; // C: voice_array[voc].act = nna (0=CUT, 1=CONT, 2=OFF, 3=FADE)
     v.nnaAct = nna;
     v.flags = 0;
     v.pos = 0;
