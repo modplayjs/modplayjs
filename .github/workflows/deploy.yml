@@ -27,8 +27,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: latest
-          cache: 'npm'
-          cache-dependency-path: ./apps/demo/package-lock.json
       - name: Install dependencies
         working-directory: ./apps/demo
         run: npm ci
