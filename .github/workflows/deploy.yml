@@ -15,6 +15,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,7 +28,7 @@ jobs:
         with:
           node-version: lts/*
           cache: 'npm'
-          cache-dependency-path: apps/demo/package-lock.json # Point to lockfile if in apps/demo
+          cache-dependency-path: apps/demo/package-lock.json
       - name: Install dependencies
         working-directory: ./apps/demo
         run: npm ci
@@ -36,7 +40,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './apps/demo/dist' # Point artifact to the nested dist folder
+          path: './apps/demo/dist'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
