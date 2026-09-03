@@ -158,6 +158,10 @@ export class SoftMixer implements DspPlugin {
           (xxs.flags & SampleFlags.SUSTAIN) !== 0 &&
           (~vi.flags & VoiceFlag.RELEASE) !== 0;
         let start = vi.start, end = vi.end;
+        // C re-reads VOICE_REVERSE per mix-loop iteration (mixer.c:604-624):
+        // loop_reposition's bidi XOR (mixer.c:375) flips direction
+        // mid-tick, so the direction must not be cached across chunks.
+        let reverse = (vi.flags & VoiceFlag.VOICE_REVERSE) !== 0;
 
         // step (:584) + sanity (:586-588). C keeps the double step for the
         // chunk-boundary pos commit (mixer.c:703) and converts to fixed
@@ -178,7 +182,6 @@ export class SoftMixer implements DspPlugin {
         // Frames of the anti-click ramp already consumed this tick — the
         // ramp level is old_vl + delta × (frames into the ramp).
         let rampDone = 0;
-        const reverse = (vi.flags & VoiceFlag.VOICE_REVERSE) !== 0;
 
         // IT lowpass biquad (mix_all.c FILTER_LEFT/FILTER_RIGHT :219-233,
         // applied inside the _filter mixers selected by FLAG_FILTER set at
@@ -204,6 +207,9 @@ export class SoftMixer implements DspPlugin {
 
         let usmp = ticksize;
         while (size > 0) {
+          // C re-reads the direction flag per iteration — loop_reposition's
+          // bidi XOR (mixer.c:375) may have flipped it in the previous chunk.
+          reverse = (vi.flags & VoiceFlag.VOICE_REVERSE) !== 0;
           // Samples until loop break/end (:604-629). C keeps vi->pos as a
           // DOUBLE in the voice struct (mixer.h:27) and advances it per
           // chunk with the double step (mixer.c:703).

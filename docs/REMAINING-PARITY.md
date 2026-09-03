@@ -5,33 +5,21 @@ working-tree goldens in `reference/libxmp/test-dev/data/*.data`
 (16 fixtures carry 12-field regen versions; the suite compares
 against whatever is in the working tree).
 
-**Current state: 95 passed / 10 failed** (65 fixtures without .data).
+**Current state: 100 passed / 5 failed** (65 fixtures without .data).
 
-## Current failures (10), grouped by symptom
+## Current failures (5), grouped by symptom
 
-### Loop re-entry pos0 (5 fixtures — likely one root cause)
-Sample position resets/drifts when a pattern or bidi loop wraps; C
-continues it. `portamento_sustain.it` belongs here too: its reported
-period ±5 drift (`3123816 vs 3123821`) is the porta slide seeing a
-drifted pos0 at loop re-entry — the golden's period is identical on
-every loop pass, ours is not.
-- `pattern_loop_it100.it` — 74 mismatches, `row 1 frame 1: pos0 10 vs 0`
-- `pattern_loop_it104.it` — 44, `row 5 frame 1: pos0 9 vs 0`
-- `pattern_loop_it210.it` — 31, `row 5 frame 1: pos0 9 vs 0`
-- `it_sus_after_loop_bidi.it` — 4, `row 2 frame 0: pos0 1772 vs 0`
-- `portamento_sustain.it` — 4, period ±5 drift (see above)
+### Porta slide precision (1)
+- `portamento_sustain.it` — 4 mismatches (period ±5 out of ~3.1M,
+  e.g. `3123816 vs 3123821` at a late pass, note 51 toneporta).
+  IT linear-slide fixed-point accumulation across the bidi loop;
+  needs the exact C step/rounding chain traced.
 
-### Reverse samples (2)
+### Reverse (1)
 - `reverse_it.it` — 103 mismatches vs the pristine-C dump. The
   committed golden is ALSO stale (pristine C emits 443 lines, the
   golden 450); two layers to untangle: regen the golden, then fix
   the remaining real divergence.
-- `reverse_xm.xm` — 51 mismatches, all vs pristine C (the golden
-  matches pristine C). Real bug: ins3's bidi loop + VOICE_REVERSE —
-  C flips direction at the loop start (mixer.c:723-724 →
-  loop_reposition bidi branch, pos0 ascending from 173); ours keeps
-  descending (pos0 4003→2330). Trace the bidi flip trigger with
-  vi.start = loop start.
 
 ### NNA / retrigger / voice pool (2)
 - `portamento_nna_sample.it` — 84 mismatches, line delta 1584 (912
@@ -60,7 +48,7 @@ every loop pass, ours is not.
   `it_sample_porta.data` with a pristine-C genmix build; our player
   matches it exactly.
 
-## Session 3 results (95/10, from 90/15)
+## Session 3 results (100/5, from 90/15)
 
 Root causes found and fixed:
 1. **setPatch NNA rehome** (`3493228`) — C's `alloc_voice`
@@ -75,6 +63,13 @@ Root causes found and fixed:
 3. **FT2 tremor row reset** — read_row clears the tremor flag in
    xc->flags (player.c:836-838), not per_flags. Fixed
    `ft2_tremor_delay.xm`.
+4. **Stale VOICE_REVERSE across mix chunks** — C re-reads
+   `vi->flags & VOICE_REVERSE` per mix-loop iteration; loop_
+   reposition's bidi XOR (mixer.c:375) flips direction mid-tick,
+   and our cached const kept mixing in the old direction after the
+   first flip. Fixed `pattern_loop_it210/104/100`,
+   `it_sus_after_loop_bidi`, and `reverse_xm` (its ins3 bidi+reverse
+   case was the same root cause).
 
 ## Session 2 results (90/15, from 73/32)
 
