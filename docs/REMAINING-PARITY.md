@@ -1,68 +1,76 @@
-Remaining modplayjs parity failures (17 fixtures, all real bugs vs
-checkout-C regen goldens in /tmp/regen-all/):
+# Remaining modplayjs parity failures
 
-GROUP A — voice/retrig after sample-end or NNA (missing retrig):
-  reverse_it, reverse_xm (reversed voice: ord1 retrig never fires;
-    our player keeps the frozen pos=end/pos=0 voice)
-  it_sample_porta (row4 retrig missed after the pos=end freeze)
-  duplicate_check_transpose, portamento_nna_sample (DCT/NNA voice
-    pool: allocVoice returns -1 after DCT kills; used counter goes
-    negative)
-  it_multi_retrigger (Qxx ramp: vol 0 vs 16 mid-ramp)
-  portamento_sustain
+Suite: `sh tools/run-mixer-data-tests.sh` — compares against the
+committed goldens in `reference/libxmp/test-dev/data/*.data`.
 
-GROUP B — envelope engine (pan env sweep divergence):
-  it_smooth_macro (cutoff 236 vs 238), it_sus_after_loop_bidi,
-  storlek_01/03/04/18 (note mismatches from env-driven retrigs)
+**Current state: 92 passed / 13 failed** (65 fixtures without .data).
 
-GROUP C — loop/break ordering:
-  pattern_loop_it100/104/210 (pos0 mismatch at loop re-entry)
+## Current failures (13), grouped by symptom
 
-Debug assets:
-  /tmp/genmix.c     — C golden generator (note_flags & 32 skip bit)
-  /tmp/dbgflow2.c   — C flow trace per row
-  /tmp/dbgpan9.c    — C pan envelope probe
-  /tmp/regen-all/   — regenerated goldens from the checkout C
+### Loop re-entry pos0 (4 fixtures — likely one root cause)
+Sample position resets to 0 when a pattern loops; C continues it.
+- `pattern_loop_it100.it` — 74 mismatches, `row 1 frame 1: pos0 10 vs 0`
+- `pattern_loop_it104.it` — 44, `row 5 frame 1: pos0 9 vs 0`
+- `pattern_loop_it210.it` — 31, `row 5 frame 1: pos0 9 vs 0`
+- `it_sus_after_loop_bidi.it` — 4, `row 2 frame 0: pos0 1772 vs 0`
 
+### Reverse samples (2)
+- `reverse_it.it` — 110 mismatches + 17 lines missing (voice freezes;
+  the order-1 retrig never fires in ours)
+- `reverse_xm.xm` — 51, `row 13: pos0 173 vs 4003` (reverse playback
+  position wrong)
 
-SESSION 2 RESULTS: 17 fixtures fixed (90 passed / 15 failed, from 73/32).
+### NNA / retrigger / voice pool (4)
+- `portamento_nna_sample.it` — 84 mismatches, line delta 1584 (912
+  golden vs 2496 ours — we allocate a flood of extra overflow voices)
+- `it_multi_retrigger.it` — 7, Qxx volume ramp (`row 5: vol 0 vs 16`)
+- `duplicate_check_transpose.it` — 67, flow divergence (golden at
+  row 4 while our cursor is at row 8)
+- `it_sample_porta.it` — 8, tail of row 3 missing in ours (voice cut
+  at t=500, golden plays to t=480); passes in direct runs — flaky
+  under the suite's parallel load
+
+### Envelope / rounding (2)
+- `it_smooth_macro.it` — 4, cutoff `236 vs 238` (smooth-macro LFO)
+- `portamento_sustain.it` — 4, period `3123816 vs 3123821`
+
+### Tremor (1)
+- `ft2_tremor_delay.xm` — 13, `row 25 frame 2: vol 0 vs 1024` (tremor
+  onset/delay timing)
+
+## Session 3 results (92/13, from 90/15)
 
 Root causes found and fixed:
-1. insKey() nondeterminism — keys assigned in first-touch order, so the
-   dump's ins field reported wrong instruments. Fixed: keyInstruments()
-   pins keys to index+1 at load.
-2. Signed envelope y — C's it_envelope_node.y is int8; we read it
-   unsigned, breaking pan-envelope sweeps. Fixed with sign extension.
+1. **setPatch NNA rehome** (`3493228`) — C's `alloc_voice`
+   (virtual.c:509-517) reuses the channel's voice in place when its
+   act is inactive, and only allocs + re-homes the old voice to a free
+   overflow channel when it is still active. Ported: `oldActive` gate,
+   `vidx = oldVoice` reuse path, `to = hunt - 1` re-home. Fixed
+   `it_fade_env_reset`, `it_fade_env_reset_carry`, `it_note_delay_nna`,
+   `it_sample_porta` (direct runs).
+
+## Session 2 results (90/15, from 73/32)
+
+Root causes found and fixed:
+1. insKey() nondeterminism — keys assigned in first-touch order; fixed
+   by pinning keys to index+1 at load.
+2. Signed envelope y — C's it_envelope_node.y is int8; sign-extend it.
 3. LOOP_PATTERN_RESET flag constant — nextOrder tested 0x40 instead of
-   1 << 4; the ST3 position-change loop reset never ran.
-4. NNA act encoding — the DCT setPatch mapped nna=0 (CUT) to Act.NOTE
-   instead of Act.NONE; the next setPatch saw the voice as active and
-   allocated a new voice + rehome, orphaning the new note. Fixed: v.act
-   = nna (C encoding), mixer skips on v.smp < 0 instead of act.
-5. Dump virtual channels — the dump iterated mod.chn instead of
-   virt.virt_channels, dropping NNA overflow lines.
-6. Dump period rounding — Math.round instead of Math.trunc (C printf %d
-   truncates).
-7. Dump act check — removed the v.act === 0 skip (wrong under C's
-   encoding).
-8. Scan row = jumpline — added scan.c:633 'row = f.jumpline' before
+   1 << 4.
+4. NNA act encoding — v.act = nna (C encoding); mixer skips on
+   v.smp < 0 instead of act.
+5. Dump virtual channels — iterate virt.virt_channels, not mod.chn.
+6. Dump period rounding — Math.trunc (C printf %d truncates).
+7. Dump act check — removed the v.act === 0 skip.
+8. Scan row = jumpline — scan.c:633 'row = f.jumpline' before
    end_module.
 9. Regenerated goldens — the stored goldens predated current libxmp
-   behavior (LINEAR periods for IT); regenerated with the checkout C.
+   behavior (LINEAR periods for IT).
 
-Remaining 15 failures (all real bugs, verified vs checkout-C regens):
-- portamento_nna_sample (222): NNA voice allocation — our allocVoice
-  pushes new slots where C's maxvoc-limited pool reuses the same slot
-- reverse_it (216) / reverse_xm (51): reverse sample playback
-- it_multi_retrigger (145): Qxx vol ramp
-- duplicate_check_transpose (135): DCT transpose
-- pattern_loop_it100/104/210 (74/44/31): loop re-entry pos0
-- storlek_10 (304): playback flow — our player skips the first rows
-- storlek_17 (?), portamento_sustain (54), it_sample_porta (25,
-  partial: retrig works, pan env mismatch), ft2_tremor_delay (13),
-  it_smooth_macro (4), it_sus_after_loop_bidi (4)
-
-Debug assets: /tmp/genmix.c (golden gen), /tmp/dbgflow2.c (C flow
-trace), /tmp/dbgpan9.c (C pan probe), /tmp/regen-all/ (regenerated
-goldens). C virtual.c instrumented with virt_setpatch/rehome traces
-(reference/libxmp/src/virtual.c — REMOVE before committing C changes).
+## Debug assets
+- `/tmp/genmix.c` — C golden generator (note_flags & 32 skip bit)
+- `/tmp/dbgflow2.c` — C flow trace per row
+- `/tmp/dbgpan9.c` — C pan envelope probe
+- `/tmp/regen-all/` — regenerated goldens (STALE — predates the
+  checkout C's set_sample_end behavior; the committed goldens in
+  test-dev/data are authoritative)
