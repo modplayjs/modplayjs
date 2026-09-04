@@ -2,11 +2,13 @@
 // Copyright (c) 2026 Bitti09 — modplayjs contributors
 // Project-original code.
 import { defineConfig } from 'vite';
+import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'node:path';
 
 // Workspace packages ship no dist (source-of-truth is packages/*/src), so
 // the demo resolves @modplayjs/* straight to TypeScript sources.
 export default defineConfig({
+  plugins: [tailwindcss()],
   // AudioWorklet modules load as ES module scripts — emit worker assets
   // as ES modules so audioWorklet.addModule can fetch them.
   worker: {

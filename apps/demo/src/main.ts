@@ -16,6 +16,7 @@ import { plugin as itPlugin } from '@modplayjs/fmt-it';
 import { createPaulaPlugin } from '@modplayjs/dsp-paula';
 import { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
 import { WebAudioOutput } from '@modplayjs/out-webaudio';
+import './style.css';
 
 const fileInput = document.getElementById('file') as HTMLInputElement;
 const playBtn = document.getElementById('play') as HTMLButtonElement;
@@ -181,6 +182,7 @@ function buildPatternView(patternIdx: number): void {
   viewTracks = mod.chn;
 
   patNumEl.textContent = '#' + patternIdx + ' (pattern ' + pi + ')';
+  // 4 cells per track (note/ins/vol/fx) — consumed by the CSS grid template.
   patHead.style.setProperty('--cols', String(viewTracks));
   patBody.style.setProperty('--cols', String(viewTracks));
 
@@ -234,13 +236,15 @@ function updatePatternHighlight(): void {
     const el = rowEls[curRow]!;
     el.classList.add('active');
     if (followChk.checked) {
-      // keep the active row vertically centered in the visible window
-      const body = patBody;
-      const viewH = body.clientHeight;
-      const rowH = el.offsetHeight || 19;
-      const target = row * rowH - viewH / 2 + rowH / 2;
-      body.scrollTop = Math.max(0, target);
+      // Keep the active row visible: only scroll when it leaves the view
+      // (block:'nearest'), so manual scrolling isn't fought every frame.
+      el.scrollIntoView({ block: 'nearest' });
     }
+  }
+  // Keep the current order entry visible in the order list panel.
+  if (followChk.checked) {
+    const cur = ordEl.querySelector('.cur');
+    if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 }
 

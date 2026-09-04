@@ -1,0 +1,121 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
+/* Copyright (c) 2026 Bitti09 — modplayjs contributors */
+/* Project-original code. */
+@import 'tailwindcss';
+@plugin 'daisyui' {
+  themes: dark --default;
+}
+
+/* ---------------------------------------------------------------- pattern view --
+ * Tracker-style grid: one .prow per pattern row, four .cell columns per
+ * track (note/ins/vol/fx) plus the row-number gutter. The active row is
+ * highlighted and (with "follow" on) autoscrolls into view.
+ * ---------------------------------------------------------------- */
+
+#pattern {
+  --pat-cols: 4;
+  --row-h: 1.35em;
+  font-family: var(--mono, ui-monospace, 'Cascadia Mono', 'Source Code Pro', Menlo, Consolas, monospace);
+  background: oklch(0.16 0.02 275);
+}
+
+#pathead,
+.prow {
+  display: grid;
+  /* row gutter + 4 columns per track (note/ins/vol/fx) */
+  grid-template-columns: 3.5em repeat(calc(var(--cols, 4) * 4), minmax(0, 1fr));
+  font-family: inherit;
+}
+
+#pathead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: oklch(0.65 0.02 275);
+  font-size: 0.68rem;
+  padding: 4px 0;
+  background: oklch(0.16 0.02 275);
+  border-bottom: 1px solid oklch(0.28 0.03 275);
+}
+
+/* Channel header labels: span the 4-cell group of their track so
+   C1..Cn align with the note/ins/vol/fx groups below. */
+#pathead .marker {
+  grid-column: span 4;
+  overflow: hidden;
+  padding: 0 2px;
+}
+
+#patbody {
+  max-height: 26rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.prow {
+  font-size: 0.78rem;
+  line-height: var(--row-h);
+  white-space: pre;
+}
+
+.prow:nth-child(even) {
+  background: oklch(0.19 0.02 275);
+}
+
+.prow.active {
+  background: oklch(0.32 0.06 275);
+  outline: none;
+  box-shadow: inset 2px 0 0 oklch(0.75 0.12 255);
+}
+
+.prow.active .cell-row {
+  color: oklch(0.85 0.12 85);
+  font-weight: 700;
+}
+
+.cell {
+  overflow: hidden;
+  padding: 0 2px;
+}
+
+.cell-note {
+  color: oklch(0.8 0.08 240);
+}
+
+.cell-ins {
+  color: oklch(0.8 0.09 145);
+}
+
+.cell-vol {
+  color: oklch(0.82 0.09 75);
+}
+
+.cell-fx {
+  color: oklch(0.78 0.1 320);
+}
+
+.prow.active .cell-note,
+.prow.active .cell-ins,
+.prow.active .cell-vol,
+.prow.active .cell-fx {
+  color: oklch(0.97 0.01 275);
+}
+
+/* Order list: the currently playing order. */
+#ordlist {
+  font-variant-numeric: tabular-nums;
+  color: oklch(0.55 0.03 275);
+}
+
+#ordlist .cur {
+  color: oklch(0.85 0.12 85);
+  font-weight: 700;
+  background: oklch(0.32 0.06 275);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.marker {
+  color: oklch(0.45 0.03 275);
+}
+

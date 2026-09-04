@@ -1,99 +1,92 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>modplayjs demo</title>
-    <style>
-      :root {
-        --bg: #1a1a24; --panel: #232330; --text: #d8d8e8; --dim: #8888a0;
-        --accent: #7ab8ff; --hl: #ffcf6e; --row-alt: #26263a; --row-hl: #4a4a6a;
-        --mono: ui-monospace, "Cascadia Mono", "Source Code Pro", Menlo, Consolas, monospace;
-      }
-      * { box-sizing: border-box; }
-      body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 2rem auto;
-             padding: 0 1rem; background: var(--bg); color: var(--text); }
-      h1 { font-size: 1.25rem; }
-      h2 { font-size: 0.95rem; color: var(--dim); text-transform: uppercase;
-           letter-spacing: 0.08em; margin: 1.2rem 0 0.4rem; }
-      input[type=file], button { font-size: 1rem; margin-right: 0.5rem; }
-      button { padding: 0.4rem 1.2rem; background: var(--panel); color: var(--text);
-               border: 1px solid #3a3a50; border-radius: 4px; cursor: pointer; }
-      button:hover:not(:disabled) { border-color: var(--accent); }
-      button:disabled { opacity: 0.35; cursor: default; }
-      pre { background: var(--panel); padding: 0.75rem; border-radius: 4px;
-            white-space: pre; overflow: auto; font-family: var(--mono);
-            font-size: 0.82rem; line-height: 1.45; margin: 0.3rem 0; }
-      #status { color: var(--dim); min-height: 1.2em; white-space: pre-wrap; }
-      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-      @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-      .panel { background: var(--panel); border-radius: 6px; padding: 0.75rem;
-               max-height: 22rem; overflow: auto; font-family: var(--mono);
-               font-size: 0.8rem; line-height: 1.5; white-space: pre; }
-      /* pattern view */
-      #pattern { --vis: 24; position: relative; background: #14141c; }
-      #pathead, #patrow { display: grid;
-        grid-template-columns: 3.5em repeat(var(--cols), 1fr); font-family: var(--mono); }
-      #pathead { position: sticky; top: 0; background: #14141c; color: var(--dim);
-                 font-size: 0.7rem; padding: 2px 0; }
-      #patbody { max-height: 24rem; overflow-y: hidden; position: relative; }
-      .prow { display: grid; grid-template-columns: 3.5em repeat(var(--cols), 1fr);
-              font-family: var(--mono); font-size: 0.8rem; line-height: 1.5;
-              white-space: pre; }
-      .prow:nth-child(even) { background: var(--row-alt); }
-      .prow.active { background: var(--row-hl); color: #fff; }
-      .prow.active .cell-row { color: var(--hl); font-weight: 700; }
-      .cell { overflow: hidden; padding: 0 2px; }
-      .cell-note { color: #9fd8ff; }
-      .cell-ins { color: #b8e6b8; }
-      .cell-vol { color: #ffd9a0; }
-      .cell-fx { color: #f0a0f0; }
-      .prow.active .cell-note, .prow.active .cell-ins,
-      .prow.active .cell-vol, .prow.active .cell-fx { color: #fff; }
-      .marker { color: #4a4a6a; }
-      #ordlist { color: var(--dim); }
-      #ordlist .cur { color: var(--hl); font-weight: 700; }
-      label { color: var(--dim); font-size: 0.85rem; }
-      input[type=checkbox] { vertical-align: middle; }
-    </style>
   </head>
-  <body>
-    <h1>modplayjs demo</h1>
-    <p>Load a MOD / S3M / XM / IT module, then press Play.</p>
-    <p>
-      <input type="file" id="file" accept=".mod,.s3m,.xm,.it" />
-      <button id="play" disabled>Play</button>
-      <button id="pause" disabled>Pause</button>
-      <button id="stop" disabled>Stop</button>
-      <label><input type="checkbox" id="follow" checked /> follow</label>
-      <label>pan sep <input type="range" id="pansep" min="0" max="200" value="100"
-        style="vertical-align:middle; width:90px" /> <span id="pansepv">100</span></label>
-    </p>
-    <pre id="status">no file loaded</pre>
+  <body class="min-h-screen bg-base-300 text-base-content">
+    <main class="mx-auto w-full max-w-none px-4 py-6 lg:px-8">
+      <header class="mb-4">
+        <h1 class="text-2xl font-bold tracking-tight">modplayjs <span class="text-secondary">demo</span></h1>
+        <p class="text-sm opacity-70">Load a MOD / S3M / XM / IT module, then press Play.</p>
+      </header>
 
-    <h2>File information</h2>
-    <div class="panel" id="info">—</div>
-
-    <h2>Order list</h2>
-    <div class="panel" id="ordlist">—</div>
-
-    <div class="grid">
-      <div>
-        <h2>Instruments</h2>
-        <div class="panel" id="inslist">—</div>
+      <div class="card bg-base-100 shadow-sm mb-4">
+        <div class="card-body gap-4 py-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <input type="file" id="file" accept=".mod,.s3m,.xm,.it"
+              class="file-input file-input-bordered file-input-sm w-full max-w-xs" />
+            <div class="join">
+              <button id="play" disabled class="btn btn-primary btn-sm join-item">Play</button>
+              <button id="pause" disabled class="btn btn-sm join-item">Pause</button>
+              <button id="stop" disabled class="btn btn-sm join-item">Stop</button>
+            </div>
+            <label class="label cursor-pointer gap-2 text-sm">
+              <span>follow</span>
+              <input type="checkbox" id="follow" checked class="toggle toggle-sm toggle-primary" />
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <span class="opacity-70">pan sep</span>
+              <input type="range" id="pansep" min="0" max="200" value="100"
+                class="range range-xs range-primary w-28" />
+              <span id="pansepv" class="badge badge-ghost">100</span>
+            </label>
+          </div>
+          <pre id="status" class="whitespace-pre-wrap text-sm opacity-70 min-h-6 m-0">no file loaded</pre>
+        </div>
       </div>
-      <div>
-        <h2>Samples</h2>
-        <div class="panel" id="samplist">—</div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+        <section>
+          <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60 mb-1">File information</h2>
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-3">
+              <pre id="info" class="m-0 whitespace-pre font-mono text-xs leading-relaxed overflow-auto max-h-72">—</pre>
+            </div>
+          </div>
+        </section>
+        <section>
+          <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60 mb-1">Order list</h2>
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-3">
+              <div id="ordlist" class="font-mono text-xs leading-relaxed overflow-auto max-h-72 whitespace-pre">—</div>
+            </div>
+          </div>
+        </section>
       </div>
-    </div>
 
-    <h2>Pattern <span id="patnum" style="color:var(--accent)"></span></h2>
-    <div class="panel" id="pattern">
-      <div id="pathead"></div>
-      <div id="patbody"></div>
-    </div>
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+        <section>
+          <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60 mb-1">Instruments</h2>
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-3">
+              <pre id="inslist" class="m-0 whitespace-pre font-mono text-xs leading-relaxed overflow-auto max-h-72">—</pre>
+            </div>
+          </div>
+        </section>
+        <section>
+          <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60 mb-1">Samples</h2>
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-3">
+              <pre id="samplist" class="m-0 whitespace-pre font-mono text-xs leading-relaxed overflow-auto max-h-72">—</pre>
+            </div>
+          </div>
+        </section>
+      </div>
 
+      <section>
+        <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60 mb-1">
+          Pattern <span id="patnum" class="badge badge-primary badge-sm align-middle"></span>
+        </h2>
+        <div class="card bg-base-100 shadow-sm">
+          <div id="pattern" class="card-body p-0">
+            <div id="pathead"></div>
+            <div id="patbody"></div>
+          </div>
+        </div>
+      </section>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

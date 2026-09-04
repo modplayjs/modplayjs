@@ -11,17 +11,20 @@
   },
   "dependencies": {
     "@modplayjs/core": "*",
+    "@modplayjs/dsp-paula": "*",
+    "@modplayjs/dsp-softmixer": "*",
     "@modplayjs/effects-shared": "*",
+    "@modplayjs/fmt-it": "*",
     "@modplayjs/fmt-mod": "*",
     "@modplayjs/fmt-s3m": "*",
     "@modplayjs/fmt-xm": "*",
-    "@modplayjs/fmt-it": "*",
-    "@modplayjs/dsp-paula": "*",
-    "@modplayjs/dsp-softmixer": "*",
-    "@modplayjs/out-webaudio": "*",
-    "@modplayjs/out-pcm": "*"
+    "@modplayjs/out-pcm": "*",
+    "@modplayjs/out-webaudio": "*"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "daisyui": "^5.7.28",
+    "tailwindcss": "^4.3.3",
     "vite": "^6.0.0"
   },
   "license": "BSD-3-Clause"
