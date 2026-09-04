@@ -87,6 +87,15 @@
   padding: 0 2px;
 }
 
+/* Channel separators: each track group ends with its fx cell, and the
+   row gutter ends at the first data column. Header markers (span-4)
+   match with the same rule. */
+.cell-fx,
+.cell-row,
+#pathead .marker {
+  border-right: 1px solid oklch(0.3 0.03 275);
+}
+
 .cell-note {
   color: oklch(0.8 0.08 240);
 }
