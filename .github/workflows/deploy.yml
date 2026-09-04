@@ -31,7 +31,7 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install dependencies
         working-directory: ./apps/demo
-        run: npm ci
+        run: npm ci --no-audit --no-fund
       - name: Build
         working-directory: ./apps/demo
         run: npm run build
