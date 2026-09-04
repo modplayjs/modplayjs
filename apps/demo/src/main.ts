@@ -38,6 +38,7 @@ const patRows = document.getElementById('patrows') as HTMLDivElement;
 const patHead = document.getElementById('pathead') as HTMLDivElement;
 const patNumEl = document.getElementById('patnum') as HTMLSpanElement;
 const chanStrip = document.getElementById('chanstrip') as HTMLDivElement;
+const themeMode = document.getElementById('thememode') as HTMLInputElement;
 const buildHashEl = document.getElementById('buildhash') as HTMLSpanElement;
 
 const core = new CorePlayer();
@@ -51,6 +52,26 @@ core.registries.registerDsp(createSoftMixerPlugin());
 buildHashEl.textContent = __GIT_HASH__;
 
 const output = new WebAudioOutput();
+
+// light/dark theme: persisted, applied to <html data-theme>.
+const THEME_KEY = 'modplayjs-theme';
+const applyTheme = (dark: boolean): void => {
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+};
+themeMode.addEventListener('change', () => {
+  applyTheme(themeMode.checked);
+  localStorage.setItem(THEME_KEY, themeMode.checked ? 'dark' : 'light');
+});
+// restore persisted theme before first paint of the pattern view
+{
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'light') {
+    themeMode.checked = false;
+    applyTheme(false);
+  } else {
+    applyTheme(true);
+  }
+}
 
 panSep.addEventListener('input', () => {
   const v = Number(panSep.value);

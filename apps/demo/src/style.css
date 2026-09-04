@@ -3,21 +3,54 @@
 /* Project-original code. */
 @import 'tailwindcss';
 @plugin 'daisyui' {
-  themes: dark --default;
+  themes: dark --default, light;
 }
 
 /* ---------------------------------------------------------------- pattern view --
  * Tracker-style grid: one .prow per pattern row, four .cell columns per
  * track (note/ins/vol/fx) plus the row-number gutter. The active row is
  * highlighted and (with "follow" on) autoscrolls into view.
+ * All colors route through --pat-* custom properties so both themes work.
  * ---------------------------------------------------------------- */
 
+:root {
+  --pat-bg: oklch(0.16 0.02 275);
+  --pat-row-alt: oklch(0.19 0.02 275);
+  --pat-row-active: oklch(0.32 0.06 275);
+  --pat-border: oklch(0.28 0.03 275);
+  --pat-sep: oklch(0.65 0.04 275);
+  --pat-note: oklch(0.8 0.08 240);
+  --pat-ins: oklch(0.8 0.09 145);
+  --pat-vol: oklch(0.82 0.09 75);
+  --pat-fx: oklch(0.78 0.1 320);
+  --pat-dim: oklch(0.45 0.03 275);
+  --pat-active-text: oklch(0.97 0.01 275);
+  --pat-accent: oklch(0.75 0.12 255);
+  --pat-rownum: oklch(0.85 0.12 85);
+}
+
+[data-theme='light'] {
+  --pat-bg: oklch(0.97 0.01 275);
+  --pat-row-alt: oklch(0.94 0.01 275);
+  --pat-row-active: oklch(0.86 0.05 275);
+  --pat-border: oklch(0.78 0.02 275);
+  --pat-sep: oklch(0.55 0.04 275);
+  --pat-note: oklch(0.45 0.13 240);
+  --pat-ins: oklch(0.47 0.12 145);
+  --pat-vol: oklch(0.5 0.12 70);
+  --pat-fx: oklch(0.45 0.14 320);
+  --pat-dim: oklch(0.55 0.03 275);
+  --pat-active-text: oklch(0.25 0.03 275);
+  --pat-accent: oklch(0.5 0.15 255);
+  --pat-rownum: oklch(0.42 0.13 60);
+}
+
 #pattern {
-  --pat-cols: 4;
   --row-h: 1.35em;
   font-family: var(--mono, ui-monospace, 'Cascadia Mono', 'Source Code Pro', Menlo, Consolas, monospace);
-  background: oklch(0.16 0.02 275);
+  background: var(--pat-bg);
 }
+
 #pathead,
 .prow {
   display: grid;
@@ -33,11 +66,11 @@
   top: 0;
   z-index: 1;
   min-width: max-content;
-  color: oklch(0.65 0.02 275);
+  color: var(--pat-dim);
   font-size: 0.68rem;
   padding: 4px 0;
-  background: oklch(0.16 0.02 275);
-  border-bottom: 1px solid oklch(0.28 0.03 275);
+  background: var(--pat-bg);
+  border-bottom: 1px solid var(--pat-border);
 }
 
 /* Channel header labels: span the 4-cell group of their track so
@@ -68,17 +101,17 @@
 }
 
 .prow:nth-child(even) {
-  background: oklch(0.19 0.02 275);
+  background: var(--pat-row-alt);
 }
 
 .prow.active {
-  background: oklch(0.32 0.06 275);
+  background: var(--pat-row-active);
   outline: none;
-  box-shadow: inset 2px 0 0 oklch(0.75 0.12 255);
+  box-shadow: inset 2px 0 0 var(--pat-accent);
 }
 
 .prow.active .cell-row {
-  color: oklch(0.85 0.12 85);
+  color: var(--pat-rownum);
   font-weight: 700;
 }
 
@@ -93,48 +126,48 @@
 .cell-fx,
 .cell-row,
 #pathead .marker {
-  border-right: 1px solid oklch(0.52 0.04 275);
+  border-right: 1px solid var(--pat-sep);
 }
 
 .cell-note {
-  color: oklch(0.8 0.08 240);
+  color: var(--pat-note);
 }
 
 .cell-ins {
-  color: oklch(0.8 0.09 145);
+  color: var(--pat-ins);
 }
 
 .cell-vol {
-  color: oklch(0.82 0.09 75);
+  color: var(--pat-vol);
 }
 
 .cell-fx {
-  color: oklch(0.78 0.1 320);
+  color: var(--pat-fx);
 }
 
 .prow.active .cell-note,
 .prow.active .cell-ins,
 .prow.active .cell-vol,
 .prow.active .cell-fx {
-  color: oklch(0.97 0.01 275);
+  color: var(--pat-active-text);
 }
 
 /* Order list: the currently playing order. */
 #ordlist {
   font-variant-numeric: tabular-nums;
-  color: oklch(0.55 0.03 275);
+  color: var(--pat-dim);
 }
 
 #ordlist .cur {
-  color: oklch(0.85 0.12 85);
+  color: var(--pat-rownum);
   font-weight: 700;
-  background: oklch(0.32 0.06 275);
+  background: var(--pat-row-active);
   border-radius: 3px;
   padding: 0 2px;
 }
 
 .marker {
-  color: oklch(0.45 0.03 275);
+  color: var(--pat-dim);
 }
 
 /* Legend swatches next to the Pattern header. */
@@ -142,19 +175,18 @@
   display: inline-block;
   padding: 0 4px;
   border-radius: 3px;
-  background: oklch(0.19 0.02 275);
+  background: var(--pat-row-alt);
   font-family: inherit;
   font-size: 0.7rem;
   line-height: 1.5;
 }
 
-.legend-swatch.cell-note { color: oklch(0.8 0.08 240); }
-.legend-swatch.cell-ins { color: oklch(0.8 0.09 145); }
-.legend-swatch.cell-vol { color: oklch(0.82 0.09 75); }
-.legend-swatch.cell-fx { color: oklch(0.78 0.1 320); }
-.legend-swatch.legend-empty { color: oklch(0.45 0.03 275); }
+.legend-swatch.cell-note { color: var(--pat-note); }
+.legend-swatch.cell-ins { color: var(--pat-ins); }
+.legend-swatch.cell-vol { color: var(--pat-vol); }
+.legend-swatch.cell-fx { color: var(--pat-fx); }
+.legend-swatch.legend-empty { color: var(--pat-dim); }
 .legend-swatch.legend-rownum {
-  color: oklch(0.85 0.12 85);
+  color: var(--pat-rownum);
   white-space: pre;
 }
-
