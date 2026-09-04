@@ -166,7 +166,14 @@ function renderInstruments(): void {
     btn.textContent = '▶';
     btn.title = 'audition instrument ' + (i + 1);
     btn.disabled = !playing;
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
+      if (paused) {
+        await output.resume();
+        paused = false;
+        pauseBtn.textContent = 'Pause';
+      } else if (!playing) {
+        await startPlayback();
+      }
       core.playNote(i, 60, 64);
     });
     const label = document.createElement('span');
@@ -210,8 +217,16 @@ function renderSamples(): void {
         }
       }
     }
-    btn.addEventListener('click', () => {
-      if (mappedIns >= 0) core.playNote(mappedIns, mappedNote, 64);
+    btn.addEventListener('click', async () => {
+      if (mappedIns < 0) return;
+      if (paused) {
+        await output.resume();
+        paused = false;
+        pauseBtn.textContent = 'Pause';
+      } else if (!playing) {
+        await startPlayback();
+      }
+      core.playNote(mappedIns, mappedNote, 64);
     });
     if (mappedIns < 0) btn.disabled = true;
     const label = document.createElement('span');
@@ -368,6 +383,7 @@ fileInput.addEventListener('change', async () => {
     playBtn.textContent = 'Play';
     pauseBtn.disabled = true;
     stopBtn.disabled = true;
+    setAuditionButtons(false);
 
     curPattern = -1;
     curRow = -1;
@@ -392,6 +408,26 @@ fileInput.addEventListener('change', async () => {
   }
 });
 
+/** Start (or restart) playback: device-rate match, smix reservation,
+ * player start, and audio output. Shared by the Play button and the
+ * instrument/sample audition buttons (which auto-start playback). */
+async function startPlayback(): Promise<void> {
+  const deviceRate = await output.deviceSampleRate();
+  core.setSampleRate(deviceRate);
+  core.startSmix(4); // reserve channels for instrument/sample audition
+  core.startPlayer();
+  await output.start(core, workletUrl); // click handler = user gesture
+  playing = true;
+  paused = false;
+  pauseBtn.disabled = false;
+  stopBtn.disabled = false;
+  show(
+    'playing | DSP: ' + core.dsp().name + ' | ' +
+    output.transportMode + ' | rate: ' +
+    output.audioContextSampleRate + ' Hz',
+  );
+}
+
 playBtn.addEventListener('click', async () => {
   if (!loaded) return;
   if (paused) {
@@ -404,21 +440,7 @@ playBtn.addEventListener('click', async () => {
   }
   if (playing) return;
   try {
-    const deviceRate = await output.deviceSampleRate();
-    core.setSampleRate(deviceRate);
-    core.startSmix(4); // reserve channels for instrument/sample audition
-    core.startPlayer();
-    await output.start(core, workletUrl); // click handler = user gesture
-    playing = true;
-    paused = false;
-    pauseBtn.disabled = false;
-    stopBtn.disabled = false;
-    setAuditionButtons(false);
-    show(
-      'playing | DSP: ' + core.dsp().name + ' | ' +
-      output.transportMode + ' | rate: ' +
-      output.audioContextSampleRate + ' Hz',
-    );
+    await startPlayback();
   } catch (err) {
     const msg = err instanceof StateError || err instanceof Error ? err.message : String(err);
     const secureHint =
@@ -454,7 +476,6 @@ stopBtn.addEventListener('click', () => {
   playBtn.textContent = 'Play';
   pauseBtn.textContent = 'Pause';
   show('stopped');
-  setAuditionButtons(true);
 });
 
 function setAuditionButtons(disabled: boolean): void {
