@@ -6,6 +6,10 @@
     <title>modplayjs demo</title>
   </head>
   <body class="min-h-screen bg-base-300 text-base-content">
+    <!-- coi-serviceworker: re-serves the page with COOP/COEP headers so
+         SharedArrayBuffer (the SAB audio transport) works on GitHub Pages,
+         which cannot set response headers. Reloads once to take control. -->
+    <script src="coi-serviceworker.js"></script>
     <main class="mx-auto w-full max-w-none px-4 py-6 lg:px-8">
       <header class="mb-4">
         <h1 class="text-2xl font-bold tracking-tight">modplayjs <span class="text-secondary">demo</span></h1>

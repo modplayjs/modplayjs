@@ -331,7 +331,8 @@ playBtn.addEventListener('click', async () => {
     pauseBtn.disabled = false;
     stopBtn.disabled = false;
     show(
-      'playing | DSP: ' + core.dsp().name + ' | rate: ' +
+      'playing | DSP: ' + core.dsp().name + ' | ' +
+      output.transportMode + ' | rate: ' +
       output.audioContextSampleRate + ' Hz',
     );
   } catch (err) {
