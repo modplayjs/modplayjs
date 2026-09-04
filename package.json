@@ -13,12 +13,17 @@
     "dev": "turbo run dev --filter=@modplayjs/demo"
   },
   "devDependencies": {
-    "typescript": "^5.6.2",
-    "turbo": "^2.3.3"
+    "turbo": "^2.3.3",
+    "typescript": "^5.6.2"
   },
   "dependencies": {
+    "i": "^0.3.7",
+    "npm": "^12.0.2",
     "stb-vorbis": "^0.0.6"
   },
   "packageManager": "npm@11.17.0",
-  "license": "BSD-3-Clause"
+  "license": "BSD-3-Clause",
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  }
 }
