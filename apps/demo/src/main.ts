@@ -34,6 +34,7 @@ const ordEl = document.getElementById('ordlist') as HTMLDivElement;
 const insEl = document.getElementById('inslist') as HTMLDivElement;
 const smpEl = document.getElementById('samplist') as HTMLDivElement;
 const patBody = document.getElementById('patbody') as HTMLDivElement;
+const patRows = document.getElementById('patrows') as HTMLDivElement;
 const patHead = document.getElementById('pathead') as HTMLDivElement;
 const patNumEl = document.getElementById('patnum') as HTMLSpanElement;
 const chanStrip = document.getElementById('chanstrip') as HTMLDivElement;
@@ -285,6 +286,7 @@ function buildPatternView(patternIdx: number): void {
   // 4 cells per track (note/ins/vol/fx) — consumed by the CSS grid template.
   patHead.style.setProperty('--cols', String(viewTracks));
   patBody.style.setProperty('--cols', String(viewTracks));
+  patRows.style.setProperty('--cols', String(viewTracks));
 
   let head = '<span class="cell cell-row"></span>';
   for (let c = 0; c < viewTracks; c++) {
@@ -292,7 +294,7 @@ function buildPatternView(patternIdx: number): void {
   }
   patHead.innerHTML = head;
 
-  patBody.innerHTML = '';
+  patRows.innerHTML = '';
   rowEls.length = 0;
   const frag = document.createDocumentFragment();
   for (let r = 0; r < viewRows; r++) {
@@ -316,7 +318,7 @@ function buildPatternView(patternIdx: number): void {
     frag.appendChild(row);
     rowEls.push(row);
   }
-  patBody.appendChild(frag);
+  patRows.appendChild(frag);
   curRow = -1;
 }
 

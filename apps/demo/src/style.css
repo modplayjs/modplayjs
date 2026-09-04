@@ -32,6 +32,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
+  min-width: max-content;
   color: oklch(0.65 0.02 275);
   font-size: 0.68rem;
   padding: 4px 0;
@@ -53,10 +54,17 @@
   overscroll-behavior: contain;
 }
 
+/* Row wrapper: keeps .prow siblings together so nth-child striping
+   is unaffected by the sticky header living in the same scroller. */
+#patrows {
+  min-width: max-content;
+}
+
 .prow {
   font-size: 0.78rem;
   line-height: var(--row-h);
   white-space: pre;
+  min-width: max-content;
 }
 
 .prow:nth-child(even) {
