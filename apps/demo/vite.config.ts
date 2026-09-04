@@ -7,7 +7,10 @@ import { resolve } from 'node:path';
 
 // Workspace packages ship no dist (source-of-truth is packages/*/src), so
 // the demo resolves @modplayjs/* straight to TypeScript sources.
-export default defineConfig({
+// Assets load from the site root on `vite dev` and from /modplayjs/ in a
+// production build (project-page deployment).
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/modplayjs/' : '/',
   plugins: [tailwindcss()],
   // AudioWorklet modules load as ES module scripts — emit worker assets
   // as ES modules so audioWorklet.addModule can fetch them.
@@ -45,4 +48,4 @@ export default defineConfig({
       { find: 'worklet-url-impl', replacement: resolve(__dirname, 'src/worklet-url-impl.ts') },
     ],
   },
-});
+}));
