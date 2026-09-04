@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>modplayjs studio</title>
+  </head>
+  <body class="min-h-screen bg-base-300 text-base-content">
+    <main class="mx-auto w-full max-w-none px-4 py-6 lg:px-8">
+      <header class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <h1 class="text-2xl font-bold tracking-tight">modplayjs <span class="text-secondary">studio</span> <span id="buildhash" class="badge badge-ghost badge-sm align-middle font-mono"></span></h1>
+        <a href="./" class="link link-hover text-sm opacity-70">← player</a>
+      </header>
+
+      <div class="grid grid-cols-1 xl:grid-cols-[22rem_1fr] gap-4">
+        <!-- LEFT: song setup -->
+        <div class="flex flex-col gap-4">
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-4 gap-3">
+              <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60">Song setup</h2>
+              <label class="flex items-center gap-2 text-sm">
+                <span class="w-20 opacity-70">title</span>
+                <input id="stitle" class="input input-bordered input-sm grow" value="untitled" />
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <span class="w-20 opacity-70">channels</span>
+                <input id="schn" type="number" min="2" max="32" value="4"
+                  class="input input-bordered input-sm w-24" />
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <span class="w-20 opacity-70">speed</span>
+                <input id="sspeed" type="number" min="1" max="31" value="6"
+                  class="input input-bordered input-sm w-24" />
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <span class="w-20 opacity-70">bpm</span>
+                <input id="sbpm" type="number" min="32" max="255" value="125"
+                  class="input input-bordered input-sm w-24" />
+              </label>
+              <div class="flex gap-2">
+                <button id="screate" class="btn btn-primary btn-sm">new module</button>
+                <button id="splay" class="btn btn-sm" disabled>play</button>
+                <button id="sstop" class="btn btn-sm btn-ghost" disabled>stop</button>
+              </div>
+              <pre id="sstatus" role="status" class="whitespace-pre-wrap text-xs opacity-70 min-h-5 m-0">create a module to begin</pre>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-4 gap-3">
+              <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60">Order</h2>
+              <div id="orderlist" class="flex flex-wrap gap-1 font-mono text-xs min-h-8"></div>
+              <div class="flex gap-2">
+                <button id="ordadd" class="btn btn-xs" disabled>+ pattern</button>
+                <button id="orddel" class="btn btn-xs btn-ghost" disabled>− last</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-4 gap-3">
+              <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60">Instruments & samples</h2>
+              <div id="inspane" class="font-mono text-xs flex flex-col gap-1 min-h-8"></div>
+              <h3 class="text-xs font-semibold uppercase tracking-widest opacity-60 mt-2">Sample generator</h3>
+              <label class="flex items-center gap-2 text-xs">
+                <span class="w-14 opacity-70">waveform</span>
+                <select id="genwave" class="select select-bordered select-xs grow">
+                  <option value="sine">sine</option>
+                  <option value="square">square</option>
+                  <option value="saw">saw</option>
+                  <option value="triangle">triangle</option>
+                  <option value="noise">noise</option>
+                </select>
+              </label>
+              <label class="flex items-center gap-2 text-xs">
+                <span class="w-14 opacity-70">freq Hz</span>
+                <input id="genfreq" type="number" min="20" max="8000" value="440"
+                  class="input input-bordered input-xs w-24" />
+              </label>
+              <label class="flex items-center gap-2 text-xs">
+                <span class="w-14 opacity-70">length ms</span>
+                <input id="genms" type="number" min="20" max="4000" value="500"
+                  class="input input-bordered input-xs w-24" />
+              </label>
+              <label class="flex items-center gap-2 text-xs">
+                <span class="w-14 opacity-70">loop</span>
+                <input id="genloop" type="checkbox" class="toggle toggle-xs" />
+              </label>
+              <div class="flex gap-2">
+                <button id="genprev" class="btn btn-xs btn-ghost">▶ preview</button>
+                <button id="genadd" class="btn btn-xs btn-primary" disabled>+ new sample</button>
+              </div>
+              <div class="flex gap-2">
+                <button id="gennext" class="btn btn-xs" disabled>attach to instrument →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: pattern editor -->
+        <div class="flex flex-col gap-4">
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-0">
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 pt-3 pb-1">
+                <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60 mb-0">
+                  Pattern <span id="patnum" class="badge badge-primary badge-sm align-middle"></span>
+                </h2>
+                <div class="flex gap-1">
+                  <button id="prowins" class="btn btn-xs" disabled>+ row</button>
+                  <button id="prowdel" class="btn btn-xs btn-ghost" disabled>− row</button>
+                  <button id="paclear" class="btn btn-xs btn-ghost" disabled>clear</button>
+                </div>
+                <span id="cellinfo" class="text-xs opacity-70 font-mono"></span>
+              </div>
+              <div id="patbody" role="group" aria-label="pattern editor">
+                <div id="pathead"></div>
+                <div id="patrows"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 shadow-sm" id="inspector">
+            <div class="card-body p-4 gap-3">
+              <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60">Note inspector</h2>
+              <div id="inspbody" class="text-sm opacity-70">select a cell in the pattern editor</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/studio.ts"></script>
+  </body>
+</html>

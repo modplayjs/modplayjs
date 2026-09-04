@@ -23,6 +23,14 @@ const GIT_HASH = (() => {
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/modplayjs/' : '/',
   plugins: [tailwindcss()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        studio: resolve(__dirname, 'studio.html'),
+      },
+    },
+  },
   define: {
     __GIT_HASH__: JSON.stringify(GIT_HASH),
   },

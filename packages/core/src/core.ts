@@ -254,7 +254,28 @@ export class Core implements CoreIface {
     };
 
     const mod = fmt.load(bytes, loaderCtx);
+    this.finalizeModule(mod);
+  }
 
+  /**
+   * In-memory module entry point (studio/creator path): same finalize
+   * sequence as loadModule — sequence scan, ordInfo, instrument keys —
+   * but takes a caller-constructed ModuleData and registers its samples
+   * through the store so voices resolve them by id.
+   *
+   * IMPORTANT: store ids are assigned in registration order, so the
+   * caller MUST register samples in the same order as mod.samples
+   * (instrument sub.sid values index mod.samples).
+   */
+  loadModuleData(mod: ModuleData): void {
+    if (this._state === CoreState.PLAYING) this.stopPlayer();
+    this.samples.clear();
+    for (const raw of mod.samples) this.samples.add(raw);
+    this.finalizeModule(mod);
+  }
+
+  /** Shared loadModule/loadModuleData tail: scan + sequence setup + keys. */
+  private finalizeModule(mod: ModuleData): void {
     // Scan sequences (libxmp_scan_sequences): scan[chain] carries the
     // end point ord/row/num written by scan_module's end_module block.
     const sc = new Scanner();
