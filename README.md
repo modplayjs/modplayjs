@@ -35,6 +35,14 @@ deep fixed-point precision divergence (porta slide ±5 of ~3.1M), a known
 stale golden, or a real port bug (NNA voice-pool flood, DCT flow divergence,
 retrig × envelope interplay) with a documented reproduction path.
 
+## Plugin APIs
+
+Contributors writing mixers, format loaders or outputs: the core's plugin
+contracts are documented in [docs/](docs/) —
+[DSP plugin API](docs/plugin-api-dsp.md),
+[Format plugin API](docs/plugin-api-format.md),
+[Output plugin API](docs/plugin-api-output.md).
+
 ## Packages
 
 | Package | Purpose |
