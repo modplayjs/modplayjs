@@ -93,7 +93,7 @@
 .cell-fx,
 .cell-row,
 #pathead .marker {
-  border-right: 1px solid oklch(0.3 0.03 275);
+  border-right: 1px solid oklch(0.52 0.04 275);
 }
 
 .cell-note {

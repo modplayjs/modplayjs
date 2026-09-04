@@ -19,7 +19,7 @@
         <div class="card-body gap-4 py-4">
           <div class="flex flex-wrap items-center gap-3">
             <input type="file" id="file" accept=".mod,.s3m,.xm,.it"
-              class="file-input file-input-bordered file-input-sm w-full max-w-xs" />
+              class="file-input file-input-bordered file-input-sm w-full max-w-xs" aria-label="Module file" />
             <div class="join">
               <button id="play" disabled class="btn btn-primary btn-sm join-item">Play</button>
               <button id="pause" disabled class="btn btn-sm join-item">Pause</button>
@@ -44,7 +44,7 @@
             <span class="text-xs opacity-60 mr-1">channels:</span>
             <div id="chanstrip" class="flex flex-wrap gap-1"></div>
           </div>
-          <pre id="status" class="whitespace-pre-wrap text-sm opacity-70 min-h-6 m-0">no file loaded</pre>
+          <pre id="status" role="status" class="whitespace-pre-wrap text-sm opacity-70 min-h-6 m-0">no file loaded</pre>
         </div>
       </div>
 
@@ -100,7 +100,7 @@
           <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60 mb-0">
             Pattern <span id="patnum" class="badge badge-primary badge-sm align-middle"></span>
           </h2>
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" aria-label="column legend">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" role="group" aria-label="column legend">
             <span class="opacity-60">columns:</span>
             <span class="inline-flex items-center gap-1"><span class="legend-swatch cell-note">C-4</span> note</span>
             <span class="inline-flex items-center gap-1"><span class="legend-swatch cell-ins">01</span> instrument</span>
@@ -111,7 +111,7 @@
           </div>
         </div>
         <div class="card bg-base-100 shadow-sm">
-          <div id="patbody" class="card-body p-0">
+          <div id="patbody" class="card-body p-0" role="group" aria-label="pattern data">
             <div id="pathead"></div>
             <div id="patrows"></div>
           </div>

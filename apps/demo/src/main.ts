@@ -169,6 +169,7 @@ function renderInstruments(): void {
     btn.className = 'btn btn-xs btn-ghost btn-circle';
     btn.textContent = '▶';
     btn.title = 'audition instrument ' + (i + 1);
+    btn.setAttribute('aria-label', 'play instrument ' + (i + 1));
     btn.disabled = !playing;
     btn.addEventListener('click', async () => {
       if (paused) {
@@ -204,6 +205,7 @@ function renderSamples(): void {
     btn.className = 'btn btn-xs btn-ghost btn-circle';
     btn.textContent = '▶';
     btn.title = 'audition sample ' + (id + 1);
+    btn.setAttribute('aria-label', 'play sample ' + (id + 1));
     btn.disabled = !playing;
     // Map sample → an instrument that owns it (sub.sid == sample index);
     // the note is the first mapped key (C-4 == map row 48) so the right
@@ -253,6 +255,8 @@ function renderChannelStrip(): void {
       (muted ? 'badge-error badge-outline' : 'badge-ghost');
     b.textContent = 'C' + (c + 1);
     b.title = muted ? 'unmute channel ' + (c + 1) : 'mute channel ' + (c + 1);
+    b.setAttribute('aria-pressed', String(muted));
+    b.setAttribute('aria-label', 'channel ' + (c + 1) + (muted ? ' muted' : ''));
     b.addEventListener('click', () => {
       core.setChannelMute(c, !core.getChannelMute(c));
       renderChannelStrip();
