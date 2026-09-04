@@ -291,7 +291,10 @@ export class WebAudioOutput implements OutputPlugin {
     const core2 = this.core;
     if (!core2) return;
     if (this.copyDepth > COPY_HIGH_WATER_FRAMES) return; // FIFO healthy
-    const needFrames = COPY_HIGH_WATER_FRAMES - this.copyDepth;
+    const needFrames = Math.min(
+      COPY_HIGH_WATER_FRAMES - this.copyDepth,
+      CHUNK_FRAMES * 4, // never exceed the scratch capacity (16384 floats)
+    );
     if (needFrames < CHUNK_FRAMES) return;
     const scratchFloats = needFrames * 2;
     const scratch = this.renderScratch ?? (this.renderScratch = new Float32Array(CHUNK_FRAMES * 2 * 4));
@@ -321,9 +324,13 @@ export class WebAudioOutput implements OutputPlugin {
         ctxState: this.ctxState,
       });
     }
-    for (let off = 0; off + CHUNK_FRAMES * 2 <= n; off += CHUNK_FRAMES * 2) {
-      const chunk = new Float32Array(CHUNK_FRAMES * 2);
-      chunk.set(scratch.subarray(off, off + CHUNK_FRAMES * 2));
+    // Post the rendered audio in CHUNK_FRAMES-frame chunks. The FIFO drain
+    // handles partial chunks, so the tail (n % chunk) must be posted too —
+    // dropping it silently skips audio and corrupts the depth accounting.
+    for (let off = 0; off < n; off += CHUNK_FRAMES * 2) {
+      const frames = Math.min(CHUNK_FRAMES, (n - off) / 2);
+      const chunk = new Float32Array(frames * 2);
+      chunk.set(scratch.subarray(off, off + frames * 2));
       this.debugInfo.postedChunks++;
       this.node?.port.postMessage({ mode: 'chunk', data: chunk }, [chunk.buffer]);
     }
