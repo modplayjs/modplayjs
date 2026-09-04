@@ -7,6 +7,10 @@ against whatever is in the working tree).
 
 **Current state: 100 passed / 5 failed** (65 fixtures without .data).
 
+The interactive control surface (channel mute/volume, instrument/sample
+audition via reserved smix channels) shipped alongside these fixes; it
+shares the same mixer path, so the parity numbers include it.
+
 ## Current failures (5), grouped by symptom
 
 ### Porta slide precision (1)

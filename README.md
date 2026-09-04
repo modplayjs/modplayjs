@@ -20,13 +20,20 @@ reference WAVs:
 | Knetus — UltraEdit-32 | XM | 0.9995 |
 | MANtiCORE — IRLink 3 | S3M | 0.9980 |
 
-## Plugin APIs
+### Mixer-state parity harness
 
-Contributors writing mixers, format loaders or outputs: the core's plugin
-contracts are documented in [docs/](docs/) —
-[DSP plugin API](docs/plugin-api-dsp.md),
-[Format plugin API](docs/plugin-api-format.md),
-[Output plugin API](docs/plugin-api-output.md).
+`tools/run-mixer-data-tests.sh` replays libxmp's own test modules and diffs
+our internal mixer state against the reference dumps, frame by frame:
+
+```text
+100 passed / 5 failed  (65 fixtures without .data)
+```
+
+The 5 remaining failures are analyzed with C-referenced root causes in
+[docs/REMAINING-PARITY.md](docs/REMAINING-PARITY.md) — each is either a
+deep fixed-point precision divergence (porta slide ±5 of ~3.1M), a known
+stale golden, or a real port bug (NNA voice-pool flood, DCT flow divergence,
+retrig × envelope interplay) with a documented reproduction path.
 
 ## Packages
 
@@ -40,9 +47,26 @@ contracts are documented in [docs/](docs/) —
 | `@modplayjs/effects-shared` | Shared effect handlers and per-frame stages (frame-accurate C port) |
 | `@modplayjs/dsp-paula` | Amiga Paula-emulating mixer (MOD) |
 | `@modplayjs/dsp-softmixer` | libxmp-parity software mixer (S3M/XM/IT, A500 optional) |
-| `@modplayjs/out-webaudio` | AudioWorklet output: SAB ring + transferable copy transport, pause/resume |
+| `@modplayjs/out-webaudio` | AudioWorklet output: SAB ring (COOP/COEP) with automatic copy-mode fallback, pause/resume |
 | `@modplayjs/out-pcm` | Offline PCM render + WAV encoder |
-| `@modplayjs/demo` | Playback page: file info, instrument/sample lists, realtime pattern view, pause |
+| `@modplayjs/demo` | Demo page: transport, channel mute strip, instrument/sample audition, file info, order list, tracker message, realtime pattern view with legend |
+
+## Interactive playback API
+
+Beyond `startPlayer`/`stop`, the core exposes libxmp's control surface for
+interactive use:
+
+```ts
+core.startSmix(4);                 // reserve channels (xmp_start_smix)
+core.playNote(ins, note, vol);     // xmp_smix_play_instrument — audition
+core.stopNote(chn);                // key-off an audition voice
+core.setChannelMute(chn, true);    // xmp_channel_mute
+core.setChannelVol(chn, 80);       // xmp_channel_vol (0-100)
+```
+
+The demo wires these into a channel mute strip and ▶ audition buttons on
+every instrument/sample row (auto-starting playback in a song-muted jam
+mode when pressed while stopped).
 
 ## Usage
 
@@ -110,7 +134,8 @@ npm install
 npx turbo run typecheck
 npx turbo run build            # all workspaces
 npx turbo run dev --filter=@modplayjs/demo   # demo page
-# (COOP/COEP headers in the demo vite config enable the SAB transport)
+# (the dev server sends COOP/COEP; production builds use the bundled
+#  coi-serviceworker so GitHub Pages gets the SAB transport too)
 ```
 
 ## License
