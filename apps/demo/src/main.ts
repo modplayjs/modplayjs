@@ -252,16 +252,32 @@ function updatePatternHighlight(): void {
     curRow = row;
     const el = rowEls[curRow]!;
     el.classList.add('active');
-    if (followChk.checked) {
-      // Keep the active row visible: only scroll when it leaves the view
-      // (block:'nearest'), so manual scrolling isn't fought every frame.
-      el.scrollIntoView({ block: 'nearest' });
-    }
+    if (followChk.checked) keepInView(patBody, el);
   }
   // Keep the current order entry visible in the order list panel.
   if (followChk.checked) {
     const cur = ordEl.querySelector('.cur');
-    if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (cur) keepInView(ordEl, cur as HTMLElement, true);
+  }
+}
+
+/** Scroll `el` into view INSIDE `container` only — never the page.
+ * scrollIntoView() scrolls every scrollable ancestor, which yanked the
+ * whole page to the pattern card each row and made Stop unreachable. */
+function keepInView(container: HTMLElement, el: HTMLElement, horizontal = false): void {
+  const c = container.getBoundingClientRect();
+  const e = el.getBoundingClientRect();
+  if (e.top < c.top) {
+    container.scrollTop -= c.top - e.top;
+  } else if (e.bottom > c.bottom) {
+    container.scrollTop += e.bottom - c.bottom;
+  }
+  if (horizontal) {
+    if (e.left < c.left) {
+      container.scrollLeft -= c.left - e.left;
+    } else if (e.right > c.right) {
+      container.scrollLeft += e.right - c.right;
+    }
   }
 }
 
