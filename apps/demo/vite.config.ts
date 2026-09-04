@@ -3,7 +3,18 @@
 // Project-original code.
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
+import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
+
+// Short commit hash of the working tree — displayed in the demo header so
+// a deployed page is identifiable at a glance.
+const GIT_HASH = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch {
+    return 'dev';
+  }
+})();
 
 // Workspace packages ship no dist (source-of-truth is packages/*/src), so
 // the demo resolves @modplayjs/* straight to TypeScript sources.
@@ -12,6 +23,9 @@ import { resolve } from 'node:path';
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/modplayjs/' : '/',
   plugins: [tailwindcss()],
+  define: {
+    __GIT_HASH__: JSON.stringify(GIT_HASH),
+  },
   // AudioWorklet modules load as ES module scripts — emit worker assets
   // as ES modules so audioWorklet.addModule can fetch them.
   worker: {

@@ -18,12 +18,13 @@
   font-family: var(--mono, ui-monospace, 'Cascadia Mono', 'Source Code Pro', Menlo, Consolas, monospace);
   background: oklch(0.16 0.02 275);
 }
-
 #pathead,
 .prow {
   display: grid;
-  /* row gutter + 4 columns per track (note/ins/vol/fx) */
-  grid-template-columns: 3.5em repeat(calc(var(--cols, 4) * 4), minmax(0, 1fr));
+  /* row gutter + 4 columns per track (note/ins/vol/fx). Each data cell
+     holds a minimum width so narrow viewports scroll horizontally
+     instead of squeezing the note/ins/vol/fx columns unreadable. */
+  grid-template-columns: 3.5em repeat(calc(var(--cols, 4) * 4), minmax(3.2em, 1fr));
   font-family: inherit;
 }
 

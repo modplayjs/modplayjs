@@ -37,6 +37,7 @@ const patBody = document.getElementById('patbody') as HTMLDivElement;
 const patHead = document.getElementById('pathead') as HTMLDivElement;
 const patNumEl = document.getElementById('patnum') as HTMLSpanElement;
 const chanStrip = document.getElementById('chanstrip') as HTMLDivElement;
+const buildHashEl = document.getElementById('buildhash') as HTMLSpanElement;
 
 const core = new CorePlayer();
 core.registries.registerFormat(modPlugin);
@@ -45,6 +46,8 @@ core.registries.registerFormat(xmPlugin);
 core.registries.registerFormat(itPlugin);
 core.registries.registerDsp(createPaulaPlugin());
 core.registries.registerDsp(createSoftMixerPlugin());
+
+buildHashEl.textContent = __GIT_HASH__;
 
 const output = new WebAudioOutput();
 
