@@ -5,8 +5,9 @@
 // Builds ModuleData in memory, plays through loadModuleData + the same
 // core/audio stack as the player page, with a per-note-part inspector.
 
-import { CorePlayer, StateError, type ModuleData, type Event, type RawSample } from '@modplayjs/core';
+import { CorePlayer, StateError, XMP_KEY_OFF, keyInstruments, type ModuleData, type Event, type RawSample, type SubInstrument } from '@modplayjs/core';
 import { plugin as itPlugin } from '@modplayjs/fmt-it';
+import type { Instrument } from '@modplayjs/core';
 import { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
 import { WebAudioOutput } from '@modplayjs/out-webaudio';
 import './style.css';
@@ -53,6 +54,8 @@ const paClear = document.getElementById('paclear') as HTMLButtonElement;
 const cellInfo = document.getElementById('cellinfo') as HTMLSpanElement;
 const inspBody = document.getElementById('inspbody') as HTMLDivElement;
 const buildHashEl = document.getElementById('buildhash') as HTMLSpanElement;
+const ssave = document.getElementById('ssave') as HTMLButtonElement;
+const sload = document.getElementById('sload') as HTMLInputElement;
 buildHashEl.textContent = __GIT_HASH__;
 const fmt2 = (v: number): string => String(v).padStart(2, '0');
 
@@ -119,7 +122,7 @@ function emptyEnvelope() {
   return { flags: 0, npt: 0, scl: 0, sus: 0, sue: 0, lps: 0, lpe: 0, x: [], y: [] };
 }
 
-function emptyInstrument(name: string) {
+function emptyInstrument(name: string): Instrument {
   return {
     name,
     volume: 0x40,
@@ -131,8 +134,6 @@ function emptyInstrument(name: string) {
     aei: emptyEnvelope(),
     pei: emptyEnvelope(),
     fei: emptyEnvelope(),
-    vwf: 0, vde: 0, vra: 0, vsw: 0,
-    dca: 0, dct: 0, nna: 0,
   };
 }
 
@@ -263,7 +264,7 @@ function renderPattern(): void {
       const idx = cells.indexOf(cell as Element);
       if (idx <= 0) return; // gutter
       selRow = r;
-      selChn = idx - 1;
+      selChn = Math.floor((idx - 1) / 4);
       selPart = (idx - 1) % 4;
       renderPattern();
       renderInspector();
@@ -310,6 +311,39 @@ function renderInsPane(): void {
   genNext.disabled = !playing || module.samples.length === 0;
 }
 
+/** The event being edited is applied straight into ModuleData. */
+const undoStack: { pat: number; chn: number; row: number; ev: Event }[] = [];
+
+function mutateSelected(mut: (e: Event) => void): void {
+  if (selRow < 0 || selChn < 0 || !module) return;
+  const tr = module.patterns[curPattern]!.tracks[selChn]!;
+  const before = tr.event[selRow] ?? { ...EMPTY };
+  undoStack.push({ pat: curPattern, chn: selChn, row: selRow, ev: { ...before } });
+  if (undoStack.length > 200) undoStack.shift();
+  const e = { ...before };
+  mut(e);
+  tr.event[selRow] = e;
+  renderPattern();
+  renderInspector();
+}
+
+function undo(): void {
+  const last = undoStack.pop();
+  if (!last || !module) return;
+  const tr = module.patterns[last.pat]!.tracks[last.chn]!;
+  tr.event[last.row] = last.ev;
+  renderPattern();
+  renderInspector();
+}
+
+const FX_NAMES: Record<number, string> = {
+  0x1: 'portamento up', 0x2: 'portamento down', 0x3: 'tone portamento',
+  0x4: 'vibrato', 0x5: 'tone porta + vol slide', 0x6: 'vibrato + vol slide',
+  0x8: 'set pan', 0x9: 'sample offset', 0xa: 'volume slide',
+  0xb: 'pattern jump', 0xc: 'set volume', 0xd: 'pattern break',
+  0xe: 'extended (S-effect)', 0xf: 'set speed/tempo',
+};
+
 function renderInspector(): void {
   if (selRow < 0 || selChn < 0 || !module) {
     inspBody.textContent = 'select a cell in the pattern editor';
@@ -319,8 +353,127 @@ function renderInspector(): void {
   const e = cellAt(selRow, selChn);
   const partName = ['note', 'instrument', 'volume', 'effect'][selPart]!;
   cellInfo.textContent = `row ${selRow} · chn ${selChn + 1} · editing: ${partName}`;
-  inspBody.textContent = JSON.stringify(e);
-  // Phase 4 replaces this placeholder with per-part editors.
+  inspBody.textContent = '';
+
+  // -- note part: octave picker
+  const noteRow = document.createElement('div');
+  noteRow.className = 'flex items-center gap-2 flex-wrap';
+  const noteLabel = document.createElement('span');
+  noteLabel.className = 'w-20 opacity-70';
+  noteLabel.textContent = 'note';
+  noteRow.appendChild(noteLabel);
+  const cur = e.note > 0 && e.note < 129 ? e.note - 1 : -1;
+  for (let oct = 2; oct <= 6; oct++) {
+    const grp = document.createElement('span');
+    grp.className = 'flex gap-0.5';
+    for (let n = 0; n < 12; n++) {
+      const key = document.createElement('button');
+      const noteNum = oct * 12 + n;
+      key.className = 'btn btn-xs h-6 min-h-6 px-1 ' +
+        (cur === noteNum ? 'btn-primary' : 'btn-ghost');
+      key.textContent = NOTE_NAMES[n]!.replace('-', '');
+      key.addEventListener('click', () => {
+        mutateSelected((ev) => { ev.note = noteNum + 1; if (!ev.ins) ev.ins = 1; });
+        audition(0, noteNum);
+      });
+      grp.appendChild(key);
+    }
+    noteRow.appendChild(grp);
+  }
+  const offBtn = document.createElement('button');
+  offBtn.className = 'btn btn-xs ' + (e.note === 0 ? 'btn-primary' : 'btn-ghost');
+  offBtn.textContent = 'off';
+  offBtn.addEventListener('click', () => mutateSelected((ev) => { ev.note = 0; }));
+  noteRow.appendChild(offBtn);
+  inspBody.appendChild(noteRow);
+
+  // -- instrument part
+  const insRow = document.createElement('div');
+  insRow.className = 'flex items-center gap-2';
+  const insLabel = document.createElement('span');
+  insLabel.className = 'w-20 opacity-70';
+  insLabel.textContent = 'instrument';
+  insRow.appendChild(insLabel);
+  const insSel = document.createElement('select');
+  insSel.className = 'select select-bordered select-xs';
+  for (let i = 0; i < module.ins; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i + 1);
+    opt.textContent = fmt2(i + 1) + ' ' + (module.instruments[i]?.name ?? '');
+    if (e.ins === i + 1) opt.selected = true;
+    insSel.appendChild(opt);
+  }
+  insSel.addEventListener('change', () => {
+    const v = Number(insSel.value);
+    mutateSelected((ev) => { ev.ins = v; });
+    audition(0, Math.max(0, cur));
+  });
+  insRow.appendChild(insSel);
+  inspBody.appendChild(insRow);
+
+  // -- volume part
+  const volRow = document.createElement('div');
+  volRow.className = 'flex items-center gap-2';
+  const volLabel = document.createElement('span');
+  volLabel.className = 'w-20 opacity-70';
+  volLabel.textContent = 'volume';
+  volRow.appendChild(volLabel);
+  const volRange = document.createElement('input');
+  volRange.type = 'range';
+  volRange.min = '0'; volRange.max = '64';
+  volRange.value = String(e.vol ? e.vol - 1 : 0);
+  volRange.className = 'range range-xs grow';
+  volRange.addEventListener('input', () => {
+    const v = Number(volRange.value);
+    mutateSelected((ev) => { ev.vol = v ? v + 1 : 0; });
+  });
+  volRow.appendChild(volRange);
+  inspBody.appendChild(volRow);
+
+  // -- effect part
+  const fxRow = document.createElement('div');
+  fxRow.className = 'flex items-center gap-2';
+  const fxLabel = document.createElement('span');
+  fxLabel.className = 'w-20 opacity-70';
+  fxLabel.textContent = 'effect';
+  fxRow.appendChild(fxLabel);
+  const fxSel = document.createElement('select');
+  fxSel.className = 'select select-bordered select-xs w-40';
+  const none = document.createElement('option');
+  none.value = '0'; none.textContent = '— none —';
+  fxSel.appendChild(none);
+  for (const [k, desc] of Object.entries(FX_NAMES)) {
+    const o = document.createElement('option');
+    o.value = k;
+    o.textContent = (k === '14' ? 'S' : String.fromCharCode(64 + Number(k))) + ' — ' + desc;
+    if (e.fxt === Number(k)) o.selected = true;
+    fxSel.appendChild(o);
+  }
+  fxSel.addEventListener('change', () => {
+    const v = Number(fxSel.value);
+    mutateSelected((ev) => { ev.fxt = v; if (!v) ev.fxp = 0; });
+  });
+  fxRow.appendChild(fxSel);
+  const fxParam = document.createElement('input');
+  fxParam.className = 'input input-bordered input-xs w-16 font-mono';
+  fxParam.placeholder = '00';
+  fxParam.value = e.fxp ? e.fxp.toString(16).toUpperCase().padStart(2, '0') : '';
+  fxParam.addEventListener('input', () => {
+    const v = parseInt(fxParam.value, 16);
+    if (Number.isNaN(v)) return;
+    mutateSelected((ev) => { ev.fxp = Math.min(255, v); if (!ev.fxt) ev.fxt = 0x0f; });
+  });
+  fxRow.appendChild(fxParam);
+  const fxDesc = document.createElement('span');
+  fxDesc.className = 'text-xs opacity-60';
+  fxDesc.textContent = e.fxt && FX_NAMES[e.fxt] ? FX_NAMES[e.fxt]! : '';
+  fxRow.appendChild(fxDesc);
+  inspBody.appendChild(fxRow);
+}
+
+/** Audition helper: inject a note on a smix channel (requires playing). */
+function audition(ins: number, note: number): void {
+  if (playing) core.playNote(ins, note, 64);
 }
 
 function enableEditor(on: boolean): void {
@@ -339,6 +492,57 @@ function setAuditionButtons(disabled: boolean): void {
 
 // -- events -----------------------------------------------------------------
 
+// live tempo/speed apply while playing
+sspeed.addEventListener('input', () => {
+  if (playing) core.setSpeed(Math.max(1, Math.min(31, Number(sspeed.value) || 6)));
+});
+sbpm.addEventListener('input', () => {
+  if (playing) core.setTempo(Math.max(32, Math.min(255, Number(sbpm.value) || 125)));
+});
+stitle.addEventListener('input', () => {
+  if (module) module.title = stitle.value;
+});
+
+ssave.addEventListener('click', () => {
+  if (!module) return;
+  const payload = {
+    module,
+    samples: module.samples.map((sm) => Array.from(sm.data)),
+  };
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (module.title || 'untitled') + '.modplayjs.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+sload.addEventListener('change', async () => {
+  const f = sload.files?.[0];
+  if (!f) return;
+  try {
+    const payload = JSON.parse(await f.text()) as {
+      module: ModuleData; samples: number[][];
+    };
+    payload.module.samples = payload.samples.map((arr, i) => ({
+      name: 'sample ' + (i + 1), data: new Uint8Array(arr),
+      length: arr.length, loopStart: 0, loopEnd: 0,
+      sustainStart: 0, sustainEnd: 0, finetune: 0, volume: 64,
+      flags: 1, c5spd: 22050,
+    }));
+    module = payload.module;
+    curPattern = 0; selRow = selChn = -1;
+    core.loadModuleData(module);
+    core.setDsp('softmixer');
+    renderPattern(); renderOrder(); renderInsPane(); renderInspector();
+    splay.disabled = false;
+    ssave.disabled = false;
+    show('project loaded: ' + module.title);
+  } catch (err) {
+    show('load failed: ' + (err instanceof Error ? err.message : String(err)));
+  }
+});
+
 screate.addEventListener('click', () => {
   try {
     module = createEmptyModule(Math.max(2, Math.min(32, Number(schn.value) || 4)));
@@ -352,6 +556,7 @@ screate.addEventListener('click', () => {
     renderInsPane();
     renderInspector();
     splay.disabled = false;
+    ssave.disabled = false;
     show('module created — press play, then edit rows (edits apply live)');
   } catch (err) {
     show('create failed: ' + (err instanceof Error ? err.message : String(err)));
@@ -377,20 +582,149 @@ ordDel.addEventListener('click', () => {
 });
 
 // Phase 3: structural row ops + full editor keys land with tracker input.
-prowIns.addEventListener('click', () => { /* Phase 3 */ });
-prowDel.addEventListener('click', () => { /* Phase 3 */ });
-paClear.addEventListener('click', () => { /* Phase 3 */ });
+prowIns.addEventListener('click', () => {
+  if (!module || selRow < 0) return;
+  const pat = module.patterns[curPattern]!;
+  for (const tr of pat.tracks) {
+    tr.event.splice(selRow, 0, { ...EMPTY });
+    tr.rows++;
+    if (tr.event.length > tr.rows) tr.event.pop();
+  }
+  pat.rows++;
+  renderPattern();
+});
+prowDel.addEventListener('click', () => {
+  if (!module || selRow < 0 || module.patterns[curPattern]!.rows <= 1) return;
+  const pat = module.patterns[curPattern]!;
+  for (const tr of pat.tracks) {
+    tr.event.splice(selRow, 1);
+    tr.rows--;
+  }
+  pat.rows--;
+  selRow = Math.min(selRow, pat.rows - 1);
+  renderPattern();
+  renderInspector();
+});
+paClear.addEventListener('click', () => {
+  if (!module || selRow < 0) return;
+  mutateSelected((ev) => {
+    ev.note = 0; ev.ins = 0; ev.vol = 0; ev.fxt = 0; ev.fxp = 0; ev.f2t = 0; ev.f2p = 0;
+  });
+});
 
 genPrev.addEventListener('click', () => {
-  // preview the generated wave without attaching: quick synthesis into a
-  // temp module sample is Phase 5; for now just report
-  show('preview: attach the sample first (Phase 5 wires preview)');
+  if (!module || !playing) {
+    show('preview: press play first (audition needs the engine running)');
+    return;
+  }
+  const raw = generateSample();
+  module.samples.push(raw);
+  const id = core.samples.add(raw);
+  // find or create an instrument that owns it, then audition
+  let insIdx = -1;
+  for (let j = 0; j < module.ins; j++) {
+    const ins = module.instruments[j]!;
+    if (ins.nsm > 0 && ins.sub.some((sub) => sub.sid === id)) { insIdx = j; break; }
+  }
+  if (insIdx < 0) {
+    // reuse the first instrument: remap its first sub to the new sample
+    const ins = module.instruments[0]!;
+    if (ins.nsm === 0) {
+      ins.nsm = 1;
+      ins.sub[0] = { vol: 64, gvl: 64, pan: -1, xpo: 0, fin: 0, sid: id, nna: 0, dct: 0, dca: 0, ifc: 0, ifr: 0, rvv: 0, vwf: 0, vde: 0, vra: 0, vsw: 0 } as SubInstrument;
+      ins.map = Array(121).fill(0);
+    } else {
+      ins.sub[0]!.sid = id;
+    }
+    insIdx = 0;
+  }
+  core.playNote(insIdx, 60, 64);
+  show(`previewing ${raw.name} (sample id ${id})`);
 });
 genAdd.addEventListener('click', () => {
-  // Phase 5: generateSample() → attach to instrument
+  if (!module) return;
+  const raw = generateSample();
+  module.samples.push(raw);
+  core.samples.add(raw); // store id == mod.samples.length - 1
+  // attach to instrument 1 (first) if it has no samples yet
+  const ins = module.instruments[0]!;
+  if (ins.nsm === 0) {
+    ins.nsm = 1;
+    ins.sub[0] = { vol: 64, gvl: 64, pan: -1, xpo: 0, fin: 0, sid: module.samples.length - 1, nna: 0, dct: 0, dca: 0, ifc: 0, ifr: 0, rvv: 0, vwf: 0, vde: 0, vra: 0, vsw: 0 };
+    ins.map = Array(121).fill(0);
+  }
+  renderInsPane();
+  show(`sample ${module.samples.length} added (${raw.name})`);
 });
 void generateSample;
-genNext.addEventListener('click', () => { /* Phase 5 */ });
+genNext.addEventListener('click', () => {
+  if (!module || module.samples.length === 0) return;
+  const sid = module.samples.length - 1;
+  const ins = emptyInstrument(`inst ${module.ins + 1} (${module.samples[sid]!.name})`);
+  ins.nsm = 1;
+  ins.sub[0] = { vol: 64, gvl: 64, pan: -1, xpo: 0, fin: 0, sid, nna: 0, dct: 0, dca: 0, ifc: 0, ifr: 0, rvv: 0, vwf: 0, vde: 0, vra: 0, vsw: 0 };
+  ins.map = Array(121).fill(0);
+  module.instruments.push(ins);
+  module.ins++;
+  keyInstruments(module.instruments);
+  renderInsPane();
+  show(`${ins.name} created for sample ${sid + 1}`);
+});
+
+// -- tracker keyboard entry -------------------------------------------------
+
+const KEY_NOTES: Record<string, number> = {
+  z: 0, s: 1, x: 2, d: 3, c: 4, v: 5, g: 6, b: 7, h: 8, n: 9, j: 10, m: 11,
+  q: 12, '2': 13, w: 14, '3': 15, e: 16, r: 17, '5': 18, t: 19, '6': 20,
+  y: 21, '7': 22, u: 23, i: 24,
+};
+
+document.addEventListener('keydown', (ev) => {
+  if (selRow < 0 || selChn < 0) return;
+  if ((ev.target as HTMLElement).tagName === 'INPUT' ||
+      (ev.target as HTMLElement).tagName === 'SELECT') return;
+  const cur = cellAt(selRow, selChn);
+  const k = ev.key;
+  if (k === 'ArrowUp' || k === 'ArrowDown') {
+    ev.preventDefault();
+    selRow = Math.max(0, Math.min(module!.patterns[curPattern]!.rows - 1,
+      selRow + (k === 'ArrowDown' ? 1 : -1)));
+    renderPattern();
+    renderInspector();
+  } else if (k === 'ArrowLeft' || k === 'ArrowRight') {
+    ev.preventDefault();
+    const total = module!.chn * 4;
+    selPart = (selPart + (k === 'ArrowRight' ? 1 : total - 1)) % total;
+    selChn = Math.floor(selPart / 4) % module!.chn;
+    renderPattern();
+    renderInspector();
+  } else if (k === ' ') {
+    // note-off
+    ev.preventDefault();
+    mutateSelected((e) => { e.note = XMP_KEY_OFF; });
+  } else if (k === 'Backspace') {
+    ev.preventDefault();
+    mutateSelected((e) => {
+      if (selPart === 0) e.note = 0;
+      else if (selPart === 1) e.ins = 0;
+      else if (selPart === 2) e.vol = 0;
+      else { e.fxt = 0; e.fxp = 0; }
+    });
+  } else if ((ev.ctrlKey || ev.metaKey) && k.toLowerCase() === 'z') {
+    ev.preventDefault();
+    undo();
+  } else if (selPart === 0 && KEY_NOTES[k.toLowerCase()] !== undefined && !ev.ctrlKey && !ev.metaKey) {
+    ev.preventDefault();
+    const octave = Math.floor((cur.note > 0 ? cur.note - 1 : 60) / 12);
+    const noteNum = octave * 12 + KEY_NOTES[k.toLowerCase()]!;
+    mutateSelected((e) => { e.note = noteNum + 1; if (!e.ins) e.ins = 1; });
+    audition(0, noteNum);
+    // advance to next row (tracker convention)
+    selRow = Math.min(module!.patterns[curPattern]!.rows - 1, selRow + 1);
+    renderPattern();
+    renderInspector();
+  }
+});
 
 // -- live pattern refresh while playing (edits apply live) ------------------
 

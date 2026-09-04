@@ -120,6 +120,17 @@
   padding: 0 2px;
 }
 
+.cell.selcell {
+  outline: 2px solid var(--pat-accent);
+  outline-offset: -2px;
+  background: var(--pat-row-active);
+  cursor: text;
+}
+
+.cell:not(.selcell) {
+  cursor: pointer;
+}
+
 /* Channel separators: each track group ends with its fx cell, and the
    row gutter ends at the first data column. Header markers (span-4)
    match with the same rule. */
