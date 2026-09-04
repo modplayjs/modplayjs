@@ -7,6 +7,9 @@
 
 import { CorePlayer, StateError, XMP_KEY_OFF, keyInstruments, type ModuleData, type Event, type RawSample, type SubInstrument } from '@modplayjs/core';
 import { plugin as itPlugin } from '@modplayjs/fmt-it';
+import { plugin as modPlugin } from '@modplayjs/fmt-mod';
+import { plugin as xmPlugin } from '@modplayjs/fmt-xm';
+import { plugin as s3mPlugin } from '@modplayjs/fmt-s3m';
 import type { Instrument } from '@modplayjs/core';
 import { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
 import { WebAudioOutput } from '@modplayjs/out-webaudio';
@@ -56,6 +59,9 @@ const inspBody = document.getElementById('inspbody') as HTMLDivElement;
 const buildHashEl = document.getElementById('buildhash') as HTMLSpanElement;
 const ssave = document.getElementById('ssave') as HTMLButtonElement;
 const sload = document.getElementById('sload') as HTMLInputElement;
+const importMod = document.getElementById('importmod') as HTMLInputElement;
+const importDo = document.getElementById('importdo') as HTMLButtonElement;
+const importInfo = document.getElementById('importinfo') as HTMLDivElement;
 buildHashEl.textContent = __GIT_HASH__;
 const fmt2 = (v: number): string => String(v).padStart(2, '0');
 
@@ -610,6 +616,74 @@ paClear.addEventListener('click', () => {
   mutateSelected((ev) => {
     ev.note = 0; ev.ins = 0; ev.vol = 0; ev.fxt = 0; ev.fxp = 0; ev.f2t = 0; ev.f2p = 0;
   });
+});
+
+let importSrc: Uint8Array | null = null;
+let importParsed: ModuleData | null = null;
+
+importMod.addEventListener('change', async () => {
+  const f = importMod.files?.[0];
+  if (!f) return;
+  try {
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    const probe = new CorePlayer();
+    probe.registries.registerFormat(itPlugin);
+    probe.registries.registerFormat(modPlugin);
+    probe.registries.registerFormat(xmPlugin);
+    probe.registries.registerFormat(s3mPlugin);
+    probe.loadModule(bytes);
+    const parsed: ModuleData = probe.module!;
+    importSrc = bytes;
+    importDo.disabled = false;
+    importInfo.textContent =
+      `${parsed.title} [${parsed.format.toUpperCase()}] — ` +
+      `${parsed.ins} instruments, ${parsed.samples.length} samples ready to import`;
+  } catch (err) {
+    importParsed = null;
+    importDo.disabled = true;
+    importInfo.textContent = 'could not parse: ' + (err instanceof Error ? err.message : String(err));
+  }
+});
+
+importDo.addEventListener('click', () => {
+  const src = importParsed;
+  const srcBytes = importSrc;
+  if (!module || !src || !srcBytes) return;
+  // Parse fresh in a scratch core so its sample store holds exactly this
+  // module's samples in order — we copy the decoded float data from there.
+  const probe = new CorePlayer();
+  probe.registries.registerFormat(itPlugin);
+  probe.registries.registerFormat(modPlugin);
+  probe.registries.registerFormat(xmPlugin);
+  probe.registries.registerFormat(s3mPlugin);
+  probe.loadModule(srcBytes);
+
+  const base = module.samples.length;
+  // 1. samples: copy RawSample entries (byte data preserved)
+  for (const raw of src.samples) module.samples.push({ ...raw });
+  // 2. register the byte data with the store so voices resolve by sid
+  for (const raw of src.samples) core.samples.add(raw);
+  // 3. instruments: deep-ish copy with remapped sids (base + sub.sid)
+  for (let i = 0; i < src.ins; i++) {
+    const s2 = src.instruments[i]!;
+    const ins = emptyInstrument(`${module.ins + 1} ${s2.name || 'imported'}`);
+    ins.volume = s2.volume;
+    ins.nsm = s2.nsm;
+    ins.rls = s2.rls;
+    ins.map = [...s2.map];
+    ins.mapXpo = [...s2.mapXpo];
+    ins.sub = s2.sub.map((sub) => ({ ...sub, sid: base + sub.sid }));
+    ins.aei = JSON.parse(JSON.stringify(s2.aei));
+    ins.pei = JSON.parse(JSON.stringify(s2.pei));
+    ins.fei = JSON.parse(JSON.stringify(s2.fei));
+    module.instruments.push(ins);
+    module.ins++;
+  }
+  keyInstruments(module.instruments);
+  renderInsPane();
+  importInfo.textContent = `imported ${src.ins} instruments / ${src.samples.length} samples`;
+  importDo.disabled = true;
+  importMod.value = '';
 });
 
 genPrev.addEventListener('click', () => {

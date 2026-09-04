@@ -119,11 +119,55 @@
             </div>
           </div>
 
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-4 gap-2">
+              <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60">Import from module</h2>
+              <p class="text-xs opacity-70 m-0">Load a .mod/.s3m/.xm/.it file and copy its instruments + samples into your project (patterns are not imported).</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <input type="file" id="importmod" accept=".mod,.s3m,.xm,.it"
+                  class="file-input file-input-bordered file-input-xs max-w-xs" aria-label="Module file to import" />
+                <button id="importdo" class="btn btn-xs btn-primary" disabled>import</button>
+              </div>
+              <div id="importinfo" class="text-xs opacity-70 min-h-4"></div>
+            </div>
+          </div>
+
           <div class="card bg-base-100 shadow-sm" id="inspector">
             <div class="card-body p-4 gap-3">
               <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60">Note inspector</h2>
               <div id="inspbody" class="text-sm opacity-70">select a cell in the pattern editor</div>
             </div>
+          </div>
+        </div>
+      </div>
+      <div class="card bg-base-100 shadow-sm mt-4">
+        <div class="collapse collapse-arrow" aria-open="false">
+          <input type="checkbox" class="peer" />
+          <div class="collapse-title text-xs font-semibold uppercase tracking-widest opacity-60">
+            How to use the studio — quick tutorial
+          </div>
+          <div class="collapse-content">
+            <ol class="text-sm leading-6 list-decimal list-inside space-y-1">
+              <li><b>New module</b> — set title/channels/speed/bpm, press <b>new module</b>.</li>
+              <li><b>Make a sound</b> — pick a waveform + frequency under
+                  <i>Sample generator</i>, press <b>▶ preview</b> to hear it,
+                  then <b>+ new sample</b> to attach it (or <b>load</b> a full
+                  module and <b>import</b> its instruments/samples).</li>
+              <li><b>Write notes</b> — click a cell in the pattern grid, then use
+                  your keyboard: <code>Z S X D C V G B H N J M</code> = C…B,
+                  <code>Q W E R T Y U</code> = the next octave (classic tracker
+                  layout). Each key press enters the note and moves down a row.</li>
+              <li><b>Inspect a note</b> — the <i>Note inspector</i> below the grid
+                  shows the selected cell's four parts: note, instrument, volume
+                  and effect. Edit any part and it writes straight into the
+                  pattern.</li>
+              <li><b>Fix mistakes</b> — <code>Ctrl/Cmd+Z</code> undoes the last
+                  cell edit; <i>− row</i> / <i>clear</i> fix rows.</li>
+              <li><b>Listen</b> — <b>play</b> runs the song live; edits apply
+                  immediately while it plays.</li>
+              <li><b>Save</b> — <b>save</b> downloads your project as
+                  <code>.modplayjs.json</code>; <b>load</b> reopens it.</li>
+            </ol>
           </div>
         </div>
       </div>
