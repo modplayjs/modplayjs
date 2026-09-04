@@ -23,13 +23,16 @@ const playBtn = document.getElementById('play') as HTMLButtonElement;
 const pauseBtn = document.getElementById('pause') as HTMLButtonElement;
 const stopBtn = document.getElementById('stop') as HTMLButtonElement;
 const followChk = document.getElementById('follow') as HTMLInputElement;
+const stripDotsChk = document.getElementById('stripdots') as HTMLInputElement;
 const panSep = document.getElementById('pansep') as HTMLInputElement;
 const panSepV = document.getElementById('pansepv') as HTMLSpanElement;
 const status = document.getElementById('status') as HTMLPreElement;
-const infoEl = document.getElementById('info') as HTMLDivElement;
+const infoEl = document.getElementById('info') as HTMLPreElement;
+const msgEl = document.getElementById('message') as HTMLPreElement;
+const msgSection = document.getElementById('messagesection') as HTMLElement;
 const ordEl = document.getElementById('ordlist') as HTMLDivElement;
-const insEl = document.getElementById('inslist') as HTMLDivElement;
-const smpEl = document.getElementById('samplist') as HTMLDivElement;
+const insEl = document.getElementById('inslist') as HTMLPreElement;
+const smpEl = document.getElementById('samplist') as HTMLPreElement;
 const patBody = document.getElementById('patbody') as HTMLDivElement;
 const patHead = document.getElementById('pathead') as HTMLDivElement;
 const patNumEl = document.getElementById('patnum') as HTMLSpanElement;
@@ -122,12 +125,17 @@ function renderInfo(): void {
     'restart     ' + mod.restart + '   global vol: ' + mod.gvol + '/' + mod.gvolbase +
     '   master: ' + mod.mvol + '/' + mod.mvolbase,
   );
-  if (mod.comment && mod.comment.trim()) {
-    l.push('');
-    l.push('message:');
-    for (const line of mod.comment.split('\n')) l.push('  ' + line);
-  }
   infoEl.textContent = l.join('\n');
+
+  // The tracker message (IT "message:", XM/Modplug comments) gets its own
+  // box — it can be long and deserves independent scrolling.
+  if (mod.comment && mod.comment.trim()) {
+    msgSection.hidden = false;
+    msgEl.textContent = mod.comment.replace(/\r/g, '');
+  } else {
+    msgSection.hidden = true;
+    msgEl.textContent = '';
+  }
 }
 
 function renderOrders(): void {
@@ -148,7 +156,7 @@ function renderInstruments(): void {
   if (!mod) return;
   const l: string[] = [];
   for (let i = 0; i < mod.instruments.length; i++) {
-    const name = mod.instruments[i]?.name ?? '';
+    const name = displayName(mod.instruments[i]?.name ?? '');
     // blank lines preserved: the name string is used verbatim inside <pre>
     l.push(fmtPad(i + 1, 2) + ' ' + (name || ' '));
   }
@@ -161,7 +169,7 @@ function renderSamples(): void {
   const l: string[] = [];
   for (let id = 0; id < core.samples.size; id++) {
     const s = core.samples.get(id);
-    const name = s.name || ' ';
+    const name = displayName(s.name || ' ');
     const loop = s.loopEnd > s.loopStart ? ' L' : '  ';
     const len = fmtPad(s.length, 6);
     l.push(fmtPad(id + 1, 2) + ' ' + len + loop + ' ' + name);
@@ -169,7 +177,16 @@ function renderSamples(): void {
   smpEl.textContent = l.join('\n');
 }
 
-// ------------------------------------------------------------- pattern view --
+/** Trackers pad names with trailing dots ('....'); the toggle hides them. */
+function displayName(name: string): string {
+  return stripDotsChk.checked ? name.replace(/\.+$/, '') : name;
+}
+
+stripDotsChk.addEventListener('change', () => {
+  if (!loaded) return;
+  renderInstruments();
+  renderSamples();
+});
 
 function buildPatternView(patternIdx: number): void {
   const mod = core.module;
