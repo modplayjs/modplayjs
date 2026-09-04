@@ -172,7 +172,7 @@ function renderInstruments(): void {
         paused = false;
         pauseBtn.textContent = 'Pause';
       } else if (!playing) {
-        await startPlayback();
+        await startPlayback(true);
       }
       core.playNote(i, 60, 64);
     });
@@ -224,7 +224,7 @@ function renderSamples(): void {
         paused = false;
         pauseBtn.textContent = 'Pause';
       } else if (!playing) {
-        await startPlayback();
+        await startPlayback(true);
       }
       core.playNote(mappedIns, mappedNote, 64);
     });
@@ -410,19 +410,30 @@ fileInput.addEventListener('change', async () => {
 
 /** Start (or restart) playback: device-rate match, smix reservation,
  * player start, and audio output. Shared by the Play button and the
- * instrument/sample audition buttons (which auto-start playback). */
-async function startPlayback(): Promise<void> {
+ * instrument/sample audition buttons. With muteSong (audition
+ * auto-start) all song channels are silenced so only the auditioned
+ * instrument/sample sounds — jam mode. */
+let jamMode = false;
+async function startPlayback(muteSong: boolean): Promise<void> {
   const deviceRate = await output.deviceSampleRate();
   core.setSampleRate(deviceRate);
   core.startSmix(4); // reserve channels for instrument/sample audition
   core.startPlayer();
   await output.start(core, workletUrl); // click handler = user gesture
+  jamMode = muteSong;
+  const mod = core.module;
+  if (mod) {
+    for (let chn = 0; chn < mod.chn; chn++) {
+      core.setChannelVol(chn, muteSong ? 0 : 100);
+    }
+  }
   playing = true;
   paused = false;
   pauseBtn.disabled = false;
   stopBtn.disabled = false;
   show(
-    'playing | DSP: ' + core.dsp().name + ' | ' +
+    (muteSong ? 'jam (song muted) | ' : 'playing | ') +
+    'DSP: ' + core.dsp().name + ' | ' +
     output.transportMode + ' | rate: ' +
     output.audioContextSampleRate + ' Hz',
   );
@@ -435,12 +446,20 @@ playBtn.addEventListener('click', async () => {
     await output.resume();
     paused = false;
     pauseBtn.textContent = 'Pause';
-    show('resumed');
+    // Leaving jam mode: restore song channel volumes.
+    if (jamMode) {
+      const mod = core.module;
+      if (mod) for (let chn = 0; chn < mod.chn; chn++) core.setChannelVol(chn, 100);
+      jamMode = false;
+      show('playing');
+    } else {
+      show('resumed');
+    }
     return;
   }
   if (playing) return;
   try {
-    await startPlayback();
+    await startPlayback(false);
   } catch (err) {
     const msg = err instanceof StateError || err instanceof Error ? err.message : String(err);
     const secureHint =
@@ -476,6 +495,7 @@ stopBtn.addEventListener('click', () => {
   playBtn.textContent = 'Play';
   pauseBtn.textContent = 'Pause';
   show('stopped');
+  jamMode = false;
 });
 
 function setAuditionButtons(disabled: boolean): void {
