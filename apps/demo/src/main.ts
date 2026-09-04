@@ -31,11 +31,12 @@ const infoEl = document.getElementById('info') as HTMLPreElement;
 const msgEl = document.getElementById('message') as HTMLPreElement;
 const msgSection = document.getElementById('messagesection') as HTMLElement;
 const ordEl = document.getElementById('ordlist') as HTMLDivElement;
-const insEl = document.getElementById('inslist') as HTMLPreElement;
-const smpEl = document.getElementById('samplist') as HTMLPreElement;
+const insEl = document.getElementById('inslist') as HTMLDivElement;
+const smpEl = document.getElementById('samplist') as HTMLDivElement;
 const patBody = document.getElementById('patbody') as HTMLDivElement;
 const patHead = document.getElementById('pathead') as HTMLDivElement;
 const patNumEl = document.getElementById('patnum') as HTMLSpanElement;
+const chanStrip = document.getElementById('chanstrip') as HTMLDivElement;
 
 const core = new CorePlayer();
 core.registries.registerFormat(modPlugin);
@@ -154,27 +155,91 @@ function renderOrders(): void {
 function renderInstruments(): void {
   const mod = core.module;
   if (!mod) return;
-  const l: string[] = [];
+  insEl.textContent = '';
+  const frag = document.createDocumentFragment();
   for (let i = 0; i < mod.instruments.length; i++) {
     const name = displayName(mod.instruments[i]?.name ?? '');
-    // blank lines preserved: the name string is used verbatim inside <pre>
-    l.push(fmtPad(i + 1, 2) + ' ' + (name || ' '));
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 font-mono text-xs leading-6';
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-xs btn-ghost btn-circle';
+    btn.textContent = '▶';
+    btn.title = 'audition instrument ' + (i + 1);
+    btn.disabled = !playing;
+    btn.addEventListener('click', () => {
+      core.playNote(i, 60, 64);
+    });
+    const label = document.createElement('span');
+    label.textContent = fmtPad(i + 1, 2) + ' ' + (name || ' ');
+    row.append(btn, label);
+    frag.appendChild(row);
   }
-  insEl.textContent = l.join('\n');
+  insEl.appendChild(frag);
 }
 
 function renderSamples(): void {
   const mod = core.module;
   if (!mod) return;
-  const l: string[] = [];
+  smpEl.textContent = '';
+  const frag = document.createDocumentFragment();
   for (let id = 0; id < core.samples.size; id++) {
     const s = core.samples.get(id);
     const name = displayName(s.name || ' ');
     const loop = s.loopEnd > s.loopStart ? ' L' : '  ';
     const len = fmtPad(s.length, 6);
-    l.push(fmtPad(id + 1, 2) + ' ' + len + loop + ' ' + name);
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 font-mono text-xs leading-6';
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-xs btn-ghost btn-circle';
+    btn.textContent = '▶';
+    btn.title = 'audition sample ' + (id + 1);
+    btn.disabled = !playing;
+    // Map sample → an instrument that owns it (sub.sid == sample index);
+    // the note is the first mapped key (C-4 == map row 48) so the right
+    // sub-instrument plays.
+    let mappedIns = -1;
+    let mappedNote = 60;
+    for (let j = 0; j < mod.instruments.length && mappedIns < 0; j++) {
+      const ins = mod.instruments[j]!;
+      for (let k = 0; k < ins.nsm; k++) {
+        if (ins.sub[k]?.sid === id) {
+          mappedIns = j;
+          const keyRow = ins.map.indexOf(k);
+          mappedNote = keyRow >= 0 ? keyRow : 60;
+          break;
+        }
+      }
+    }
+    btn.addEventListener('click', () => {
+      if (mappedIns >= 0) core.playNote(mappedIns, mappedNote, 64);
+    });
+    if (mappedIns < 0) btn.disabled = true;
+    const label = document.createElement('span');
+    label.textContent = fmtPad(id + 1, 2) + ' ' + len + loop + ' ' + (name || ' ');
+    row.append(btn, label);
+    frag.appendChild(row);
   }
-  smpEl.textContent = l.join('\n');
+  smpEl.appendChild(frag);
+}
+
+function renderChannelStrip(): void {
+  const mod = core.module;
+  if (!mod) return;
+  const strip = chanStrip;
+  strip.textContent = '';
+  for (let c = 0; c < mod.chn; c++) {
+    const b = document.createElement('button');
+    const muted = core.getChannelMute(c);
+    b.className = 'badge cursor-pointer select-none ' +
+      (muted ? 'badge-error badge-outline' : 'badge-ghost');
+    b.textContent = 'C' + (c + 1);
+    b.title = muted ? 'unmute channel ' + (c + 1) : 'mute channel ' + (c + 1);
+    b.addEventListener('click', () => {
+      core.setChannelMute(c, !core.getChannelMute(c));
+      renderChannelStrip();
+    });
+    strip.appendChild(b);
+  }
 }
 
 /** Trackers pad names with trailing dots ('....'); the toggle hides them. */
@@ -310,6 +375,7 @@ fileInput.addEventListener('change', async () => {
     renderOrders();
     renderInstruments();
     renderSamples();
+    renderChannelStrip();
     buildPatternView(0);
     show(
       'loaded | format: ' + mod.format.toUpperCase() + ' | ' + core.dsp().name +
@@ -340,12 +406,14 @@ playBtn.addEventListener('click', async () => {
   try {
     const deviceRate = await output.deviceSampleRate();
     core.setSampleRate(deviceRate);
+    core.startSmix(4); // reserve channels for instrument/sample audition
     core.startPlayer();
     await output.start(core, workletUrl); // click handler = user gesture
     playing = true;
     paused = false;
     pauseBtn.disabled = false;
     stopBtn.disabled = false;
+    setAuditionButtons(false);
     show(
       'playing | DSP: ' + core.dsp().name + ' | ' +
       output.transportMode + ' | rate: ' +
@@ -386,7 +454,16 @@ stopBtn.addEventListener('click', () => {
   playBtn.textContent = 'Play';
   pauseBtn.textContent = 'Pause';
   show('stopped');
+  setAuditionButtons(true);
 });
+
+function setAuditionButtons(disabled: boolean): void {
+  for (const b of document.querySelectorAll<HTMLButtonElement>(
+    '#inslist button, #samplist button',
+  )) {
+    b.disabled = disabled;
+  }
+}
 
 // ------------------------------------------------------- realtime pattern UI --
 

@@ -15,7 +15,7 @@
 // time_factor=10 (DEFAULT_TIME_FACTOR), rrate=250 (PAL_RATE).
 
 import { CoreState, FlowFlag, Quirk } from './model/constants';
-import { ChannelFlags } from './model/model';
+import { ChannelFlags, XMP_KEY_OFF } from './model/model';
 
 import {
   RowDelay,
@@ -117,6 +117,10 @@ export class Core implements CoreIface {
   readonly virt = new VirtualLayer();
 
   private _timeFactorRelative = 1.0;
+  /** Reserved smix channels (xmp_start_smix) — appended after the song's
+   * mod.chn; playNote()/stopNote() inject events into them. */
+  private smixChannels = 0;
+  private smixNext = 0;
   private activeDspName = 'softmixer';
   private eventScratch: (Event | undefined)[] = [];
   private _state: number = CoreState.UNLOADED;
@@ -299,13 +303,13 @@ export class Core implements CoreIface {
     p.pos = p.ord = 0;
     p.frame = -1;
     p.row = 0;
-    p.current_time = 0;
-    p.loop_count = 0;
-    p.sequence = 0;
-
-    for (let i = 0; i < mod.chn; i++) {
-      p.channel_mute[i] = (mod.channels[i]?.flg ?? 0) & 0x04 /* MUTE */ ? true : false;
+    for (let i = 0; i < mod.chn + this.smixChannels; i++) {
+      p.channel_mute[i] =
+        i < mod.chn && (mod.channels[i]?.flg ?? 0) & 0x04 /* MUTE */
+          ? true
+          : false;
       p.channel_vol[i] = 100;
+      p.inject_event[i] = { ...EMPTY_EVENT };
     }
     this.virt.setChannelMute(p.channel_mute);
 
@@ -335,7 +339,10 @@ export class Core implements CoreIface {
       apply(xc);
       return true;
     });
-    this.virt.on(mod.chn, (mod.quirks & Quirk.VIRTUAL) !== 0);
+    // xmp_start_player: libxmp_virt_on(ctx, mod->chn + smix->chn)
+    // (player.c:1997) — the reserved smix channels extend the virtual
+    // layer so playNote()/stopNote() can address them.
+    this.virt.on(mod.chn + this.smixChannels, (mod.quirks & Quirk.VIRTUAL) !== 0);
     // f->loop = calloc(virt_channels) (player.c:2004) — the player's flow
     // state owns per-channel pattern-loop slots; scan uses its own copy.
     this._flow.loop = Array.from({ length: this.virt.virtChannels }, () => ({
@@ -427,6 +434,80 @@ export class Core implements CoreIface {
   getSample(id: number): SampleData {
     return this.samples.get(id);
   }
+
+  /**
+   * xmp_start_smix (smix.c:197-233): reserve `channels` extra channels
+   * (appended after the song's mod.chn) for playNote()/stopNote().
+   * Call after loadModule, before startPlayer — C requires state <= LOADED.
+   */
+  startSmix(channels = 4): void {
+    if (this._state >= CoreState.PLAYING) {
+      throw new StateError('cannot start smix while playing');
+    }
+    if (channels < 1) throw new StateError('smix channels must be >= 1');
+    this.smixChannels = channels;
+  }
+
+  /**
+   * xmp_smix_play_instrument (smix.c:241-270): inject note+ins+vol into
+   * reserved smix channel `chn` (0-based over the reserved pool). Re-triggering
+   * the same channel retakes it. note 0 = middle C (60), C convention.
+   */
+  playNote(ins: number, note = 60, vol = 64, chn = -1): void {
+    const mod = this._module;
+    if (this._state !== CoreState.PLAYING || !mod) {
+      throw new StateError('player not started');
+    }
+    if (this.smixChannels === 0 || ins < 0 || ins >= mod.ins) {
+      throw new StateError('invalid smix note');
+    }
+    const c = chn >= 0 ? chn % this.smixChannels : this.smixNext++ % this.smixChannels;
+    const e: Event = {
+      note: note > 0 && note < 120 ? note + 1 : note,
+      ins: ins + 1,
+      vol: Math.min(64, Math.max(0, vol)) + 1,
+      fxt: 0, fxp: 0, f2t: 0, f2p: 0,
+    };
+    this._p.inject_event[mod.chn + c] = e;
+  }
+
+  /** xmp_smix_stop... inject a key-off on the reserved channel. */
+  stopNote(chn: number): void {
+    const mod = this._module;
+    if (this._state !== CoreState.PLAYING || !mod) {
+      throw new StateError('player not started');
+    }
+    if (chn < 0 || chn >= this.smixChannels) {
+      throw new StateError('invalid smix channel');
+    }
+    this._p.inject_event[mod.chn + chn] = {
+      note: XMP_KEY_OFF, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0,
+    };
+  }
+
+  /** xmp_channel_mute (control.c:345): -1 query / 0 unmute / 1 mute. */
+  setChannelMute(chn: number, mute: boolean): void {
+    const p = this._p;
+    if (chn < 0 || chn >= p.channel_mute.length) return;
+    p.channel_mute[chn] = mute;
+    this.virt.setChannelMute(p.channel_mute);
+  }
+
+  getChannelMute(chn: number): boolean {
+    return this._p.channel_mute[chn] ?? false;
+  }
+
+  /** xmp_channel_vol (control.c:369): 0..100 per-channel volume. */
+  setChannelVol(chn: number, vol: number): void {
+    const p = this._p;
+    if (chn < 0 || chn >= p.channel_vol.length) return;
+    p.channel_vol[chn] = Math.max(0, Math.min(100, vol));
+  }
+
+  getChannelVol(chn: number): number {
+    return this._p.channel_vol[chn] ?? 100;
+  }
+
 
   // ------------------------------------------------------------------
   // rendering
@@ -673,6 +754,7 @@ export class Core implements CoreIface {
     for (let chn = 0; chn < mod.chn; chn++) {
       const xc = this._xc[chn]!;
       const track = pat?.tracks[chn];
+      // (the inject_event loop in injectEvent() covers reserved smix channels)
       let event: Event;
       if (track && row < track.rows) {
         event = track.event[row] ?? EMPTY_EVENT;
@@ -744,7 +826,9 @@ export class Core implements CoreIface {
   private injectEvent(): void {
     const p = this._p;
     const mod = this._module!;
-    for (let chn = 0; chn < mod.chn; chn++) {
+    // player.c:1720-1730 — the loop covers mod->chn + smix->chn so
+    // playNote()/stopNote() injections on reserved channels are applied.
+    for (let chn = 0; chn < mod.chn + this.smixChannels; chn++) {
       const e = p.inject_event[chn];
       if (e && (e.note !== 0 || e.ins !== 0 || e.vol !== 0 || e.fxt !== 0 || e.f2t !== 0)) {
         this.readSingleEvent(chn, e);

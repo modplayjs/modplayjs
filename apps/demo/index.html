@@ -40,6 +40,10 @@
               <span id="pansepv" class="badge badge-ghost">100</span>
             </label>
           </div>
+          <div class="flex flex-wrap items-center gap-1">
+            <span class="text-xs opacity-60 mr-1">channels:</span>
+            <div id="chanstrip" class="flex flex-wrap gap-1"></div>
+          </div>
           <pre id="status" class="whitespace-pre-wrap text-sm opacity-70 min-h-6 m-0">no file loaded</pre>
         </div>
       </div>
@@ -77,7 +81,7 @@
           <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60 mb-1">Instruments</h2>
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-3">
-              <pre id="inslist" class="m-0 whitespace-pre font-mono text-xs leading-relaxed overflow-auto max-h-72">—</pre>
+              <div id="inslist" class="font-mono text-xs leading-relaxed overflow-auto max-h-72">—</div>
             </div>
           </div>
         </section>
@@ -85,7 +89,7 @@
           <h2 class="text-xs font-semibold uppercase tracking-widest opacity-60 mb-1">Samples</h2>
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-3">
-              <pre id="samplist" class="m-0 whitespace-pre font-mono text-xs leading-relaxed overflow-auto max-h-72">—</pre>
+              <div id="samplist" class="font-mono text-xs leading-relaxed overflow-auto max-h-72">—</div>
             </div>
           </div>
         </section>
