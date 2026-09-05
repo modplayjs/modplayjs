@@ -6,10 +6,10 @@
 // core/audio stack as the player page, with a per-note-part inspector.
 
 import { CorePlayer, StateError, XMP_KEY_OFF, keyInstruments, type ModuleData, type Event, type RawSample, type SubInstrument } from '@modplayjs/core';
-import { plugin as itPlugin } from '@modplayjs/fmt-it';
-import { plugin as modPlugin } from '@modplayjs/fmt-mod';
-import { plugin as xmPlugin } from '@modplayjs/fmt-xm';
-import { plugin as s3mPlugin } from '@modplayjs/fmt-s3m';
+import { plugin as itPlugin, itExportPlugin } from '@modplayjs/fmt-it';
+import { plugin as s3mPlugin, s3mExportPlugin } from '@modplayjs/fmt-s3m';
+import { plugin as modPlugin, modExportPlugin } from '@modplayjs/fmt-mod';
+import { plugin as xmPlugin, xmExportPlugin } from '@modplayjs/fmt-xm';
 import type { Instrument } from '@modplayjs/core';
 import { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
 import { WebAudioOutput } from '@modplayjs/out-webaudio';
@@ -22,6 +22,10 @@ import workletUrl from './worklet-url';
 
 const core = new CorePlayer();
 core.registries.registerFormat(itPlugin);
+core.registries.registerExport(itExportPlugin());
+core.registries.registerExport(s3mExportPlugin());
+core.registries.registerExport(modExportPlugin());
+core.registries.registerExport(xmExportPlugin());
 core.registries.registerDsp(createSoftMixerPlugin());
 const output = new WebAudioOutput();
 
@@ -35,6 +39,9 @@ const screate = document.getElementById('screate') as HTMLButtonElement;
 const splay = document.getElementById('splay') as HTMLButtonElement;
 const sstop = document.getElementById('sstop') as HTMLButtonElement;
 const sstatus = document.getElementById('sstatus') as HTMLPreElement;
+const sformat = document.getElementById('sformat') as HTMLSelectElement;
+const sexportBtn = document.getElementById('sexport') as HTMLButtonElement;
+const sexportFmt = document.getElementById('sexportfmt') as HTMLSpanElement;
 const orderList = document.getElementById('orderlist') as HTMLDivElement;
 const ordAdd = document.getElementById('ordadd') as HTMLButtonElement;
 const ordDel = document.getElementById('orddel') as HTMLButtonElement;
@@ -91,9 +98,17 @@ function createEmptyModule(chn: number): ModuleData {
       event: Array.from({ length: 64 }, () => ({ ...EMPTY })),
     })),
   }];
+  const fmt = sformat.value as ModuleData['format'];
+  const fmtDefaults: Record<string, { quirks: number; readEventType: number; periodType: number; volbase: number; gvolbase: number; c4rate: number }> = {
+    it: { quirks: 0, readEventType: 3, periodType: 1, volbase: 64, gvolbase: 128, c4rate: 8363 },
+    xm: { quirks: 0, readEventType: 1, periodType: 1, volbase: 64, gvolbase: 128, c4rate: 8363 },
+    s3m: { quirks: 0, readEventType: 2, periodType: 0, volbase: 64, gvolbase: 64, c4rate: 8363 },
+    mod: { quirks: 0, readEventType: 0, periodType: 0, volbase: 64, gvolbase: 128, c4rate: 8287 },
+  };
+  const d = fmtDefaults[fmt]!;
   return {
     title: stitle.value || 'untitled',
-    format: 'it',
+    format: fmt,
     tracker: 'modplayjs studio',
     comment: '',
     chn,
@@ -110,17 +125,17 @@ function createEmptyModule(chn: number): ModuleData {
     sequences: [],
     speed: Number(sspeed.value) || 6,
     bpm: Number(sbpm.value) || 125,
-    volbase: 64,
-    gvolbase: 128,
-    gvol: 128,
-    quirks: 0,
+    volbase: d.volbase,
+    gvolbase: d.gvolbase,
+    gvol: d.gvolbase,
+    quirks: d.quirks,
     flowMode: 0,
-    readEventType: 3, // IT
-    periodType: 1,    // linear
+    readEventType: d.readEventType as ModuleData['readEventType'],
+    periodType: d.periodType as ModuleData['periodType'],
     defpan: 128,
     time_factor: 10,
     rrate: 250,
-    c4rate: 8363,
+    c4rate: d.c4rate,
   };
 }
 
@@ -509,6 +524,23 @@ stitle.addEventListener('input', () => {
   if (module) module.title = stitle.value;
 });
 
+sexportBtn.addEventListener('click', () => {
+  if (!module) return;
+  const plugin = core.registries.exportPlugins().find((p) => p.name === module!.format);
+  if (!plugin) {
+    show(`no export writer for format '${module.format}'`);
+    return;
+  }
+  const bytes = plugin.write(module);
+  const blob = new Blob([bytes.slice()], { type: 'application/octet-stream' });
+  const a2 = document.createElement('a');
+  a2.href = URL.createObjectURL(blob);
+  a2.download = `${(module.title || 'untitled').replace(/\.+$/, '')}.${plugin.extension}`;
+  a2.click();
+  URL.revokeObjectURL(a2.href);
+  show(`exported ${a2.download} (${bytes.length} bytes)`);
+});
+
 ssave.addEventListener('click', () => {
   if (!module) return;
   const payload = {
@@ -543,6 +575,8 @@ sload.addEventListener('change', async () => {
     renderPattern(); renderOrder(); renderInsPane(); renderInspector();
     splay.disabled = false;
     ssave.disabled = false;
+    sexportBtn.disabled = false;
+    sexportFmt.textContent = `exports as .${module.format}`;
     show('project loaded: ' + module.title);
   } catch (err) {
     show('load failed: ' + (err instanceof Error ? err.message : String(err)));
@@ -563,6 +597,8 @@ screate.addEventListener('click', () => {
     renderInspector();
     splay.disabled = false;
     ssave.disabled = false;
+    sexportBtn.disabled = false;
+    sexportFmt.textContent = `exports as .${module.format}`;
     show('module created — press play, then edit rows (edits apply live)');
   } catch (err) {
     show('create failed: ' + (err instanceof Error ? err.message : String(err)));

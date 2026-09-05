@@ -86,7 +86,12 @@ function packPattern(pat: Pattern, chn: number): Uint8Array {
       let type = 0;
       const fields: number[] = [];
 
-      if (e.note > 0 && e.note < 130) { type |= 0x01; fields.push(e.note > 96 ? 97 : e.note); }
+      // XM file notes are 12 lower than libxmp internal (XM C-0 = 1,
+      // libxmp C-0 = 13); 97 = key-off marker (xm.ts:266-269).
+      if (e.note > 0 && e.note < 130) {
+        type |= 0x01;
+        fields.push(e.note > 12 && e.note < 109 ? e.note - 12 : 97);
+      }
       if (e.ins > 0) { type |= 0x02; fields.push(e.ins & 0xff); }
       if (e.vol > 0) {
         type |= 0x04;

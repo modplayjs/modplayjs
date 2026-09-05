@@ -37,10 +37,23 @@
                 <input id="sbpm" type="number" min="32" max="255" value="125"
                   class="input input-bordered input-sm w-24" />
               </label>
+              <label class="flex items-center gap-2 text-sm">
+                <span class="w-20 opacity-70">format</span>
+                <select id="sformat" class="select select-bordered select-sm grow">
+                  <option value="it" selected>IT</option>
+                  <option value="xm">XM</option>
+                  <option value="s3m">S3M</option>
+                  <option value="mod">MOD</option>
+                </select>
+              </label>
               <div class="flex gap-2">
                 <button id="screate" class="btn btn-primary btn-sm">new module</button>
                 <button id="splay" class="btn btn-sm" disabled>play</button>
                 <button id="sstop" class="btn btn-sm btn-ghost" disabled>stop</button>
+              </div>
+              <div class="flex flex-wrap gap-2 items-center">
+                <button id="sexport" class="btn btn-xs btn-secondary" disabled>export</button>
+                <span id="sexportfmt" class="text-xs opacity-60"></span>
               </div>
               <pre id="sstatus" role="status" class="whitespace-pre-wrap text-xs opacity-70 min-h-5 m-0">create a module to begin</pre>
             </div>
