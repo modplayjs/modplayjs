@@ -462,10 +462,14 @@ export class Core implements CoreIface {
    * Call after loadModule, before startPlayer — C requires state <= LOADED.
    */
   startSmix(channels = 4): void {
-    if (this._state >= CoreState.PLAYING) {
-      throw new StateError('cannot start smix while playing');
-    }
     if (channels < 1) throw new StateError('smix channels must be >= 1');
+    // Idempotent: re-reserving the same count (the demo calls this on
+    // every Play click) is a no-op. Changing the count mid-play would
+    // desync the virtual layer, so that stays an error.
+    if (this._state >= CoreState.PLAYING) {
+      if (this.smixChannels === channels) return;
+      throw new StateError('cannot change smix channels while playing');
+    }
     this.smixChannels = channels;
   }
 

@@ -191,7 +191,7 @@ function renderInstruments(): void {
     btn.textContent = '▶';
     btn.title = 'audition instrument ' + (i + 1);
     btn.setAttribute('aria-label', 'play instrument ' + (i + 1));
-    btn.disabled = !playing;
+    btn.disabled = !loaded;
     btn.addEventListener('click', async () => {
       if (paused) {
         await output.resume();
@@ -227,7 +227,6 @@ function renderSamples(): void {
     btn.textContent = '▶';
     btn.title = 'audition sample ' + (id + 1);
     btn.setAttribute('aria-label', 'play sample ' + (id + 1));
-    btn.disabled = !playing;
     // Map sample → an instrument that owns it (sub.sid == sample index);
     // the note is the first mapped key (C-4 == map row 48) so the right
     // sub-instrument plays.
@@ -244,6 +243,7 @@ function renderSamples(): void {
         }
       }
     }
+    btn.disabled = !loaded || mappedIns < 0;
     btn.addEventListener('click', async () => {
       if (mappedIns < 0) return;
       if (paused) {
