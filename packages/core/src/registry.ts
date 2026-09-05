@@ -10,6 +10,7 @@ import type {
   EffectPlugin,
   DspPlugin,
   OutputPlugin,
+  ExportPlugin,
 } from './types/index';
 import { PluginNotFoundError } from './errors';
 
@@ -23,6 +24,8 @@ export class Registries {
   private dspList: DspPlugin[] = [];
   private outputs = new Map<string, OutputPlugin>();
   private outputList: OutputPlugin[] = [];
+  private exports = new Map<string, ExportPlugin>();
+  private exportList: ExportPlugin[] = [];
 
   registerFormat(p: FormatPlugin): void {
     if (this.formats.has(p.name)) throw new PluginNotFoundError(`format '${p.name}' already registered`);
@@ -48,6 +51,12 @@ export class Registries {
     this.outputList.push(p);
   }
 
+  registerExport(p: ExportPlugin): void {
+    if (this.exports.has(p.name)) throw new PluginNotFoundError(`export '${p.name}' already registered`);
+    this.exports.set(p.name, p);
+    this.exportList.push(p);
+  }
+
   /** First plugin whose test() passes over the bytes (add_loaders probe parity). */
   formatFor(bytes: Uint8Array): FormatPlugin | null {
     for (const p of this.formatList) {
@@ -64,6 +73,17 @@ export class Registries {
   /** Registered DSPs in registration order. */
   dspPlugins(): readonly DspPlugin[] {
     return this.dspList;
+  }
+
+  /** Registered export (writer) plugins in registration order. */
+  exportPlugins(): readonly ExportPlugin[] {
+    return this.exportList;
+  }
+
+  export(name: string): ExportPlugin {
+    const p = this.exports.get(name);
+    if (!p) throw new PluginNotFoundError(`no export plugin '${name}'`);
+    return p;
   }
 
   format(name: string): FormatPlugin {

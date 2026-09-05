@@ -7,3 +7,4 @@
 // shared player-core code in libxmp, not loader-local).
 
 export { s3mTest, s3mLoad, plugin } from './s3m.js';
+export { s3mExportPlugin } from './s3mWrite.js';

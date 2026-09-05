@@ -7,3 +7,4 @@
 // decode via bundled stb-vorbis (is_ogg_sample/oggdec parity).
 
 export { xmTest, xmLoad, plugin } from './xm.js';
+export { xmExportPlugin } from './xmWrite.js';

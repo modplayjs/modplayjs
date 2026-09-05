@@ -14,6 +14,7 @@ export type {
   EffectPlugin,
   DspPlugin,
   OutputPlugin,
+  ExportPlugin,
 } from './types/index';
 
 export {

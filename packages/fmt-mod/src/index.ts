@@ -22,3 +22,4 @@ export const plugin: FormatPlugin = {
     readEventDispatch(core, chn, row);
   },
 };
+export { modExportPlugin } from './modWrite.js';

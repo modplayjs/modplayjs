@@ -217,6 +217,23 @@ export interface DspPlugin {
 // ---------------------------------------------------------------------------
 
 /**
+ * An export (writer) plugin: serializes a ModuleData back into a
+ * format's file bytes — the write-side twin of FormatPlugin. One per
+ * format; the studio's export buttons consume these.
+ */
+export interface ExportPlugin {
+  readonly name: string;
+  /** Human-readable label for UI pickers. */
+  readonly label: string;
+  /** File extension without the dot. */
+  readonly extension: string;
+  /** Whether this writer can represent the module (format family check). */
+  supports(mod: ModuleData): boolean;
+  /** Serialize the module (samples read from mod.samples[i].data). */
+  write(mod: ModuleData): Uint8Array;
+}
+
+/**
  * An output plugin. PULLs audio by calling ctx.playBuffer.
  */
 export interface OutputPlugin {
