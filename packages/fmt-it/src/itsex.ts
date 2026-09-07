@@ -144,17 +144,21 @@ export function itsexDecompress8(
           // goto unpack_byte
           if (left < 8) {
             const shift = 8 - left;
+            // C: signed char c = (signed char)(bits << shift); c >>= shift;
+            // bits = (uint16)c — 16-bit sign extension of the shifted value.
             const c = (((bits << shift) & 0xff) << 24) >> 24;
-            bits = c & 0xffff;
+            bits = (c >> shift) & 0xffff;
           }
           bits = (bits + temp) & 0xffff;
           temp = bits & 0xff;
           temp2 = (temp2 + temp) & 0xff;
           dst[dstOff + pos] = it215 ? temp2 : temp;
+          pos++; // unpack_byte falls into skip_byte
         } else {
           bits = (readBits(s, tmp, 3) + 1) & 0xff;
           if (s.err) return false;
           left = (bits & 0xff) < left ? bits & 0xff : (bits + 1) & 0xff;
+          // goto next: pos NOT advanced
         }
       } else if (left < 9) {
         const i = (0xff >> (9 - left)) + 4;
@@ -165,28 +169,31 @@ export function itsexDecompress8(
           if (left < 8) {
             const shift = 8 - left;
             const c = (((bits << shift) & 0xff) << 24) >> 24;
-            bits = c & 0xffff;
+            bits = (c >> shift) & 0xffff;
           }
           bits = (bits + temp) & 0xffff;
           temp = bits & 0xff;
           temp2 = (temp2 + temp) & 0xff;
           dst[dstOff + pos] = it215 ? temp2 : temp;
+          pos++; // unpack_byte falls into skip_byte
         } else {
           bits -= j;
           left = (bits & 0xff) < left ? bits & 0xff : (bits + 1) & 0xff;
+          // goto next: pos NOT advanced
         }
       } else if (left >= 10) {
-        // goto skip_byte
+        pos++; // goto skip_byte
       } else if (bits >= 256) {
         left = (bits + 1) & 0xff;
+        // goto next: pos NOT advanced
       } else {
         // unpack_byte (left == 9)
         bits = (bits + temp) & 0xffff;
         temp = bits & 0xff;
         temp2 = (temp2 + temp) & 0xff;
         dst[dstOff + pos] = it215 ? temp2 : temp;
+        pos++; // unpack_byte falls into skip_byte
       }
-      pos++;
     } while (pos < d);
 
     /* Move On */
@@ -244,17 +251,20 @@ export function itsexDecompress16(
           // goto unpack_byte
           if (left < 16) {
             const shift = 16 - left;
+            // C: int16 c = (int16)(bits << shift); c >>= shift; bits = (uint32)c.
             const c = (((bits << shift) & 0xffff) << 16) >> 16;
-            bits = c >>> 0;
+            bits = (c >> shift) >>> 0;
           }
           bits = (bits + temp) >>> 0;
           temp = (bits << 16) >> 16;
           temp2 = (temp2 + temp) | 0;
           write16(dst, dstOff + pos, it215 ? temp2 : temp);
+          pos++; // unpack_byte falls into skip_byte
         } else {
           bits = readBits(s, tmp, 4) + 1;
           if (s.err) return false;
           left = (bits & 0xff) < left ? bits & 0xff : (bits + 1) & 0xff;
+          // goto next: pos NOT advanced
         }
       } else if (left < 17) {
         const i = (0xffff >> (17 - left)) + 8;
@@ -265,28 +275,31 @@ export function itsexDecompress16(
           if (left < 16) {
             const shift = 16 - left;
             const c = (((bits << shift) & 0xffff) << 16) >> 16;
-            bits = c >>> 0;
+            bits = (c >> shift) >>> 0;
           }
           bits = (bits + temp) >>> 0;
           temp = (bits << 16) >> 16;
           temp2 = (temp2 + temp) | 0;
           write16(dst, dstOff + pos, it215 ? temp2 : temp);
+          pos++; // unpack_byte falls into skip_byte
         } else {
           bits -= j;
           left = (bits & 0xff) < left ? bits & 0xff : (bits + 1) & 0xff;
+          // goto next: pos NOT advanced
         }
       } else if (left >= 18) {
-        // goto skip_byte
+        pos++; // goto skip_byte
       } else if (bits >= 0x10000) {
         left = (bits + 1) & 0xff;
+        // goto next: pos NOT advanced
       } else {
         // unpack_byte (left == 17, so no sign-extend branch)
         bits = (bits + temp) >>> 0;
         temp = (bits << 16) >> 16;
         temp2 = (temp2 + temp) | 0;
         write16(dst, dstOff + pos, it215 ? temp2 : temp);
+        pos++; // unpack_byte falls into skip_byte
       }
-      pos++;
     } while (pos < d);
 
     /* Move On */
