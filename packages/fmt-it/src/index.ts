@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026 Bitti09 — modplayjs contributors
 // Project-original code.
-export { itTest, itLoad, plugin } from './it.js';
+export { itTest, itLoad, plugin, applyMptPreamp } from './it.js';
 export { itExportPlugin } from './itWrite.js';

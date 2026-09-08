@@ -271,7 +271,7 @@ function fail(msg: string): never {
 
 /** libxmp_apply_mpt_preamp (common.c:596-613): scale mvol by the
  * channel-count preamp table. Set mod.chn and mvol first! */
-function applyMptPreamp(mod: ModuleData): void {
+export function applyMptPreamp(mod: ModuleData): void {
   // OpenMPT uses a slightly different table (common.c:598-604).
   const preampTable: number[] = [
     0x60, 0x60, 0x60, 0x70, // 0-7
@@ -958,13 +958,13 @@ function loadItSample(
     xxi.sub[0]!.pan = -1; // XMP_INST_NO_DEFAULT_PAN
     xxi.sub[0]!.sid = i;
     xxi.nsm = length !== 0 ? 1 : 0; // !!(xxs->len)
-    // libxmp_instrument_name(mod, i, ish.name, 25): name on the instrument.
+    // libxmp_instrument_name(mod, i, ish.name, 25): name ONLY on the
+    // instrument — xxs->name stays empty in sample mode.
     xxi.name = name;
   } else {
     // libxmp_copy_adjust(xxs->name, ish.name, 25): name lives on the sample.
     raw.name = name;
   }
-  raw.name = name;
   raw.volume = vol;
 
   // Convert C5SPD to relnote/finetune (it_load.c:919-949): a sample can be
@@ -1367,8 +1367,9 @@ export function itLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   if (readmem32b(bytes, 0) !== MAGIC_IMPM) fail('bad magic');
   const nameBuf = bytes.slice(4, 30);
   fixName(nameBuf, 26);
-  const name = copyAdjust(nameBuf, 25);
-
+  // Module title: libxmp_read_title(f, t, 26) → copy_adjust over 26 chars
+  // (it_load.c:51). Instrument/sample names use 25; the title uses 26.
+  const name = copyAdjust(nameBuf, 26);
   const ifh: ItFileHeader = {
     name: nameBuf,
     hiliteMin: bytes[30]!,
@@ -1687,10 +1688,15 @@ function finalizeIt(
   let comment: string | undefined;
   if (ifh.special & IT_HAS_MSG && ifh.msglen > 0) {
     const mp = start + ifh.msgofs;
-    const take = Math.min(ifh.msglen, Math.max(0, bytes.length - mp));
+    // C: ifh.msglen = hio_read(m->comment, 1, ifh.msglen, f) — the length is
+    // REWRITTEN to the number of bytes actually read; the string is NUL-
+    // terminated at msglen-1 (j + 1 < msglen loop). Short file reads shrink
+    // the message; there is no zero-fill from the file.
+    const avail = Math.max(0, bytes.length - mp);
+    const take = Math.min(ifh.msglen, avail);
     if (take > 0) {
       let s = '';
-      for (let j = 0; j < take; j++) {
+      for (let j = 0; j + 1 < take; j++) {
         let b = bytes[mp + j]!;
         if (b === 13) {
           b = 10; // \r → \n
@@ -1740,8 +1746,11 @@ function finalizeIt(
 
   // Assemble pattern list for the module.
   mod.patterns = [];
+  // numRows[i] === 0 marks an unloadable pattern (num_rows > 1024 → C zeroes
+  // pp_pat[i] → empty 64 rows); `?? 64` alone would keep 0 (0 is not nullish).
   for (let i = 0; i < ifh.patnum; i++) {
-    mod.patterns.push({ rows: numRows[i] ?? 64, tracks: tracks[i]! });
+    const rows = numRows[i] === undefined || numRows[i] === 0 ? 64 : numRows[i]!;
+    mod.patterns.push({ rows, tracks: tracks[i]! });
   }
 
   return mod;

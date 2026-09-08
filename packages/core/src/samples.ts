@@ -45,24 +45,29 @@ function clamp16(v: number): number {
   return v < -32768 ? -32768 : v > 32767 ? 32767 : v;
 }
 
-/** Delta-to-absolute over the raw view (convert_delta, sample.c:99-123). */
+/** Delta-to-absolute over the raw view (convert_delta, sample.c:99-123).
+ *  C walks the buffer CONTIGUOUSLY per channel: channel 0 covers bytes
+ *  [0..frames), channel 1 [frames..frames*2) — the planar L|R layout the
+ *  conversions run in (interleaving happens afterwards, sample.c:396-400). */
 function convertDelta(bytes: Uint8Array, frames: number, is16bit: boolean, channels: number): void {
   if (is16bit) {
     const w = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     for (let chn = 0; chn < channels; chn++) {
       let absval = 0;
-      for (let i = chn; i < frames * channels; i += channels) {
-        absval = (w.getUint16(i * 2, true) + absval) & 0xffff;
-        w.setUint16(i * 2, absval, true);
+      for (let i = 0; i < frames; i++) {
+        const off = (chn * frames + i) * 2;
+        absval = (w.getUint16(off, true) + absval) & 0xffff;
+        w.setUint16(off, absval, true);
       }
     }
     void clamp16;
   } else {
     for (let chn = 0; chn < channels; chn++) {
       let absval = 0;
-      for (let i = chn; i < frames * channels; i += channels) {
-        absval = (bytes[i]! + absval) & 0xff;
-        bytes[i] = absval;
+      for (let i = 0; i < frames; i++) {
+        const off = chn * frames + i;
+        absval = (bytes[off]! + absval) & 0xff;
+        bytes[off] = absval;
       }
     }
   }
@@ -195,17 +200,22 @@ function normalize(raw: RawSample, id: number): SampleData {
     for (let i = 0; i < len * chnCount; i++) floats[i] = signedByte(bytes[i]!) / 128;
   }
 
-  // Loop sanity (sample.c:286-300).
+  // Loop sanity (sample.c:286-300). C's libxmp_load_sample returns EARLY for
+  // len <= 0 (sample.c:196-199) — the sanity block never runs for empty
+  // samples, so loop flags survive on zero-length samples (4DNinja 3DAttack
+  // smp4: flg=06 with len=0).
   let loopStart = raw.loopStart;
   let loopEnd = raw.loopEnd;
   let flags = raw.flags;
-  if (loopEnd > len) loopEnd = len;
-  if (loopStart >= len || loopStart >= loopEnd) {
-    loopStart = loopEnd = 0;
-    flags &= ~(SampleFlags.LOOP | SampleFlags.BIDIR);
-  }
-  if ((flags & SampleFlags.BIDIR) !== 0 && (flags & SampleFlags.LOOP) === 0) {
-    flags &= ~SampleFlags.BIDIR;
+  if (len > 0) {
+    if (loopEnd > len) loopEnd = len;
+    if (loopStart >= len || loopStart >= loopEnd) {
+      loopStart = loopEnd = 0;
+      flags &= ~(SampleFlags.LOOP | SampleFlags.BIDIR);
+    }
+    if ((flags & SampleFlags.BIDIR) !== 0 && (flags & SampleFlags.LOOP) === 0) {
+      flags &= ~SampleFlags.BIDIR;
+    }
   }
   let susS = raw.sustainStart;
   let susE = raw.sustainEnd;

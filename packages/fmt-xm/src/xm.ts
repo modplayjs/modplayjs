@@ -51,6 +51,7 @@ import {
 } from '@modplayjs/core';
 import { EX_F_VSLIDE_DN, EX_F_VSLIDE_UP } from '@modplayjs/core';
 import { LSN, MSN, readEventFt2, TEST_NOTE, NoteFlag, SET_NOTE } from '@modplayjs/effects-shared';
+import { applyMptPreamp } from '@modplayjs/fmt-it';
 import { StbVorbis } from 'stb-vorbis';
 
 // ---------------------------------------------------------------------------
@@ -91,6 +92,7 @@ function copyAdjust(r: Uint8Array, n: number): string {
   let s = '';
   for (let i = 0; i < n && i < r.length; i++) {
     const c = r[i]!;
+    if (c === 0) break; // strncpy stops at NUL
     s += c > 127 || c < 0x20 || c === 0x7f ? '.' : String.fromCharCode(c);
   }
   return s.replace(/ +$/, '');
@@ -510,7 +512,24 @@ function loadInstruments(
   ctx: LoadCtx,
 ): { endPos: number; mptInsHeaders: number } {
   let mptInsHeaders = 0;
+  // libxmp_init_instrument (xm_load.c:448) calloc's ALL mod->ins instruments
+  // up front — a short header read (xm_load.c:465-471) breaks the loop but the
+  // remaining instruments stay (zeroed name, nsm = 0).
   const instruments: Instrument[] = [];
+  for (let i = 0; i < mod.ins; i++) {
+    instruments.push({
+      name: '',
+      volume: 0x40,
+      nsm: 0,
+      rls: 0,
+      map: new Array<number>(121).fill(0),
+      mapXpo: new Array<number>(121).fill(0),
+      sub: [],
+      aei: zeroEnvelope(),
+      fei: zeroEnvelope(),
+      pei: zeroEnvelope(),
+    });
+  }
   // Sample store: sid = running sample_num (C mod->xxs[sample_num]).
   const rawSamples: RawSample[] = [];
   let sampleNum = 0;
@@ -558,7 +577,10 @@ function loadInstruments(
       volume: 0x40,
       nsm: xihSamples,
       rls: 0,
-      map: new Array<number>(121).fill(0xff),
+      // C: xxi comes from calloc (libxmp_init_instrument) — maps start at 0,
+      // NOT 0xff. Keys 12..108 are overwritten from the file; keys 0-11 and
+      // 108-120 stay 0 (xm_load.c:602-607).
+      map: new Array<number>(121).fill(0),
       mapXpo: new Array<number>(121).fill(0),
       sub: [],
       aei: zeroEnvelope(),
@@ -576,7 +598,7 @@ function loadInstruments(
       // zero advanced the stream +4 per such instrument, landing every
       // later instrument header on garbage ('header size 0').
       pos = instrPos + xihSize;
-      instruments.push(xxi);
+      instruments[i] = xxi;
       continue;
     }
 
@@ -585,8 +607,11 @@ function loadInstruments(
     for (let j = 0; j < xihSamples; j++) {
       subs.push({
         vol: 0,
-        gvl: 0,
-        pan: 0,
+        // QUIRK_INSVOL is never set for XM: libxmp_load_epilogue
+        // (load_helpers.c:370-383) rewrites sub.gvl = m->volbase = 0x40.
+        gvl: 0x40,
+        // XMP_INST_NO_DEFAULT_PAN (xm_load.c:632): sub->pan = -1.
+        pan: -1,
         xpo: 0,
         fin: 0,
         vwf: 0,
@@ -750,9 +775,9 @@ function loadInstruments(
       sub.sid = sampleNum;
 
       const raw: RawSample = {
-        // C: libxmp_copy_adjust(xxs->name, xi.name, 22) — the sample name is
-        // the instrument name in XM (xm_load.c:708).
-        name,
+        // libxmp_copy_adjust(xxs->name, xsh[j].name, 22) — the SAMPLE header
+        // name, not the instrument name (xm_load.c:660).
+        name: copyAdjust(sname, 22),
         data: new Uint8Array(0),
         length,
         loopStart,
@@ -827,8 +852,15 @@ function loadInstruments(
         // 16-bit lengths, fixed by the reposition below.
         const framelen = (raw.flags & SampleFlags.BITS16 ? 2 : 1) * (raw.flags & SampleFlags.STEREO ? 2 : 1);
         const bytelen = raw.length * framelen;
-        const take = Math.max(0, Math.min(bytelen, bytes.length - dataPos));
-        raw.data = bytes.subarray(dataPos, dataPos + take);
+        const avail = Math.max(0, Math.min(bytelen, bytes.length - dataPos));
+        if (avail < bytelen) {
+          // Short read → zero-fill the tail (sample.c:355-360).
+          const buf = new Uint8Array(bytelen);
+          buf.set(bytes.subarray(dataPos, dataPos + avail), 0);
+          raw.data = buf;
+        } else {
+          raw.data = bytes.subarray(dataPos, dataPos + bytelen);
+        }
         raw.flags = raw.flags | flags;
         if (flags & DecodeFlag.ADPCM) {
           totalSampleSize += 16 + ((sh.length + 1) >> 1);
@@ -841,8 +873,7 @@ function loadInstruments(
 
     // Reposition for odd 16-bit in-file length (xm_load.c:759-763).
     pos = instrPos + xihSize + 40 * xihSamples + totalSampleSize;
-
-    instruments.push(xxi);
+    instruments[i] = xxi;
   }
 
   // Final sample number adjustment (xm_load.c:766-769): mod->smp = sampleNum.
@@ -1134,8 +1165,11 @@ export function xmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   if (isMpt116 || isMptOld) {
     quirk &= ~Quirk.FT2BUGS;
     flowMode = FLOW_MODE_MPT_116;
-    // mvolbase=48, mvol=48, libxmp_apply_mpt_preamp — ModuleData has no
-    // mvol fields yet (T18 wiring, same as S3M); preamp not applied.
+    // xm_load.c:1007-1013 — is_mpt_116 OR is_mpt_old: mvolbase = 48, mvol = 48,
+    // then libxmp_apply_mpt_preamp.
+    mod.mvolbase = 48;
+    mod.mvol = 48;
+    applyMptPreamp(mod);
   }
 
   // Channel default pans (xm_load.c:1017-1019)

@@ -276,6 +276,22 @@ export class Core implements CoreIface {
 
   /** Shared loadModule/loadModuleData tail: scan + sequence setup + keys. */
   private finalizeModule(mod: ModuleData): void {
+    // load.c:298-304 — libxmp_adjust_string over module title, instrument
+    // and sample names: non-printables → ' ', then trailing spaces stripped.
+    const adjust = (s: string): string => {
+      let out = '';
+      for (const ch of s) {
+        const c = ch.codePointAt(0)!;
+        out += c > 127 || (c < 0x20 && c !== 0) || c === 0x7f ? ' ' : ch;
+      }
+      return out.replace(/ +$/, '');
+    };
+    mod.title = adjust(mod.title);
+    for (const ins of mod.instruments) ins.name = adjust(ins.name);
+    for (const smp of mod.samples) {
+      if (smp.name) smp.name = adjust(smp.name);
+    }
+
     // Scan sequences (libxmp_scan_sequences): scan[chain] carries the
     // end point ord/row/num written by scan_module's end_module block.
     const sc = new Scanner();
