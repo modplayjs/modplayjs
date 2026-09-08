@@ -44,7 +44,7 @@ jobs:
         with:
           # No publish: the workspace packages are private. Tagging is what
           # marks a release; tags drive the CI build workflow.
-          publish-script: npx changeset tag
+          publish-script: npx changeset git-tag
           push-git-tags: true
           commit-message: 'chore: version packages'
           pr-title: 'chore: version packages'
