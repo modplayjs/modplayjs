@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/out-webaudio",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "WebAudio output for the modplayjs tracker player (AudioWorklet based).",
   "type": "module",
   "main": "dist/index.js",
@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.0.1"
+    "@modplayjs/core": "^0.1.0"
   },
   "keywords": [
     "tracker",
