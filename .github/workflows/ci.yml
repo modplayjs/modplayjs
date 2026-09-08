@@ -42,8 +42,22 @@ jobs:
             head="HEAD"
           fi
 
-          # Workspace package dirs (packages/*) + the root manifests.
-          changed=$(git diff --name-only "$base" "$head" | grep -E '^(packages/[^/]+/|package(-lock)?\.json$|tsconfig)' | cut -d/ -f2 | sort -u | tr '\n' ' ' || true)
+          # Root-level manifest/tsconfig changes affect every package — set
+          # the sentinel 'ALL' instead of leaking filenames
+          # ('package-lock.json' etc.) into the package matrix.
+          if git diff --name-only "$base" "$head" | grep -Eq '^(package(-lock)?\.json$|tsconfig)'; then
+            changed="ALL"
+          else
+            changed=$(git diff --name-only "$base" "$head" | grep -E '^packages/[^/]+/' | cut -d/ -f2 | sort -u | tr '\n' ' ' || true)
+          fi
+
+          if [ "$changed" = "ALL" ]; then
+            # Root manifest/tsconfig change → build everything.
+            echo "packages=$(printf '%s\n' $(ls -d packages/*/ | xargs -n1 basename) | python3 -c "import json, sys; print(json.dumps(sorted(set(sys.stdin.read().split()))))")" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Root-level manifest change; building all packages."
+            exit 0
+          fi
 
           if [ -z "$changed" ]; then
             echo "packages=[]" >> "$GITHUB_OUTPUT"
