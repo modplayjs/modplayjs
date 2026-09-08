@@ -104,3 +104,52 @@ working tree is pristine first (`git -C reference/libxmp status`);
 session-2 left behavioral C edits whose output differs from the
 pristine checkout.
 
+
+## Session: uTorrent IT + stereo samples (2026-09-08)
+
+### Stereo-sample mixing (FIXED)
+`dsp-softmixer` treated every sample as mono-source: `kernel(data, pos)`
+read one value and fed it to both L and R gains. C selects a
+`stereoout_stereo_*` mixer when `XMP_SAMPLE_STEREO` is set (mixer.c:894,
+mix_all.c LIST_MIX_FUNCTIONS): `VAR_STEREO` sets `chn = 2`, L reads
+`sptr[pos]`, R reads `sptr[pos + 1]`, interpolation strides by `chn`
+(`LINEAR_8BIT`: `sptr[pos + chn]`; `SPLINE_8BIT`: taps at `pos ± chn`),
+and `UPDATE_POS` advances `pos` by `(frac >> 16) * chn` in C's
+sample-unit space. Port: kernels now take `(frameIdx, frac, chn, off)`;
+`posInt` stays in frames; R gets its own filter history
+(`VAR_FILTER_STEREO` / `SAVE_FILTER_STEREO`).
+Verified: stereo.xm L/R now correlate with the C render (previously R was
+a copy of L); golden mixer-data suite unchanged (100 pass / 5 fail).
+`reference` renders for stereo.xm: ours L=0.097 R=0.005 (was L only).
+
+### Pavel Kocourek - uTorrent Plus 3.4 crk.it (characterized, open)
+Parity state via /tmp/genmixer (gen_mixer_data.c): 96045 state lines,
+629 mismatches (0.65%). All mismatches are channel 0 around IT keyoff
+(row 13) + note retrig with IT volume-column slide (row 14, vol byte 49,
+raw vol col A... actually `fxa/c` = F_VSLIDE arm): our first active frame
+after the retrig holds vol 928 where C reports 797, then our slide
+catches up with bigger steps (736, 144...). First pass through the same
+pattern matches exactly, so it is state carry across the keyoff →
+retrig boundary: our `resetEnv`/`fadeout`/`v_idx` handling after
+XMP_KEY_OFF differs from C read_event.c:1282-1291 (`reset_env` resets
+NOTE_ENV_RELEASE|SUSEXIT|FADEOUT + fadeout=0x10000). The volslide-on-
+retrig frame-0 application also differs (C slides already at the first
+active frame). Suspect list: xc.v_idx not reset by reset_envelopes path
+for same-ins retrig after keyoff, and VOL_SLIDE_2 memory (vol.memory2)
+carrying the pre-keyoff slide.
+
+AIF question: neither modplayjs nor libxmp decodes AIFF/8SVX sample
+files; IT/S3M/XM store PCM internally (delta/IT214/IT215 compression,
+all ported). `grep -ri 'aif'` hits in apps/demo are base64 WAV blobs in
+stb-vorbis dist files — false positives. No AIFF support exists or is
+needed for this file; its samples are ordinary IT PCM.
+
+### storlek_11.it (scan num=0 end handling, open)
+`scan[0].num` wraps to 0 (by design, scan.c:288-293) for the Schism
+"infinite loop exploit". C then plays the loop indefinitely (≥1000s,
+verified via xmpref uncapped); our player stops instantly
+(`playBuffer` → -1, scan time 0). Our scanModule returns the right
+row/ord but `time` computes 0, and playback treats `num=0` as "already
+ended". Needs: C's end-of-playback check (`player.c` / `scan.c`
+`get_scan` num semantics) — num=0 with an overflowing scan_cnt is not
+the same as "empty song". No golden fixture exists for this file.
