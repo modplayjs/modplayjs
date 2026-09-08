@@ -621,3 +621,5 @@ export class SoftMixer implements DspPlugin {
 export function createSoftMixerPlugin(): DspPlugin {
   return new SoftMixer();
 }
+
+// CI matrix end-to-end check
