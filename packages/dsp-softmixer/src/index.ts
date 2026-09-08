@@ -195,13 +195,19 @@ export class SoftMixer implements DspPlugin {
           !(vi.filter.cutoff >= 0xfe && vi.filter.resonance === 0) &&
           (vi.filter.a0 !== 0 || vi.filter.b0 !== 0 || vi.filter.b1 !== 0);
         // Filter state (C keeps l1/l2/fl and r1/r2/fr per voice across
-        // chunks; SAVE_FILTER_* at chunk end — our mono-source path matches
-        // C's stereoout-mono filtered mixers, which use only the L state).
+        // chunks; SAVE_FILTER_* at chunk end).
         // PREAMP_BITS = 15 (mix_all.c:102); FILTER_SHIFT = 22 (mixer.h:12).
         let fl1 = 0, fl2 = 0;
         if (useFilter) {
           fl1 = vi.filter.l1;
           fl2 = vi.filter.l2;
+        }
+        // VAR_FILTER_STEREO (mix_all.c:226-230): R channel filter history,
+        // persisted per voice across chunks (SAVE_FILTER_STEREO).
+        let fr1 = 0, fr2 = 0;
+        if (useFilter) {
+          fr1 = vi.filter.r1;
+          fr2 = vi.filter.r2;
         }
         const sampleScale = (xxs.flags & SampleFlags.BITS16) !== 0 ? 32768 : 128;
 
@@ -272,14 +278,21 @@ export class SoftMixer implements DspPlugin {
             // C LOOP_AC / LOOP split (mix_all.c:90,92): within a chunk the
             // ramped macro runs for `ramp` frames and the plain macro for
             // the rest; the level starts at old_vl and steps delta per
-            // frame — it never runs past the ramp budget (that would keep
-            // multiplying delta by the frame index and blow the gain up).
+            // frame — it never runs past the ramp budget.
+            // Source channel count (VAR_MONO/VAR_STEREO, mix_all.c:185-192):
+            // stereo sources read interleaved L/R pairs; pos advances ×chn.
+            const isStereoSrc = (xxs.flags & SampleFlags.STEREO) !== 0;
+            const srcChn = isStereoSrc ? 2 : 1;
             const rampFrames = Math.min(samples, rampLeft);
             for (let n = 0; n < samples; n++) {
               const idx = chunkPos + n * 2;
-              let lSmp = kernel(xxs.data, posInt, frac);
-              const gainL = n < rampFrames ? oldVlF + lRampF * (rampDone + n) : lVolF;
-              const gainR = n < rampFrames ? oldVrF + rRampF * (rampDone + n) : rVolF;
+              // Kernels take the FRAME index; stride = source channels
+              // (LINEAR_8BIT/16BIT interp between pos and pos+chn,
+              // mix_all.c:48-58; SPLINE taps at ±chn, :74-88).
+              let lSmp = kernel(xxs.data, posInt, frac, srcChn);
+              let rSmp = isStereoSrc
+                ? kernel(xxs.data, posInt, frac, srcChn, 1)
+                : lSmp;
               if (useFilter) {
                 // FILTER_LEFT (mix_all.c:219-227) in the C integer domain:
                 // smp_in is the interpolated sample in native sample units
@@ -299,23 +312,43 @@ export class SoftMixer implements DspPlugin {
                 fl2 = fl1;
                 fl1 = sl;
                 lSmp = sl / 32768 / sampleScale;
+                // FILTER_RIGHT (mix_all.c:229-235): R has its own
+                // fr1/fr2 history (VAR_FILTER_STEREO).
+                if (isStereoSrc) {
+                  let rSmpC = Math.round(rSmp * sampleScale);
+                  let sr64 =
+                    (vi.filter.a0 * (rSmpC * 32768) + vi.filter.b0 * fr1 +
+                      vi.filter.b1 * fr2) / (1 << 22);
+                  let sr = sr64;
+                  if (sr < FILTER_MIN) sr = FILTER_MIN;
+                  else if (sr > FILTER_MAX) sr = FILTER_MAX;
+                  sr = Math.trunc(sr);
+                  fr2 = fr1;
+                  fr1 = sr;
+                  rSmp = sr / 32768 / sampleScale;
+                }
               }
-              // stereo output (always interleaved stereo here).
+              // MIX_STEREO (mix_all.c:147-151): L gain × L sample, R gain
+              const gainL = n < rampFrames ? oldVlF + lRampF * (rampDone + n) : lVolF;
+              const gainR = n < rampFrames ? oldVrF + rRampF * (rampDone + n) : rVolF;
               out[idx] = (out[idx] ?? 0) + lSmp * gainL;
-              out[idx + 1] = (out[idx + 1] ?? 0) + lSmp * gainR;
-              // UPDATE_POS (mix_all.c:94-98): frac += step; pos += frac>>16;
-              // frac &= SMIX_MASK. Chunk-local integer accumulation.
+              out[idx + 1] = (out[idx + 1] ?? 0) + rSmp * gainR;
+              // UPDATE_POS (mix_all.c:94-98): C's loop pos is in SAMPLE
+              // units (VAR_NORM pre-multiplies by chn once at entry) and
+              // advances (frac>>16)*chn. Ours stays in FRAMES — the
+              // kernels take the frame index and stride by chn internally.
               frac += stepFixed;
               posInt += frac >> SMIX_SHIFT;
               frac &= SMIX_MASK;
             }
             if (useFilter) {
-              // SAVE_FILTER_MONO (mix_all.c:232-238): persist L state;
-              // C copies fl1/fl2 into r1/r2 "just in case" for mono sources.
+              // SAVE_FILTER_STEREO/SAVE_FILTER_MONO (mix_all.c:232-245):
+              // stereo sources persist separate R history; mono copies
+              // fl1/fl2 into r1/r2 "just in case".
               vi.filter.l1 = fl1;
               vi.filter.l2 = fl2;
-              vi.filter.r1 = fl1;
-              vi.filter.r2 = fl2;
+              vi.filter.r1 = isStereoSrc ? fr1 : fl1;
+              vi.filter.r2 = isStereoSrc ? fr2 : fl2;
             }
             // Commit back to the double pos (mixer.c:703): pos += step_dir
             // × samples. The int/frac pair is discarded here.

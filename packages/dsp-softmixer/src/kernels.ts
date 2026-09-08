@@ -27,16 +27,30 @@ export type KernelName = 'nearest' | 'linear' | 'spline';
 
 /**
  * NEAREST_8BIT/16BIT (mix_all.c:40-46): truncate frac.
- * pos is the integer sample index, frac is the 16-bit fractional part (0..0xFFFF).
+ * pos is the integer FRAME index; chn = source channels (1 mono, 2 stereo);
+ * off = intra-frame channel offset (0 = L, 1 = R). frac is 16-bit (0..0xFFFF).
  */
-export function nearest(data: Float32Array, pos: number, _frac: number): number {
-  return data[pos] ?? 0;
+export function nearest(
+  data: Float32Array,
+  pos: number,
+  _frac: number,
+  chn = 1,
+  off = 0,
+): number {
+  return data[pos * chn + off] ?? 0;
 }
 
 /** LINEAR_* (mix_all.c:48-58): l1 + (frac>>1)*dt >> (SMIX_SHIFT-1). */
-export function linear(data: Float32Array, pos: number, frac: number): number {
-  const s1 = data[pos] ?? 0;
-  const s2 = data[pos + 1] ?? 0;
+export function linear(
+  data: Float32Array,
+  pos: number,
+  frac: number,
+  chn = 1,
+  off = 0,
+): number {
+  const p = pos * chn + off;
+  const s1 = data[p] ?? 0;
+  const s2 = data[p + chn] ?? 0;
   // C: smp_in = l1 + ((frac >> 1) * dt) >> (SMIX_SHIFT - 1) — the frac
   // weighting is frac/65536, so the interpolated value in the float domain
   // is s1 + (s2 - s1) * (frac / 65536).
@@ -50,20 +64,32 @@ const SPLINE_FRACBITS = 10;
 const SPLINE_FRACSHIFT = (SMIX_SHIFT - SPLINE_FRACBITS) - 2;
 
 /** SPLINE_8BIT/16BIT (:74-88): 4-point precomputed cubic spline. */
-export function spline(data: Float32Array, pos: number, frac: number): number {
+export function spline(
+  data: Float32Array,
+  pos: number,
+  frac: number,
+  chn = 1,
+  off = 0,
+): number {
   // C: fIdx = frac >> SPLINE_FRACSHIFT; f = (fIdx & mask) >> 2
   const fIdx = frac >> SPLINE_FRACSHIFT;
   const f = (fIdx & (((1 << (SMIX_SHIFT - SPLINE_FRACSHIFT)) - 1) & ~3)) >> 2;
+  // Taps: pos-chn, pos, pos+chn, pos+2·chn plus the intra-frame channel
+  // offset (SPLINE_8BIT/16BIT sptr[pos + off ± chn]).
+  const p = pos * chn + off;
   // Normalize LUT output back to float domain: LUT sums to 1<<SPLINE_SHIFT.
   return (
-    cubic_spline_lut0[f]! * (data[pos - 1] ?? 0) +
-    cubic_spline_lut1[f]! * (data[pos] ?? 0) +
-    cubic_spline_lut2[f]! * (data[pos + 1] ?? 0) +
-    cubic_spline_lut3[f]! * (data[pos + 2] ?? 0)
+    cubic_spline_lut0[f]! * (data[p - chn] ?? 0) +
+    cubic_spline_lut1[f]! * (data[p] ?? 0) +
+    cubic_spline_lut2[f]! * (data[p + chn] ?? 0) +
+    cubic_spline_lut3[f]! * (data[p + chn * 2] ?? 0)
   ) / (1 << SPLINE_SHIFT);
 }
 
-export const KERNELS: Record<KernelName, (data: Float32Array, pos: number, frac: number) => number> = {
+export const KERNELS: Record<
+  KernelName,
+  (data: Float32Array, pos: number, frac: number, chn?: number, off?: number) => number
+> = {
   nearest,
   linear,
   spline,
