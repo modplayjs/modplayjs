@@ -1,0 +1,52 @@
+name: Release
+
+# Changesets automation: on every push to main the action consumes pending
+# changesets — if any exist it opens/updates a "Version Packages" PR; when
+# that PR is merged (i.e. a push contains no pending changesets but versions
+# changed), it tags the released packages and pushes the tags.
+#
+# Packages are `private: true` (no npm publish), so there is no publish
+# script — only versioning, per-package CHANGELOG.md files, and git tags.
+
+on:
+  push:
+    branches: ['main']
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Version packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: latest
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Version packages (or open the Version Packages PR)
+        uses: changesets/action@v2
+        with:
+          # No publish: the workspace packages are private. Tagging is what
+          # marks a release; tags drive the CI build workflow.
+          publish-script: npx changeset tag
+          push-git-tags: true
+          commit-message: 'chore: version packages'
+          pr-title: 'chore: version packages'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
