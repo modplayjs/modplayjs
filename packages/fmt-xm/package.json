@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "@modplayjs/core": "^0.0.1",
-    "@modplayjs/fmt-it": "^0.0.1"
+    "@modplayjs/fmt-it": "^0.0.1",
+    "stb-vorbis": "^0.0.6"
   },
   "keywords": [
     "tracker",
