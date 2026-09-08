@@ -10,8 +10,8 @@ import type {
   Event,
   Instrument,
   SubInstrument,
-} from '@modplayjs/core';
-import { FX, Quirk, XMP_KEY_OFF } from '@modplayjs/core';
+} from '../index.js';
+import { FX, Quirk, XMP_KEY_OFF } from '../index.js';
 import {
   MSN,
   RESET_NOTE,

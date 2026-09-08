@@ -7,8 +7,8 @@
 // libxmp_reset_flow (player.c:1903-1930). These operate on the FlowState in
 // model/model.ts, which mirrors struct flow_control.
 
-import { FlowFlag, Quirk } from './model/constants';
-import type { ModuleData, FlowState } from './model/model';
+import { FlowFlag, Quirk } from './model/constants.js';
+import type { ModuleData, FlowState } from './model/model.js';
 
 /** Reset flow vars; player.c:1903-1930. */
 export function resetFlow(f: FlowState): void {

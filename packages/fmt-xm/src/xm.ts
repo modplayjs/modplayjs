@@ -50,7 +50,7 @@ import {
   FX_XF_PORTA,
 } from '@modplayjs/core';
 import { EX_F_VSLIDE_DN, EX_F_VSLIDE_UP } from '@modplayjs/core';
-import { LSN, MSN, readEventFt2, TEST_NOTE, NoteFlag, SET_NOTE } from '@modplayjs/effects-shared';
+import { LSN, MSN, readEventFt2, TEST_NOTE, NoteFlag, SET_NOTE } from '@modplayjs/core';
 import { applyMptPreamp } from '@modplayjs/fmt-it';
 import { StbVorbis } from 'stb-vorbis';
 

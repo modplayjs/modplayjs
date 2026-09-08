@@ -14,7 +14,7 @@ import {
   cubic_spline_lut1,
   cubic_spline_lut2,
   cubic_spline_lut3,
-} from './lut';
+} from './lut.js';
 
 export const SMIX_SHIFT = 16;
 export const SMIX_MASK = 0xffff;

@@ -13,8 +13,8 @@
 // In the TS port a sample "has data" iff its stored id decodes to a
 // non-empty sample buffer (SampleStore.get(id).length > 0).
 
-import type { Core } from '@modplayjs/core';
-import { EnvelopeFlags, FX, type ChannelState, type Instrument, type SubInstrument } from '@modplayjs/core';
+import type { Core } from '../index.js';
+import { EnvelopeFlags, FX, type ChannelState, type Instrument, type SubInstrument } from '../index.js';
 import {
   SET,
   RESET_NOTE,
@@ -23,7 +23,7 @@ import {
   MSN,
   LSN,
 } from './helpers.js';
-import { Quirk } from '@modplayjs/core';
+import { Quirk } from '../index.js';
 import { VolSlideFlag } from './state.js';
 
 /** IS_VALID_INSTRUMENT(x) (player.h:79). */

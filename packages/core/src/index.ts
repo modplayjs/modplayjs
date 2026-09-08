@@ -15,7 +15,7 @@ export type {
   DspPlugin,
   OutputPlugin,
   ExportPlugin,
-} from './types/index';
+} from './types/index.js';
 
 export {
   // enums / constants (T3)
@@ -46,7 +46,7 @@ export {
   Interp,
   PluginKind,
   NoteFlag,
-} from './model/constants';
+} from './model/constants.js';
 
 export {
   // all FX constants
@@ -69,25 +69,28 @@ export {
   FX_PANSL_NOMEM, FX_VSLIDE_UP_2, FX_VSLIDE_DN_2, FX_F_VSLIDE_UP_2,
   FX_F_VSLIDE_DN_2, FX_OKT_ARP3, FX_OKT_ARP4, FX_OKT_ARP5,
   FX_NSLIDE_DN, FX_NSLIDE_UP, FX_F_NSLIDE_DN, FX_F_NSLIDE_UP,
-} from './model/fx';
+} from './model/fx.js';
 
-import * as FX from './model/fx';
+import * as FX from './model/fx.js';
 export { FX };
 
 // Data-model types + model constants (T3)
-export * from './model/model';
+export * from './model/model.js';
 
 // Core implementation (T4-T8)
-export { ModplayError, UnknownFormatError, ParseError, PackedModuleError, StateError, PluginNotFoundError, SampleError } from './errors';
-export { VirtualLayer, PastNote, VIRT_INVALID, keyInstruments } from './virtual';
-export { SampleStore, DecodeFlag, adpcm4Decode } from './samples';
-export { Registries } from './registry';
+export { ModplayError, UnknownFormatError, ParseError, PackedModuleError, StateError, PluginNotFoundError, SampleError } from './errors.js';
+export { VirtualLayer, PastNote, VIRT_INVALID, keyInstruments } from './virtual.js';
+export { SampleStore, DecodeFlag, adpcm4Decode } from './samples.js';
+export { Registries } from './registry.js';
 export {
   Scanner,
   applyScanToModule,
   type ScanResult,
   type ScanData,
   type OrdInfo,
-} from './scan';
-export { resetFlow, processPatternLoop, processPatternJump, processPatternBreak, processLineJump } from './flow';
-export { Core as CorePlayer } from './core';
+} from './scan.js';
+export { resetFlow, processPatternLoop, processPatternJump, processPatternBreak, processLineJump } from './flow.js';
+export { Core as CorePlayer } from './core.js';
+// Effects processor (formerly @modplayjs/effects-shared; the package is now
+// a re-export shim of this module).
+export * from './effects/index.js';

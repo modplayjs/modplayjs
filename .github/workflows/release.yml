@@ -3,10 +3,11 @@ name: Release
 # Changesets automation: on every push to main the action consumes pending
 # changesets — if any exist it opens/updates a "Version Packages" PR; when
 # that PR is merged (i.e. a push contains no pending changesets but versions
-# changed), it tags the released packages and pushes the tags.
+# changed), it publishes the packages to npm, creates git tags and pushes
+# them.
 #
-# Packages are `private: true` (no npm publish), so there is no publish
-# script — only versioning, per-package CHANGELOG.md files, and git tags.
+# Publish runs `changeset publish` (npm) with NPM_TOKEN + trusted-publishing
+# provenance; `changeset git-tag` tags every released package version.
 
 on:
   push:
@@ -20,10 +21,11 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 jobs:
   release:
-    name: Version packages
+    name: Version and publish packages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,18 +37,24 @@ jobs:
           node-version: latest
           cache: 'npm'
           cache-dependency-path: package-lock.json
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Version packages (or open the Version Packages PR)
+      - name: Build packages
+        run: npx turbo run build
+
+      - name: Version and publish packages
         uses: changesets/action@v2
         with:
-          # No publish: the workspace packages are private. Tagging is what
-          # marks a release; tags drive the CI build workflow.
-          publish-script: npx changeset git-tag
+          publish-script: npx changeset publish
           push-git-tags: true
+          create-github-releases: true
           commit-message: 'chore: version packages'
           pr-title: 'chore: version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true

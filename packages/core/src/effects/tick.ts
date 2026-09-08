@@ -10,8 +10,8 @@
 // (:932-957). The core calls processTick once per channel per frame, from
 // play_frame (player.c:2166 play_channel(ctx, i)).
 
-import type { Core, ChannelState, Envelope, Instrument, SampleData } from '@modplayjs/core';
-import { Act, PastNote } from '@modplayjs/core';
+import type { Core, ChannelState, Envelope, Instrument, SampleData } from '../index.js';
+import { Act, PastNote } from '../index.js';
 import {
   Quirk,
   ReadEventType,
@@ -19,7 +19,7 @@ import {
   EnvelopeFlags,
   SampleFlags,
   RowDelay,
-} from '@modplayjs/core';
+} from '../index.js';
 import {
   RESET,
   TEST,

@@ -6,8 +6,8 @@
 // reset_envelope_volume, reset_envelopes_carry, copy_channel, check_fadeout,
 // check_invalid_sample, fix_period, is_same_sid.
 
-import type { ChannelState, Core, Event, SubInstrument } from '@modplayjs/core';
-import { Quirk } from '@modplayjs/core';
+import type { ChannelState, Core, Event, SubInstrument } from '../index.js';
+import { Quirk } from '../index.js';
 import {
   RESET_NOTE,
   SET,

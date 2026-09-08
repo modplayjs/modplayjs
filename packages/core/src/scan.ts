@@ -16,15 +16,15 @@
 // FX_PATT_DELAY (OctaMED accumulate), FX_GLOBALVOL, FX_GVOL_SLIDE
 // (FINEFX/VSALL/gvol_memory).
 
-import { FlowFlag, Quirk } from './model/constants';
-import type { ModuleData, FlowState, Event } from './model/model';
-import * as FX from './model/fx';
+import { FlowFlag, Quirk } from './model/constants.js';
+import type { ModuleData, FlowState, Event } from './model/model.js';
+import * as FX from './model/fx.js';
 import {
   processPatternLoop,
   processPatternJump,
   processPatternBreak,
   processLineJump,
-} from './flow';
+} from './flow.js';
 
 const XMP_MARK_END = 0xff;
 const XMP_MIN_BPM = 0x20;

@@ -11,8 +11,8 @@ import type {
   DspPlugin,
   OutputPlugin,
   ExportPlugin,
-} from './types/index';
-import { PluginNotFoundError } from './errors';
+} from './types/index.js';
+import { PluginNotFoundError } from './errors.js';
 
 export class Registries {
   private formats = new Map<string, FormatPlugin>();

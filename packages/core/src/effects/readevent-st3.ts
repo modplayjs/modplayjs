@@ -3,8 +3,8 @@
 // Ported from: libxmp src/read_event.c (READ_EVENT_ST3).
 // read_event_st3 (reference/libxmp/src/read_event.c:736-933).
 
-import type { ChannelState, Core, Event, SubInstrument } from '@modplayjs/core';
-import { Quirk } from '@modplayjs/core';
+import type { ChannelState, Core, Event, SubInstrument } from '../index.js';
+import { Quirk } from '../index.js';
 import { RESET_NOTE, SET, SET_NOTE, TEST, isValidNote } from './helpers.js';
 import { NoteFlag, VolSlideFlag } from './state.js';
 import {

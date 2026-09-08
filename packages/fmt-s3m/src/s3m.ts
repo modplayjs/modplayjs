@@ -41,7 +41,7 @@ import {
   TEST_NOTE,
   NoteFlag,
   readEventSt3,
-} from '@modplayjs/effects-shared';
+} from '@modplayjs/core';
 import { FX, EX_GLISS, EX_VIBRATO_WF, EX_FINETUNE, EX_PATTERN_LOOP, EX_TREMOLO_WF } from '@modplayjs/core';
 
 // ---------------------------------------------------------------------------

@@ -40,7 +40,7 @@ import {
   setChannelVolume,
   setEffectDefaults,
   setPeriod,
-} from '@modplayjs/effects-shared';
+} from '@modplayjs/core';
 
 // IS_TONEPORTA/IS_SFX_PITCH/IS_MOD_RETRIG + set_patch moved to
 // effects-shared (read_event.c is shared player code, needed by fmt-s3m
@@ -50,7 +50,7 @@ export {
   isSfxPitch,
   isModRetrig,
   setPatch,
-} from '@modplayjs/effects-shared';
+} from '@modplayjs/core';
 
 /**
  * libxmp_read_event (read_event.c:1624-1664): old_ins update + NOTE_END
@@ -86,9 +86,9 @@ export function readEventDispatch(core: Core, chn: number, row: number): void {
   }
 }
 
-export { readEventFt2 } from '@modplayjs/effects-shared';
-import { readEventFt2 } from '@modplayjs/effects-shared';
-import { readEventSt3 } from '@modplayjs/effects-shared';
+export { readEventFt2 } from '@modplayjs/core';
+import { readEventFt2 } from '@modplayjs/core';
+import { readEventSt3 } from '@modplayjs/core';
 /**
  * read_event_mod (read_event.c:267-475).
  */

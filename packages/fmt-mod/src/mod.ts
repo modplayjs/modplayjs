@@ -25,7 +25,7 @@ import {
   type SubInstrument,
 } from '@modplayjs/core';
 import { SampleFlags } from '@modplayjs/core';
-import { LSN, MSN, PERIOD_BASE } from '@modplayjs/effects-shared';
+import { LSN, MSN, PERIOD_BASE } from '@modplayjs/core';
 import { ParseError } from '@modplayjs/core';
 import {
   MOD_MAGIC,

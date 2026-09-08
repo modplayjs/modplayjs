@@ -5,9 +5,9 @@
 // Direct port of reference/libxmp/src/lfo.c (LFO) and parts of
 // player.c/effects.c that operate on ChannelState between rows/ticks.
 
-import type { Core } from '@modplayjs/core';
-import { Quirk, PeriodType } from '@modplayjs/core';
-import type { ChannelState } from '@modplayjs/core';
+import type { Core } from '../index.js';
+import { Quirk, PeriodType } from '../index.js';
+import type { ChannelState } from '../index.js';
 
 /** WAVEFORM_SIZE (lfo.c:26). */
 export const WAVEFORM_SIZE = 64;

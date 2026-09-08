@@ -12,7 +12,7 @@ import {
   type VoiceState,
   type ChannelState,
   type Instrument,
-} from './model/model';
+} from './model/model.js';
 
 /** PERIOD_BASE (period.h:6) — C0 period for note_to_period_mix. */
 const PERIOD_BASE = 13696.0;

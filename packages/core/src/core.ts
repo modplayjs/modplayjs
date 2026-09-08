@@ -14,8 +14,8 @@
 // bpm / 1000), truncated, min 1<<ANTICLICK_SHIFT = 8 (mixer.h:13).
 // time_factor=10 (DEFAULT_TIME_FACTOR), rrate=250 (PAL_RATE).
 
-import { CoreState, FlowFlag, Quirk } from './model/constants';
-import { ChannelFlags, XMP_KEY_OFF } from './model/model';
+import { CoreState, FlowFlag, Quirk } from './model/constants.js';
+import { ChannelFlags, XMP_KEY_OFF } from './model/model.js';
 
 import {
   RowDelay,
@@ -29,8 +29,8 @@ import {
   type VoiceState,
   type SampleData,
   type SampleMeta,
-} from './model/model';
-import * as FX from './model/fx';
+} from './model/model.js';
+import * as FX from './model/fx.js';
 import type {
   Core as CoreIface,
   CoreConfig,
@@ -38,22 +38,22 @@ import type {
   DspPlugin,
   OutputPlugin,
   LoadCtx,
-} from './types/index';
+} from './types/index.js';
 import {
   ModplayError,
   StateError,
-} from './errors';
-import { Registries } from './registry';
-import { VirtualLayer, keyInstruments } from './virtual';
-import { SampleStore } from './samples';
-import { Scanner, OrdInfo } from './scan';
-import { resetFlow, processPatternLoop, processPatternJump, processPatternBreak } from './flow';
+} from './errors.js';
+import { Registries } from './registry.js';
+import { VirtualLayer, keyInstruments } from './virtual.js';
+import { SampleStore } from './samples.js';
+import { Scanner, OrdInfo } from './scan.js';
+import { resetFlow, processPatternLoop, processPatternJump, processPatternBreak } from './flow.js';
 import {
   processTick,
   VolSlideFlag,
   TREMOR_FLAG,
   RESET,
-} from '@modplayjs/effects-shared';
+} from './effects/index.js';
 
 const MSN = (v: number) => (v >> 4) & 0x0f;
 const LSN = (v: number) => v & 0x0f;

@@ -6,8 +6,8 @@
 // update_midi_macro. Update is hooked into the per-tick channel stage
 // (player.c:1627) BEFORE the voice-state check.
 
-import type { ChannelState, Core } from '@modplayjs/core';
-import { VoiceFlag, Quirk } from '@modplayjs/core';
+import type { ChannelState, Core } from '../index.js';
+import { VoiceFlag, Quirk } from '../index.js';
 import { TEST, hasQuirk } from './helpers.js';
 import { VolSlideFlag } from './state.js';
 

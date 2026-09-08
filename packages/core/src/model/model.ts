@@ -7,9 +7,9 @@
 //
 // Types only — no logic.
 
-import type { CoreState, Quirks, ReadEventType, PeriodType, FlowMode, Interp } from './constants';
+import type { CoreState, Quirks, ReadEventType, PeriodType, FlowMode, Interp } from './constants.js';
 
-export { NoteFlag } from './constants';
+export { NoteFlag } from './constants.js';
 // ---------------------------------------------------------------------------
 // Module data (parsed, static)
 // ---------------------------------------------------------------------------

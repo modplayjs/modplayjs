@@ -8,8 +8,8 @@
 // waveforms). Flow-relevant subops route into fxts.ts via callbacks supplied
 // by the format readers.
 
-import type { Core, ChannelState, Event } from '@modplayjs/core';
-import { Quirk, ReadEventType } from '@modplayjs/core';
+import type { Core, ChannelState, Event } from '../index.js';
+import { Quirk, ReadEventType } from '../index.js';
 import {
   MSN,
   LSN,

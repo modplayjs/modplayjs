@@ -6,7 +6,17 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "dist",
-    "composite": false
+    "rootDir": "src",
+    "composite": false,
+    "skipLibCheck": true,
+    "paths": {
+      "@modplayjs/core": [
+        "packages/core/dist/index.d.ts"
+      ],
+      "@modplayjs/fmt-it": [
+        "packages/fmt-it/dist/index.d.ts"
+      ]
+    }
   },
   "include": [
     "src/**/*.ts"

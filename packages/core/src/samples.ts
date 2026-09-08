@@ -9,8 +9,8 @@
 // sample by ID and re-resolve the array on EVERY read, so swapSample can
 // replace data underneath playing voices without restarts.
 
-import { SampleFlags, XMP_KEY_FADE, type RawSample, type SampleData, type SampleMeta } from './model/model';
-import { SampleError } from './errors';
+import { SampleFlags, XMP_KEY_FADE, type RawSample, type SampleData, type SampleMeta } from './model/model.js';
+import { SampleError } from './errors.js';
 
 /** Same sanity limit as libxmp MAX_SAMPLE_SIZE (common.h). */
 const MAX_SAMPLE_SIZE = 0x10000000;

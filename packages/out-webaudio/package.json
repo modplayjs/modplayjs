@@ -1,7 +1,7 @@
 {
   "name": "@modplayjs/out-webaudio",
   "version": "0.0.1",
-  "private": true,
+  "description": "WebAudio output for the modplayjs tracker player (AudioWorklet based).",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,12 +11,37 @@
       "import": "./dist/index.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "*"
+    "@modplayjs/core": "^0.0.1"
   },
+  "keywords": [
+    "tracker",
+    "mod",
+    "s3m",
+    "xm",
+    "it",
+    "libxmp",
+    "chiptune",
+    "audio",
+    "music"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/modplayjs/modplayjs.git",
+    "directory": "packages/out-webaudio"
+  },
+  "bugs": "https://github.com/modplayjs/modplayjs/issues",
+  "homepage": "https://github.com/modplayjs/modplayjs#readme",
   "license": "BSD-3-Clause"
 }

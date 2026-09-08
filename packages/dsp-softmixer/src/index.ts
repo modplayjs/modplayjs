@@ -31,7 +31,7 @@ import {
   type SampleData,
   type ChannelState,
 } from '@modplayjs/core';
-import { KERNELS, C4_PERIOD, SMIX_SHIFT, SMIX_MASK, type KernelName } from './kernels';
+import { KERNELS, C4_PERIOD, SMIX_SHIFT, SMIX_MASK, type KernelName } from './kernels.js';
 
 /** mixer.c:36 DOWNMIX_SHIFT — float model keeps relative amplitude parity. */
 const SHRT_MAX = 0x7fff;

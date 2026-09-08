@@ -16,7 +16,7 @@
 // Sanity check: 44100 Hz, bpm 125 → 882 samples/tick (20 ms).
 // Source: libxmp_mixer_get_ticksize (mixer.c:426-446).
 
-import type { CoreState, Quirks } from '../model/constants';
+import type { CoreState, Quirks } from '../model/constants.js';
 import type {
   CoreContext,
   ModuleData,
@@ -27,8 +27,8 @@ import type {
   VoiceState,
   RawSample,
   PlayStateView,
-} from '../model/model';
-import type { VirtualLayer } from '../virtual';
+} from '../model/model.js';
+import type { VirtualLayer } from '../virtual.js';
 
 // ---------------------------------------------------------------------------
 // Core interface (implemented by class Core in T4)

@@ -6,8 +6,8 @@
 // call exactly one function, like libxmp does; volume/pan/flow arms route
 // through the vfx/fxts modules (T13) which share this signature set.
 
-import type { Core, ChannelState, Event } from '@modplayjs/core';
-import { FX, Quirk, PlayerFlag, FlowFlag, PastNote, VoiceFlag } from '@modplayjs/core';
+import type { Core, ChannelState, Event } from '../index.js';
+import { FX, Quirk, PlayerFlag, FlowFlag, PastNote, VoiceFlag } from '../index.js';
 import {
   MSN,
   LSN,

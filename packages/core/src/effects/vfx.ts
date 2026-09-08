@@ -6,8 +6,8 @@
 // started in fx.ts (T12): FX_VOLSLIDE family, tremor, retrig, pan, gvol,
 // flow jumps and tempo.
 
-import type { Core, ChannelState } from '@modplayjs/core';
-import { Quirk, FLOW_MODE_ORPHEUS } from '@modplayjs/core';
+import type { Core, ChannelState } from '../index.js';
+import { Quirk, FLOW_MODE_ORPHEUS } from '../index.js';
 import { MSN, LSN, SET, hasQuirk, effectMemoryS3m, NOTE_CUT } from './helpers.js';
 import { VolSlideFlag } from './state.js';
 

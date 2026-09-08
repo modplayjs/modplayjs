@@ -6,8 +6,8 @@
 export { modTest, modLoad } from './mod.js';
 export { readEventDispatch as readEvent } from './readevent.js';
 export { readEventMod, isToneportaFx, isSfxPitch, isModRetrig, setPatch } from './readevent.js';
-export { readEventFt2 } from '@modplayjs/effects-shared';
-export { readEventSt3 } from '@modplayjs/effects-shared';
+export { readEventFt2 } from '@modplayjs/core';
+export { readEventSt3 } from '@modplayjs/core';
 
 import type { Core, FormatPlugin } from '@modplayjs/core';
 import { modLoad, modTest } from './mod.js';

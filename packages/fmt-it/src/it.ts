@@ -52,7 +52,7 @@ import {
   XMP_KEY_FADE,
   XMP_KEY_OFF,
 } from '@modplayjs/core';
-import { SET_NOTE, TEST_NOTE, NoteFlag, readEventIt } from '@modplayjs/effects-shared';
+import { SET_NOTE, TEST_NOTE, NoteFlag, readEventIt } from '@modplayjs/core';
 import { itsexDecompress8, itsexDecompress16, TEMP_BUFFER_LEN } from './itsex.js';
 
 // ---------------------------------------------------------------------------
