@@ -60,3 +60,43 @@ portamento_sustain (15.1s):
 - Everything measured, nothing inferred: corr/bad numbers from
   `/tmp/{ours,xmp,ompt}-<fixture>.wav` renders, state numbers from
   `tools/compare-mixer-data.mjs`.
+
+## Update (latest upstream pull + clean check)
+
+The libxmp tree was pulled to the latest upstream and the reference lib
+rebuilt. Fresh goldens, fresh C dumps, fresh OpenMPT renders — all
+four remaining fixtures re-measured:
+
+| Fixture | golden lines | ours | state diffs (row-keyed, vs fresh C) | audio corr ours~libxmp |
+|---|---|---|---|---|
+| `it_multi_retrigger.it` | 366 | 366 | 7 (vol ±16, retrig ramp tail) | 0.9861 |
+| `portamento_nna_sample.it` | 540 | 876 | 30 (tail pitch/stale note) + 336 ours-only rows (extra tail voices) | 0.8700 |
+| `portamento_sustain.it` | 144 | 144 | 85 (pos0 phase at bidi-loop wraps) | 0.9388 |
+| `reverse_it.it` | 56 | 56 | 5 (pass-2 ins/note sequence after loop) | 0.7914 |
+
+Per-cause status:
+
+1. `it_multi_retrigger` — the E1b ×⅔ retrig decay tail: C's anticlick
+   discharge (do_anticlick quadratic stepmul) zeroes the mixer vol one
+   frame before ours. Fix target: port do_anticlick's discharge math
+   exactly (stepval = (1<<ANTICLICK_FPSHIFT)/count; stepmul decrement
+   per frame; out += stepmul_sq*smp>>32).
+2. `portamento_nna_sample` — our NNA-Continue tails persist and play a
+   stale pitch; C's tail slots rotate (the tail dies and its slot is
+   reused for the next continuation). The re-homes fire identically in
+   both; the difference is downstream tail lifetime. Needs a C debug
+   run (breakpoints in virt_setpatch/read_event_it) to pin which path
+   retires C's tails.
+3. `portamento_sustain` — pos0 phase offset (~7 samples) at the bidi
+   loop wraps: C's pos0 is captured post-advance relative to ours, or
+   our wrap fires a frame early. Fix target: instrument both mixers'
+   pos0 at the identical point in the tick and align.
+4. `reverse_it` — pass-2 ins/note sequence after the module loop (5
+   lines + 10 C-only): our pass-2 ord sequence re-patches where C
+   sustains. Needs the C sustain-loop release flow traced with a debug
+   run.
+
+All four have precise, reproducible evidence (fresh C dumps at
+/tmp/c-<fixture>.data, our dumps at /tmp/ours-<fixture>.data, renders
+in /tmp/{ours,xmp,ompt}-<fixture>.wav). Each needs a focused C
+debugger session rather than further static reading.
