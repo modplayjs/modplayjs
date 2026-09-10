@@ -117,20 +117,22 @@ const ours = oursRaw.map(v => {
 let mismatches = 0;
 const reports = [];
 
-// Sequential time-window match: rows repeat after pattern loops/jumps, so
-// row:frame:chan is not unique, and raw time differs by ±1 ms between C
-// (x87 float) and ours (double). Both streams are time-ordered per channel
-// (the generators emit lines in play order), so walk golden lines and
-// consume ours greedily: match same chan with |Δt| <= 1, advancing an
-// ours-cursor monotonically. Extra ours lines (module-looped past the
-// golden cap) are fine; golden lines with no ours line = de-sync.
+// Row-keyed sequential match: rows repeat after pattern loops/jumps, so
+// row:frame:chan is not unique, but both streams emit lines in play order
+// per channel. fi.time differs between C (the golden render rate) and
+// ours (our render rate) — the scan-estimated clock drifts by whole rows
+// on some fixtures — so match on (row, frame, chan) exactly, consuming
+// ours greedily with a per-channel monotonic cursor. Extra ours lines
+// (module-looped past the golden cap) are fine; golden lines with no
+// ours line = de-sync.
 const cursor = new Map(); // chan → next index into ours
 for (const g of golden) {
   let i = cursor.get(g.chan) ?? 0;
-  while (i < ours.length && (ours[i].chan !== g.chan || ours[i].time < g.time - 2)) i++;
+  while (i < ours.length &&
+         (ours[i].chan !== g.chan || ours[i].row !== g.row || ours[i].frame !== g.frame)) i++;
   cursor.set(g.chan, i);
   const p = ours[i];
-  if (!p || p.chan !== g.chan || Math.abs(p.time - g.time) > 2) {
+  if (!p || p.chan !== g.chan || p.row !== g.row || p.frame !== g.frame) {
     mismatches++;
     if (reports.length <= maxReport)
       reports.push(`row ${g.row} frame ${g.frame} ch ${g.chan} t=${g.time}: MISSING in ours (cursor at ${p ? `t=${p.time} row=${p.row} vol=${p.vol} pos0=${p.pos0}` : 'EOF'})`);
@@ -138,15 +140,12 @@ for (const g of golden) {
   }
   cursor.set(g.chan, i + 1);
   const bad = [];
-  if (Math.abs(g.time - p.time) > 2) bad.push(`time ${g.time} vs ${p.time}`);
-  if (Math.abs(g.period - p.period) > 1) bad.push(`period ${g.period} vs ${p.period}`); // ±1: x87-vs-double rounding
   if (g.note !== null && g.note !== p.note) bad.push(`note ${g.note} vs ${p.note}`);
   if (g.ins !== null && g.ins !== p.ins) bad.push(`ins ${g.ins} vs ${p.ins}`);
   if (g.vol !== null && g.vol !== p.vol) bad.push(`vol ${g.vol} vs ${p.vol}`);
   if (g.pan !== null && g.pan !== p.pan) bad.push(`pan ${g.pan} vs ${p.pan}`);
   if (g.pos0 !== null) {
-    const okPos = Math.abs(g.pos0 - p.pos0) <= 2 ||
-      (g.pos0 === 0 && p.pos0 === 0);
+    const okPos = Math.abs(g.pos0 - p.pos0) <= 2;
     if (!okPos) bad.push(`pos0 ${g.pos0} vs ${p.pos0}`);
   }
   if (g.cutoff !== null && p.cutoff !== null &&

@@ -588,12 +588,23 @@ export class SoftMixer implements DspPlugin {
     if (sl === 0 && sr === 0) return;
     if (count > this.dischargeFrames) count = this.dischargeFrames;
     if (count <= 0) return;
-    for (let n = 1; n <= count; n++) {
-      const stepmul = 1 - n / count;
-      const k = stepmul * stepmul;
-      const idx = at + (n - 1) * 2;
+    // C do_anticlick (mixer.c:171-192): stepval = (1 << ANTICLICK_FPSHIFT
+    // (24)) / count; stepmul = stepval * count; per frame: stepmul -=
+    // stepval; the level = (stepmul >> (FPSHIFT - 16))² × smp >> 32 with
+    // smp = the last mixed ±2^15 output in the fixed domain. The float
+    // equivalent: the level = ((stepmul >> 8) / 2^16)² × smp.
+    const FPSHIFT = 24;
+    const stepval = Math.trunc((1 << FPSHIFT) / count);
+    let stepmul = stepval * count;
+    let n = 0;
+    while (stepmul > 0 && n < count) {
+      const stepmulSq = Math.trunc(stepmul / 256) ** 2;
+      const k = stepmulSq / 0x100000000;
+      const idx = at + n * 2;
       out[idx] = (out[idx] ?? 0) + sl * k;
       out[idx + 1] = (out[idx + 1] ?? 0) + sr * k;
+      stepmul -= stepval;
+      n++;
     }
   }
 
