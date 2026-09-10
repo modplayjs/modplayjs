@@ -945,8 +945,46 @@ export class VirtualLayer {
         v.flags |= VoiceFlag.RELEASE | VoiceFlag.ANTICLICK;
         break;
     }
-    if (this.map[v.chn]?.voice === vi) {
-      this.map[v.chn]!.voice = VIRT_INVALID;
+    // C keeps the voice MAPPED for OFF/FADE — libxmp_virt_pastnote never
+    // unmaps (only CUT's virt_resetvoice does), and the channel's map must
+    // keep referencing the fading voice so later state updates (virt_
+    // release, setvol) reach it. Unmapping here orphaned the voice and
+    // dropped notes C sustains (portamento_nna_sample ch0 after S71).
+  }
+
+  /**
+   * libxmp_virt_pastnote (virtual.c:604-626): apply a past-note action to
+   * every re-homed tail voice whose root is this channel. C does NOT
+   * touch the channel's main voice here — the main voice's keyoff/release
+   * is driven by the event's own note handling (XMP_KEY_OFF), and
+   * unmapping it would cut a note C fades. For tails: OFF sets
+   * NOTE_RELEASE on the tail's channel state (player_set_release
+   * player.c:1856), FADE sets NOTE_FADEOUT (player_set_fadeout
+   * player.c:1864) — that release drives the tail's fade in
+   * process_volume (NNA Continue tails otherwise keep sounding at their
+   * snapshot volume).
+   */
+  pastnote(chn: number, action: number): void {
+    for (let c = this.numTracks; c < this.virtChannels; c++) {
+      const voc = this.mapChannel(c);
+      if (voc < 0) continue;
+      const v = this.voiceAt(voc)!;
+      if (v.root !== chn) continue;
+      switch (action) {
+        case PastNote.CUT:
+          this.resetVoice(voc, true);
+          break;
+        case PastNote.OFF:
+          this.channelStatesHook?.(c, (xc) => {
+            xc.note_flags |= NoteFlag.RELEASE;
+          });
+          break;
+        case PastNote.FADE:
+          this.channelStatesHook?.(c, (xc) => {
+            xc.note_flags |= NoteFlag.FADEOUT;
+          });
+          break;
+      }
     }
   }
 

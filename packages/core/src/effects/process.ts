@@ -494,13 +494,13 @@ function processRest(
       // S7x instrument functions (effects.c:773-813).
       switch (LSN(fxp)) {
         case 0: // Past note cut
-          core.virt.releaseChannel(chn, PastNote.CUT);
+          core.virt.pastnote(chn, PastNote.CUT);
           break;
         case 1: // Past note off
-          core.virt.releaseChannel(chn, PastNote.OFF);
+          core.virt.pastnote(chn, PastNote.OFF);
           break;
         case 2: // Past note fade
-          core.virt.releaseChannel(chn, PastNote.FADE);
+          core.virt.pastnote(chn, PastNote.FADE);
           break;
         case 3: // Set NNA to note cut
           core.virt.setNna(chn, 0);
