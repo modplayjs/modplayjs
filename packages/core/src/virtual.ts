@@ -185,32 +185,34 @@ export class VirtualLayer {
     return this.used;
   }
 
-  private allocVoice(): number {
+  /**
+   * C alloc_voice (virtual.c:250-274): find a free slot and IMMEDIATELY
+   * bind it to the channel — `voice_array[i].chn = chn; root = chn;
+   * virt_channel[chn].map = i`. The map entry is written by the allocator
+   * itself, so no caller can leave a map pointing at a freed slot (the
+   * stale-map alias bug: setPatchSmp's smp<0 path wiped a freshly
+   * allocated slot whose chn was never bound, leaving map[chn] stale).
+   */
+  private allocVoice(chn: number): number {
     if (this.used < MAXVOICES && this.used >= this.voices.length) {
       this.voices.push(makeVoice(this.voices.length));
     }
-    // Free slots: reset voices (chn = FREE).
+    const bind = (i: number): number => {
+      this.used++; /* alloc_voice (virtual.c:225): virt_used++ */
+      this.voices[i]!.chn = chn;
+      this.voices[i]!.root = chn;
+      this.map[chn]!.voice = i;
+      return i;
+    };
+    // Free slots: chn == FREE (virt_resetvoice cleared them).
     for (let i = 0; i < this.voices.length; i++) {
       if (this.voices[i]!.chn === VIRT_INVALID) {
-        this.used++; /* alloc_voice (virtual.c:225): virt_used++ */
-        return i;
-      }
-    }
-    // Garbage-collect dead slots: act cleared but the slot still bound
-    // to a channel whose map has moved on (one-shot samples that ran to
-    // their end keep chn set in C until reset — but C recycles them via
-    // free_voice when the pool runs dry). A slot whose channel's map no
-    // longer references it is unreachable and safe to reuse.
-    for (let i = 0; i < this.voices.length; i++) {
-      const v = this.voices[i]!;
-      if (v.act === Act.NONE && v.chn >= 0 && v.chn < this.map.length && this.map[v.chn]!.voice !== i) {
-        this.resetVoice(i, false);
-        this.used++; /* slot recycled: alloc_voice's virt_used++ */
-        return i;
+        return bind(i);
       }
     }
     // C free_voice (virtual.c:241-282): no free slot — steal the
-    // background voice (chn >= num_tracks) with the lowest volume.
+    // background voice (chn >= num_tracks) with the lowest volume. The
+    // stolen slot's own map entry is cleared first (virtual.c:242).
     let steal = -1;
     let stealVol = Number.MAX_VALUE;
     for (let i = 0; i < this.voices.length; i++) {
@@ -221,15 +223,17 @@ export class VirtualLayer {
       }
     }
     if (steal >= 0) {
+      const stolenChn = this.voices[steal]!.chn;
+      if (this.map[stolenChn]!.voice === steal) {
+        this.map[stolenChn]!.voice = VIRT_INVALID;
+      }
       this.resetVoice(steal, false);
-      this.used++; /* slot recycled: alloc_voice's virt_used++ */
-      return steal;
+      return bind(steal);
     }
     if (this.voices.length < MAXVOICES) {
       const idx = this.voices.length;
-      this.voices.push(makeVoice(idx));
-      this.used++; /* alloc_voice (virtual.c:225): virt_used++ */
-      return idx;
+      this.voices.push(makeVoice(VIRT_INVALID));
+      return bind(idx);
     }
     return VIRT_INVALID;
   }
@@ -316,8 +320,17 @@ export class VirtualLayer {
     const oldActive =
       oldVoice !== VIRT_INVALID && this.voices[oldVoice]!.act !== Act.NONE;
     let to = chn;
-    const vidx =
-      oldVoice !== VIRT_INVALID && !oldActive ? oldVoice : this.allocVoice();
+    let vidx: number;
+    if (oldVoice !== VIRT_INVALID && !oldActive) {
+      // In-place reuse: the slot stays bound to this channel; re-bind
+      // explicitly (C alloc_voice would on the fresh path) so the map
+      // cannot go stale.
+      vidx = oldVoice;
+      this.voices[vidx]!.chn = chn;
+      this.voices[vidx]!.root = chn;
+    } else {
+      vidx = this.allocVoice(chn);
+    }
     if (vidx === VIRT_INVALID) return VIRT_INVALID;
     if (vidx !== oldVoice) this.map[chn]!.voice = vidx;
     if (oldVoice !== VIRT_INVALID && oldActive) {
@@ -861,13 +874,14 @@ export class VirtualLayer {
 
     // C setpatch flow (virtual.c:500-546): the channel's CURRENT voice
     // slot is reused in place — a fresh allocation happens only when the
-    // channel had no voice (map empty). The old note is simply
-    // overwritten (MOD NNA = CUT), so the pool never exhausts.
+    // channel had no voice (map empty). allocVoice binds the slot to the
+    // channel + map immediately (C alloc_voice:266-272), so the smp<0
+    // reset below clears the map via resetVoice instead of leaving a
+    // stale entry that would alias a later note onto this slot.
     let voc = this.map[chn]!.voice;
     if (voc <= VIRT_INVALID) {
-      voc = this.allocVoice();
+      voc = this.allocVoice(chn);
       if (voc === VIRT_INVALID) return VIRT_INVALID;
-      this.map[chn]!.voice = voc;
     }
 
     if (smp < 0) {
