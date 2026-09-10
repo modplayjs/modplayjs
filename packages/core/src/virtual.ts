@@ -683,10 +683,15 @@ export class VirtualLayer {
     const anticlickR = v.sright;
     const flags = v.flags & VoiceFlag.ANTICLICK;
     const queued = v.queued;
-    const fresh = makeVoice(v.chn);
-    // memcpy(vi, 0, sizeof) — full wipe:
-    v.chn = fresh.chn;
-    v.root = fresh.root;
+    // C virt_resetvoice (virtual.c:76): vi->chn = vi->root = FREE — the
+    // wiped slot must re-enter the allocator's FREE pool. Wiping with
+    // makeVoice(v.chn) kept the old channel bound, so the slot never
+    // showed up in alloc_voice's free pass and the GC fallback re-used it
+    // while the old channel's map entry still pointed here (map alias →
+    // a later note on another channel clobbered a live voice).
+    const fresh = makeVoice(VIRT_INVALID);
+    v.chn = VIRT_INVALID;
+    v.root = VIRT_INVALID;
     v.note = fresh.note;
     v.pan = fresh.pan;
     v.vol = fresh.vol;

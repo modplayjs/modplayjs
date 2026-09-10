@@ -246,8 +246,11 @@ export class SoftMixer implements DspPlugin {
           // VAR_NORM (mix_all.c:181-184): convert the double pos into the
           // chunk-local integer pos + 16-bit frac. C resets this at every
           // mix_fn call — the integer accumulation never crosses chunks.
+          // The frac term uses (int)vi->pos — C truncates toward zero (not
+          // rounding); keep identical or the first chunk's pos advance
+          // drifts by ±1 sample vs the C reference.
           let posInt = Math.trunc(vi.pos);
-          let frac = Math.round((vi.pos - posInt) * (1 << SMIX_SHIFT));
+          let frac = (vi.pos - posInt) * (1 << SMIX_SHIFT);
           const stepFixed = Math.trunc(stepDir * (1 << SMIX_SHIFT));
 
           // Mix `samples` frames (:631-714), when audible.
