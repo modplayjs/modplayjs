@@ -44,8 +44,8 @@ portamento_sustain (15.1s):
 | Fixture | OpenMPT-sided? | Fix target |
 |---|---|---|
 | `duplicate_check_transpose` | — | **FIXED** (state match, audio 0.98) via pastnote/release fixes |
-| `it_multi_retrigger` | No — OpenMPT ≈ libxmp ≈ ours (0.98) | 7 lines, vol ±16 (1.5%): anticlick ramp one-frame offset on retrig volume; smallest of the remaining |
-| `portamento_nna_sample` | partially fixed | **remaining**: tail-slot lifetime — we accumulate tail voices (6 tails where C rotates 1); C's tail sample end → background reset frees the slot for reuse; our tail slots keep mapping (tail xc lacks the NOTE_END that drives C's background reset) |
+| `it_multi_retrigger` | No — OpenMPT ≈ libxmp ≈ ours (0.98) | 7 lines, vol ±16 (1.5%): the E1b (vol ×⅔) retrig decay tail differs in the last 2 frames (C 16→0 at f4, ours 16→16→0) — anticlick discharge frame rounding; audio identical to both references (0.986) |
+| `portamento_nna_sample` | partially fixed | **remaining** (54→30 state diffs with fresh dumps): tail-slot lifetime — the fixture NNA-continues 4 voices; C holds exactly 4 tails (ch6-9) and rotates one slot; ours accumulates 6+ tails (re-homes at every retrig incl. pass-2, C's pass-2 retrigs reuse the freed slot). Root cause: our re-home hunt takes a fresh overflow channel per retrig and prior tails never die (their samples loop, so no sample-end reset). C's tail slot frees via the background NOTE_END reset (player.c:1057) then re-homes reuse it. Fix direction: free/steal the oldest tail when the re-home hunt finds no free slot (C free_voice steals lowest-vol background), OR reset the tail on sample end like C's background reset |
 | `portamento_sustain` | Irrelevant — libxmp and OpenMPT disagree with each other (−0.19); ours matches libxmp's shape (0.94) | the 4-line period ±5 rounding only |
 | `reverse_it` | No — OpenMPT tracks libxmp (0.98); ours breaks away (0.77) | sustain-loop (flg=0x20/0x60, lps=lpe=0 degenerate) + reverse + keyoff interaction; our voice ends where C sustains (rows 36-45) — needs the C adjust_voice_end/sustain-on-release flow traced |
 
