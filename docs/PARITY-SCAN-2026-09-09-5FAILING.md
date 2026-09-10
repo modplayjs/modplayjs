@@ -87,6 +87,11 @@ Per-cause status:
    both; the difference is downstream tail lifetime. Needs a C debug
    run (breakpoints in virt_setpatch/read_event_it) to pin which path
    retires C's tails.
+   Traced: our re-homes fire at ord0 rows 1-4 and 9-12; C's dump shows
+   tails only at rows 1-6 and 19-23 (pass 2). Our rows 9-12 re-homes
+   produce tails C's equivalent flow does not keep alive. Requires a C
+   debug run with breakpoints in virt_setpatch/read_event_it to pin
+   which path retires C's tails — static comparison exhausted.
 3. `portamento_sustain` — pos0 phase offset (~7 samples) at the bidi
    loop wraps: C's pos0 is captured post-advance relative to ours, or
    our wrap fires a frame early. Fix target: instrument both mixers'
