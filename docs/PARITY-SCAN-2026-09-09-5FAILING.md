@@ -13,9 +13,9 @@ the per-frame ground truth the suite measures.
 
 | Fixture | State parity (libxmp golden) | ours~libxmp | ours~ompt | libxmp~ompt | OpenMPT agrees with… | Root cause of OUR failure |
 |---|---|---|---|---|---|---|
-| `duplicate_check_transpose.it` | ~~67 mism~~ **STATE MATCH** (passes) | 0.9795 (was 0.57) | 0.9511 | 0.9713 | libxmp | **fixed** — the pastnote/release work fixed it |
+| `duplicate_check_transpose.it` | ~~67 mism~~ **STATE MATCH** (passes) | **0.9795** (was 0.57) | 0.9511 | 0.9713 | libxmp | **fixed** — the pastnote/release work fixed it |
 | `it_multi_retrigger.it` | 7 mism, 0 delta | 0.9861 | 0.9851 | 0.9812 | libxmp (0.981) | **ours** — marginal: 7 vol-state lines around IT retrig (retrig volume re-arm timing); audio-level impact small |
-| `portamento_nna_sample.it` | ~~84 mism~~ 54 mism, +576 lines (improved by the pastnote + release fixes) | — | — | — | libxmp | **partially fixed** — tail fade now correct (pastnote propagation); remaining: tail-slot lifetime (we accumulate tails where C rotates one slot; C's tail sample end → background reset frees the slot) |
+| `portamento_nna_sample.it` | ~~84 mism~~ 54 mism, +576 lines (improved by the pastnote + release fixes) | **0.8700** (was 0.6274) | 0.8411 | 0.9405 | libxmp | **partially fixed** — tail fade now correct (pastnote propagation); remaining: tail-slot lifetime (we accumulate tails where C rotates one slot; C's tail sample end → background reset frees the slot) |
 | `portamento_sustain.it` | 4 mism, 0 delta | 0.9388 | −0.1724 | −0.1926 | libxmp (matches shape, −0.19) | **ours** — only the known period ±5 rounding (4 lines); both references disagree with each other at this level (−0.19), i.e. this test is sensitive beyond either player's exact rounding |
 | `reverse_it.it` | 53 mism, −17 lines | 0.7914 | 0.7708 | **0.9806** | libxmp (0.98) | **ours** — reverse-sample loop positioning; hard failure windows at t=9 s (corr −0.34 vs ompt 1.00) and t=13-14 s |
 
