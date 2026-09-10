@@ -250,7 +250,10 @@ export class SoftMixer implements DspPlugin {
           // rounding); keep identical or the first chunk's pos advance
           // drifts by ±1 sample vs the C reference.
           let posInt = Math.trunc(vi.pos);
-          let frac = (vi.pos - posInt) * (1 << SMIX_SHIFT);
+          // C stores frac in an int — the initial fractional part is
+          // truncated ((int)(65536 * fract)); keeping the fraction in our
+          // float accumulator compounds a ±1-2 sample pos0 drift vs C.
+          let frac = Math.trunc((vi.pos - posInt) * (1 << SMIX_SHIFT));
           const stepFixed = Math.trunc(stepDir * (1 << SMIX_SHIFT));
 
           // Mix `samples` frames (:631-714), when audible.

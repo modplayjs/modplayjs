@@ -39,7 +39,7 @@ export function dumpMixerState(core, maxLines, maxTimeMs = Infinity) {
       lines.push(
         `${Math.trunc(ps.timeMs)} ${ps.row} ${ps.frame} ${ch} ` +
         `${Math.trunc(xc?.info_period ?? 0)} ${v.note} ${v.ins - 1} ${v.vol} ` +
-        `${v.pan} ${Math.round(v.pos0 ?? 0)} ${v.filter?.cutoff ?? 255} ` +
+        `${v.pan} ${Math.trunc(v.pos0 ?? 0)} ${v.filter?.cutoff ?? 255} ` +
         `${v.filter?.resonance ?? 0}`);
     }
   }
