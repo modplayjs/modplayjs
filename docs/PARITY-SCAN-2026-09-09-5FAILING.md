@@ -13,9 +13,9 @@ the per-frame ground truth the suite measures.
 
 | Fixture | State parity (libxmp golden) | ours~libxmp | ours~ompt | libxmp~ompt | OpenMPT agrees with… | Root cause of OUR failure |
 |---|---|---|---|---|---|---|
-| `duplicate_check_transpose.it` | 67 mism, +61 lines | 0.5697 | 0.5545 | **0.9713** | libxmp (0.97) | **ours** — our ch0 voice dies where C sustains; ours is ~8× louder on L (energy 0.0063 vs 0.0008): DCT/transpose duplicate-check drops/mis-handles the voice |
+| `duplicate_check_transpose.it` | ~~67 mism~~ **STATE MATCH** (passes) | 0.9795 (was 0.57) | 0.9511 | 0.9713 | libxmp | **fixed** — the pastnote/release work fixed it |
 | `it_multi_retrigger.it` | 7 mism, 0 delta | 0.9861 | 0.9851 | 0.9812 | libxmp (0.981) | **ours** — marginal: 7 vol-state lines around IT retrig (retrig volume re-arm timing); audio-level impact small |
-| `portamento_nna_sample.it` | 84 mism, +1584 lines | 0.6274 | 0.6054 | **0.9405** | libxmp (0.94) | **ours** — we spawn/keep extra NNA-tail voices: L energy 0.688 vs libxmp 0.046 (≈15×), corr L 0.47 vs R 0.996 (the extra voice is left-panned) |
+| `portamento_nna_sample.it` | ~~84 mism~~ 54 mism, +576 lines (improved by the pastnote + release fixes) | — | — | — | libxmp | **partially fixed** — tail fade now correct (pastnote propagation); remaining: tail-slot lifetime (we accumulate tails where C rotates one slot; C's tail sample end → background reset frees the slot) |
 | `portamento_sustain.it` | 4 mism, 0 delta | 0.9388 | −0.1724 | −0.1926 | libxmp (matches shape, −0.19) | **ours** — only the known period ±5 rounding (4 lines); both references disagree with each other at this level (−0.19), i.e. this test is sensitive beyond either player's exact rounding |
 | `reverse_it.it` | 53 mism, −17 lines | 0.7914 | 0.7708 | **0.9806** | libxmp (0.98) | **ours** — reverse-sample loop positioning; hard failure windows at t=9 s (corr −0.34 vs ompt 1.00) and t=13-14 s |
 
@@ -43,11 +43,11 @@ portamento_sustain (15.1s):
 
 | Fixture | OpenMPT-sided? | Fix target |
 |---|---|---|
-| `duplicate_check_transpose` | No — OpenMPT tracks libxmp (0.97); ours breaks away (0.55) | our virtual-channel/DCT logic (`check_dct` virtual.c:434-471 vs our port) |
-| `it_multi_retrigger` | No — OpenMPT ≈ libxmp ≈ ours (0.98) | cosmetic; IT retrig volume re-arm (read_event_it retrig path) |
-| `portamento_nna_sample` | No — OpenMPT tracks libxmp (0.94); ours breaks away (0.61), extra voices keep sounding (NNA cut not applied when the channel re-patches) | our NNA cut on re-patch + voice lifetime (same family as the fixed ABAKUS alias) |
-| `portamento_sustain` | Irrelevant — libxmp and OpenMPT disagree with each other (−0.19); ours matches libxmp's shape (0.94) | the 4-line period ±5 rounding only; audio-level parity unattainable against either reference at this precision |
-| `reverse_it` | No — OpenMPT tracks libxmp (0.98); ours breaks away (0.77) | our reverse-loop position handling (`VOICE_REVERSE` reposition vs C mixer.c:375-420) |
+| `duplicate_check_transpose` | — | **FIXED** (state match, audio 0.98) via pastnote/release fixes |
+| `it_multi_retrigger` | No — OpenMPT ≈ libxmp ≈ ours (0.98) | 7 lines, vol ±16 (1.5%): anticlick ramp one-frame offset on retrig volume; smallest of the remaining |
+| `portamento_nna_sample` | partially fixed | **remaining**: tail-slot lifetime — we accumulate tail voices (6 tails where C rotates 1); C's tail sample end → background reset frees the slot for reuse; our tail slots keep mapping (tail xc lacks the NOTE_END that drives C's background reset) |
+| `portamento_sustain` | Irrelevant — libxmp and OpenMPT disagree with each other (−0.19); ours matches libxmp's shape (0.94) | the 4-line period ±5 rounding only |
+| `reverse_it` | No — OpenMPT tracks libxmp (0.98); ours breaks away (0.77) | sustain-loop (flg=0x20/0x60, lps=lpe=0 degenerate) + reverse + keyoff interaction; our voice ends where C sustains (rows 36-45) — needs the C adjust_voice_end/sustain-on-release flow traced |
 
 ## Measurement notes
 
