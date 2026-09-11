@@ -36,7 +36,8 @@ jobs:
 
   # A version bump may only enter main through a PR (the bump is applied
   # in the feature PR itself). The release workflow then opens the
-  # "chore: release" PR whose merge is the only thing that publishes.
+  # "chore: version packages" PR (opened by changesets) whose merge is
+  # the only thing that publishes.
   # This job fails direct pushes to main that bump versions outside the
   # release merge.
   version-guard:
@@ -70,8 +71,8 @@ jobs:
           # The release merge is the one direct-push commit allowed to
           # carry version changes (it merges the bot PR to main).
           subject=$(git log -1 --pretty=%s HEAD)
-          if printf '%s' "$subject" | grep -q '^chore: release'; then
-            echo "release merge; bumps allowed"
+          if printf '%s' "$subject" | grep -q '^chore: version packages'; then
+            echo "changesets version-packages merge; bumps allowed"
             exit 0
           fi
 

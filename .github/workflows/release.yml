@@ -1,18 +1,22 @@
 name: Release
 
-# Flow:
-#   1. Every push to main (that is not itself the version-bump PR merge)
-#      checks all packages: if a package's version is not yet on npm, it
-#      goes into ONE standing "chore: version bump" PR.
-#   2. Merging that PR publishes the bumped packages to npm, tags
+# Built on the official changesets GitHub Action — no hand-rolled scripts.
+#
+#   1. Every PR that should bump versions adds .changeset/*.md files:
+#          npx changeset            # pick packages + bump level, write notes
+#          git add .changeset && git commit
+#   2. Merging such a PR → changesets/action opens/updates ONE
+#      "chore: version packages" PR applying the bumps to package.json +
+#      package-lock.json and aggregating the changelogs.
+#   3. Merging that Version Packages PR → changesets/action publishes
+#      every changed package to npm (npm Trusted Publisher OIDC), tags
 #      @modplayjs/<name>@<version> and creates GitHub releases.
 #
-# The version-bump merge is detected structurally (merge commit whose
-# branch carried the bump), never by parsing commit messages — GitHub's
-# merge commits read "Merge pull request #N from …", which is why the
-# previous message-based gate never fired and nothing reached npm.
+# The publish uses npm Trusted Publisher (configured on npmjs.com for
+# owner modplayjs / repo modplayjs / workflow release.yml) — npm ≥ 11.5.1
+# exchanges the workflow's OIDC token, so no NPM_TOKEN secret is needed.
 
-on:
+"on":
   push:
     branches: ['main']
   workflow_dispatch:
@@ -28,6 +32,7 @@ permissions:
 
 jobs:
   release:
+    name: Version packages / publish
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -52,165 +57,19 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      # Every non-private package whose version is missing from the npm
-      # registry → "name|version". This IS the bump definition: registry
-      # truth, not commit messages, not branch diffs.
-      - name: Collect unpublished packages
-        id: bumps
-        run: |
-          set -eu
-          : > /tmp/bumps.txt
-          for f in packages/*/package.json; do
-            name=$(node -pe 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).name' "$f")
-            version=$(node -pe 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).version' "$f")
-            private=$(node -pe 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).private === true' "$f")
-            [ "$private" = "true" ] && continue
-            if ! npm view "$name@$version" version >/dev/null 2>&1; then
-              echo "$name|$version" >> /tmp/bumps.txt
-            fi
-          done
-          cat /tmp/bumps.txt
-          if [ -s /tmp/bumps.txt ]; then
-            echo "has=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # Is this push the version-bump PR merge? Structural test: HEAD is a
-      # merge commit and its message references the bot branch — GitHub
-      # always writes "Merge pull request #N from …/<branch>" for PR
-      # merges, and the bot branch name is fixed (chore/version-bump).
-      # (Commit-subject matching was the old bug: the bump PR's own merge
-      # message never equals the PR title.)
-      - name: Detect version-bump PR merge
-        id: merge
-        run: |
-          set -eu
-          msg=$(git log -1 --pretty=%s HEAD)
-          parents=$(git rev-list --parents -n 1 HEAD | wc -w)
-          if [ "$parents" = "3" ] && printf '%s' "$msg" | grep -q 'chore/version-bump'; then
-            echo "is=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "is=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # ── Version-bump PR merged: publish + tag + release ────────────────
-      - name: Build all packages
-        if: steps.bumps.outputs.has == 'true' && (steps.merge.outputs.is == 'true' || github.event_name == 'workflow_dispatch')
+      - name: Build packages
         run: npx turbo run build
 
-      - name: Publish to npm
-        # Auth = npm Trusted Publisher (OIDC). No NPM_TOKEN, no .npmrc
-        # auth line anywhere in the job — any auth line makes npm skip the
-        # OIDC exchange, and an invalid one fails the PUT as a masked 404.
-        # Requires the npmjs.com Trusted Publisher entry: owner
-        # modplayjs, repo modplayjs, workflow filename release.yml, no
-        # environment.
-        if: steps.bumps.outputs.has == 'true' && (steps.merge.outputs.is == 'true' || github.event_name == 'workflow_dispatch')
-        run: |
-          set -eu
-          # make sure no leftover auth line exists
-          rm -f ~/.npmrc
-          while IFS='|' read -r name version; do
-            [ -z "$name" ] && continue
-            pkg_dir=$(node -e '
-              const fs = require("fs"), path = require("path");
-              for (const d of fs.readdirSync("packages")) {
-                const p = path.join("packages", d, "package.json");
-                if (JSON.parse(fs.readFileSync(p, "utf8")).name === process.argv[1]) {
-                  console.log("packages/" + d);
-                  break;
-                }
-              }' "$name")
-            [ -z "$pkg_dir" ] && { echo "::error::no package dir for $name"; exit 1; }
-            echo "publishing $name@$version (auth: trusted-publisher)"
-            (cd "$pkg_dir" && npm publish --provenance --access public)
-          done < /tmp/bumps.txt
-
-      - name: Tag released versions
-        if: steps.bumps.outputs.has == 'true' && (steps.merge.outputs.is == 'true' || github.event_name == 'workflow_dispatch')
-        run: |
-          set -eu
-          git config user.name "modplayjs-release-bot"
-          git config user.email "noreply@github.com"
-          while IFS='|' read -r name version; do
-            [ -z "$name" ] && continue
-            npm view "$name@$version" version >/dev/null 2>&1 || continue
-            tag="$name@$version"
-            git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1 && continue
-            git tag -a "$tag" -m "$name@$version"
-            git push origin "$tag"
-            echo "tagged $tag"
-          done < /tmp/bumps.txt
+      - name: Version & publish (changesets)
+        uses: changesets/action@v1
+        with:
+          # changeset publish tags each released package
+          # (@modplayjs/<name>@<version>) and pushes the tags; the action
+          # creates the GitHub release from the changeset changelogs.
+          publish: npx changeset publish
+          version: npx changeset version
+          title: 'chore: version packages'
+          commit: 'chore: version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create GitHub releases
-        if: steps.bumps.outputs.has == 'true' && (steps.merge.outputs.is == 'true' || github.event_name == 'workflow_dispatch')
-        run: |
-          set -eu
-          while IFS='|' read -r name version; do
-            [ -z "$name" ] && continue
-            dir="packages/${name#@modplayjs/}"
-            tag="$name@$version"
-            notes=$(git log --pretty='- %s (%h)' -20 -- "$dir")
-            gh release create "$tag" --title "$name@$version" --notes "${notes:-release}" --verify-tag || true
-          done < /tmp/bumps.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # ── Ordinary push: open/update the standing version-bump PR ────────
-      # main already carries the bumped versions (the maintainer's PR set
-      # them); the bot PR is the publish gate. No file edits needed here —
-      # only the PR with the notes.
-      - name: Open or update the version-bump PR
-        if: steps.bumps.outputs.has == 'true' && steps.merge.outputs.is == 'false'
-        run: |
-          set -eu
-          # Release notes: commits per bumped package since its last tag.
-          : > release-notes.md
-          {
-            echo "These packages have versions on main that are not yet on npm."
-            echo "Merging this PR publishes them:"
-            echo
-            echo '```'
-            cat /tmp/bumps.txt
-            echo '```'
-            echo
-          } >> release-notes.md
-          while IFS='|' read -r name version; do
-            dir="packages/${name#@modplayjs/}"
-            last_tag=$(git tag --list "$name@*" --sort=-v:refname | head -1)
-            {
-              echo "## $name@$version"
-              echo
-              if [ -n "$last_tag" ]; then
-                git log --pretty='- %s (%h)' "$last_tag..HEAD" -- "$dir"
-              else
-                git log --pretty='- %s (%h)' -20 -- "$dir"
-              fi
-              echo
-            } >> release-notes.md
-          done < /tmp/bumps.txt
-
-          # Update the existing PR if one is open (body only — no branch
-          # reset, no churn); else create the bot branch + PR.
-          existing=$(gh pr list --head chore/version-bump --state open --json number --jq '.[0].number' || true)
-          if [ -n "$existing" ]; then
-            gh pr edit "$existing" --title 'chore: version bump' --body-file release-notes.md
-            exit 0
-          fi
-
-          git config user.name "modplayjs-release-bot"
-          git config user.email "noreply@github.com"
-          if git ls-remote --exit-code --heads origin chore/version-bump >/dev/null 2>&1; then
-            git push -q origin --delete chore/version-bump || true
-          fi
-          git checkout -q -b chore/version-bump
-          git commit -q --allow-empty -m "chore: version bump"
-          git push -q origin chore/version-bump
-          git checkout -q main
-          gh pr create --base main --head chore/version-bump \
-            --title 'chore: version bump' --body-file release-notes.md --label release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
