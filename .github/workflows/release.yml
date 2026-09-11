@@ -192,6 +192,17 @@ jobs:
               else if (lvl === "minor") console.log(maj + "." + (min + 1) + ".0");
               else console.log(maj + "." + min + "." + (pat + 1));
             ' "$version" "$level")
+            # A human override wins: if the existing version-bump branch
+            # already carries a different (manually adjusted) version for
+            # this package, keep it instead of the recomputed one — so
+            # notes, diff and body stay consistent across rechecks.
+            if git cat-file -e origin/chore/version-bump:"$f" 2>/dev/null; then
+              override=$(git show "origin/chore/version-bump:$f" 2>/dev/null \
+                | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).version')
+              if [ -n "$override" ] && [ "$override" != "$version" ]; then
+                next=$override
+              fi
+            fi
             echo "$name|$version|$next|$level" >> /tmp/next/bumps.txt
           done
           if [ -s /tmp/next/bumps.txt ]; then
