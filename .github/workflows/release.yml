@@ -93,25 +93,17 @@ jobs:
         run: npx turbo run build
 
       - name: Publish to npm
+        # Auth = npm Trusted Publisher (OIDC). No NPM_TOKEN, no .npmrc
+        # auth line anywhere in the job — any auth line makes npm skip the
+        # OIDC exchange, and an invalid one fails the PUT as a masked 404.
+        # Requires the npmjs.com Trusted Publisher entry: owner
+        # modplayjs, repo modplayjs, workflow filename release.yml, no
+        # environment.
         if: steps.bumps.outputs.has == 'true' && (steps.merge.outputs.is == 'true' || github.event_name == 'workflow_dispatch')
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -eu
-          # Two auth paths:
-          #  - NPM_TOKEN secret set  → classic publish (no --provenance:
-          #    classic/automation tokens are rejected for provenance
-          #    publishes, surfacing as a misleading E404).
-          #  - NPM_TOKEN unset       → npm Trusted Publisher OIDC exchange
-          #    (requires the npmjs.com Trusted Publisher entry to match:
-          #    owner/repo, workflow filename release.yml, environment must
-          #    be EMPTY unless the job declares one).
-          if [ -n "$NPM_TOKEN" ]; then
-            echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
-            PROV=""
-          else
-            PROV="--provenance"
-          fi
+          # make sure no leftover auth line exists
+          rm -f ~/.npmrc
           while IFS='|' read -r name version; do
             [ -z "$name" ] && continue
             pkg_dir=$(node -e '
@@ -124,8 +116,8 @@ jobs:
                 }
               }' "$name")
             [ -z "$pkg_dir" ] && { echo "::error::no package dir for $name"; exit 1; }
-            echo "publishing $name@$version (auth: ${NPM_TOKEN:+token}${NPM_TOKEN:-trusted-publisher})"
-            (cd "$pkg_dir" && npm publish $PROV --access public)
+            echo "publishing $name@$version (auth: trusted-publisher)"
+            (cd "$pkg_dir" && npm publish --provenance --access public)
           done < /tmp/bumps.txt
 
       - name: Tag released versions
