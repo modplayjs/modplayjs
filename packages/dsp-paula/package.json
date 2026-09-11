@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/dsp-paula",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Amiga Paula audio simulator DSP for the modplayjs tracker player.",
   "type": "module",
   "main": "dist/index.js",

@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/effects-shared",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Compatibility shim re-exporting the effects processor from @modplayjs/core.",
   "type": "module",
   "main": "dist/index.js",

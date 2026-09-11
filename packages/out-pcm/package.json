@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/out-pcm",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "PCM file/stream output for the modplayjs tracker player.",
   "type": "module",
   "main": "dist/index.js",

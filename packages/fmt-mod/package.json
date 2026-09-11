@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-mod",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Protracker (.mod) format plugin for modplayjs (libxmp mod_load.c port).",
   "type": "module",
   "main": "dist/index.js",

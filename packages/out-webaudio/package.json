@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/out-webaudio",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "WebAudio output for the modplayjs tracker player (AudioWorklet based).",
   "type": "module",
   "main": "dist/index.js",
