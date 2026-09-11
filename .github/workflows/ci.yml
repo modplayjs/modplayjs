@@ -33,3 +33,65 @@ jobs:
       # workspace dependency graph); a no-op PR hits the remote cache.
       - name: Build
         run: npx turbo run build typecheck
+
+  # Every version bump must arrive as a .changeset/*.md file (the bump
+  # itself is applied by the "chore: version packages" PR that changesets
+  # opens). This fails any other commit that edits a package version.
+  version-guard:
+    name: Version bump guard
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Fail version bumps that do not come from a changeset file
+        run: |
+          set -eu
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+            if [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              echo "initial push; nothing to compare"
+              exit 0
+            fi
+          fi
+          if ! git cat-file -e "$base" 2>/dev/null; then
+            base=$(git merge-base origin/main HEAD)
+          fi
+
+          # A bump is legal iff .changeset/ files were added/changed in the
+          # same range, or the range is the changesets "version packages"
+          # merge (that merge applies the bumps by design).
+          subject=$(git log -1 --pretty=%s HEAD)
+          if git diff --name-only "$base" HEAD -- .changeset/ | grep -q .; then
+            echo "changeset files changed; bump allowed"
+            exit 0
+          fi
+          if [ "$subject" = "chore: version packages" ]; then
+            echo "changesets version-packages merge; bump allowed"
+            exit 0
+          fi
+
+          bumped=0
+          for f in packages/*/package.json; do
+            before=$(git show "$base:$f" 2>/dev/null \
+              | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).version' \
+              2>/dev/null || echo "")
+            after=$(node -pe 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).version' "$f")
+            if [ -n "$before" ] && [ "$before" != "$after" ]; then
+              echo "::error::file=$f::manual version bump $before -> $after; use changesets (npx changeset)"
+              bumped=1
+            fi
+          done
+          if [ "$bumped" != "0" ]; then
+            echo "::error::version bumps must go through changesets: add a .changeset/*.md file in a PR"
+            exit 1
+          fi
+          echo "no manual version bumps"
