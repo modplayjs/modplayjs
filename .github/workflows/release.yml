@@ -192,6 +192,17 @@ jobs:
               else if (lvl === "minor") console.log(maj + "." + (min + 1) + ".0");
               else console.log(maj + "." + min + "." + (pat + 1));
             ' "$version" "$level")
+            # A human override wins: if the existing version-bump branch
+            # already carries a different (manually adjusted) version for
+            # this package, keep it instead of the recomputed one — so
+            # notes, diff and body stay consistent across rechecks.
+            if git cat-file -e origin/chore/version-bump:"$f" 2>/dev/null; then
+              override=$(git show "origin/chore/version-bump:$f" 2>/dev/null \
+                | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).version')
+              if [ -n "$override" ] && [ "$override" != "$version" ]; then
+                next=$override
+              fi
+            fi
             echo "$name|$version|$next|$level" >> /tmp/next/bumps.txt
           done
           if [ -s /tmp/next/bumps.txt ]; then
@@ -228,6 +239,10 @@ jobs:
               echo
             } >> /tmp/notes.md
           done < /tmp/next/bumps.txt
+          # Keep package-lock.json consistent with the bumped versions —
+          # otherwise `npm ci` fails on the PR (lock mismatch) and the
+          # publish-on-merge build would never go green.
+          npm install --package-lock-only --no-audit --no-fund
           {
             echo "Merging this PR bumps the versions and publishes to npm:"
             echo
@@ -243,9 +258,10 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           branch: chore/version-bump
-          delete-branch: true
+          add-paths: |
+            packages/
+            package-lock.json
           title: 'chore: version bump'
           body-path: release-notes.md
           commit-message: 'chore: version bump'
           labels: release
-          add-paths: packages/
