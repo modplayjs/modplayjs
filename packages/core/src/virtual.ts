@@ -136,6 +136,7 @@ export class VirtualLayer {
     // the extra overflow slots ARE the voice pool, so the pool cap is
     // MAXVOICES for VIRTUAL modules and every pre-made slot is free.
     this.virtChannels = numTracks + (quirkVirtual ? MAXVOICES : 0);
+    this.extChannels = quirkVirtual;
     for (let i = 0; i < this.virtChannels; i++) {
       this.map.push({ voice: VIRT_INVALID, tail: VIRT_INVALID });
     }
@@ -396,12 +397,17 @@ export class VirtualLayer {
 
 
   /**
-   * Set the NNA used when this channel's voice is later released
-   * (virt_setnna :417). NNA is applied at release time through
-   * releaseChannel's action argument; the setter exists for API parity.
+   * libxmp_virt_setnna (virtual.c:417-430): write the NNA action into the
+   * channel's mapped voice's act. read_event.c calls this with NNA_CUT
+   * before a toneporta re-patch (portamento_nna_sample.it, gxsmp2.it):
+   * zeroing act makes the next virt_setpatch reuse the voice in place
+   * instead of re-homing it to an overflow channel.
    */
-  setNna(_chn: number, _nna: number): void {
-    // applied at release time — see release()
+  setNna(chn: number, nna: number): void {
+    if (!this.extChannels) return; /* C: !HAS_QUIRK(QUIRK_VIRTUAL) */
+    const vi = this.mapChannel(chn);
+    if (vi === VIRT_INVALID) return;
+    this.voices[vi]!.act = nna;
   }
 
   /** Set the note played by the channel's voice (virt_setnote :472). */
