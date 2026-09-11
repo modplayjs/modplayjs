@@ -131,6 +131,8 @@ jobs:
         if: steps.bumps.outputs.has == 'true' && (steps.merge.outputs.is == 'true' || github.event_name == 'workflow_dispatch')
         run: |
           set -eu
+          git config user.name "modplayjs-release-bot"
+          git config user.email "noreply@github.com"
           while IFS='|' read -r name version; do
             [ -z "$name" ] && continue
             npm view "$name@$version" version >/dev/null 2>&1 || continue
@@ -191,8 +193,14 @@ jobs:
             } >> release-notes.md
           done < /tmp/bumps.txt
 
-          # The bot branch: reset it to main so the PR is exactly
-          # main + a marker commit (no stale diffs from old runs).
+          # Update the existing PR if one is open (body only — no branch
+          # reset, no churn); else create the bot branch + PR.
+          existing=$(gh pr list --head chore/version-bump --state open --json number --jq '.[0].number' || true)
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --title 'chore: version bump' --body-file release-notes.md
+            exit 0
+          fi
+
           git config user.name "modplayjs-release-bot"
           git config user.email "noreply@github.com"
           if git ls-remote --exit-code --heads origin chore/version-bump >/dev/null 2>&1; then
@@ -202,14 +210,7 @@ jobs:
           git commit -q --allow-empty -m "chore: version bump"
           git push -q origin chore/version-bump
           git checkout -q main
-
-          # Update the existing PR if one is open, else create it.
-          existing=$(gh pr list --head chore/version-bump --state open --json number --jq '.[0].number' || true)
-          if [ -n "$existing" ]; then
-            gh pr edit "$existing" --title 'chore: version bump' --body-file release-notes.md
-          else
-            gh pr create --base main --head chore/version-bump \
-              --title 'chore: version bump' --body-file release-notes.md --label release
-          fi
+          gh pr create --base main --head chore/version-bump \
+            --title 'chore: version bump' --body-file release-notes.md --label release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
