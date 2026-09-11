@@ -90,11 +90,11 @@ jobs:
 
       # ── Version-bump PR merged: publish + tag + release ────────────────
       - name: Build all packages
-        if: steps.bumps.outputs.has == 'true' && steps.merge.outputs.is == 'true'
+        if: steps.bumps.outputs.has == 'true' && (steps.merge.outputs.is == 'true' || github.event_name == 'workflow_dispatch')
         run: npx turbo run build
 
       - name: Publish to npm
-        if: steps.bumps.outputs.has == 'true' && steps.merge.outputs.is == 'true'
+        if: steps.bumps.outputs.has == 'true' && (steps.merge.outputs.is == 'true' || github.event_name == 'workflow_dispatch')
         run: |
           set -eu
           while IFS='|' read -r name version; do
@@ -114,7 +114,7 @@ jobs:
           done < /tmp/bumps.txt
 
       - name: Tag released versions
-        if: steps.bumps.outputs.has == 'true' && steps.merge.outputs.is == 'true'
+        if: steps.bumps.outputs.has == 'true' && (steps.merge.outputs.is == 'true' || github.event_name == 'workflow_dispatch')
         run: |
           set -eu
           while IFS='|' read -r name version; do
@@ -130,7 +130,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub releases
-        if: steps.bumps.outputs.has == 'true' && steps.merge.outputs.is == 'true'
+        if: steps.bumps.outputs.has == 'true' && (steps.merge.outputs.is == 'true' || github.event_name == 'workflow_dispatch')
         run: |
           set -eu
           while IFS='|' read -r name version; do
