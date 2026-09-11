@@ -26,14 +26,11 @@ reference WAVs:
 our internal mixer state against the reference dumps, frame by frame:
 
 ```text
-100 passed / 5 failed  (65 fixtures without .data)
+105 passed / 0 failed  (65 fixtures without .data)
 ```
 
-The 5 remaining failures are analyzed with C-referenced root causes in
-[docs/REMAINING-PARITY.md](docs/REMAINING-PARITY.md) — each is either a
-deep fixed-point precision divergence (porta slide ±5 of ~3.1M), a known
-stale golden, or a real port bug (NNA voice-pool flood, DCT flow divergence,
-retrig × envelope interplay) with a documented reproduction path.
+The remaining state-level divergences are analyzed with C-referenced
+root causes in [docs/REMAINING-PARITY.md](docs/REMAINING-PARITY.md).
 
 ## Plugin APIs
 
@@ -57,7 +54,7 @@ contracts are documented in [docs/](docs/) —
 | `@modplayjs/dsp-softmixer` | libxmp-parity software mixer (S3M/XM/IT, A500 optional) |
 | `@modplayjs/out-webaudio` | AudioWorklet output: SAB ring (COOP/COEP) with automatic copy-mode fallback, pause/resume |
 | `@modplayjs/out-pcm` | Offline PCM render + WAV encoder |
-| `@modplayjs/demo` | Demo page: transport, channel mute strip, instrument/sample audition, file info, order list, tracker message, realtime pattern view with legend |
+| `@modplayjs/demo` | Demo page (GitHub Pages): player with transport/seek/volume, channel mute strip, instrument/sample audition, file info, order list, tracker message, realtime pattern view |
 
 ## Interactive playback API
 
