@@ -241,7 +241,17 @@ export class Scanner {
     // in this.pendingScan indexed by chain; copy them out.
     for (let i = 0; i < seq; i++) {
       const pend = this.pendingScan[i];
-      if (pend) scan[i] = pend;
+      if (pend) {
+        // C's end_module writes ord/row/num INTO p.scan[chain] without
+        // touching .time (set by scan_module's return value). Merge —
+        // replacing the entry zeroed sequences[].duration downstream.
+        scan[i] = {
+          time: scan[i]?.time ?? pend.time,
+          ord: pend.ord,
+          row: pend.row,
+          num: pend.num,
+        };
+      }
     }
     this.pendingScan.length = 0;
 

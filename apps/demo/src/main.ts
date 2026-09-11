@@ -25,8 +25,13 @@ const stopBtn = document.getElementById('stop') as HTMLButtonElement;
 const followChk = document.getElementById('follow') as HTMLInputElement;
 const stripDotsChk = document.getElementById('stripdots') as HTMLInputElement;
 const panSep = document.getElementById('pansep') as HTMLInputElement;
-const panSepV = document.getElementById('pansepv') as HTMLSpanElement;
 const status = document.getElementById('status') as HTMLPreElement;
+const panSepV = document.getElementById('pansepv') as HTMLSpanElement;
+const seek = document.getElementById('seek') as HTMLInputElement;
+const timeCur = document.getElementById('timecur') as HTMLSpanElement;
+const timeRem = document.getElementById('timerem') as HTMLSpanElement;
+const volume = document.getElementById('volume') as HTMLInputElement;
+const volumeV = document.getElementById('volumev') as HTMLSpanElement;
 const infoEl = document.getElementById('info') as HTMLPreElement;
 const msgEl = document.getElementById('message') as HTMLPreElement;
 const msgSection = document.getElementById('messagesection') as HTMLElement;
@@ -79,6 +84,62 @@ panSep.addEventListener('input', () => {
   panSepV.textContent = String(v);
 });
 
+volume.addEventListener('input', () => {
+  const v = Number(volume.value);
+  core.setVolume(v);
+  volumeV.textContent = String(v);
+});
+core.setVolume(Number(volume.value));
+volumeV.textContent = volume.value;
+
+// Seek: drag updates the label live; release jumps. Seeking repositions
+// the player (ord + row); the pattern view snaps on the next frame().
+let seeking = false;
+let seekTarget = 0;
+const fmtTime = (ms: number): string => {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+};
+
+function moduleDuration(): number {
+  const mod = core.module;
+  if (!mod) return 0;
+  let total = 0;
+  for (const seq of mod.sequences) total += seq.duration;
+  return total;
+}
+
+seek.addEventListener('input', () => {
+  seeking = true;
+  const pct = Number(seek.value);
+  seekTarget = (pct / 1000) * moduleDuration();
+  seek.style.setProperty('--fill', (pct / 10).toFixed(1) + '%');
+  timeCur.textContent = fmtTime(seekTarget);
+});
+seek.addEventListener('change', () => {
+  const dur = moduleDuration();
+  const targetMs = (Number(seek.value) / 1000) * dur;
+  // Locate the order for the target time via the sequence time table.
+  const mod = core.module;
+  let ord = 0;
+  if (mod) {
+    let acc = 0;
+    for (let o = 0; o < mod.len; o++) {
+      const info = core.ordInfo?.[o];
+      const t = info?.time ?? 0;
+      if (acc + t > targetMs) {
+        ord = o;
+        break;
+      }
+      acc += t;
+      ord = Math.min(o + 1, mod.len - 1);
+    }
+  }
+  core.setPosition(ord);
+  seeking = false;
+  if (!playing && !paused && loaded) void startPlayback(false);
+});
+
 // end-of-track: reset the transport buttons (the output stops itself and
 // fires onEnded after the final ring drains)
 output.onEnded = () => {
@@ -100,6 +161,8 @@ let viewTracks = 0;
 let curPattern = -1;
 let curRow = -1;
 const rowEls: HTMLDivElement[] = [];
+// Pattern row pitch in px: --row-h 1.35em × 0.78rem font ≈ 17px (style.css).
+const ROW_PX = 17;
 
 const NOTE_NAMES = [
   'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-',
@@ -345,6 +408,11 @@ function buildPatternView(patternIdx: number): void {
   }
   patRows.appendChild(frag);
   curRow = -1;
+  // Anchor the scroll immediately after the rebuild: the active row lands
+  // ~1/3 from the top so the upcoming rows stay visible. Without this the
+  // container starts at scrollTop 0 and visually 'chases' the row down
+  // one keepInView step at a time.
+  patBody.scrollTop = 0;
 }
 
 function updatePatternHighlight(): void {
@@ -362,13 +430,26 @@ function updatePatternHighlight(): void {
     curRow = row;
     const el = rowEls[curRow]!;
     el.classList.add('active');
-    if (followChk.checked) keepInView(patBody, el);
+    if (followChk.checked) {
+      // Direct scrollTop assignment: instant, no smooth-scroll lag, and
+      // cheaper than two getBoundingClientRect calls per row. The active
+      // row is kept ~1/3 from the container top.
+      const target = Math.max(0, (curRow - Math.floor(viewRowsPerScreen() / 3)) * ROW_PX);
+      if (Math.abs(patBody.scrollTop - target) > ROW_PX * 2) {
+        patBody.scrollTop = target;
+      }
+    }
   }
   // Keep the current order entry visible in the order list panel.
   if (followChk.checked) {
     const cur = ordEl.querySelector('.cur');
     if (cur) keepInView(ordEl, cur as HTMLElement, true);
   }
+}
+
+/** Visible pattern rows in the scroll container (row height + border). */
+function viewRowsPerScreen(): number {
+  return Math.max(1, Math.floor(patBody.clientHeight / ROW_PX));
 }
 
 /** Scroll `el` into view INSIDE `container` only — never the page.
@@ -414,7 +495,10 @@ fileInput.addEventListener('change', async () => {
     pauseBtn.disabled = true;
     stopBtn.disabled = true;
     setAuditionButtons(false);
-
+    seek.disabled = false;
+    seek.value = '0';
+    timeCur.textContent = '0:00';
+    timeRem.textContent = '-' + fmtTime(moduleDuration());
     curPattern = -1;
     curRow = -1;
     renderInfo();
@@ -433,6 +517,7 @@ fileInput.addEventListener('change', async () => {
     playBtn.disabled = true;
     pauseBtn.disabled = true;
     stopBtn.disabled = true;
+    seek.disabled = true;
     const msg = err instanceof Error ? err.message : String(err);
     show(`unsupported or corrupt file: ${msg}`);
   }
@@ -538,18 +623,40 @@ function setAuditionButtons(disabled: boolean): void {
 
 // ------------------------------------------------------- realtime pattern UI --
 
+let lastStatus = '';
+function showThrottled(msg: string): void {
+  if (msg !== lastStatus) {
+    lastStatus = msg;
+    status.textContent = msg;
+  }
+}
+
 function frame(): void {
   if (loaded && (playing || paused)) {
     updatePatternHighlight();
     const ps = core.playState;
+    const dur = moduleDuration();
+    const cur = seeking ? seekTarget : ps.timeMs;
+    if (!seeking) {
+      if (dur > 0) {
+        const pct = Math.min(1000, Math.round((cur / dur) * 1000));
+        seek.value = String(pct);
+        seek.style.setProperty('--fill', (pct / 10).toFixed(1) + '%');
+      }
+      timeCur.textContent = fmtTime(cur);
+      timeRem.textContent = '-' + fmtTime(dur - cur);
+    }
     if (playing && !paused) {
-      show(
+      showThrottled(
         'playing | ord ' + ps.ord + ' row ' + ps.row + ' | ' +
-        ps.speed + '/' + ps.bpm + ' | rate: ' + output.audioContextSampleRate + ' Hz',
+        ps.speed + '/' + ps.bpm + ' | rate: ' +
+        output.audioContextSampleRate + ' Hz',
       );
     } else if (paused) {
-      show('paused | ord ' + ps.ord + ' row ' + ps.row);
+      showThrottled('paused | ord ' + ps.ord + ' row ' + ps.row);
     }
+  } else {
+    showThrottled('');
   }
   requestAnimationFrame(frame);
 }

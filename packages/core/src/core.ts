@@ -126,10 +126,12 @@ export class Core implements CoreIface {
   private eventScratch: (Event | undefined)[] = [];
   private _state: number = CoreState.UNLOADED;
   private _module: ModuleData | null = null;
-  /** scan result keyed by order (xxo_info). */
-  private ordInfo: OrdInfo[] = [];
+  /** Per-order time/speed/bpm info (xxo_info) — used by the demo's seek bar. */
+  ordInfo: OrdInfo[] = [];
   /** scan[seq] end ord/row/num per sequence — flattened for sequence 0 use. */
   private scanEnd = { ord: 0, row: 0, num: 0 };
+  /** Per-sequence scan endpoints (C's p->scan[seq]) for setPosition. */
+  private _scan: { ord: number; row: number; num: number }[] = [];
 
   private _p!: PlayState;
   private _flow!: FlowState;
@@ -323,6 +325,13 @@ export class Core implements CoreIface {
     }
     const s0 = res.scan[0];
     this.scanEnd = { ord: s0?.ord ?? 0, row: s0?.row ?? 0, num: s0?.num ?? 0 };
+    // Per-sequence scan endpoints (C's p->scan[seq]) — setPosition needs
+    // the target sequence's ord/num to adjust end_point like set_position.
+    this._scan = res.scan.map((s) => ({
+      ord: s?.ord ?? 0,
+      row: s?.row ?? 0,
+      num: s?.num ?? 0,
+    }));
 
     // Pin instrument identity keys to index+1 (C mixer_voice.ins).
     keyInstruments(mod.instruments);
@@ -972,6 +981,62 @@ export class Core implements CoreIface {
     p.bpm = oi.bpm;
     p.gvol = oi.gvl;
     p.current_time = oi.time;
+  }
+
+  /**
+   * set_position (control.c:63-132): jump playback to order `ord`,
+   * optionally to `row` within it (xmp_set_position + the flow jumpline
+   * mechanism). Works while playing — the next frame() takes the
+   * reposition path. Skips marker orders (xxo >= mod.pat) like C's
+   * marker walk, resets flow state so no stale pattern jump fires, and
+   * adjusts end_point for the new scan position.
+   */
+  setPosition(ord: number, row = 0): void {
+    if (this._state < CoreState.PLAYING) return;
+    const mod = this._module!;
+    const p = this._p;
+    const f = this._flow;
+    if (ord < 0 || ord >= mod.len) return;
+
+    const seq = this.getSequence(ord);
+    if (seq < 0 || seq >= mod.num_sequences) return;
+    p.sequence = seq;
+
+    const hasMarker = (mod.quirks & Quirk.MARKER) !== 0;
+    let pos = ord;
+    if (hasMarker) {
+      while (pos > 0 && pos < mod.len - 1 && (mod.xxo[pos] ?? 0xff) >= mod.pat) {
+        pos--;
+      }
+      if (pos >= mod.len) return;
+    }
+    const pat = mod.xxo[pos]!;
+    if (pat < mod.pat) {
+      if (pos > this._scan[seq]!.ord) {
+        f.end_point = 0;
+      } else {
+        f.num_rows = mod.patterns[pat]?.rows ?? 0;
+        f.end_point = this._scan[seq]!.num;
+        f.jumpline = 0;
+      }
+    }
+
+    p.pos = pos === 0 ? -1 : pos;
+    resetFlow(f);
+    f.jumpline = Math.max(0, Math.min(row, (mod.patterns[mod.xxo[pos]!]?.rows ?? 1) - 1));
+    f.force_reposition = 1;
+    // Recompute ticksize: the target row may carry a different tempo.
+    this.recomputeTicksize();
+  }
+
+  /** Master volume percent (xmp_set_player XMP_PLAYER_VOLUME):
+   * 0 = silence, 100 = full. Consumed in process_volume (tick.ts). */
+  setVolume(percent: number): void {
+    this._p.master_vol = Math.max(0, Math.min(100, Math.round(percent)));
+  }
+
+  getVolume(): number {
+    return this._p.master_vol;
   }
 
   /** get_sequence parity via stored control array. */

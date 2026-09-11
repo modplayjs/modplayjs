@@ -201,3 +201,44 @@
   color: var(--pat-rownum);
   white-space: pre;
 }
+
+/* ---------------------------------------------------------------- transport --
+ * Seek bar: filled track up to the thumb via the accent gradient; the
+ * volume slider stays neutral. Sticky pattern header so channel markers
+ * stay visible while the rows scroll underneath. */
+
+#seek {
+  height: 1rem;
+}
+#seek::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    var(--pat-accent) 0%,
+    var(--pat-accent) var(--fill, 0%),
+    oklch(from var(--pat-border) l c h / 0.5) var(--fill, 0%)
+  );
+  border-radius: 9999px;
+}
+#seek::-moz-range-track {
+  background: linear-gradient(
+    to right,
+    var(--pat-accent) 0%,
+    var(--pat-accent) var(--fill, 0%),
+    oklch(from var(--pat-border) l c h / 0.5) var(--fill, 0%)
+  );
+  border-radius: 9999px;
+}
+
+#pathead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--pat-bg);
+  box-shadow: 0 1px 0 var(--pat-border);
+}
+
+.prow.active {
+  box-shadow:
+    inset 2px 0 0 var(--pat-accent),
+    0 0 12px oklch(from var(--pat-accent) l c h / 0.25);
+}

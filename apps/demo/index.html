@@ -44,6 +44,22 @@
               <span id="pansepv" class="badge badge-ghost">100</span>
             </label>
           </div>
+
+          <!-- transport: seek / elapsed / remain / volume -->
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span id="timecur" class="font-mono text-xs tabular-nums opacity-80 w-14 text-right">0:00</span>
+            <input type="range" id="seek" min="0" max="1000" value="0" disabled
+              class="range range-xs range-primary grow min-w-48" aria-label="Seek" />
+            <span id="timerem" class="font-mono text-xs tabular-nums opacity-80 w-14">-0:00</span>
+            <div class="flex items-center gap-2 pl-2 ml-auto border-l border-base-300 pl-3">
+              <svg xmlns="http://www.w3.org/2000/svg" class="size-4 opacity-70" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05A4.5 4.5 0 0 0 16.5 12z"/>
+              </svg>
+              <input type="range" id="volume" min="0" max="100" value="100"
+                class="range range-xs w-28" aria-label="Volume" />
+              <span id="volumev" class="badge badge-ghost w-10 text-center">100</span>
+            </div>
+          </div>
           <div class="flex flex-wrap items-center gap-1">
             <span class="text-xs opacity-60 mr-1">channels:</span>
             <div id="chanstrip" class="flex flex-wrap gap-1"></div>
