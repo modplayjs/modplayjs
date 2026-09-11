@@ -44,7 +44,7 @@ portamento_sustain (15.1s):
 | Fixture | OpenMPT-sided? | Fix target |
 |---|---|---|
 | `duplicate_check_transpose` | — | **FIXED** (state match, audio 0.98) via pastnote/release fixes |
-| `it_multi_retrigger` | No — OpenMPT ≈ libxmp ≈ ours (0.98) | 7 lines, vol ±16 (1.5%): the E1b (vol ×⅔) retrig decay tail differs in the last 2 frames (C 16→0 at f4, ours 16→16→0) — anticlick discharge frame rounding; audio identical to both references (0.986) |
+| `it_multi_retrigger` | — | **FIXED** (state match) — our JS float division in the E1b ×⅔ retrig chain (`vol /= 3` → 42.67) never hit zero like C's int division (`42`, `28`, …, `0`); truncating the divide fixed all 7 lines |
 | `portamento_nna_sample` | partially fixed | **remaining** (54→30 state diffs with fresh dumps): tail-slot lifetime — the fixture NNA-continues 4 voices; C holds exactly 4 tails (ch6-9) and rotates one slot; ours accumulates 6+ tails (re-homes at every retrig incl. pass-2, C's pass-2 retrigs reuse the freed slot). Root cause: our re-home hunt takes a fresh overflow channel per retrig and prior tails never die (their samples loop, so no sample-end reset). C's tail slot frees via the background NOTE_END reset (player.c:1057) then re-homes reuse it. Fix direction: free/steal the oldest tail when the re-home hunt finds no free slot (C free_voice steals lowest-vol background), OR reset the tail on sample end like C's background reset |
 | `portamento_sustain` | Irrelevant — libxmp and OpenMPT disagree with each other (−0.19); ours matches libxmp's shape (0.94) | the 4-line period ±5 rounding only |
 | `reverse_it` | No — OpenMPT tracks libxmp (0.98); ours breaks away (0.77) | sustain-loop (flg=0x20/0x60, lps=lpe=0 degenerate) + reverse + keyoff interaction; our voice ends where C sustains (rows 36-45) — needs the C adjust_voice_end/sustain-on-release flow traced |
@@ -108,7 +108,7 @@ All four have precise, reproducible evidence
 
 | Fixture | C lines | ours | state diffs | the delta |
 |---|---|---|---|---|
-| `it_multi_retrigger` | 366 | 366 | 7 | vol column only: the E1b ×⅔ decay chain's last 2 frames (C 16→0 at f4, ours 16→16→0) |
+| `it_multi_retrigger` | 366 | 366 | 0 | **FIXED** — the E1b retrig vol divide now truncates like C int division |
 | `portamento_nna_sample` | 540 | 876 | 30 | ins col off (our v.ins key vs C's index) + the tail notes stale; +336 ours-only rows (our NNA-Continue tails persist, C's tails retire via the background NOTE_END reset at sample end) |
 | `portamento_sustain` | 144 | 144 | 85 | pos0 col only: our bidi-loop wrap phase differs by ~5 samples (our pos wraps at the sustain end, C's continues past it) |
 | `reverse_it` | 56 | 56 | 5 | pass-2 rows 40-44: C plays the ord3 sustained note; ours re-patches (see the per-row table below) |
