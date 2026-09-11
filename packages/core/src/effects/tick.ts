@@ -1313,8 +1313,8 @@ export function processTick(core: Core, chn: number): void {
         SET_NOTE(xc, NOTE_END);
       }
       xc.volume += rval[xc.retrig.type]!.s;
-      xc.volume *= rval[xc.retrig.type]!.m;
-      xc.volume /= rval[xc.retrig.type]!.d;
+      xc.volume = Math.trunc((xc.volume * rval[xc.retrig.type]!.m) /
+        rval[xc.retrig.type]!.d); /* C int division truncates */
       xc.retrig.count = xc.retrig.val;
 
       if (xc.retrig.limit > 0) {
