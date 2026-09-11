@@ -54,10 +54,11 @@
 #pathead,
 .prow {
   display: grid;
-  /* row gutter + 4 columns per track (note/ins/vol/fx). Each data cell
-     holds a minimum width so narrow viewports scroll horizontally
-     instead of squeezing the note/ins/vol/fx columns unreadable. */
-  grid-template-columns: 3.5em repeat(calc(var(--cols, 4) * 4), minmax(3.2em, 1fr));
+  /* row gutter + 4 columns per track (note/ins/vol/fx). FIXED cell
+     widths: header and rows must resolve to identical column tracks or
+     they drift apart on horizontal scroll (a 1fr track resolves against
+     each grid's own width — self-referential for max-content grids). */
+  grid-template-columns: 3.5em repeat(calc(var(--cols, 4) * 4), 3.2em);
   font-family: inherit;
 }
 
