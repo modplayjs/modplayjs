@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.0.2"
+    "@modplayjs/core": "^0.0.3"
   },
   "keywords": [
     "tracker",

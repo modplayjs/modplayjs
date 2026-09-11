@@ -19,8 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.0.2",
-    "@modplayjs/fmt-it": "^0.0.2",
+    "@modplayjs/core": "^0.0.3",
+    "@modplayjs/fmt-it": "^0.0.3",
     "stb-vorbis": "^0.0.6"
   },
   "keywords": [
