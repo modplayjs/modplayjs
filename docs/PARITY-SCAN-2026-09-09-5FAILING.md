@@ -111,7 +111,14 @@ All four have precise, reproducible evidence
 | `it_multi_retrigger` | 366 | 366 | 7 | vol column only: the E1b ×⅔ decay chain's last 2 frames (C 16→0 at f4, ours 16→16→0) |
 | `portamento_nna_sample` | 540 | 876 | 30 | ins col off (our v.ins key vs C's index) + the tail notes stale; +336 ours-only rows (our NNA-Continue tails persist, C's tails retire via the background NOTE_END reset at sample end) |
 | `portamento_sustain` | 144 | 144 | 85 | pos0 col only: our bidi-loop wrap phase differs by ~5 samples (our pos wraps at the sustain end, C's continues past it) |
-| `reverse_it` | 56 | 56 | 5 | pass-2 rows 40-44: C plays the ord3 sustained note; ours re-patches |
+| `reverse_it` | 56 | 56 | 5 | pass-2 rows 40-44: C plays the ord3 sustained note; ours re-patches (see the per-row table below) |
+
+### `reverse_it` per-row diff (rows 35-44, pass 2 boundary)
+
+| row | C (note, ins, pos0) | ours (note, ins, pos0) | |
+|---|---|---|---|
+| 35-39 | note 72 ins 6, pos0 3357→4695 | note 72 ins 6, pos0 3357→4695 | ✓ identical |
+| 40-44 | note 84 ins 2, pos0 4981→7657 | note 60 ins 0, pos0 5674→6343 | ✗ C sustains the ord3 voice; ours advances to the pass-2 note |
 
 The ins-column difference in the NNA/SUSTAIN fixtures is a dump-harness
 artifact: our dumpMixerState prints `v.ins - 1` (our insKey = index + 1)
