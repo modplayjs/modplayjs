@@ -1,17 +1,22 @@
 name: Release
 
-# A version bump reaches npm ONLY through a release PR:
+# Every push to main (except the release merge itself) opens/updates ONE
+# standing version-bump PR that collects all incoming commits:
 #
-#   1. Any PR may bump a package version (0.0.2 -> 0.0.3 in package.json).
-#   2. The moment such a PR merges to main, this workflow detects the bump
-#      (diff vs the previous main commit) and opens the release PR
-#      "chore: release" — it carries .github/release/pending.txt (the
-#      exact list of name@version pairs to publish) and release notes.
-#   3. Merging THAT PR publishes to npm (provenance), tags
-#      @modplayjs/<name>@<version>.
+#   1. push commits to main (via PRs or directly)
+#   2. the workflow computes, per changed package, the next version from
+#      the commits since its last release tag:
+#        - any "feat!:" or "BREAKING CHANGE:"  → major
+#        - any "feat:"                          → minor
+#        - anything else                        → patch
+#      and opens/updates the "chore: version bump" PR with the version
+#      edits + release notes
+#   3. merging THAT PR is the release: it applies the bumps and publishes
+#      every bumped package to npm (provenance), tags
+#      @modplayjs/<name>@<version> and creates GitHub releases
 #
-# Direct pushes to main may bump versions only inside the release merge
-# itself (guarded in ci.yml / version-guard).
+# Direct pushes to main may not change package versions themselves — the
+# bump is applied only by the version-bump PR merge (guarded in ci.yml).
 
 on:
   push:
@@ -29,7 +34,7 @@ permissions:
 
 jobs:
   release:
-    name: Open release PR / publish on merge
+    name: Collect commits / publish on version-bump merge
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -48,14 +53,31 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      # Merging the release PR: the commit subject is "chore: release"
-      # and the pending list in the repo says exactly what to publish.
-      - name: Publish release-PR merge to npm
+      # ── Release merge: publish + tag, then stop ────────────────────────
+      - name: Compute bumped packages on this merge
+        id: release_merge
         if: >-
-          startsWith(github.event.head_commit.message, 'chore: release')
+          startsWith(github.event.head_commit.message, 'chore: version bump')
         run: |
           set -eu
-          published=""
+          # On the version-bump merge, every package whose version is not on
+          # npm was bumped by this PR.
+          : > /tmp/bumps.txt
+          for f in packages/*/package.json; do
+            name=$(node -pe 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).name' "$f")
+            version=$(node -pe 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).version' "$f")
+            private=$(node -pe 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).private === true' "$f")
+            [ "$private" = "true" ] && continue
+            if ! npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name|$version" >> /tmp/bumps.txt
+            fi
+          done
+          echo "bumps:"; cat /tmp/bumps.txt
+
+      - name: Publish to npm
+        if: steps.release_merge.outcome == 'success'
+        run: |
+          set -eu
           while IFS='|' read -r name version; do
             [ -z "$name" ] && continue
             if npm view "$name@$version" version >/dev/null 2>&1; then
@@ -74,15 +96,12 @@ jobs:
             [ -z "$pkg_dir" ] && { echo "::error::no package dir for $name"; exit 1; }
             echo "publishing $name@$version"
             (cd "$pkg_dir" && npm publish --provenance --access public)
-            published="$published $name@$version"
-          done < .github/release/pending.txt
-          echo "published:${published:- none}"
+          done < /tmp/bumps.txt
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Tag released versions
-        if: >-
-          startsWith(github.event.head_commit.message, 'chore: release')
+        if: steps.release_merge.outcome == 'success'
         run: |
           set -eu
           while IFS='|' read -r name version; do
@@ -92,11 +111,10 @@ jobs:
               continue
             fi
             tag="$name@$version"
-            # A fresh runner has no tags fetched — query the REMOTE refspace.
             if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
               continue
             fi
-            git tag "$tag"
+            git tag -a "$tag" -m "$name@$version"
             if ! git push origin "$tag" 2>&1; then
               remote_sha=$(git ls-remote origin "refs/tags/$tag" | cut -f1)
               if [ "$remote_sha" != "$(git rev-parse HEAD)" ]; then
@@ -105,79 +123,132 @@ jobs:
               fi
             fi
             echo "tagged $tag"
-          done < .github/release/pending.txt
+          done < /tmp/bumps.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # A feature PR with a version bump just merged: open the release PR.
-      - name: Detect version bumps on main
-        if: >-
-          !startsWith(github.event.head_commit.message, 'chore: release')
-        id: bumps
+      - name: Create GitHub releases
+        if: steps.release_merge.outcome == 'success'
         run: |
           set -eu
-          before="${{ github.event.before }}"
-          if ! git cat-file -e "$before" 2>/dev/null; then
-            echo "no parent to compare; skipping"
-            exit 0
-          fi
-          mkdir -p .github/release
-          : > /tmp/bumps.txt
+          while IFS='|' read -r name version; do
+            [ -z "$name" ] && continue
+            dir="packages/${name#@modplayjs/}"
+            tag="$name@$version"
+            notes=$(git log --pretty='- %s (%h)' -20 -- "$dir")
+            gh release create "$tag" --title "$name@$version" --notes "${notes:-release}" --verify-tag || true
+          done < /tmp/bumps.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Ordinary push: open/update the standing version-bump PR ────────
+      - name: Compute next versions from commits
+        id: compute
+        if: "!startsWith(github.event.head_commit.message, 'chore: version bump')"
+        run: |
+          set -eu
+          # Changed packages since the last RELEASE commit (not per-package
+          # tags: the release PR merges publish every bumped package, so the
+          # previous release merge commit is the boundary).
+          last_release=$(git log --pretty=%s -200 origin/main \
+            | grep -nm1 '^chore: version bump$' >/dev/null 2>&1 && \
+            git log --pretty='%H %s' -200 | grep -m1 ' chore: version bump$' | cut -d' ' -f1 || echo "")
+          [ -z "$last_release" ] && last_release=$(git rev-list --max-parents=0 HEAD | tail -1)
+
+          mkdir -p /tmp/next
           for f in packages/*/package.json; do
             name=$(node -pe 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).name' "$f")
             version=$(node -pe 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).version' "$f")
             private=$(node -pe 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).private === true' "$f")
             [ "$private" = "true" ] && continue
-            old=$(git show "$before:$f" 2>/dev/null \
-              | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).version' 2>/dev/null || echo "")
-            if [ -n "$old" ] && [ "$old" != "$version" ]; then
-              echo "$name|$version" >> /tmp/bumps.txt
+            dir="packages/${name#@modplayjs/}"
+
+            # Commits touching this package since its last release tag
+            # (or since the beginning for a never-released package).
+            last_tag=$(git tag --list "$name@*" --sort=-v:refname | head -1)
+            if [ -n "$last_tag" ]; then
+              commits=$(git log --pretty=%s "$last_tag..HEAD" -- "$dir")
+            else
+              commits=$(git log --pretty=%s -50 -- "$dir")
             fi
+            [ -z "$commits" ] && continue   # nothing new in this package
+
+            last_tag_range="$last_tag..HEAD"
+            [ -z "$last_tag" ] && last_tag_range="HEAD"
+            level=patch
+            if git log --pretty=%B "$last_tag_range" -- "$dir" \
+                | grep -qE '^feat!|^!|BREAKING CHANGE'; then
+              level=major   # feat! or a BREAKING CHANGE footer
+            elif git log --pretty=%s "$last_tag_range" -- "$dir" \
+                | grep -qE '^feat(\(|:| )'; then
+              level=minor   # features without breaking changes
+            fi
+            next=$(node -e '
+              const [maj, min, pat] = process.argv[1].split(".").map(Number);
+              const lvl = process.argv[2];
+              if (lvl === "major") console.log((maj + 1) + ".0.0");
+              else if (lvl === "minor") console.log(maj + "." + (min + 1) + ".0");
+              else console.log(maj + "." + min + "." + (pat + 1));
+            ' "$version" "$level")
+            echo "$name|$version|$next|$level" >> /tmp/next/bumps.txt
           done
-          if [ -s /tmp/bumps.txt ]; then
-            cp /tmp/bumps.txt .github/release/pending.txt
-            max_version=$(cut -d'|' -f2 /tmp/bumps.txt | sort -V | tail -1)
+          if [ -s /tmp/next/bumps.txt ]; then
             {
               echo "list<<EOF"
-              cat /tmp/bumps.txt
+              cat /tmp/next/bumps.txt
               echo "EOF"
-              echo "max_version=$max_version"
             } >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build release notes
-        if: steps.bumps.outputs.max_version != ''
+      - name: Apply version bumps to the release branch
+        if: steps.compute.outputs.list != ''
         run: |
           set -eu
-          {
-            echo "Bumps collected from main — merging this PR publishes:"
-            echo
-            echo '```'
-            cat /tmp/bumps.txt
-            echo '```'
-            echo
-            while IFS='|' read -r name version; do
-              echo "## $name@$version"
+          git checkout -b chore/version-bump origin/main
+          : > /tmp/notes.md
+          while IFS='|' read -r name current next level; do
+            f="packages/${name#@modplayjs/}/package.json"
+            node -e '
+              const fs = require("fs");
+              const p = process.argv[1], next = process.argv[2];
+              const j = JSON.parse(fs.readFileSync(p, "utf8"));
+              j.version = next;
+              fs.writeFileSync(p, JSON.stringify(j, null, 2) + "\n");
+            ' "$f" "$next"
+            {
+              echo "## $name@$next ($level, was $current)"
               echo
               last_tag=$(git tag --list "$name@*" --sort=-v:refname | head -1)
-              dir="packages/${name#@modplayjs/}"
               if [ -n "$last_tag" ]; then
-                git log --pretty='- %s (%h)' "$last_tag..HEAD" -- "$dir"
+                git log --pretty='- %s (%h)' "$last_tag..origin/main" -- "packages/${name#@modplayjs/}"
               else
-                git log --pretty='- %s (%h)' -20 -- "$dir"
+                git log --pretty='- %s (%h)' -20 origin/main -- "packages/${name#@modplayjs/}"
               fi
               echo
-            done < /tmp/bumps.txt
+            } >> /tmp/notes.md
+          done < /tmp/next/bumps.txt
+          {
+            echo "Merging this PR bumps the versions and publishes to npm:"
+            echo
+            echo '```'
+            cat /tmp/next/bumps.txt
+            echo '```'
+            echo
+            cat /tmp/notes.md
           } > release-notes.md
+          git config user.name "modplayjs-release-bot"
+          git config user.email "noreply@github.com"
+          git add packages/
+          git commit -q -m "chore: version bump" || true
 
-      - name: Open the release PR
-        if: steps.bumps.outputs.max_version != ''
+      - name: Open the version-bump PR
+        if: steps.compute.outputs.list != ''
         uses: peter-evans/create-pull-request@v7
         with:
-          branch: chore/release
+          branch: chore/version-bump
           delete-branch: true
-          title: 'chore: release'
+          title: 'chore: version bump'
           body-path: release-notes.md
-          commit-message: 'chore: release'
+          commit-message: 'chore: version bump'
           labels: release
-          add-paths: .github/release/pending.txt
+          add-paths: packages/
