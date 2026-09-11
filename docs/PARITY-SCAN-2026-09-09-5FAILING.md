@@ -102,6 +102,21 @@ Per-cause status:
    run.
 
 All four have precise, reproducible evidence (fresh C dumps at
+All four have precise, reproducible evidence
+
+### Deltas quantified with row-keyed matching (fresh upstream dumps, per-process)
+
+| Fixture | C lines | ours | state diffs | the delta |
+|---|---|---|---|---|
+| `it_multi_retrigger` | 366 | 366 | 7 | vol column only: the E1b ×⅔ decay chain's last 2 frames (C 16→0 at f4, ours 16→16→0) |
+| `portamento_nna_sample` | 540 | 876 | 30 | ins col off (our v.ins key vs C's index) + the tail notes stale; +336 ours-only rows (our NNA-Continue tails persist, C's tails retire via the background NOTE_END reset at sample end) |
+| `portamento_sustain` | 144 | 144 | 85 | pos0 col only: our bidi-loop wrap phase differs by ~5 samples (our pos wraps at the sustain end, C's continues past it) |
+| `reverse_it` | 56 | 56 | 5 | pass-2 rows 40-44: C plays the ord3 sustained note; ours re-patches |
+
+The ins-column difference in the NNA/SUSTAIN fixtures is a dump-harness
+artifact: our dumpMixerState prints `v.ins - 1` (our insKey = index + 1)
+while C's gen prints `vi->ins` (the 0-based index) — the semantics match,
+the displayed value doesn't.
 /tmp/c-<fixture>.data, our dumps at /tmp/ours-<fixture>.data, renders
 in /tmp/{ours,xmp,ompt}-<fixture>.wav). Each needs a focused C
 debugger session rather than further static reading.
