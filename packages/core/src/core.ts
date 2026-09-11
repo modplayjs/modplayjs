@@ -348,6 +348,9 @@ export class Core implements CoreIface {
     p.pos = p.ord = 0;
     p.frame = -1;
     p.row = 0;
+    p.current_time = 0;
+    p.loop_count = 0;
+    p.sequence = 0;
     for (let i = 0; i < mod.chn + this.smixChannels; i++) {
       p.channel_mute[i] =
         i < mod.chn && (mod.channels[i]?.flg ?? 0) & 0x04 /* MUTE */
