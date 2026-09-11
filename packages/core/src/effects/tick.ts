@@ -1334,7 +1334,12 @@ export function processTick(core: Core, chn: number): void {
     }
   }
 
-  core.virt.releaseFlag(chn, TEST_NOTE(xc, NOTE_SAMPLE_RELEASE) !== 0 ? 1 : 0);
+  const relSample = core.getSample(core.virt.voiceSmp(chn));
+  core.virt.releaseFlag(
+    chn,
+    TEST_NOTE(xc, NOTE_SAMPLE_RELEASE) !== 0 ? 1 : 0,
+    relSample,
+  );
 
   updateVolume(core, chn);
   updateFrequency(core, chn);

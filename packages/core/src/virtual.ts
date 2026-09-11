@@ -645,17 +645,32 @@ export class VirtualLayer {
    * (mixer.c:958-981): set/clear the voice RELEASE flag. `rel` is the
    * NOTE_SAMPLE_RELEASE test result (play_channel player.c:1683).
    */
-  releaseFlag(chn: number, rel: number): void {
+  releaseFlag(
+    chn: number,
+    rel: number,
+    xxs?: SampleViewLike,
+  ): void {
     const vi = this.mapChannel(chn);
     if (vi === VIRT_INVALID) return;
     const v = this.voices[vi]!;
     if (rel) {
+      // mixer_release (mixer.c:959-975): cancel VOICE_REVERSE when
+      // releasing an ACTIVE sustain loop whose MAIN loop is not
+      // bidirectional — covers bidi sustain loops and forward sustain
+      // loops reversed with MPT S9F Play Backward (reverse_it.it).
+      if (
+        (v.flags & VoiceFlag.RELEASE) === 0 &&
+        xxs !== undefined &&
+        (xxs.flags & SampleFlags.SUSTAIN) !== 0 &&
+        (xxs.flags & SampleFlags.BIDIR) === 0
+      ) {
+        v.flags &= ~VoiceFlag.VOICE_REVERSE;
+      }
       v.flags |= VoiceFlag.RELEASE;
     } else {
       v.flags &= ~VoiceFlag.RELEASE;
     }
   }
-
   /**
    * libxmp_virt_getvoicepos (virtual.c:378-388) + libxmp_mixer_getvoicepos
    * (mixer.c:840-855): current sample position of the channel's voice.
@@ -669,6 +684,13 @@ export class VirtualLayer {
   /** Direct voice access for the DSP mixer. */
   voiceAt(idx: number): VoiceState | undefined {
     return this.voices[idx];
+  }
+
+  /** Sample id of the channel's mapped voice (-1 when unmapped/ended). */
+  voiceSmp(chn: number): number {
+    const vi = this.mapChannel(chn);
+    if (vi === VIRT_INVALID) return -1;
+    return this.voices[vi]!.smp;
   }
 
   get numVoices(): number {
