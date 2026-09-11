@@ -110,4 +110,6 @@ jobs:
               fi
             fi
             echo "tagged $tag"
+          done
+        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
