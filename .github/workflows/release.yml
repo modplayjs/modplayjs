@@ -147,12 +147,11 @@ jobs:
         if: "!startsWith(github.event.head_commit.message, 'chore: version bump')"
         run: |
           set -eu
-          # Changed packages since the last RELEASE commit (not per-package
-          # tags: the release PR merges publish every bumped package, so the
-          # previous release merge commit is the boundary).
-          last_release=$(git log --pretty=%s -200 origin/main \
-            | grep -nm1 '^chore: version bump$' >/dev/null 2>&1 && \
-            git log --pretty='%H %s' -200 | grep -m1 ' chore: version bump$' | cut -d' ' -f1 || echo "")
+          # Per-package scan over FULL git history with no commit-count
+          # bounds. The scan boundary is the last release-merge commit
+          # (located via full `git log`, not a windowed search); the repo
+          # root is the absolute fallback for a never-released repo.
+          last_release=$(git log --pretty='%H %s'             | awk '/ chore: version bump$/{print $1; exit}')
           [ -z "$last_release" ] && last_release=$(git rev-list --max-parents=0 HEAD | tail -1)
 
           mkdir -p /tmp/next
@@ -164,22 +163,25 @@ jobs:
             dir="packages/${name#@modplayjs/}"
 
             # Commits touching this package since its last release tag
-            # (or since the beginning for a never-released package).
+            # (or since the scan boundary for a never-released package).
+            # Both sides of the range come from full history — no `-N`
+            # windows, so no commit can fall outside the scan.
             last_tag=$(git tag --list "$name@*" --sort=-v:refname | head -1)
             if [ -n "$last_tag" ]; then
-              commits=$(git log --pretty=%s "$last_tag..HEAD" -- "$dir")
+              range="$last_tag..HEAD"
+              commits=$(git log --pretty=%s "$range" -- "$dir")
             else
-              commits=$(git log --pretty=%s -50 -- "$dir")
+              range="$last_release..HEAD"
+              commits=$(git log --pretty=%s "$range" -- "$dir")
+              [ -z "$commits" ] && commits=$(git log --pretty=%s HEAD -- "$dir")
             fi
             [ -z "$commits" ] && continue   # nothing new in this package
 
-            last_tag_range="$last_tag..HEAD"
-            [ -z "$last_tag" ] && last_tag_range="HEAD"
             level=patch
-            if git log --pretty=%B "$last_tag_range" -- "$dir" \
+            if git log --pretty=%B "$range" -- "$dir" \
                 | grep -qE '^feat!|^!|BREAKING CHANGE'; then
               level=major   # feat! or a BREAKING CHANGE footer
-            elif git log --pretty=%s "$last_tag_range" -- "$dir" \
+            elif git log --pretty=%s "$range" -- "$dir" \
                 | grep -qE '^feat(\(|:| )'; then
               level=minor   # features without breaking changes
             fi
