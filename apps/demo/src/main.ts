@@ -456,16 +456,12 @@ function updatePatternHighlight(): void {
     const el = rowEls[curRow]!;
     el.classList.add('active');
     if (followChk.checked) {
-      // Keep the active row vertically centered in the pattern box and
-      // glide there smoothly. The row-anchor math targets the exact
-      // center; only a ±half-row jitter is allowed before a re-anchor,
-      // so each row advance produces one short eased step instead of a
-      // continuous chase.
-      const target = (curRow + 0.5) * ROW_PX - patBody.clientHeight / 2;
-      const clamped = Math.max(0, Math.min(target, patBody.scrollHeight - patBody.clientHeight));
-      if (Math.abs(patBody.scrollTop - clamped) > ROW_PX * 1.5) {
-        patBody.scrollTo({ top: clamped, behavior: 'smooth' });
-      }
+      glideScrollTo(
+        Math.max(0, Math.min(
+          (curRow + 0.5) * ROW_PX - patBody.clientHeight / 2,
+          patBody.scrollHeight - patBody.clientHeight,
+        )),
+      );
     }
   }
   // Keep the current order entry visible in the order list panel.
@@ -475,10 +471,27 @@ function updatePatternHighlight(): void {
   }
 }
 
-/** Visible pattern rows in the scroll container (row height + border). */
-function viewRowsPerScreen(): number {
-  return Math.max(1, Math.floor(patBody.clientHeight / ROW_PX));
+/** Scroll glide state: rAF-interpolated approach to the centered anchor.
+ * Native smooth scrollTo() restarts its easing on every row advance,
+ * which reads as a twitch; interpolating the residual distance each
+ * frame instead gives one continuous glide that never overshoots. */
+let glideRaf = 0;
+function glideScrollTo(target: number): void {
+  cancelAnimationFrame(glideRaf);
+  const step = (): void => {
+    const residual = target - patBody.scrollTop;
+    if (Math.abs(residual) <= 0.5) {
+      patBody.scrollTop = target;
+      glideRaf = 0;
+      return;
+    }
+    // Exponential approach: 35% of the remaining distance per frame.
+    patBody.scrollTop += residual * 0.35;
+    glideRaf = requestAnimationFrame(step);
+  };
+  glideRaf = requestAnimationFrame(step);
 }
+
 
 /** Scroll `el` into view INSIDE `container` only — never the page.
  * scrollIntoView() scrolls every scrollable ancestor, which yanked the
