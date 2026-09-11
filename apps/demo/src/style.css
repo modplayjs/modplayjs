@@ -82,7 +82,10 @@
 }
 
 #patbody {
-  max-height: 26rem;
+  /* Never taller than the viewport: with follow-scroll the active row
+     stays centered, so a box taller than the screen just pushes the
+     transport controls off-view. */
+  max-height: min(60vh, 42rem);
   overflow: auto;
   overscroll-behavior: contain;
 }

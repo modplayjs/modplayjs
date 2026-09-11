@@ -456,12 +456,15 @@ function updatePatternHighlight(): void {
     const el = rowEls[curRow]!;
     el.classList.add('active');
     if (followChk.checked) {
-      // Direct scrollTop assignment: instant, no smooth-scroll lag, and
-      // cheaper than two getBoundingClientRect calls per row. The active
-      // row is kept ~1/3 from the container top.
-      const target = Math.max(0, (curRow - Math.floor(viewRowsPerScreen() / 3)) * ROW_PX);
-      if (Math.abs(patBody.scrollTop - target) > ROW_PX * 2) {
-        patBody.scrollTop = target;
+      // Keep the active row vertically centered in the pattern box and
+      // glide there smoothly. The row-anchor math targets the exact
+      // center; only a ±half-row jitter is allowed before a re-anchor,
+      // so each row advance produces one short eased step instead of a
+      // continuous chase.
+      const target = (curRow + 0.5) * ROW_PX - patBody.clientHeight / 2;
+      const clamped = Math.max(0, Math.min(target, patBody.scrollHeight - patBody.clientHeight));
+      if (Math.abs(patBody.scrollTop - clamped) > ROW_PX * 1.5) {
+        patBody.scrollTo({ top: clamped, behavior: 'smooth' });
       }
     }
   }
