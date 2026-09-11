@@ -63,11 +63,15 @@ jobs:
       - name: Version & publish (changesets)
         uses: changesets/action@v1
         with:
-          # changeset publish tags each released package
-          # (@modplayjs/<name>@<version>) and pushes the tags; the action
-          # creates the GitHub release from the changeset changelogs.
+          # version: apply bumps AND keep package-lock.json in sync inside
+          # the Version Packages PR (npm ci in CI would fail otherwise).
+          version: npx changeset version && npm install --package-lock-only --no-audit --no-fund
+          # publish: changeset publish releases every bumped package,
+          # creates the @modplayjs/<name>@<version> git tags and pushes
+          # them; createGithubReleases turns each tag into a GitHub
+          # release using the changeset changelogs.
           publish: npx changeset publish
-          version: npx changeset version
+          createGithubReleases: true
           title: 'chore: version packages'
           commit: 'chore: version packages'
         env:
