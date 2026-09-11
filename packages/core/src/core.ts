@@ -1025,12 +1025,16 @@ export class Core implements CoreIface {
     resetFlow(f);
     f.jumpline = Math.max(0, Math.min(row, (mod.patterns[mod.xxo[pos]!]?.rows ?? 1) - 1));
     f.force_reposition = 1;
+    // Predict current_time now: the reposition lands on the next frame(),
+    // but the UI reads timeMs every rAF — without this the seek bar snaps
+    // back to the pre-seek position for a frame or two.
+    p.current_time = this.ordInfo[pos]?.time ?? p.current_time;
     // Recompute ticksize: the target row may carry a different tempo.
     this.recomputeTicksize();
   }
 
   /** Master volume percent (xmp_set_player XMP_PLAYER_VOLUME):
-   * 0 = silence, 100 = full. Consumed in process_volume (tick.ts). */
+   * 0 = silence, 100 = full. Consumed in process_volume (tick.ts:908). */
   setVolume(percent: number): void {
     this._p.master_vol = Math.max(0, Math.min(100, Math.round(percent)));
   }

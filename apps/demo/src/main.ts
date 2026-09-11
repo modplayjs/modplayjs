@@ -116,26 +116,36 @@ seek.addEventListener('input', () => {
   seek.style.setProperty('--fill', (pct / 10).toFixed(1) + '%');
   timeCur.textContent = fmtTime(seekTarget);
 });
+
 seek.addEventListener('change', () => {
   const dur = moduleDuration();
   const targetMs = (Number(seek.value) / 1000) * dur;
-  // Locate the order for the target time via the sequence time table.
+  // Locate the order + row for the target time. ordInfo[].time is the
+  // absolute replay time at the START of each order, so the ord is the
+  // last one whose start ≤ target, and the row is the remaining offset
+  // scaled by that order's row duration.
   const mod = core.module;
   let ord = 0;
+  let row = 0;
   if (mod) {
-    let acc = 0;
-    for (let o = 0; o < mod.len; o++) {
-      const info = core.ordInfo?.[o];
-      const t = info?.time ?? 0;
-      if (acc + t > targetMs) {
+    for (let o = mod.len - 1; o >= 0; o--) {
+      const t = core.ordInfo?.[o]?.time ?? 0;
+      if (targetMs >= t) {
         ord = o;
+        const rows = mod.patterns[mod.xxo[o] ?? 0]?.rows ?? 64;
+        const ordDur = (core.ordInfo?.[o + 1]?.time ?? dur) - t;
+        row = ordDur > 0
+          ? Math.min(rows - 1, Math.floor(((targetMs - t) / ordDur) * rows))
+          : 0;
         break;
       }
-      acc += t;
-      ord = Math.min(o + 1, mod.len - 1);
     }
   }
-  core.setPosition(ord);
+  core.setPosition(ord, row);
+  // Latch: the reposition lands on the audio thread's next frame; until
+  // playState catches up, frame() must not overwrite the slider.
+  seekLatchUntil = performance.now() + 400;
+  timeCur.textContent = fmtTime(targetMs);
   seeking = false;
   if (!playing && !paused && loaded) void startPlayback(false);
 });
@@ -534,6 +544,11 @@ async function startPlayback(muteSong: boolean): Promise<void> {
   core.setSampleRate(deviceRate);
   core.startSmix(4); // reserve channels for instrument/sample audition
   core.startPlayer();
+  // startPlayer resets master_vol to 100 (parity with C's
+  // xmp_start_player) — re-apply the user's slider values so volume and
+  // pan survive a load/replay.
+  core.setVolume(Number(volume.value));
+  core.setPanSeparation(Number(panSep.value));
   await output.start(core, workletUrl); // click handler = user gesture
   jamMode = muteSong;
   const mod = core.module;
@@ -631,13 +646,16 @@ function showThrottled(msg: string): void {
   }
 }
 
+let seekLatchUntil = 0;
+
 function frame(): void {
   if (loaded && (playing || paused)) {
     updatePatternHighlight();
     const ps = core.playState;
     const dur = moduleDuration();
     const cur = seeking ? seekTarget : ps.timeMs;
-    if (!seeking) {
+    const latched = performance.now() < seekLatchUntil;
+    if (!seeking && !latched) {
       if (dur > 0) {
         const pct = Math.min(1000, Math.round((cur / dur) * 1000));
         seek.value = String(pct);
@@ -645,6 +663,10 @@ function frame(): void {
       }
       timeCur.textContent = fmtTime(cur);
       timeRem.textContent = '-' + fmtTime(dur - cur);
+    } else if (latched) {
+      // Reposition pending: show the target while the audio thread catches up.
+      timeCur.textContent = fmtTime(seekTarget);
+      timeRem.textContent = '-' + fmtTime(dur - seekTarget);
     }
     if (playing && !paused) {
       showThrottled(
@@ -661,3 +683,4 @@ function frame(): void {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
