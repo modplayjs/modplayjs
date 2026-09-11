@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-it",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Impulse Tracker (.it) format plugin for modplayjs (libxmp it_load.c + itsex.c port).",
   "type": "module",
   "main": "dist/index.js",

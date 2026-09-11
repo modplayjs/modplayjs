@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-xm",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "FastTracker II Extended Module (.xm) format plugin for modplayjs (libxmp xm_load.c port).",
   "type": "module",
   "main": "dist/index.js",

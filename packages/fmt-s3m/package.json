@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-s3m",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Scream Tracker 3 (.s3m) format plugin for modplayjs (libxmp s3m_load.c port).",
   "type": "module",
   "main": "dist/index.js",
