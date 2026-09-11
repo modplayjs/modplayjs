@@ -14,6 +14,7 @@
 // bpm / 1000), truncated, min 1<<ANTICLICK_SHIFT = 8 (mixer.h:13).
 // time_factor=10 (DEFAULT_TIME_FACTOR), rrate=250 (PAL_RATE).
 
+import { depackIce, isIcePacked } from './depack/ice.js';
 import { CoreState, FlowFlag, Quirk } from './model/constants.js';
 import { ChannelFlags, XMP_KEY_OFF } from './model/model.js';
 
@@ -241,7 +242,14 @@ export class Core implements CoreIface {
     // previous module (wrong pitch / wrong data — the demo file-switch
     // regression). Reset the ID counter too.
     this.samples.clear();
-    const fmt = this.registries.formatFor(bytes);
+    // libxmp_decrunch (depacker.c): packed wrappers are unwrapped BEFORE
+    // format probing (load.c:364). ICE1's only signature sits at the file
+    // tail, so the check must precede every loader's test().
+    let data = bytes;
+    if (isIcePacked(data)) {
+      data = depackIce(data);
+    }
+    const fmt = this.registries.formatFor(data);
     if (!fmt) {
       // Match unknown-format error semantics of libxmp_load_module.
       throw new ModplayError('unknown module format');
@@ -253,7 +261,7 @@ export class Core implements CoreIface {
       addSample: (raw) => this.samples.add(raw),
     };
 
-    const mod = fmt.load(bytes, loaderCtx);
+    const mod = fmt.load(data, loaderCtx);
     this.finalizeModule(mod);
   }
 
