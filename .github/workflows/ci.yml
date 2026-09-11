@@ -10,117 +10,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  detect:
-    name: Detect affected packages
+  build:
+    name: Build, typecheck, test
     runs-on: ubuntu-latest
-    outputs:
-      # JSON array of package directory names, e.g. ["core","fmt-it"];
-      # empty string when nothing outside apps/ changed.
-      packages: ${{ steps.filter.outputs.packages }}
-      skip: ${{ steps.filter.outputs.skip }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Detect changed workspace packages
-        id: filter
-        run: |
-          set -eu
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base="${{ github.event.pull_request.base.sha }}"
-            head="${{ github.sha }}"
-          else
-            # Pushes: diff against the previous commit (first push = HEAD~1
-            # may not exist; fall back to an empty tree).
-            if git rev-parse --verify -q "HEAD~1" > /dev/null; then
-              base="HEAD~1"
-            else
-              base=$(git hash-object -t tree /dev/null)
-            fi
-            head="HEAD"
-          fi
-
-          # Root-level manifest/tsconfig changes affect every package — set
-          # the sentinel 'ALL' instead of leaking filenames
-          # ('package-lock.json' etc.) into the package matrix.
-          if git diff --name-only "$base" "$head" | grep -Eq '^(package(-lock)?\.json$|tsconfig)'; then
-            changed="ALL"
-          else
-            changed=$(git diff --name-only "$base" "$head" | grep -E '^packages/[^/]+/' | cut -d/ -f2 | sort -u | tr '\n' ' ' || true)
-          fi
-
-          if [ "$changed" = "ALL" ]; then
-            # Root manifest/tsconfig change → build everything.
-            echo "packages=$(printf '%s\n' $(ls -d packages/*/ | xargs -n1 basename) | python3 -c "import json, sys; print(json.dumps(sorted(set(sys.stdin.read().split()))))")" >> "$GITHUB_OUTPUT"
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "Root-level manifest change; building all packages."
-            exit 0
-          fi
-
-          if [ -z "$changed" ]; then
-            echo "packages=[]" >> "$GITHUB_OUTPUT"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "No package changes detected; skipping build."
-            exit 0
-          fi
-
-          printf 'Changed package dirs: %s\n' "$changed"
-
-          # Expand the change set to the closure over dependencies:
-          # if a package changed, every package that (transitively)
-          # depends on it must be rebuilt too. Dependency data comes
-          # from packages/*/package.json ("@modplayjs/*" deps only).
-          all=$(ls -d packages/*/ | xargs -n1 basename)
-          affected=$(printf '%s\n' $changed)
-          pass=0
-          while [ "$pass" != "$affected" ]; do
-            pass=$affected
-            for pkg in $all; do
-              case " $affected " in
-                *" $pkg "*) continue ;;
-              esac
-            deps=$(node -e "const p = require('./packages/$pkg/package.json'); console.log(Object.keys(p.dependencies || {}).filter(d => d.startsWith('@modplayjs/')).map(d => d.replace('@modplayjs/', '')).join(' '));")
-            for dep in $deps; do
-                case " $affected " in
-                  *" $dep "*)
-                    # A dependency changed -> this package is affected,
-                    # and everything IT depends on comes along next pass.
-                    if [ -z "$affected" ]; then affected="$pkg"; else affected="$affected $pkg"; fi
-                    break
-                    ;;
-                esac
-              done
-            done
-          done
-
-          json=$(printf '%s\n' $affected | python3 -c "import json, sys; print(json.dumps(sorted(set(sys.stdin.read().split()))))")
-          echo "Affected (with dependents): $json"
-          echo "packages=$json" >> "$GITHUB_OUTPUT"
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-
-  build:
-    name: Build ${{ matrix.package }}
-    needs: detect
-    if: needs.detect.outputs.skip != 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        package: ${{ fromJSON(needs.detect.outputs.packages) }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
-          node-version: latest
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: package-lock.json
+
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-      - name: Build ${{ matrix.package }} (and its dependencies)
-        run: npx turbo run build --filter=@modplayjs/${{ matrix.package }}...
-      - name: Typecheck ${{ matrix.package }} (and its dependencies)
-        run: npx turbo run typecheck --filter=@modplayjs/${{ matrix.package }}...
+
+      # Turbo scopes to what actually changed (input hashing + the
+      # workspace dependency graph); a no-op PR hits the remote cache.
+      - name: Build
+        run: npx turbo run build typecheck

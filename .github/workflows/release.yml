@@ -1,13 +1,19 @@
 name: Release
 
-# Changesets automation: on every push to main the action consumes pending
-# changesets — if any exist it opens/updates a "Version Packages" PR; when
-# that PR is merged (i.e. a push contains no pending changesets but versions
-# changed), it publishes the packages to npm, creates git tags and pushes
-# them.
+# Two release paths, both ending in `npm publish`:
 #
-# Publish runs `changeset publish` (npm) with NPM_TOKEN + trusted-publishing
-# provenance; `changeset git-tag` tags every released package version.
+# 1. Changesets flow: a PR that adds `.changeset/*.md` files lands on main →
+#    changesets/action opens a "chore: version packages" PR collecting every
+#    bump with the same target version → merging that PR publishes the
+#    changed packages to npm, tags them (@modplayjs/<name>@<version>) and
+#    creates GitHub releases.
+#
+# 2. Manual bumps: pushing commits that set a package.json version which is
+#    not yet on the npm registry (no .changeset files involved) publishes
+#    those packages directly on the next main push — the same "collect
+#    same-version commits, then release" contract without a changeset file.
+#
+# Requires the NPM_TOKEN repository secret (npm automation token).
 
 on:
   push:
@@ -29,12 +35,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
-          node-version: latest
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: package-lock.json
           registry-url: 'https://registry.npmjs.org'
@@ -42,19 +48,58 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Build packages
-        run: npx turbo run build
+      # Publish anything whose (name, version) pair is missing from the
+      # registry: covers manual version bumps (path 2) and is what
+      # `changeset publish` runs underneath for path 1.
+      - name: Publish unpublished package versions
+        run: |
+          set -eu
+          published=0
+          for pkg_dir in packages/*/; do
+            name=$(node -p "require('./${pkg_dir}package.json').name")
+            version=$(node -p "require('./${pkg_dir}package.json').version")
+            private=$(node -p "require('./${pkg_dir}package.json').private === true")
+            if [ "$private" = "true" ]; then
+              echo "skip $name@$version (private)"
+              continue
+            fi
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "skip $name@$version (already published)"
+              continue
+            fi
+            echo "publishing $name@$version"
+            (cd "$pkg_dir" && npm publish --provenance --access public)
+            published=$((published + 1))
+          done
+          echo "published $published package(s)"
 
-      - name: Version and publish packages
-        uses: changesets/action@v2
-        with:
-          publish-script: npx changeset publish
-          push-git-tags: true
-          create-github-releases: true
-          commit-message: 'chore: version packages'
-          pr-title: 'chore: version packages'
+      # Changesets automation: consumes pending .changeset/*.md files.
+      # With none pending it is a no-op; when the version PR is merged the
+      # step above publishes the bumped packages (they are, by definition,
+      # not yet in the registry).
+      - name: Version packages (changesets PR)
+        uses: changesets/action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
+
+      - name: Tag released versions
+        run: |
+          set -eu
+          for pkg_dir in packages/*/; do
+            name=$(node -p "require('./${pkg_dir}package.json').name")
+            version=$(node -p "require('./${pkg_dir}package.json').version")
+            private=$(node -p "require('./${pkg_dir}package.json').private === true")
+            [ "$private" = "true" ] && continue
+            if ! npm view "$name@$version" version >/dev/null 2>&1; then
+              continue # publish failed for this package; don't tag it
+            fi
+            tag="$name@$version"
+            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              continue
+            fi
+            git tag "$tag"
+            git push origin "$tag"
+            echo "tagged $tag"
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
