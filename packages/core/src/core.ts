@@ -12,7 +12,7 @@
 //
 // Timing model (binding): ticksize = (int)(freq × time_factor × rrate /
 // bpm / 1000), truncated, min 1<<ANTICLICK_SHIFT = 8 (mixer.h:13).
-// time_factor=10 (DEFAULT_TIME_FACTOR), rrate=250 (PAL_RATE).
+// time_factor=10 (DEFAULT_TIME_FACTOR), rrate=250 (PAL_RATE) — release-pr smoke test.
 
 import { depackIce, isIcePacked } from './depack/ice.js';
 import { CoreState, FlowFlag, Quirk } from './model/constants.js';
