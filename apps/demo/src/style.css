@@ -242,3 +242,33 @@
     inset 2px 0 0 var(--pat-accent),
     0 0 12px oklch(from var(--pat-accent) l c h / 0.25);
 }
+
+/* ---------------------------------------------------------------- app shell --
+ * Sticky player bar + 3-column app grid. The pattern column is the
+ * centerpiece: it fills the viewport height under the bar on desktop. */
+
+#playerbar {
+  box-shadow: 0 1px 12px oklch(from var(--pat-border) l c h / 0.35);
+}
+
+#playerbar .range-xs {
+  height: 0.85rem;
+}
+
+@media (min-width: 1024px) {
+  #patbody {
+    max-height: calc(100vh - 11.5rem); /* bar (~7rem) + paddings */
+    min-height: 24rem;
+  }
+}
+
+/* Time readouts glow slightly in accent when playing */
+#timecur {
+  color: var(--pat-accent);
+  font-weight: 600;
+}
+
+/* Channel strip: compact mute chips */
+#chanstrip .badge {
+  font-family: var(--mono, ui-monospace, monospace);
+}
