@@ -112,8 +112,6 @@ jobs:
             echo "publishing $name@$version"
             (cd "$pkg_dir" && npm publish --provenance --access public)
           done < /tmp/bumps.txt
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Tag released versions
         if: steps.bumps.outputs.has == 'true' && steps.merge.outputs.is == 'true'
