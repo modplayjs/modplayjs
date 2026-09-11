@@ -32,7 +32,7 @@ const timeCur = document.getElementById('timecur') as HTMLSpanElement;
 const timeRem = document.getElementById('timerem') as HTMLSpanElement;
 const volume = document.getElementById('volume') as HTMLInputElement;
 const volumeV = document.getElementById('volumev') as HTMLSpanElement;
-const infoEl = document.getElementById('info') as HTMLPreElement;
+const infoEl = document.getElementById('info') as HTMLElement;
 const msgEl = document.getElementById('message') as HTMLPreElement;
 const msgSection = document.getElementById('messagesection') as HTMLElement;
 const ordEl = document.getElementById('ordlist') as HTMLDivElement;
@@ -209,22 +209,37 @@ function fmtPad(n: number, w: number): string {
 function renderInfo(): void {
   const mod = core.module;
   if (!mod) return;
-  const l: string[] = [];
-  l.push('title       ' + (mod.title || '(untitled)'));
-  l.push('format      ' + mod.format.toUpperCase() + '   tracker: ' + mod.tracker);
-  l.push(
-    'speed/bpm   ' + mod.speed + ' / ' + mod.bpm +
-    '   channels: ' + mod.chn + '   orders: ' + mod.len,
-  );
-  l.push(
-    'patterns    ' + mod.pat + '   instruments: ' + mod.ins +
-    '   samples: ' + core.samples.size,
-  );
-  l.push(
-    'restart     ' + mod.restart + '   global vol: ' + mod.gvol + '/' + mod.gvolbase +
-    '   master: ' + mod.mvol + '/' + mod.mvolbase,
-  );
-  infoEl.textContent = l.join('\n');
+  // One info per row: a two-column grid of label → value.
+  const rows: [string, string][] = [
+    ['title', mod.title || '(untitled)'],
+    ['format', mod.format.toUpperCase()],
+    ['tracker', mod.tracker],
+    ['speed', String(mod.speed)],
+    ['bpm', String(mod.bpm)],
+    ['channels', String(mod.chn)],
+    ['orders', String(mod.len)],
+    ['patterns', String(mod.pat)],
+    ['instruments', String(mod.ins)],
+    ['samples', String(core.samples.size)],
+    ['restart', String(mod.restart)],
+    ['global vol', mod.gvol + ' / ' + mod.gvolbase],
+    ['master vol', mod.mvol + ' / ' + mod.mvolbase],
+  ];
+  infoEl.textContent = '';
+  const grid = document.createElement('div');
+  grid.className = 'grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5';
+  for (const [label, value] of rows) {
+    const l = document.createElement('span');
+    l.className = 'opacity-60';
+    l.textContent = label;
+    const v = document.createElement('span');
+    v.className = 'font-medium truncate';
+    v.textContent = value;
+    v.title = value;
+    grid.appendChild(l);
+    grid.appendChild(v);
+  }
+  infoEl.appendChild(grid);
 
   // The tracker message (IT "message:", XM/Modplug comments) gets its own
   // box — it can be long and deserves independent scrolling.
