@@ -94,12 +94,20 @@ jobs:
               continue # publish failed for this package; don't tag it
             fi
             tag="$name@$version"
-            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            # A fresh runner has no tags fetched — query the REMOTE refspace
+            # (git ls-remote), not the local one.
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
               continue
             fi
             git tag "$tag"
-            git push origin "$tag"
+            if ! git push origin "$tag" 2>&1; then
+              # Lost a race with a concurrent tagger; not an error when the
+              # remote tag already points at this commit.
+              remote_sha=$(git ls-remote origin "refs/tags/$tag" | cut -f1)
+              if [ "$remote_sha" != "$(git rev-parse HEAD)" ]; then
+                echo "::error::tag $tag exists on the remote pointing at $remote_sha, not HEAD"
+                exit 1
+              fi
+            fi
             echo "tagged $tag"
-          done
-        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
