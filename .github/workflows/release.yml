@@ -200,11 +200,10 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Apply version bumps to the release branch
+      - name: Apply version bumps (uncommitted; the action commits them)
         if: steps.compute.outputs.list != ''
         run: |
           set -eu
-          git checkout -b chore/version-bump origin/main
           : > /tmp/notes.md
           while IFS='|' read -r name current next level; do
             f="packages/${name#@modplayjs/}/package.json"
@@ -236,10 +235,6 @@ jobs:
             echo
             cat /tmp/notes.md
           } > release-notes.md
-          git config user.name "modplayjs-release-bot"
-          git config user.email "noreply@github.com"
-          git add packages/
-          git commit -q -m "chore: version bump" || true
 
       - name: Open the version-bump PR
         if: steps.compute.outputs.list != ''
