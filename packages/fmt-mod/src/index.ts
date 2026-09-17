@@ -4,6 +4,7 @@
 // @modplayjs/fmt-mod — MOD (Protracker/FT2/ST3 family) format plugin.
 
 export { modTest, modLoad } from './mod.js';
+export { loadDepackedMod } from './modcore.js';
 export { readEventDispatch as readEvent } from './readevent.js';
 export { readEventMod, isToneportaFx, isSfxPitch, isModRetrig, setPatch } from './readevent.js';
 export { readEventFt2 } from '@modplayjs/core';

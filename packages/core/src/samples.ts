@@ -167,7 +167,10 @@ function normalize(raw: RawSample, id: number): SampleData {
     convertDelta(bytes, len, is16bit, stereo ? 2 : 1);
   }
 
-  if (df & DecodeFlag.UNSIGNED) convertSignal(bytes, len * (stereo ? 2 : 1) * (is16bit ? 2 : 1), is16bit);
+  // convert_signal (sample.c:386): dest, xxs->len * channels, is16bit —
+  // `l` is a SAMPLE count (u16 iterations for 16-bit), so the byte count is
+  // NOT pre-multiplied by 2 here.
+  if (df & DecodeFlag.UNSIGNED) convertSignal(bytes, len * (stereo ? 2 : 1), is16bit);
 
   // Interleave planar stereo (non-interleaved layout: all L then all R).
   if (stereo && (df & DecodeFlag.INTERLEAVED) === 0) {
