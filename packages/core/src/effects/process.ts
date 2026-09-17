@@ -15,7 +15,7 @@ import {
   hasQuirk,
   lfoSetWaveform,
 } from './helpers.js';
-import { setLfoNotzero } from './helpers.js';
+import { setLfoNotzero, SET_PER, RESET_PER, PITCHBEND, TONEPORTA, VIBRATO, doToneporta } from './helpers.js';
 import { fxPanbrello, fxPanbrelloWf } from './fx.js';
 import { VolSlideFlag as VF } from './state.js';
 import {
@@ -474,6 +474,53 @@ function processRest(
         setPanArmImpl(core, xc, fxp);
       }
       break;
+    case FX.FX_SPEED_CP: /* Set speed and ... (effects.c:1051-1057) */
+      if (fxp !== 0) {
+        core.ctx.p.speed = fxp;
+        // C also zeroes p->st26_speed (IceTracker speed memory); our PlayState
+        // does not carry it yet — no-op until ICE support (Wave 1 item 7).
+      }
+      xc.per_flags = 0; // C falls through to FX_PER_CANCEL
+      break;
+    case FX.FX_PER_CANCEL: /* Cancel persistent effects */
+      xc.per_flags = 0;
+      break;
+
+    /* 669 effects (effects.c:1063-1092) */
+
+    case FX.FX_669_PORTA_UP: /* 669 portamento up */
+      SET_PER(xc, PITCHBEND);
+      xc.freq.slide = 80 * fxp;
+      xc.freq.memory = fxp;
+      if (fxp === 0) RESET_PER(xc, PITCHBEND);
+      break;
+    case FX.FX_669_PORTA_DN: /* 669 portamento down */
+      SET_PER(xc, PITCHBEND);
+      xc.freq.slide = -80 * fxp;
+      xc.freq.memory = fxp;
+      if (fxp === 0) RESET_PER(xc, PITCHBEND);
+      break;
+    case FX.FX_669_TPORTA: /* 669 tone portamento */
+      if (xc.ins < 0 || xc.ins >= (core.module?.ins ?? 0)) break;
+      SET_PER(xc, TONEPORTA);
+      doToneporta(core, xc, note);
+      xc.porta.slide = 40 * fxp;
+      if (fxp === 0) RESET_PER(xc, TONEPORTA);
+      break;
+    case FX.FX_669_FINETUNE: /* 669 finetune */
+      // 80 * (int8)fxp — sign-extended byte.
+      xc.finetune = 80 * (((fxp & 0xff) << 24) >> 24);
+      break;
+    case FX.FX_669_VIBRATO: /* 669 vibrato */
+      if (LSN(fxp) !== 0) {
+        lfoSetWaveform(xc.vibrato.lfo, 669);
+        SET_PER(xc, VIBRATO);
+      } else {
+        RESET_PER(xc, VIBRATO);
+      }
+      setLfoNotzero(xc.vibrato.lfo, 669, 1);
+      break;
+
     case FX.FX_GLOBALVOL:
       fxGlobalVol(core, fxp);
       break;

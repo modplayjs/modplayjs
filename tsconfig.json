@@ -32,6 +32,9 @@
       "@modplayjs/fmt-stm": [
         "packages/fmt-stm/src/index.ts"
       ],
+      "@modplayjs/fmt-669": [
+        "packages/fmt-669/src/index.ts"
+      ],
       "@modplayjs/dsp-paula": [
         "packages/dsp-paula/src/index.ts"
       ],
