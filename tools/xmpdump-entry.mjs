@@ -10,3 +10,4 @@ export { plugin as s69Plugin } from '@modplayjs/fmt-669';
 export { plugin as sfxPlugin } from '@modplayjs/fmt-sfx';
 export { plugin as digiPlugin } from '@modplayjs/fmt-digi';
 export { plugin as asylumPlugin } from '@modplayjs/fmt-asylum';
+export { plugin as icePlugin } from '@modplayjs/fmt-ice';
