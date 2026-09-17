@@ -65,7 +65,12 @@ jobs:
         with:
           # version: apply bumps AND keep package-lock.json in sync inside
           # the Version Packages PR (npm ci in CI would fail otherwise).
-          version: npx changeset version && npm install --package-lock-only --no-audit --no-fund
+          # The action passes the whole input as args to the changeset CLI
+          # (changesets v3 / cac rejects unknown options), so multi-command
+          # strings fail — use the package.json "version" script instead
+          # (README: "If the version script is present, this action will run
+          # that script instead of changeset version").
+          version: npm run version
           # publish: changeset publish releases every bumped package,
           # creates the @modplayjs/<name>@<version> git tags and pushes
           # them; createGithubReleases turns each tag into a GitHub
