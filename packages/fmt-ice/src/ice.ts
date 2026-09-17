@@ -19,16 +19,6 @@ function readmem32b(m: Uint8Array, off: number): number {
   return ((m[off]! << 24) | (m[off + 1]! << 16) | (m[off + 2]! << 8) | m[off + 3]!) >>> 0;
 }
 
-/** libxmp_copy_adjust (common.c:237-253): printable ASCII, trim. */
-function copyAdjust(r: Uint8Array, n: number): string {
-  let s = '';
-  for (let i = 0; i < n && i < r.length; i++) {
-    const c = r[i]!;
-    s += c > 127 || c < 0x20 || c === 0x7f ? ' ' : String.fromCharCode(c);
-  }
-  return s.replace(/ +$/, '');
-}
-
 /** Zeroed envelope (libxmp_init_instrument calloc semantics). */
 function zeroEnvelope(): Instrument['aei'] {
   return { flags: 0, npt: 0, scl: 0, sus: 0, sue: 0, lps: 0, lpe: 0, x: [], y: [] };
