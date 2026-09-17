@@ -15,7 +15,7 @@ import {
   hasQuirk,
   lfoSetWaveform,
 } from './helpers.js';
-import { setLfoNotzero } from './helpers.js';
+import { setLfoNotzero, SET_PER, RESET_PER, PITCHBEND, TONEPORTA, VIBRATO, doToneporta, noteToPeriod } from './helpers.js';
 import { fxPanbrello, fxPanbrelloWf } from './fx.js';
 import { VolSlideFlag as VF } from './state.js';
 import {
@@ -469,11 +469,92 @@ function processRest(
     case FX.FX_SPEED:
       speedArmImpl(core, fxp);
       break;
+    case FX.FX_ICE_SPEED: /* IceTracker ST2.6 speed (effects.c:896-905) */
+      if (fxp !== 0) {
+        if (LSN(fxp) !== 0) {
+          core.ctx.p.st26_speed = (MSN(fxp) << 8) | LSN(fxp);
+        } else {
+          core.ctx.p.st26_speed = MSN(fxp);
+        }
+      }
+      break;
+
     case FX.FX_SETPAN:
       if (!hasQuirk(core, Quirk.PROTRACK)) {
         setPanArmImpl(core, xc, fxp);
       }
       break;
+    case FX.FX_VOL_ADD: /* SFX change volume up (effects.c:853-862) */
+      if (xc.ins < 0 || xc.ins >= (core.module?.ins ?? 0)) break;
+      SET(xc, VolSlideFlag.NEW_VOL);
+      xc.volume = (core.module?.instruments[xc.ins]?.sub[0]?.vol ?? 0) + fxp;
+      if (xc.volume > mod.volbase) xc.volume = mod.volbase;
+      break;
+    case FX.FX_VOL_SUB: /* SFX change volume down (effects.c:863-872) */
+      if (xc.ins < 0 || xc.ins >= (core.module?.ins ?? 0)) break;
+      SET(xc, VolSlideFlag.NEW_VOL);
+      xc.volume = (core.module?.instruments[xc.ins]?.sub[0]?.vol ?? 0) - fxp;
+      if (xc.volume < 0) xc.volume = 0;
+      break;
+    case FX.FX_PITCH_ADD: /* SFX add semitones (effects.c:873-882) */
+      SET_PER(xc, TONEPORTA);
+      xc.porta.target = noteToPeriod(mod.periodType, note - 1, xc.finetune, 0) + fxp;
+      xc.porta.slide = 2;
+      xc.porta.dir = 1;
+      break;
+    case FX.FX_PITCH_SUB: /* SFX subtract semitones (effects.c:883-892) */
+      SET_PER(xc, TONEPORTA);
+      xc.porta.target = noteToPeriod(mod.periodType, note - 1, xc.finetune, 0) - fxp;
+      xc.porta.slide = 2;
+      xc.porta.dir = -1;
+      break;
+
+    case FX.FX_SPEED_CP: /* Set speed and ... (effects.c:1051-1057) */
+      if (fxp !== 0) {
+        core.ctx.p.speed = fxp;
+        core.ctx.p.st26_speed = 0;
+      }
+      xc.per_flags = 0; // C falls through to FX_PER_CANCEL
+      break;
+    case FX.FX_PER_CANCEL: /* Cancel persistent effects */
+      xc.per_flags = 0;
+      break;
+
+    /* 669 effects (effects.c:1063-1092) */
+
+    case FX.FX_669_PORTA_UP: /* 669 portamento up */
+      SET_PER(xc, PITCHBEND);
+      xc.freq.slide = 80 * fxp;
+      xc.freq.memory = fxp;
+      if (fxp === 0) RESET_PER(xc, PITCHBEND);
+      break;
+    case FX.FX_669_PORTA_DN: /* 669 portamento down */
+      SET_PER(xc, PITCHBEND);
+      xc.freq.slide = -80 * fxp;
+      xc.freq.memory = fxp;
+      if (fxp === 0) RESET_PER(xc, PITCHBEND);
+      break;
+    case FX.FX_669_TPORTA: /* 669 tone portamento */
+      if (xc.ins < 0 || xc.ins >= (core.module?.ins ?? 0)) break;
+      SET_PER(xc, TONEPORTA);
+      doToneporta(core, xc, note);
+      xc.porta.slide = 40 * fxp;
+      if (fxp === 0) RESET_PER(xc, TONEPORTA);
+      break;
+    case FX.FX_669_FINETUNE: /* 669 finetune */
+      // 80 * (int8)fxp — sign-extended byte.
+      xc.finetune = 80 * (((fxp & 0xff) << 24) >> 24);
+      break;
+    case FX.FX_669_VIBRATO: /* 669 vibrato */
+      if (LSN(fxp) !== 0) {
+        lfoSetWaveform(xc.vibrato.lfo, 669);
+        SET_PER(xc, VIBRATO);
+      } else {
+        RESET_PER(xc, VIBRATO);
+      }
+      setLfoNotzero(xc.vibrato.lfo, 669, 1);
+      break;
+
     case FX.FX_GLOBALVOL:
       fxGlobalVol(core, fxp);
       break;

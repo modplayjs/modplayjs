@@ -6,6 +6,7 @@
 export { modTest, modLoad } from './mod.js';
 export { loadDepackedMod } from './modcore.js';
 export { readEventDispatch as readEvent } from './readevent.js';
+export { decodeEvent, periodToNote } from './mod.js';
 export { readEventMod, isToneportaFx, isSfxPitch, isModRetrig, setPatch } from './readevent.js';
 export { readEventFt2 } from '@modplayjs/core';
 export { readEventSt3 } from '@modplayjs/core';

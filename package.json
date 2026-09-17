@@ -10,7 +10,8 @@
   "scripts": {
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "dev": "turbo run dev --filter=@modplayjs/demo"
+    "dev": "turbo run dev --filter=@modplayjs/demo",
+    "version": "changeset version && npm install --package-lock-only --no-audit --no-fund"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",

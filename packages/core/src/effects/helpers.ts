@@ -272,6 +272,8 @@ function getLfoMod(lfo: { type: number; rate: number; depth: number; phase: numb
       // faithful port uses libxmp_get_random(&ctx->rng, 512) - 256. The core's
       // RNG state lives on PlayState; see getRandom below.
       return (getRandom(512) - 256) * lfo.depth;
+    case 669: /* 669 vibrato (lfo.c:60-61) */
+      return (lfo.phase & 1) * lfo.depth;
     default:
       return 0;
   }

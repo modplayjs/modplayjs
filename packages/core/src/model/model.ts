@@ -325,7 +325,7 @@ export interface MidiConfig {
  */
 export interface ModuleData {
   title: string;
-  format: 'mod' | 's3m' | 'xm' | 'it';
+  format: 'mod' | 's3m' | 'xm' | 'it' | 'mtm' | 'stm' | '669' | 'sfx' | 'digi' | 'amf' | 'ice';
   /** Comment (S3M/IT). */
   comment: string;
   /** Number of channels. */
@@ -728,6 +728,10 @@ export interface PlayState {
   speed: number;
   /** BPM. */
   bpm: number;
+  /** IceTracker ST2.6 speed memory (common.h:483). 0 = inactive; bit 16
+   *  selects the hi-byte as the next row's speed, else the lo-byte, and
+   *  toggles the selector (player.c:2179-2187). */
+  st26_speed: number;
   /** Current sequence. */
   sequence: number;
   /** Loop count. */

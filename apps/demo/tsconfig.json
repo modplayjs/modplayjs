@@ -26,6 +26,27 @@
       "@modplayjs/fmt-it": [
         "packages/fmt-it/src/index.ts"
       ],
+      "@modplayjs/fmt-mtm": [
+        "packages/fmt-mtm/src/index.ts"
+      ],
+      "@modplayjs/fmt-stm": [
+        "packages/fmt-stm/src/index.ts"
+      ],
+      "@modplayjs/fmt-669": [
+        "packages/fmt-669/src/index.ts"
+      ],
+      "@modplayjs/fmt-sfx": [
+        "packages/fmt-sfx/src/index.ts"
+      ],
+      "@modplayjs/fmt-digi": [
+        "packages/fmt-digi/src/index.ts"
+      ],
+      "@modplayjs/fmt-asylum": [
+        "packages/fmt-asylum/src/index.ts"
+      ],
+      "@modplayjs/fmt-ice": [
+        "packages/fmt-ice/src/index.ts"
+      ],
       "@modplayjs/dsp-paula": [
         "packages/dsp-paula/src/index.ts"
       ],

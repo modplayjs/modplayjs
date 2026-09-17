@@ -1,0 +1,46 @@
+{
+  "name": "@modplayjs/fmt-digi",
+  "version": "0.0.3",
+  "description": "DIGI Booster format plugin for modplayjs (libxmp digi_load.c port).",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modplayjs/core": "^0.0.3",
+    "@modplayjs/fmt-mod": "^0.0.3"
+  },
+  "keywords": [
+    "tracker",
+    "digi",
+    "digi booster",
+    "libxmp",
+    "chiptune",
+    "audio",
+    "music"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/modplayjs/modplayjs.git",
+    "directory": "packages/fmt-digi"
+  },
+  "bugs": "https://github.com/modplayjs/modplayjs/issues",
+  "homepage": "https://github.com/modplayjs/modplayjs#readme",
+  "license": "BSD-3-Clause"
+}

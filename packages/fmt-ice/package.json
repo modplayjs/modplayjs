@@ -1,0 +1,47 @@
+{
+  "name": "@modplayjs/fmt-ice",
+  "version": "0.0.3",
+  "description": "Soundtracker 2.6 / Ice Tracker (.mod MTN/IT10) plugin for modplayjs (libxmp ice_load.c port).",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modplayjs/core": "^0.0.3",
+    "@modplayjs/fmt-mod": "^0.0.3"
+  },
+  "keywords": [
+    "tracker",
+    "mtn",
+    "ice tracker",
+    "soundtracker",
+    "libxmp",
+    "chiptune",
+    "audio",
+    "music"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/modplayjs/modplayjs.git",
+    "directory": "packages/fmt-ice"
+  },
+  "bugs": "https://github.com/modplayjs/modplayjs/issues",
+  "homepage": "https://github.com/modplayjs/modplayjs#readme",
+  "license": "BSD-3-Clause"
+}

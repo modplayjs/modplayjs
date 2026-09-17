@@ -29,6 +29,15 @@ export default defineConfig(({ command }) => ({
         main: resolve(__dirname, 'index.html'),
         studio: resolve(__dirname, 'studio.html'),
       },
+      output: {
+        // core/src is mutually referential (index.ts ↔ core.ts ↔ effects/*:
+        // type-only edges, but Rollup still splits chunks on them), which
+        // makes 'Core' land in two chunks with undefined execution order.
+        // Keep the whole core package in one chunk.
+        manualChunks(id) {
+          if (id.includes('packages/core/src')) return 'modplayjs-core';
+        },
+      },
     },
   },
   define: {

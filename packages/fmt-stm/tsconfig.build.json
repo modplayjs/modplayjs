@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": false,
+    "skipLibCheck": true,
+    "paths": {
+      "@modplayjs/core": [
+        "../core/dist/index.d.ts"
+      ],
+      "@modplayjs/fmt-mod": [
+        "../fmt-mod/dist/index.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
