@@ -26,6 +26,7 @@
       "@modplayjs/fmt-xm": ["packages/fmt-xm/src/index.ts"],
       "@modplayjs/fmt-it": ["packages/fmt-it/src/index.ts"],
       "@modplayjs/fmt-mtm": ["packages/fmt-mtm/src/index.ts"],
+      "@modplayjs/fmt-stm": ["packages/fmt-stm/src/index.ts"],
       "@modplayjs/fmt-mod": ["packages/fmt-mod/src/index.ts"],
       "@modplayjs/dsp-paula": ["packages/dsp-paula/src/index.ts"],
       "@modplayjs/dsp-softmixer": ["packages/dsp-softmixer/src/index.ts"],

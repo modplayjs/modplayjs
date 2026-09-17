@@ -137,9 +137,17 @@ function normalize(raw: RawSample, id: number): SampleData {
 
   // EOF-truncation semantics (sample.c:236-282): bytes shorter than declared
   // length truncate the sample to what's available (frame-aligned).
+  // EXCEPTION: a loader that never calls into sample loading (vol=0/len=0 skip
+  // in STM :488-492, ptsong external files, UMX etc.) leaves xxs->len at the
+  // header value with xxs->data == NULL — the length is load-report metadata.
+  // An EMPTY data buffer with declared length means that case: keep the
+  // declared length and zero-fill, so dump/player parity holds (nsm=0 voices
+  // never read the data).
   const framelen = (is16bit ? 2 : 1) * (stereo ? 2 : 1);
   const needed = len * framelen;
-  if (bytes.length < needed) {
+  if (bytes.length === 0 && needed > 0) {
+    bytes = new Uint8Array(needed);
+  } else if (bytes.length < needed) {
     const avail = bytes.length - (bytes.length % framelen);
     len = avail / framelen;
   }

@@ -5,3 +5,4 @@ export { plugin as s3mPlugin } from '@modplayjs/fmt-s3m';
 export { plugin as xmPlugin } from '@modplayjs/fmt-xm';
 export { plugin as itPlugin } from '@modplayjs/fmt-it';
 export { plugin as mtmPlugin } from '@modplayjs/fmt-mtm';
+export { plugin as stmPlugin } from '@modplayjs/fmt-stm';

@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const esbuild = (await import('esbuild')).default;
 const aliasMap = Object.fromEntries(
-  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm']
+  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm', 'fmt-stm']
     .map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
 const bundle = resolve(repo, 'out/xmpdump-core.mjs');
 await esbuild.build({
@@ -35,7 +35,7 @@ await esbuild.build({
   bundle: true, platform: 'node', format: 'esm',
   alias: aliasMap, outfile: bundle, logLevel: 'silent',
 });
-const { CorePlayer, modPlugin, s3mPlugin, xmPlugin, itPlugin, mtmPlugin } = await import(
+const { CorePlayer, modPlugin, s3mPlugin, xmPlugin, itPlugin, mtmPlugin, stmPlugin } = await import(
   'file://' + bundle);
 
 const file = resolve(process.argv[2]);
@@ -47,6 +47,7 @@ core.registries.registerFormat(s3mPlugin);
 core.registries.registerFormat(xmPlugin);
 core.registries.registerFormat(itPlugin);
 core.registries.registerFormat(mtmPlugin);
+core.registries.registerFormat(stmPlugin);
 core.loadModule(new Uint8Array(bytes));
 
 const mod = core.module;

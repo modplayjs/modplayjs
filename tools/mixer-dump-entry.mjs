@@ -73,3 +73,4 @@ export function dumpChannelInfo(core, maxLines, maxTimeMs = Infinity) {
   }
   return lines;
 }
+export { plugin as stmPlugin } from '@modplayjs/fmt-stm';
