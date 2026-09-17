@@ -164,6 +164,7 @@ export class Core implements CoreIface {
       frame: -1,
       speed: 6,
       bpm: 125,
+      st26_speed: 0,
       sequence: 0,
       loop_count: 0,
       sequence_control: [],
@@ -672,6 +673,17 @@ export class Core implements CoreIface {
     if (p.frame === 0) {
       this.checkEndOfModule();
       this.readRow(mod.xxo[p.ord] ?? 0, p.row);
+
+      // ST2.6 speed memory (player.c:2179-2187): alternate rows take the
+      // hi/lo byte of st26_speed.
+      if (p.st26_speed !== 0) {
+        if ((p.st26_speed & 0x10000) !== 0) {
+          p.speed = (p.st26_speed & 0xff00) >> 8;
+        } else {
+          p.speed = p.st26_speed & 0xff;
+        }
+        p.st26_speed ^= 0x10000;
+      }
     }
 
     this.injectEvent();

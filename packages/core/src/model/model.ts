@@ -728,6 +728,10 @@ export interface PlayState {
   speed: number;
   /** BPM. */
   bpm: number;
+  /** IceTracker ST2.6 speed memory (common.h:483). 0 = inactive; bit 16
+   *  selects the hi-byte as the next row's speed, else the lo-byte, and
+   *  toggles the selector (player.c:2179-2187). */
+  st26_speed: number;
   /** Current sequence. */
   sequence: number;
   /** Loop count. */

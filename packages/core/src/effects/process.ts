@@ -469,6 +469,16 @@ function processRest(
     case FX.FX_SPEED:
       speedArmImpl(core, fxp);
       break;
+    case FX.FX_ICE_SPEED: /* IceTracker ST2.6 speed (effects.c:896-905) */
+      if (fxp !== 0) {
+        if (LSN(fxp) !== 0) {
+          core.ctx.p.st26_speed = (MSN(fxp) << 8) | LSN(fxp);
+        } else {
+          core.ctx.p.st26_speed = MSN(fxp);
+        }
+      }
+      break;
+
     case FX.FX_SETPAN:
       if (!hasQuirk(core, Quirk.PROTRACK)) {
         setPanArmImpl(core, xc, fxp);
@@ -502,8 +512,7 @@ function processRest(
     case FX.FX_SPEED_CP: /* Set speed and ... (effects.c:1051-1057) */
       if (fxp !== 0) {
         core.ctx.p.speed = fxp;
-        // C also zeroes p->st26_speed (IceTracker speed memory); our PlayState
-        // does not carry it yet — no-op until ICE support (Wave 1 item 7).
+        core.ctx.p.st26_speed = 0;
       }
       xc.per_flags = 0; // C falls through to FX_PER_CANCEL
       break;
