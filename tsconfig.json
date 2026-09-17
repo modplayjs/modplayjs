@@ -41,6 +41,9 @@
       "@modplayjs/fmt-digi": [
         "packages/fmt-digi/src/index.ts"
       ],
+      "@modplayjs/fmt-asylum": [
+        "packages/fmt-asylum/src/index.ts"
+      ],
       "@modplayjs/dsp-paula": [
         "packages/dsp-paula/src/index.ts"
       ],
