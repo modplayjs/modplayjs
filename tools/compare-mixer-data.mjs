@@ -28,7 +28,7 @@ const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // esbuild-bundle our player (extensionless source imports need bundling)
 const esbuild = (await import('esbuild')).default;
 const aliasMap = Object.fromEntries(
-  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it',
+  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm',
    'dsp-paula', 'dsp-softmixer', 'out-webaudio', 'out-pcm']
     .map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
 const bundle = resolve(repo, 'out/mixer-dump.mjs');
@@ -38,7 +38,7 @@ await esbuild.build({
   alias: aliasMap, outfile: bundle, logLevel: 'silent',
 });
 
-const { CorePlayer, modPlugin, s3mPlugin, xmPlugin, itPlugin,
+const { CorePlayer, modPlugin, s3mPlugin, xmPlugin, itPlugin, mtmPlugin,
         createSoftMixerPlugin, dumpMixerState, dumpChannelInfo } = await import(
   'file://' + bundle);
 
@@ -80,6 +80,7 @@ core.registries.registerFormat(modPlugin);
 core.registries.registerFormat(s3mPlugin);
 core.registries.registerFormat(xmPlugin);
 core.registries.registerFormat(itPlugin);
+core.registries.registerFormat(mtmPlugin);
 core.registries.registerDsp(createSoftMixerPlugin());
 try {
   core.loadModule(new Uint8Array(readFileSync(modFile)));

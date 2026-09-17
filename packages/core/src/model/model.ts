@@ -325,7 +325,7 @@ export interface MidiConfig {
  */
 export interface ModuleData {
   title: string;
-  format: 'mod' | 's3m' | 'xm' | 'it';
+  format: 'mod' | 's3m' | 'xm' | 'it' | 'mtm';
   /** Comment (S3M/IT). */
   comment: string;
   /** Number of channels. */
