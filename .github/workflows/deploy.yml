@@ -9,6 +9,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/deploy.yml'
+    paths-ignore:
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
@@ -17,8 +19,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: 'pages'
+  group: 'pages-${{ github.ref }}'
   cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   deploy:

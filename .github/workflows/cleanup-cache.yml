@@ -1,0 +1,41 @@
+name: Cleanup cache
+
+# Keep the GitHub Actions turbo/npm cache from growing unbounded:
+# purge caches older than 5 days nightly, and delete the PR's cache
+# when the PR closes (astro pattern).
+
+on:
+  schedule:
+    - cron: "0 11 * * *"
+  pull_request:
+    types:
+      - closed
+
+permissions: {}
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Cleanup caches older than 5 days
+        if: github.event_name == 'schedule'
+        uses: MyAlbum/purge-cache@v2
+        with:
+          max-age: 5d
+
+      - name: Cleanup PR cache on close
+        if: github.event_name == 'pull_request' && github.event.pull_request.merged == false
+        run: |
+          set -eu
+          # List and delete caches created by this PR branch.
+          branch="${{ github.event.pull_request.head.ref }}"
+          caches=$(gh cache list --branch "$branch" --json id --jq '.[].id' 2>/dev/null || true)
+          for id in $caches; do
+            gh cache delete "$id" || true
+          done
+          echo "deleted caches for branch: $branch (if any)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
