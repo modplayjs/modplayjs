@@ -47,6 +47,9 @@
       "@modplayjs/fmt-ice": [
         "packages/fmt-ice/src/index.ts"
       ],
+      "@modplayjs/fmt-prowizard": [
+        "packages/fmt-prowizard/src/index.ts"
+      ],
       "@modplayjs/dsp-paula": [
         "packages/dsp-paula/src/index.ts"
       ],

@@ -4,3 +4,4 @@
 // @modplayjs/fmt-prowizard — ProWizard packed-MOD depackers.
 
 export { pwCheck, pwWizardry, pwFormats, pwReadTitle, type PwFormat } from './prowiz.js';
+export { pwPlugin, pwTest, pwLoad } from './pw-plugin.js';

@@ -17,6 +17,7 @@ import { plugin as sfxPlugin } from '@modplayjs/fmt-sfx';
 import { plugin as digiPlugin } from '@modplayjs/fmt-digi';
 import { plugin as asylumPlugin } from '@modplayjs/fmt-asylum';
 import { plugin as icePlugin } from '@modplayjs/fmt-ice';
+import { pwPlugin } from '@modplayjs/fmt-prowizard';
 import type { Instrument } from '@modplayjs/core';
 import { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
 import { WebAudioOutput } from '@modplayjs/out-webaudio';
@@ -681,6 +682,8 @@ importMod.addEventListener('change', async () => {
   probe.registries.registerFormat(digiPlugin);
   probe.registries.registerFormat(asylumPlugin);
   probe.registries.registerFormat(icePlugin);
+  probe.registries.registerFormat(pwPlugin);
+probe.registries.registerFormat(pwPlugin);
     probe.registries.registerFormat(mtmPlugin);
     probe.registries.registerFormat(stmPlugin);
     probe.registries.registerFormat(s69Plugin);
@@ -688,6 +691,8 @@ importMod.addEventListener('change', async () => {
     probe.registries.registerFormat(digiPlugin);
     probe.registries.registerFormat(asylumPlugin);
     probe.registries.registerFormat(icePlugin);
+  probe.registries.registerFormat(pwPlugin);
+probe.registries.registerFormat(pwPlugin);
     probe.loadModule(bytes);
     const parsed: ModuleData = probe.module!;
     importSrc = bytes;
@@ -720,6 +725,8 @@ importDo.addEventListener('click', () => {
   probe.registries.registerFormat(digiPlugin);
   probe.registries.registerFormat(asylumPlugin);
   probe.registries.registerFormat(icePlugin);
+  probe.registries.registerFormat(pwPlugin);
+probe.registries.registerFormat(pwPlugin);
   probe.loadModule(srcBytes);
 
   const base = module.samples.length;

@@ -20,6 +20,7 @@ import { plugin as sfxPlugin } from '@modplayjs/fmt-sfx';
 import { plugin as digiPlugin } from '@modplayjs/fmt-digi';
 import { plugin as asylumPlugin } from '@modplayjs/fmt-asylum';
 import { plugin as icePlugin } from '@modplayjs/fmt-ice';
+import { pwPlugin } from '@modplayjs/fmt-prowizard';
 import { createPaulaPlugin } from '@modplayjs/dsp-paula';
 import { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
 import { WebAudioOutput } from '@modplayjs/out-webaudio';
@@ -65,6 +66,7 @@ core.registries.registerFormat(sfxPlugin);
 core.registries.registerFormat(digiPlugin);
 core.registries.registerFormat(asylumPlugin);
 core.registries.registerFormat(icePlugin);
+core.registries.registerFormat(pwPlugin);
 core.registries.registerDsp(createPaulaPlugin());
 core.registries.registerDsp(createSoftMixerPlugin());
 
