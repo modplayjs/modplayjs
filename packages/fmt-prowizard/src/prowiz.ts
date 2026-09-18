@@ -17,6 +17,8 @@ import { pwPp10, pwPp21, pwPp30 } from './pw-pp.js';
 import { pwP4x } from './pw-p40.js';
 import { pwTp1 } from './pw-tp1.js';
 import { pwTp2, pwTp3 } from './pw-tp3.js';
+import { pwUnicId, pwUnicNoid, pwUnicEmptyId } from './pw-unic.js';
+import { pwUnic2 } from './pw-unic2.js';
 
 /** pw_format (prowiz.h:28-32). */
 export interface PwFormat {
@@ -54,12 +56,17 @@ export function readmem32l(d: Uint8Array, off: number): number {
 export const pwFormats: PwFormat[] = [
   // With signature (prowiz.c:33-50) — order verbatim; heuristics follow
   pwTp1,
+  pwTp2,
+  pwTp3,
   pwPp10,
   pwP4x,
   pwPp21,
   pwPp30,
-  pwTp2,
-  pwTp3,
+  // No-signature heuristics (prowiz.c:52-84) — order verbatim
+  pwUnicId,
+  pwUnicNoid,
+  pwUnicEmptyId,
+  pwUnic2,
 ];
 
 /** pw_move_data (prowiz.c:87-100): copy `len` bytes input→output. */
