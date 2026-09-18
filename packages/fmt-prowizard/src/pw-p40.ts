@@ -154,8 +154,8 @@ function depackP4x(data: Uint8Array, start: number): Uint8Array {
 
   for (let i = 0; i < len; i++) {
     for (let j = 0; j < 4; j++) {
+      pos = trackAddr[i]![j]!; // hio_seek once per (pattern, channel) — p40.c:189
       for (let k = 0; k < 64; k++) {
-        pos = trackAddr[i]![j]!;
         let [c1, c2, c3, c4] = read4();
 
         if (c1 !== 0x80) {
