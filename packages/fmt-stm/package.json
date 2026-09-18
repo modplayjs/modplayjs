@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-stm",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Scream Tracker 2 (.stm) format plugin for modplayjs (libxmp stm_load.c port).",
   "type": "module",
   "main": "dist/index.js",
