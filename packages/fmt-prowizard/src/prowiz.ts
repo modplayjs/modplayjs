@@ -24,6 +24,7 @@ import { pwNp1, pwNp2 } from './pw-np12.js';
 import { pwNp3 } from './pw-np3.js';
 import { pwXann } from './pw-xann.js';
 import { pwWn } from './pw-wn.js';
+import { pwZen } from './pw-zen.js';
 import { pwDi } from './pw-di.js';
 import { pwAc1d } from './pw-ac1d.js';
 import { pwEu } from './pw-eureka.js';
@@ -91,6 +92,7 @@ export const pwFormats: PwFormat[] = [
   pwAc1d,
   pwXann,
   pwWn,
+  pwZen,
 ];
 
 /** pw_move_data (prowiz.c:87-100): copy `len` bytes input→output. */
