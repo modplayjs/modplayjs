@@ -25,6 +25,7 @@ import { pwNp3 } from './pw-np3.js';
 import { pwXann } from './pw-xann.js';
 import { pwWn } from './pw-wn.js';
 import { pwZen } from './pw-zen.js';
+import { pwCrb } from './pw-heatseek.js';
 import { pwDi } from './pw-di.js';
 import { pwAc1d } from './pw-ac1d.js';
 import { pwEu } from './pw-eureka.js';
@@ -52,6 +53,11 @@ export function readmem32b(d: Uint8Array, off: number): number {
 /** readmem16l (dataio.c). */
 export function readmem16l(d: Uint8Array, off: number): number {
   return d[off]! | (d[off + 1]! << 8);
+}
+
+/** readmem24b (dataio.c) — big-endian 24-bit. */
+export function readmem24b(d: Uint8Array, off: number): number {
+  return (d[off]! << 16) | (d[off + 1]! << 8) | d[off + 2]!;
 }
 
 /** readmem32l (dataio.c). */
@@ -93,6 +99,7 @@ export const pwFormats: PwFormat[] = [
   pwXann,
   pwWn,
   pwZen,
+  pwCrb,
 ];
 
 /** pw_move_data (prowiz.c:87-100): copy `len` bytes input→output. */
