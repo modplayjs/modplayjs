@@ -145,7 +145,7 @@ function depackKsm(data: Uint8Array, start: number): Uint8Array {
         const tBase = j * 3;
 
         // Sanity (ksm.c:159-162)
-        if (!ptkIsValidNote(t[tBase])) throw new Error('ksm: invalid note');
+        if (!ptkIsValidNote(t[tBase] ?? 0)) throw new Error('ksm: invalid note');
 
         // 2-byte period from ptk (ksm.c:164)
         tmp[x + k * 4] = ptkTable[t[tBase] ?? 0]![0];
