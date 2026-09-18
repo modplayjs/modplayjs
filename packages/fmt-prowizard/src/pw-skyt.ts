@@ -69,8 +69,9 @@ function depackSkyt(data: Uint8Array, start: number): Uint8Array {
   for (let i = 0; i < patPos; i++) {
     const pat = new Uint8Array(1024);
     for (let j = 0; j < 4; j++) {
-      if (trkval[i]![j] === undefined || trkval[i]![j] === 0) continue;
-      pos = trkAddr + ((trkval[i]![j] - 1) << 8);
+      const tv = trkval[i]![j];
+      if (tv === undefined || tv === 0) continue;
+      pos = trkAddr + ((tv - 1) << 8);
       for (let k = 0; k < 64; k++) {
         const x = k * 16 + j * 4;
 
