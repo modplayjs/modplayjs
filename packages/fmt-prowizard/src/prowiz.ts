@@ -15,6 +15,7 @@
 import { ParseError } from '@modplayjs/core';
 import { pwPp10, pwPp21, pwPp30 } from './pw-pp.js';
 import { pwP4x } from './pw-p40.js';
+import { pwP50a, pwP60a } from './pw-theplayer.js';
 import { pwTp1 } from './pw-tp1.js';
 import { pwTp2, pwTp3 } from './pw-tp3.js';
 import { pwUnicId, pwUnicNoid, pwUnicEmptyId } from './pw-unic.js';
@@ -64,6 +65,8 @@ export const pwFormats: PwFormat[] = [
   pwP4x,
   pwPp21,
   pwPp30,
+  pwP50a,
+  pwP60a,
   // No-signature heuristics (prowiz.c:52-84) — order verbatim
   pwUnicId,
   pwUnicNoid,
