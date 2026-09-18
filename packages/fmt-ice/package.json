@@ -43,8 +43,5 @@
   },
   "bugs": "https://github.com/modplayjs/modplayjs/issues",
   "homepage": "https://github.com/modplayjs/modplayjs#readme",
-  "license": "BSD-3-Clause",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  }
+  "license": "BSD-3-Clause"
 }
