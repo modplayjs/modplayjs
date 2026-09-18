@@ -24,6 +24,7 @@ import { pwNp1, pwNp2 } from './pw-np12.js';
 import { pwNp3 } from './pw-np3.js';
 import { pwXann } from './pw-xann.js';
 import { pwWn } from './pw-wn.js';
+import { pwDi } from './pw-di.js';
 
 /** pw_format (prowiz.h:28-32). */
 export interface PwFormat {
@@ -77,6 +78,7 @@ export const pwFormats: PwFormat[] = [
   pwNp2,
   pwNp1,
   pwNp3,
+  pwDi,
   pwXann,
   pwWn,
 ];
