@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-669",
-  "version": "0.3.0",
+  "version": "0.1.0",
   "description": "Composer 669 / UNIS 669 format plugin for modplayjs (libxmp 669_load.c port).",
   "type": "module",
   "main": "dist/index.js",
@@ -19,8 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.2.0",
-    "@modplayjs/fmt-mod": "^0.2.0"
+    "@modplayjs/core": "^0.1.0",
+    "@modplayjs/fmt-mod": "^0.1.0"
   },
   "keywords": [
     "tracker",
@@ -46,5 +46,7 @@
   "license": "BSD-3-Clause",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
-  }
+  },
+  "@modplayjs/core": "^0.1.0",
+  "@modplayjs/fmt-mod": "^0.1.0"
 }

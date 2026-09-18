@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.2.0"
+    "@modplayjs/core": "^0.1.0"
   },
   "keywords": [
     "tracker",
@@ -46,5 +46,6 @@
   "license": "BSD-3-Clause",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
-  }
+  },
+  "@modplayjs/core": "^0.1.0"
 }

@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.2.0",
+    "@modplayjs/core": "^0.1.0",
     "@modplayjs/fmt-it": "^0.1.0",
     "stb-vorbis": "^0.0.6"
   },
@@ -48,5 +48,7 @@
   "license": "BSD-3-Clause",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
-  }
+  },
+  "@modplayjs/core": "^0.1.0",
+  "@modplayjs/fmt-it": "^0.1.0"
 }
