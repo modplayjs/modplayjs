@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-ice",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Soundtracker 2.6 / Ice Tracker (.mod MTN/IT10) plugin for modplayjs (libxmp ice_load.c port).",
   "type": "module",
   "main": "dist/index.js",
@@ -19,8 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.1.0",
-    "@modplayjs/fmt-mod": "^0.1.0"
+    "@modplayjs/core": "^0.2.0",
+    "@modplayjs/fmt-mod": "^0.2.0"
   },
   "keywords": [
     "tracker",

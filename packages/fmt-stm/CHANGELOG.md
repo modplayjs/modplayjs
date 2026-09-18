@@ -1,5 +1,17 @@
 # @modplayjs/fmt-stm
 
+## 0.3.0
+
+### Minor Changes
+
+- [#23](https://github.com/modplayjs/modplayjs/pull/23) [`d72eb75`](https://github.com/modplayjs/modplayjs/commit/d72eb75b50d59cd771d062d34235c4a4feb49c44) Thanks [@Bitti09](https://github.com/Bitti09)! - switch entirely to GitHub Packages (drop npmjs.com) (PR [#23](https://github.com/modplayjs/modplayjs/issues/23), by @Bitti09)
+
+### Patch Changes
+
+- Updated dependencies [[`d72eb75`](https://github.com/modplayjs/modplayjs/commit/d72eb75b50d59cd771d062d34235c4a4feb49c44)]:
+  - @modplayjs/core@0.2.0
+  - @modplayjs/fmt-mod@0.2.0
+
 ## 0.2.1
 
 ### Patch Changes
