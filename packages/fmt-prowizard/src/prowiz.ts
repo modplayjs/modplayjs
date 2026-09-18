@@ -19,6 +19,8 @@ import { pwTp1 } from './pw-tp1.js';
 import { pwTp2, pwTp3 } from './pw-tp3.js';
 import { pwUnicId, pwUnicNoid, pwUnicEmptyId } from './pw-unic.js';
 import { pwUnic2 } from './pw-unic2.js';
+import { pwNp1, pwNp2 } from './pw-np12.js';
+import { pwNp3 } from './pw-np3.js';
 
 /** pw_format (prowiz.h:28-32). */
 export interface PwFormat {
@@ -67,6 +69,9 @@ export const pwFormats: PwFormat[] = [
   pwUnicNoid,
   pwUnicEmptyId,
   pwUnic2,
+  pwNp2,
+  pwNp1,
+  pwNp3,
 ];
 
 /** pw_move_data (prowiz.c:87-100): copy `len` bytes input→output. */

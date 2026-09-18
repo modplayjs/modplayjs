@@ -8,6 +8,9 @@ export function depackModule(bytes) {
   const nameBox = {};
   const depacked = pwWizardry(bytes, 0, nameBox);
   const shimCtx = { sampleRate: 44100, outputRate: 44100, addSample: () => 0 };
+  if (process.env.PW_DEBUG) {
+    console.error('depacked 1084..1132:', Array.from(depacked.slice(1084, 1132)).map(x => x.toString(16).padStart(2, '0')).join(' '));
+  }
   const mod = loadDepackedMod(depacked, shimCtx, nameBox.name ?? 'prowizard');
   return {
     type: mod.tracker,
