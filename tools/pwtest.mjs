@@ -1,18 +1,19 @@
-// Acceptance harness: depack via fmt-prowizard, parse via fmt-mod core,
-// dump via the same ModuleData shape xmpdump.mjs prints (for diffing vs
-// the C gen_module_data golden format).
+// ProWizard acceptance harness: depack via fmt-prowizard, parse via
+// fmt-mod/modcore.loadDepackedMod, dump a compare_module-shaped summary
+// for diffing against libxmp gen_module_data goldens.
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-const repo = resolve(import.meta.dirname, '..');
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const esbuild = (await import('esbuild')).default;
-const pkgs = ['core','effects-shared','fmt-mod','fmt-prowizard'];
+const pkgs = ['core', 'effects-shared', 'fmt-mod', 'fmt-prowizard'];
 const aliasMap = Object.fromEntries(pkgs.map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
 await esbuild.build({
-  entryPoints: [resolve(repo, 'packages/fmt-prowizard/src/pw-entry.ts')],
+  entryPoints: [resolve(repo, 'tools/pw-entry.mjs')],
   bundle: true, platform: 'node', format: 'esm',
   alias: aliasMap, outfile: resolve(repo, 'out/pw-test.mjs'), logLevel: 'silent',
 });
 const { depackModule } = await import('file://' + resolve(repo, 'out/pw-test.mjs'));
-const [file, name] = process.argv.slice(2);
-const out = depackModule(new Uint8Array(readFileSync(file)), name ?? 'prowizard');
+const [file] = process.argv.slice(2);
+const out = depackModule(new Uint8Array(readFileSync(file)));
 console.log(JSON.stringify(out));

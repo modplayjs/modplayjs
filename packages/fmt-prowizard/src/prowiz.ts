@@ -14,6 +14,7 @@
 
 import { ParseError } from '@modplayjs/core';
 import { pwPp10, pwPp21, pwPp30 } from './pw-pp.js';
+import { pwP4x } from './pw-p40.js';
 
 /** pw_format (prowiz.h:28-32). */
 export interface PwFormat {
@@ -49,7 +50,9 @@ export function readmem32l(d: Uint8Array, off: number): number {
  * Populated incrementally as depackers land (Wave 2, FORMAT-PLUGINS.md).
  */
 export const pwFormats: PwFormat[] = [
+  // With signature (prowiz.c:33-50) — order verbatim
   pwPp10,
+  pwP4x,
   pwPp21,
   pwPp30,
 ];
