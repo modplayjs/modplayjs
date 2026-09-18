@@ -1,18 +1,34 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: ['main']
+    branches:
+      - main
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - ".vscode/**"
+      - ".github/ISSUE_TEMPLATE/**"
 
+permissions: {}
+
+# Cancel older in-progress runs on the same branch (astro pattern: key on
+# head_ref for PRs so re-pushes supersede, full ref for pushes).
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
   cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   build:
     name: Build, typecheck, test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,51 +47,45 @@ jobs:
 
       # Turbo scopes to what actually changed (input hashing + the
       # workspace dependency graph); a no-op PR hits the remote cache.
-      - name: Build
+      # Build and typecheck run as one turbo invocation.
+      - name: Build & typecheck
         run: npx turbo run build typecheck
 
   # A version bump may only enter main through a PR (the bump is applied
-  # in the feature PR itself). The release workflow then opens the
-  # "chore: version packages" PR (opened by changesets) whose merge is
-  # the only thing that publishes.
-  # This job fails direct pushes to main that bump versions outside the
-  # release merge.
+  # in the feature PR itself, or via the changesets "version packages"
+  # merge). This job fails direct pushes to main that bump versions
+  # outside the release merge.
   version-guard:
     name: Version bump guard
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Reject direct-push version bumps (bumps go through PRs)
+      - name: Reject direct-push version bumps
         run: |
           set -eu
-          # PRs are exactly where bumps belong — nothing to check here.
+          # PRs are exactly where bumps belong.
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            echo "PR: version bumps allowed (they ride the PR to main)"
+            echo "PR: version bumps allowed"
             exit 0
           fi
-
           base="${{ github.event.before }}"
-          if [ "$base" = "0000000000000000000000000000000000000000" ]; then
+          if [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base" 2>/dev/null; then
             echo "initial push; nothing to compare"
             exit 0
           fi
-          if ! git cat-file -e "$base" 2>/dev/null; then
-            base=$(git rev-parse HEAD~1)
-          fi
-
-          # The release merge is the one direct-push commit allowed to
-          # carry version changes (it merges the bot PR to main).
-          subject=$(git log -1 --pretty=%s HEAD)
-          if printf '%s' "$subject" | grep -q '^chore: version packages'; then
+          # The changesets release merge is the only direct push allowed
+          # to carry version changes.
+          if git log -1 --pretty=%s HEAD | grep -q '^chore: version packages'; then
             echo "changesets version-packages merge; bumps allowed"
             exit 0
           fi
-
           bumped=0
           for f in packages/*/package.json; do
             before=$(git show "$base:$f" 2>/dev/null \
@@ -83,12 +93,9 @@ jobs:
               2>/dev/null || echo "")
             after=$(node -pe 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).version' "$f")
             if [ -n "$before" ] && [ "$before" != "$after" ]; then
-              echo "::error::file=$f::direct-push version bump $before -> $after; bump in a PR instead"
+              echo "::error::file=$f::direct-push version bump $before -> $after"
               bumped=1
             fi
           done
-          if [ "$bumped" != "0" ]; then
-            echo "::error::version bumps must be merged via a PR; the release PR opens automatically"
-            exit 1
-          fi
+          [ "$bumped" = "0" ] || { echo "::error::bumps must go through a PR"; exit 1; }
           echo "no direct-push bumps"
