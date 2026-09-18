@@ -16,6 +16,7 @@ import { ParseError } from '@modplayjs/core';
 import { pwPp10, pwPp21, pwPp30 } from './pw-pp.js';
 import { pwP4x } from './pw-p40.js';
 import { pwTp1 } from './pw-tp1.js';
+import { pwTp2, pwTp3 } from './pw-tp3.js';
 
 /** pw_format (prowiz.h:28-32). */
 export interface PwFormat {
@@ -57,6 +58,8 @@ export const pwFormats: PwFormat[] = [
   pwP4x,
   pwPp21,
   pwPp30,
+  pwTp2,
+  pwTp3,
 ];
 
 /** pw_move_data (prowiz.c:87-100): copy `len` bytes input→output. */
