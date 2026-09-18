@@ -1,5 +1,11 @@
 # @modplayjs/fmt-ice
 
+## 0.2.1
+
+### Patch Changes
+
+- [#20](https://github.com/modplayjs/modplayjs/pull/20) [`6ede326`](https://github.com/modplayjs/modplayjs/commit/6ede326d00e07148664630019248f98400206857) Thanks [@Bitti09](https://github.com/Bitti09)! - publish all packages to npmjs.com — remove publishConfig redirects (PR [#20](https://github.com/modplayjs/modplayjs/issues/20), by @Bitti09)
+
 ## 0.2.0
 
 ### Minor Changes

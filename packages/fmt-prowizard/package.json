@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-prowizard",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "ProWizard packed-MOD depackers for modplayjs (libxmp loaders/prowizard port).",
   "type": "module",
   "main": "dist/index.js",
