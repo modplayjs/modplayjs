@@ -1,7 +1,7 @@
 {
-  "name": "@modplayjs/fmt-stm",
+  "name": "@modplayjs/fmt-prowizard",
   "version": "0.1.0",
-  "description": "Scream Tracker 2 (.stm) format plugin for modplayjs (libxmp stm_load.c port).",
+  "description": "ProWizard packed-MOD depackers for modplayjs (libxmp loaders/prowizard port).",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -24,8 +24,10 @@
   },
   "keywords": [
     "tracker",
-    "stm",
-    "scream tracker",
+    "prowizard",
+    "propacker",
+    "theplayer",
+    "packed mod",
     "libxmp",
     "chiptune",
     "audio",
@@ -38,7 +40,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/modplayjs/modplayjs.git",
-    "directory": "packages/fmt-stm"
+    "directory": "packages/fmt-prowizard"
   },
   "bugs": "https://github.com/modplayjs/modplayjs/issues",
   "homepage": "https://github.com/modplayjs/modplayjs#readme",

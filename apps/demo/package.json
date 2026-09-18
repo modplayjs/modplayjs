@@ -21,6 +21,7 @@
     "@modplayjs/fmt-it": "*",
     "@modplayjs/fmt-mod": "*",
     "@modplayjs/fmt-mtm": "*",
+    "@modplayjs/fmt-prowizard": "*",
     "@modplayjs/fmt-s3m": "*",
     "@modplayjs/fmt-sfx": "*",
     "@modplayjs/fmt-stm": "*",

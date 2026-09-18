@@ -151,3 +151,17 @@ Paula-Tracker MIT) — see [NOTICE](NOTICE).
 
 Code written by an AI assistant from the reference implementations above;
 review, debugging, verification and testing by Bitti09.
+
+## Package registry
+
+The `@modplayjs/*` packages are published to **GitHub Packages**
+(`npm.pkg.github.com`), not the public npm registry — npmjs.com publishes
+require interactive 2FA (auth-and-writes) which blocks headless/CLI
+publishes from this machine. Install with:
+
+```sh
+# one-time: auth against GitHub Packages (token needs read:packages)
+echo "//npm.pkg.github.com/:_authToken=YOUR_GH_TOKEN" >> ~/.npmrc
+
+npm install @modplayjs/core @modplayjs/fmt-mod ...
+```
