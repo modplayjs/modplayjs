@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-asylum",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Asylum Music Format v1.0 (AMF) plugin for modplayjs (libxmp asylum_load.c port).",
   "type": "module",
   "main": "dist/index.js",
@@ -19,8 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.1.0",
-    "@modplayjs/fmt-mod": "^0.1.0"
+    "@modplayjs/core": "^0.2.0",
+    "@modplayjs/fmt-mod": "^0.2.0"
   },
   "keywords": [
     "tracker",
