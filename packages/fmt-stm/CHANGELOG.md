@@ -1,5 +1,11 @@
 # @modplayjs/fmt-stm
 
+## 0.2.0
+
+### Minor Changes
+
+- [#17](https://github.com/modplayjs/modplayjs/pull/17) [`07b1175`](https://github.com/modplayjs/modplayjs/commit/07b1175bae10e975b1740415722a2f1c26b0414a) Thanks [@Bitti09](https://github.com/Bitti09)! - Wave 2 — ProWizard packed-MOD depackers (20 packers) (PR [#17](https://github.com/modplayjs/modplayjs/issues/17), by @Bitti09)
+
 ## 0.1.0
 
 ### Minor Changes
