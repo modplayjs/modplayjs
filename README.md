@@ -154,14 +154,18 @@ review, debugging, verification and testing by Bitti09.
 
 ## Package registry
 
-The `@modplayjs/*` packages are published to **GitHub Packages**
-(`npm.pkg.github.com`), not the public npm registry — npmjs.com publishes
-require interactive 2FA (auth-and-writes) which blocks headless/CLI
-publishes from this machine. Install with:
-
-```sh
-# one-time: auth against GitHub Packages (token needs read:packages)
-echo "//npm.pkg.github.com/:_authToken=YOUR_GH_TOKEN" >> ~/.npmrc
-
-npm install @modplayjs/core @modplayjs/fmt-mod ...
-```
+> **⚠ All `@modplayjs/*` packages are published to [GitHub Packages](https://github.com/modplayjs?tab=packages&q=modplayjs) (`npm.pkg.github.com`), NOT npmjs.com.**
+>
+> This is because npm Trusted Publisher OIDC doesn't work for first-time
+> publishes of new packages, and the npmjs.com account's 2FA blocks
+> headless publishing. GitHub Packages uses the workflow token — fully
+> automatic.
+>
+> To install, add a GitHub token (with `read:packages` scope) to
+> `~/.npmrc` once:
+>
+> ```
+> //npm.pkg.github.com/:_authToken=YOUR_GH_TOKEN
+> ```
+>
+> Then `npm install @modplayjs/core` works normally.
