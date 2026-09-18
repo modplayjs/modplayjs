@@ -13,14 +13,13 @@ name: Release
 #   3. Merging that Version Packages PR → changesets/action publishes
 #      every changed package to npm (npm Trusted Publisher OIDC), tags
 #      @modplayjs/<name>@<version> and creates GitHub releases.
-#   4. A follow-up step publishes anything changesets did NOT publish
-#      (packages configured with publishConfig.registry = npm.pkg.github.com)
-#      to GitHub Packages — fully automatic, no manual publish step.
 #
 # npmjs.com publish uses npm Trusted Publisher (configured on npmjs.com
 # for owner modplayjs / repo modplayjs / workflow release.yml) — npm
 # ≥ 11.5.1 exchanges the workflow's OIDC token, so no NPM_TOKEN secret
-# is needed. GitHub Packages publish uses the workflow's GITHUB_TOKEN.
+# is needed. ALL packages publish to npmjs.com (publishConfig redirects
+# were removed — they made changeset publish target npm.pkg.github.com
+# which needs auth the OIDC flow can't provide).
 
 "on":
   push:
@@ -38,7 +37,6 @@ permissions:
   contents: write
   pull-requests: write
   id-token: write
-  packages: write
 
 jobs:
   release:
@@ -97,43 +95,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
 
-      # Publish to GitHub Packages anything changesets left behind:
-      # packages whose publishConfig.registry points at npm.pkg.github.com.
-      # changesets always publishes to registry-url (npmjs.com), so these
-      # packages fail there — this step picks them up. Fully automatic;
-      # no manual publish.
-      - name: Publish new packages to GitHub Packages
-        if: steps.changesets.outputs.published == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -eu
-          echo "changesets published: ${{ steps.changesets.outputs.publishedPackages }}"
-          published=$(echo '${{ steps.changesets.outputs.publishedPackages }}' | node -pe '
-            try { JSON.parse(require("fs").readFileSync(0,"utf8")).map(p => p.name).join("\n") } catch { "" }')
 
-          for d in packages/*/; do
-            name=$(node -pe "JSON.parse(require('fs').readFileSync('$d/package.json','utf8')).name")
-            private=$(node -pe "JSON.parse(require('fs').readFileSync('$d/package.json','utf8')).private || false")
-            [ "$private" = "false" ] || continue
-
-            # Skip what changesets already published this run.
-            if printf '%s\n' "$published" | grep -qx "$name"; then
-              echo "skip $name (changesets published it to npmjs.com)"
-              continue
-            fi
-
-            # Only packages whose publishConfig targets GitHub Packages.
-            reg=$(node -pe "JSON.parse(require('fs').readFileSync('$d/package.json','utf8')).publishConfig?.registry || ''")
-            if [ "$reg" != "https://npm.pkg.github.com" ]; then
-              echo "skip $name (no GitHub Packages publishConfig)"
-              continue
-            fi
-
-            # Publish to GitHub Packages with the workflow token.
-            echo "publishing $name → npm.pkg.github.com"
-            ( cd "$d" && npm publish \
-              --registry=https://npm.pkg.github.com \
-              --//npm.pkg.github.com/:_authToken="$GH_TOKEN" \
-              --access public ) || echo "::warning::$name publish failed (may already exist)"
-          done
