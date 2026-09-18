@@ -25,7 +25,6 @@ import { pwNp3 } from './pw-np3.js';
 import { pwXann } from './pw-xann.js';
 import { pwWn } from './pw-wn.js';
 import { pwZen } from './pw-zen.js';
-import { pwCrb } from './pw-heatseek.js';
 import { pwKsm } from './pw-ksm.js';
 import { pwHrt } from './pw-hrt.js';
 import { pwMpId, pwMpNoid } from './pw-mp.js';
@@ -75,39 +74,50 @@ export function readmem32l(d: Uint8Array, off: number): number {
  * Populated incrementally as depackers land (Wave 2, FORMAT-PLUGINS.md).
  */
 export const pwFormats: PwFormat[] = [
-  // With signature (prowiz.c:33-50) — order verbatim; heuristics follow
-  pwTp1,
-  pwTp2,
+  // With signature (prowiz.c:33-50) — order verbatim
+  pwAc1d,
+  pwFchs,
+  pwFcm,
+  pwHrt,
+  pwKsm,
+  pwMpId,
+  // pwP18a — pending
+  // pwP10c — pending
+  // pwPru1 — pending
+  // pwPru2 — pending
+  // pwPha — pending
+  pwWn,
+  pwUnicId,
   pwTp3,
-  pwPp10,
-  pwMpNoid, // must be before Heatseeker, after ProPacker 1.0 (prowiz.c:66)
+  pwTp2,
+  pwTp1,
+  pwSkyt,
+
+  // No signature (prowiz.c:52-84) — order verbatim
+  pwXann,
+  pwDi,
+  pwEu,
   pwP4x,
   pwPp21,
   pwPp30,
+  pwPp10,
   pwP50a,
   pwP60a,
-  // No-signature heuristics (prowiz.c:52-84) — order verbatim
-  pwUnicId,
-  pwUnicNoid,
-  pwUnicEmptyId,
-  pwUnic2,
+  // pwP61a — pending
+  pwMpNoid, // must be checked before Heatseeker, after ProPacker 1.0 (:66)
+  // pwNru — pending
   pwNp2,
   pwNp1,
   pwNp3,
-  pwDi,
-  pwSkyt,
-  pwFchs,
-  pwFcm,
-  pwEu,
-  pwAc1d,
-  pwXann,
-  pwWn,
   pwZen,
-  pwMpId,
-  pwMpNoid,
-  pwHrt,
-  pwKsm,
-  pwCrb,
+  pwUnicEmptyId,
+  pwUnicNoid,
+  pwUnic2,
+  // pwCrb — pending
+  // pwTdd — pending
+  // pwStarpack — pending
+  // pwGmc — pending
+  // pwTitanics — pending
 ];
 
 /** pw_move_data (prowiz.c:87-100): copy `len` bytes input→output. */
