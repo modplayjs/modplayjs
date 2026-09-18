@@ -27,6 +27,7 @@ import { pwWn } from './pw-wn.js';
 import { pwZen } from './pw-zen.js';
 import { pwCrb } from './pw-heatseek.js';
 import { pwKsm } from './pw-ksm.js';
+import { pwHrt } from './pw-hrt.js';
 import { pwDi } from './pw-di.js';
 import { pwAc1d } from './pw-ac1d.js';
 import { pwEu } from './pw-eureka.js';
@@ -100,6 +101,7 @@ export const pwFormats: PwFormat[] = [
   pwXann,
   pwWn,
   pwZen,
+  pwHrt,
   pwKsm,
   pwCrb,
 ];
