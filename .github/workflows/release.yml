@@ -16,10 +16,15 @@ name: Release
 #
 # npmjs.com publish uses npm Trusted Publisher (configured on npmjs.com
 # for owner modplayjs / repo modplayjs / workflow release.yml) — npm
-# ≥ 11.5.1 exchanges the workflow's OIDC token, so no NPM_TOKEN secret
-# is needed. ALL packages publish to npmjs.com (publishConfig redirects
-# were removed — they made changeset publish target npm.pkg.github.com
-# which needs auth the OIDC flow can't provide).
+# ≥ 11.5.1 exchanges the workflow's OIDC token. ALL packages publish to
+# npmjs.com (publishConfig redirects were removed — they made changeset
+# publish target npm.pkg.github.com which needs auth the OIDC flow can't
+# provide).
+#
+# NOTE: Trusted Publisher OIDC only works for packages ALREADY on
+# npmjs.com. For the FIRST publish of a NEW package, an NPM_TOKEN
+# (granular automation token) must be set as a repo secret. After the
+# first publish, OIDC takes over for all subsequent versions.
 
 "on":
   push:
@@ -93,6 +98,7 @@ jobs:
           commit: 'chore: version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
 
 
