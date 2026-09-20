@@ -27,15 +27,15 @@ jobs:
 
       - name: Cleanup PR cache on close
         if: github.event_name == 'pull_request' && github.event.pull_request.merged == false
-        run: |
-          set -eu
-          # List and delete caches created by this PR branch.
-          branch="${{ github.event.pull_request.head.ref }}"
-          caches=$(gh cache list --branch "$branch" --json id --jq '.[].id' 2>/dev/null || true)
-          for id in $caches; do
-            gh cache delete "$id" || true
-          done
-          echo "deleted caches for branch: $branch (if any)"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -eu
+          # List and delete caches created by this PR branch.
+          caches=$(gh cache list --branch "$BRANCH" --json id --jq '.[].id' 2>/dev/null || true)
+          for id in $caches; do
+            gh cache delete "$id" || true
+          done
+          echo "deleted caches for branch: $BRANCH (if any)"

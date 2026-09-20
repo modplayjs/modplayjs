@@ -276,3 +276,22 @@
 #chanstrip .badge {
   font-family: var(--mono, ui-monospace, monospace);
 }
+
+/* ---------------------------------------------------------------- playlist --
+ * Drop target highlight while dragging files over the playlist card. */
+
+#playlistcard.border-primary {
+  border-style: dashed;
+}
+
+#pllist [role='option'] {
+  border: 1px solid transparent;
+}
+
+#pllist [role='option'][aria-selected='true'] {
+  border-color: oklch(from var(--pat-accent) l c h / 0.4);
+}
+
+#pllist:has([role='option']) {
+  min-height: 3rem;
+}

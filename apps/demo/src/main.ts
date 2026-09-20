@@ -24,6 +24,7 @@ import { pwPlugin } from '@modplayjs/fmt-prowizard';
 import { createPaulaPlugin } from '@modplayjs/dsp-paula';
 import { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
 import { WebAudioOutput } from '@modplayjs/out-webaudio';
+import { PlaylistStore, type PlaylistTrack } from './playlist-store';
 import './style.css';
 
 const fileInput = document.getElementById('file') as HTMLInputElement;
@@ -53,6 +54,14 @@ const patNumEl = document.getElementById('patnum') as HTMLSpanElement;
 const chanStrip = document.getElementById('chanstrip') as HTMLDivElement;
 const themeMode = document.getElementById('thememode') as HTMLInputElement;
 const buildHashEl = document.getElementById('buildhash') as HTMLSpanElement;
+const patternViewChk = document.getElementById('patternview') as HTMLInputElement;
+const patternCol = document.getElementById('patterncol') as HTMLElement;
+const appGrid = document.getElementById('appgrid') as HTMLElement;
+const plList = document.getElementById('pllist') as HTMLDivElement;
+const plEmpty = document.getElementById('plempty') as HTMLDivElement;
+const plSize = document.getElementById('plsize') as HTMLSpanElement;
+const plClear = document.getElementById('plclear') as HTMLButtonElement;
+const plCard = document.getElementById('playlistcard') as HTMLElement;
 
 const core = new CorePlayer();
 core.registries.registerFormat(modPlugin);
@@ -91,6 +100,31 @@ themeMode.addEventListener('change', () => {
     applyTheme(false);
   } else {
     applyTheme(true);
+  }
+}
+
+// pattern view: OFF by default. Hidden column + collapsed 2-col grid;
+// the frame() loop skips pattern work entirely while disabled.
+const PATVIEW_KEY = 'modplayjs-patternview';
+function applyPatternView(on: boolean): void {
+  patternCol.hidden = !on;
+  appGrid.classList.toggle('lg:grid-cols-2', !on);
+  appGrid.classList.toggle('lg:grid-cols-[1fr_2fr_1fr]', on);
+  if (on && loaded) {
+    // (re)build for whatever is loaded / currently playing
+    const ord = core.playState.ord;
+    buildPatternView(loaded && ord >= 0 ? ord : 0);
+  }
+}
+patternViewChk.addEventListener('change', () => {
+  localStorage.setItem(PATVIEW_KEY, patternViewChk.checked ? '1' : '0');
+  applyPatternView(patternViewChk.checked);
+});
+{
+  const savedPat = localStorage.getItem(PATVIEW_KEY);
+  if (savedPat === '1') {
+    patternViewChk.checked = true;
+    applyPatternView(true);
   }
 }
 
@@ -167,13 +201,19 @@ seek.addEventListener('change', () => {
 });
 
 // end-of-track: reset the transport buttons (the output stops itself and
-// fires onEnded after the final ring drains)
+// fires onEnded after the final ring drains); advance the playlist.
 output.onEnded = () => {
   playing = false;
   paused = false;
   stopBtn.disabled = true;
   pauseBtn.disabled = true;
   pauseBtn.textContent = 'Pause';
+  // auto-advance: play the next entry (wraps around)
+  const next = nextTrack();
+  if (next && !jamMode) {
+    void playTrack(next);
+    return;
+  }
   show('end of track');
 };
 
@@ -457,6 +497,7 @@ function buildPatternView(patternIdx: number): void {
 }
 
 function updatePatternHighlight(): void {
+  if (!patternViewChk.checked) return; // pattern view disabled: skip all pattern work
   const ps = core.playState;
   const ord = ps.ord;
   const row = ps.row;
@@ -532,53 +573,161 @@ function keepInView(container: HTMLElement, el: HTMLElement, horizontal = false)
 // ------------------------------------------------------------------ events --
 
 fileInput.addEventListener('change', async () => {
-  const file = fileInput.files?.[0];
-  if (!file) return;
-  try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    if (playing || paused) {
-      output.stop();
-      playing = false;
-      paused = false;
-    }
-    core.loadModule(bytes);
-    const mod = core.module;
-    if (!mod) throw new StateError('module did not load');
-    // A/B against XMPlay: everything through softmixer (libxmp-parity mixer).
-    core.setDsp('softmixer');
-    loaded = true;
-    playBtn.disabled = false;
-    playBtn.textContent = 'Play';
-    pauseBtn.disabled = true;
-    stopBtn.disabled = true;
-    setAuditionButtons(false);
-    seek.disabled = false;
-    seek.value = '0';
-    timeCur.textContent = '0:00';
-    timeRem.textContent = '-' + fmtTime(moduleDuration());
-    curPattern = -1;
-    curRow = -1;
-    renderInfo();
-    renderOrders();
-    renderInstruments();
-    renderSamples();
-    renderChannelStrip();
-    buildPatternView(0);
-    show(
-      'loaded | format: ' + mod.format.toUpperCase() + ' | ' + core.dsp().name +
-      ' | channels: ' + mod.chn + ' | patterns: ' + mod.pat +
-      ' | tracker: ' + mod.tracker,
-    );
-  } catch (err) {
-    loaded = false;
-    playBtn.disabled = true;
-    pauseBtn.disabled = true;
-    stopBtn.disabled = true;
-    seek.disabled = true;
-    const msg = err instanceof Error ? err.message : String(err);
-    show(`unsupported or corrupt file: ${msg}`);
-  }
+  const files = [...(fileInput.files ?? [])];
+  fileInput.value = '';
+  await addFiles(files);
 });
+
+/** Add files to the playlist (dedupe in the store), report skips. */
+async function addFiles(files: File[]): Promise<void> {
+  if (files.length === 0) return;
+  const skipped = await playlist.add(files);
+  renderPlaylist();
+  if (skipped > 0) showThrottled(`playlist: added ${files.length - skipped}, skipped ${skipped} duplicate(s)`);
+  else showThrottled(`playlist: +${files.length}`);
+}
+
+/** Load a module from a playlist entry (or raw file) into the player. */
+async function loadTrack(file: Blob): Promise<void> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (playing || paused) {
+    output.stop();
+    playing = false;
+    paused = false;
+  }
+  core.loadModule(bytes);
+  const mod = core.module;
+  if (!mod) throw new StateError('module did not load');
+  // A/B against XMPlay: everything through softmixer (libxmp-parity mixer).
+  core.setDsp('softmixer');
+  loaded = true;
+  playBtn.disabled = false;
+  playBtn.textContent = 'Play';
+  pauseBtn.disabled = true;
+  stopBtn.disabled = true;
+  setAuditionButtons(false);
+  seek.disabled = false;
+  seek.value = '0';
+  timeCur.textContent = '0:00';
+  timeRem.textContent = '-' + fmtTime(moduleDuration());
+  curPattern = -1;
+  curRow = -1;
+  renderInfo();
+  renderOrders();
+  renderInstruments();
+  renderSamples();
+  renderChannelStrip();
+  show(
+    'loaded | format: ' + mod.format.toUpperCase() + ' | ' + core.dsp().name +
+    ' | channels: ' + mod.chn + ' | patterns: ' + mod.pat +
+    ' | tracker: ' + mod.tracker,
+  );
+}
+
+// --------------------------------------------------------------- playlist --
+
+const playlist = new PlaylistStore();
+
+function fmtBytes(n: number): string {
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KiB';
+  return (n / (1024 * 1024)).toFixed(1) + ' MiB';
+}
+
+function renderPlaylist(): void {
+  plList.querySelectorAll('[data-track]').forEach((el) => el.remove());
+  plEmpty.hidden = playlist.tracks.length > 0;
+  let total = 0;
+  const frag = document.createDocumentFragment();
+  for (const t of playlist.tracks) {
+    total += t.size;
+    const row = document.createElement('div');
+    row.dataset.track = String(t.id);
+    row.className = 'flex items-center gap-2 rounded px-1.5 py-1 text-[0.72rem] cursor-pointer hover:bg-base-200 ' +
+      (currentTrackId === t.id ? 'bg-primary/15 outline outline-1 outline-primary/40' : '');
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', String(currentTrackId === t.id));
+    row.title = t.name + ' — click to play';
+
+    const fmt = document.createElement('span');
+    fmt.className = 'badge badge-ghost badge-xs font-mono shrink-0 uppercase';
+    fmt.textContent = t.format;
+    const name = document.createElement('span');
+    name.className = 'truncate grow min-w-0';
+    name.textContent = t.name;
+    const size = document.createElement('span');
+    size.className = 'opacity-50 font-mono shrink-0';
+    size.textContent = fmtBytes(t.size);
+    const del = document.createElement('button');
+    del.className = 'btn btn-ghost btn-xs px-1 shrink-0 opacity-60 hover:opacity-100';
+    del.textContent = '✕';
+    del.setAttribute('aria-label', 'remove ' + t.name);
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      void playlist.remove(t.id).then(renderPlaylist);
+    });
+
+    row.append(fmt, name, size, del);
+    row.addEventListener('click', () => {
+      void playTrack(t);
+    });
+    frag.appendChild(row);
+  }
+  plList.appendChild(frag);
+  plSize.textContent =
+    playlist.tracks.length > 0
+      ? `${playlist.tracks.length} · ${fmtBytes(total)}` + (playlist.ephemeral ? ' · session' : '')
+      : '';
+  plClear.disabled = playlist.tracks.length === 0;
+}
+
+/** Currently loaded playlist entry (highlight + auto-advance). */
+let currentTrackId: number | null = null;
+
+async function playTrack(t: PlaylistTrack): Promise<void> {
+  try {
+    await loadTrack(t.blob);
+    currentTrackId = t.id;
+    renderPlaylist();
+    await startPlayback(false);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    show(`play failed: ${msg}`);
+  }
+}
+
+function nextTrack(): PlaylistTrack | null {
+  const list = playlist.tracks;
+  if (list.length === 0) return null;
+  const idx = list.findIndex((t) => t.id === currentTrackId);
+  // wrap around: end of list restarts from the top
+  return list[(idx + 1) % list.length] ?? null;
+}
+
+// file picker & drag-and-drop both feed the playlist
+plCard.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  plCard.classList.add('border-primary');
+});
+plCard.addEventListener('dragleave', () => {
+  plCard.classList.remove('border-primary');
+});
+plCard.addEventListener('drop', (e) => {
+  e.preventDefault();
+  plCard.classList.remove('border-primary');
+  const files = [...e.dataTransfer?.files ?? []];
+  if (files.length > 0) void addFiles(files);
+});
+
+plClear.addEventListener('click', () => {
+  void playlist.clear().then(() => {
+    currentTrackId = null;
+    renderPlaylist();
+  });
+});
+
+// init: restore persisted playlist before first render
+void playlist.init().then(renderPlaylist);
 
 /** Start (or restart) playback: device-rate match, smix reservation,
  * player start, and audio output. Shared by the Play button and the

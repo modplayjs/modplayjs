@@ -34,12 +34,13 @@ concurrency:
 
 jobs:
   generate:
-    # Skip the release bot's own PRs and direct pushes on main that are
-    # version-packages merges.
+    # Skip the version bot's own PR (branch from changesets/action's
+    # `commit:` = "chore: version packages") and direct pushes on main
+    # that are version-packages merges.
     if: >-
       (github.event_name == 'pull_request_target' &&
        github.event.pull_request.base.ref == 'main' &&
-       github.event.pull_request.head.ref != 'chore/version-bump') ||
+       github.event.pull_request.head.ref != 'chore/version-packages') ||
       (github.event_name == 'push' &&
        !startsWith(github.event.head_commit.message, 'chore: version packages'))
     runs-on: ubuntu-latest

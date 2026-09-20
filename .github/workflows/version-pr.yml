@@ -1,0 +1,61 @@
+name: Version PR
+
+# Maintains the rolling "chore: version packages" PR. Every push to main
+# with pending changesets re-runs `changeset version` and force-updates
+# the same PR, so it always reflects the accumulated state of main.
+#
+#   1. Feature PRs / direct pushes land .changeset/*.md files on main
+#      (auto-changeset.yml).
+#   2. This workflow opens/updates the single version PR, applying all
+#      pending bumps + changelogs.
+#   3. Merging that PR lands the "chore: version packages" commit on
+#      main, which publish.yml consumes (scoped build + GitHub Packages).
+#
+# No publish here — publishing lives in publish.yml, triggered only by
+# the version merge, so unrelated pushes to main never touch the registry.
+
+"on":
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: version-pr-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  version:
+    name: Update version packages PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Version packages (no publish)
+        uses: changesets/action@v1
+        with:
+          # Updates the rolling PR from current main; publish stays out of
+          # this workflow entirely (see publish.yml).
+          version: npm run version
+          createGithubReleases: false
+          title: 'chore: version packages'
+          commit: 'chore: version packages'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
