@@ -116,8 +116,11 @@ jobs:
           const frontmatter = pkgs.map(p => `'${p}': ${level}`).join('\n');
           const name = isPush ? `push-${Date.now()}` : `auto-pr-${pr}`;
           const author = process.env.PR_USER || 'bitti09';
+          // Author line only — the GitHub changelog generator prefixes
+          // "Thanks @<author>!" from the commit author, so the changeset
+          // body stays free of redundant credit text.
           fs.writeFileSync(`.changeset/auto-${isPush ? 'push' : 'pr'}-${isPush ? Date.now() : pr}.md`,
-            `---\n${frontmatter}\n---\n\n${summary} (${isPush ? 'direct push' : `PR #${pr}`}, by @${author})\n`);
+            `---\n${frontmatter}\n---\n\n${summary} (${isPush ? 'direct push' : `PR #${pr}`})\n`);
           console.log('changeset:', level, '→', pkgs.join(', '));
           JSEOF
           ls .changeset/
@@ -125,8 +128,12 @@ jobs:
       - name: Commit & push the changeset
         run: |
           set -eu
-          git config user.name "modplayjs-changeset-bot"
-          git config user.email "noreply@github.com"
+          # Commit as the maintainer's noreply identity: changesets'
+          # GitHub changelog generator resolves the commit author to a
+          # GitHub user for the "Thanks @user!" credit. The default
+          # github-actions/web-flow identity would render as @web-flow.
+          git config user.name "Bitti09"
+          git config user.email "Bitti09@users.noreply.github.com"
           git add .changeset/
           if git diff --cached --quiet; then
             echo "changeset unchanged or none needed"
