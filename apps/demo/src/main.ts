@@ -265,7 +265,9 @@ function renderInfo(): void {
   const mod = core.module;
   if (!mod) return;
   // One info per row: a two-column grid of label → value.
+  const current = playlist.tracks.find((t) => t.id === currentTrackId);
   const rows: [string, string][] = [
+    ['file', current?.name ?? '—'],
     ['title', mod.title || '(untitled)'],
     ['format', mod.format.toUpperCase()],
     ['tracker', mod.tracker],
@@ -278,7 +280,9 @@ function renderInfo(): void {
     ['samples', String(core.samples.size)],
     ['restart', String(mod.restart)],
     ['global vol', mod.gvol + ' / ' + mod.gvolbase],
-    ['master vol', mod.mvol + ' / ' + mod.mvolbase],
+    ...(mod.mvol !== undefined
+      ? [['master vol', mod.mvol + ' / ' + mod.mvolbase] as [string, string]]
+      : []),
   ];
   infoEl.textContent = '';
   const grid = document.createElement('div');
@@ -288,7 +292,7 @@ function renderInfo(): void {
     l.className = 'opacity-60';
     l.textContent = label;
     const v = document.createElement('span');
-    v.className = 'font-medium truncate';
+    v.className = 'font-medium break-all';
     v.textContent = value;
     v.title = value;
     grid.appendChild(l);
@@ -689,6 +693,8 @@ function renderPlaylist(): void {
       ? `${playlist.tracks.length} · ${fmtBytes(total)}` + (playlist.ephemeral ? ' · session' : '')
       : '';
   plClear.disabled = playlist.tracks.length === 0;
+  // the file-information 'file' row shows the current selection
+  if (loaded) renderInfo();
 }
 
 /** Currently loaded playlist entry (highlight + auto-advance). */
