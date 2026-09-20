@@ -49,6 +49,10 @@ export class WebAudioOutput implements OutputPlugin {
    * been stopped by the time this fires; the player state remains. */
   onEnded: (() => void) | null = null;
   private endedFired = false;
+  /** Pending end-of-drain timeout (armed when playBuffer reports the
+   * module's end). stop() cancels it: a programmatic stop must not fire
+   * the queued onEnded as a ghost event. */
+  private drainTimer: number | null = null;
   /** Current transport ('sab' | 'copy') and AudioContext state. */
   get transportMode(): 'sab' | 'copy' | 'idle' {
     if (!this.running && this.node === null) return 'idle';
@@ -163,6 +167,13 @@ export class WebAudioOutput implements OutputPlugin {
   stop(): void {
     this.running = false;
     this.paused = false;
+    // A queued end-of-drain onEnded belongs to the stopped playback —
+    // cancel it so a track switch / manual stop doesn't fire a ghost
+    // end-of-track (and, in the demo, an unwanted playlist advance).
+    if (this.drainTimer !== null) {
+      window.clearTimeout(this.drainTimer);
+      this.drainTimer = null;
+    }
     if (this.renderTimer !== null) {
       window.clearInterval(this.renderTimer);
       this.renderTimer = null;
@@ -255,7 +266,8 @@ export class WebAudioOutput implements OutputPlugin {
         // the final frames).
         if (!this.endedFired) {
           this.endedFired = true;
-          window.setTimeout(() => {
+          this.drainTimer = window.setTimeout(() => {
+            this.drainTimer = null;
             this.stop();
             this.onEnded?.();
           }, 250);
@@ -304,7 +316,8 @@ export class WebAudioOutput implements OutputPlugin {
       // stopping (same rationale as the SAB path).
       if (!this.endedFired) {
         this.endedFired = true;
-        window.setTimeout(() => {
+        this.drainTimer = window.setTimeout(() => {
+          this.drainTimer = null;
           this.stop();
           this.onEnded?.();
         }, 250);

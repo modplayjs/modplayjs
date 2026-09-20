@@ -105,16 +105,13 @@ themeMode.addEventListener('change', () => {
 
 // pattern view: OFF by default. Hidden column + collapsed 2-col grid;
 // the frame() loop skips pattern work entirely while disabled.
+// NOTE: runs during module eval — must not touch load-state (`loaded`,
+// declared further down) or it would throw TDZ and kill every listener.
 const PATVIEW_KEY = 'modplayjs-patternview';
 function applyPatternView(on: boolean): void {
   patternCol.hidden = !on;
   appGrid.classList.toggle('lg:grid-cols-2', !on);
   appGrid.classList.toggle('lg:grid-cols-[1fr_2fr_1fr]', on);
-  if (on && loaded) {
-    // (re)build for whatever is loaded / currently playing
-    const ord = core.playState.ord;
-    buildPatternView(loaded && ord >= 0 ? ord : 0);
-  }
 }
 patternViewChk.addEventListener('change', () => {
   localStorage.setItem(PATVIEW_KEY, patternViewChk.checked ? '1' : '0');
@@ -208,7 +205,9 @@ output.onEnded = () => {
   stopBtn.disabled = true;
   pauseBtn.disabled = true;
   pauseBtn.textContent = 'Pause';
-  // auto-advance: play the next entry (wraps around)
+  // auto-advance: play the next entry (wraps around). A programmatic
+  // stop() cancels the pending drain timer in out-webaudio, so this only
+  // fires on a genuine natural end.
   const next = nextTrack();
   if (next && !jamMode) {
     void playTrack(next);
@@ -578,11 +577,16 @@ fileInput.addEventListener('change', async () => {
   await addFiles(files);
 });
 
-/** Add files to the playlist (dedupe in the store), report skips. */
+/** Add files to the playlist (dedupe in the store), report skips. The
+ * first entry ever added is auto-selected: loaded into the player and
+ * ready for Play — but never auto-started. */
 async function addFiles(files: File[]): Promise<void> {
   if (files.length === 0) return;
   const skipped = await playlist.add(files);
   renderPlaylist();
+  if (currentTrackId === null && playlist.tracks.length > 0) {
+    await selectTrack(playlist.tracks[0]!);
+  }
   if (skipped > 0) showThrottled(`playlist: added ${files.length - skipped}, skipped ${skipped} duplicate(s)`);
   else showThrottled(`playlist: +${files.length}`);
 }
@@ -617,6 +621,8 @@ async function loadTrack(file: Blob): Promise<void> {
   renderInstruments();
   renderSamples();
   renderChannelStrip();
+  // pattern view is user-visible: rebuild for the freshly loaded module
+  if (patternViewChk.checked) buildPatternView(0);
   show(
     'loaded | format: ' + mod.format.toUpperCase() + ' | ' + core.dsp().name +
     ' | channels: ' + mod.chn + ' | patterns: ' + mod.pat +
@@ -669,7 +675,11 @@ function renderPlaylist(): void {
 
     row.append(fmt, name, size, del);
     row.addEventListener('click', () => {
-      void playTrack(t);
+      const t2 = t;
+      // playing (or paused mid-track) → switch to it and keep going;
+      // idle → just prepare, user presses Play
+      if (playing || paused) void playTrack(t2);
+      else void selectTrack(t2);
     });
     frag.appendChild(row);
   }
@@ -684,6 +694,21 @@ function renderPlaylist(): void {
 /** Currently loaded playlist entry (highlight + auto-advance). */
 let currentTrackId: number | null = null;
 
+/** Prepare a track: load into the player, mark it selected, do NOT start.
+ * The Play button (or a selection while playing) starts audio. */
+async function selectTrack(t: PlaylistTrack): Promise<void> {
+  try {
+    await loadTrack(t.blob);
+    currentTrackId = t.id;
+    renderPlaylist();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    show(`load failed: ${msg}`);
+  }
+}
+
+/** Switch to a track and autoplay — used when the player is already
+ * running (row click while playing, playlist auto-advance). */
 async function playTrack(t: PlaylistTrack): Promise<void> {
   try {
     await loadTrack(t.blob);
@@ -726,8 +751,12 @@ plClear.addEventListener('click', () => {
   });
 });
 
-// init: restore persisted playlist before first render
-void playlist.init().then(renderPlaylist);
+// init: restore persisted playlist before first render; prime the player
+// with the first entry (marked + ready, no autoplay)
+void playlist.init().then(async () => {
+  renderPlaylist();
+  if (playlist.tracks.length > 0) await selectTrack(playlist.tracks[0]!);
+});
 
 /** Start (or restart) playback: device-rate match, smix reservation,
  * player start, and audio output. Shared by the Play button and the
