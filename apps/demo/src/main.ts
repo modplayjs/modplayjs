@@ -29,6 +29,10 @@ import { registerPwa } from './pwa';
 import './style.css';
 
 const fileInput = document.getElementById('file') as HTMLInputElement;
+const fileBtn = document.getElementById('filebtn') as HTMLButtonElement;
+const fullscreenBtn = document.getElementById('fullscreen') as HTMLButtonElement;
+const fsEnterIcon = document.getElementById('fs-enter-icon') as unknown as SVGElement;
+const fsExitIcon = document.getElementById('fs-exit-icon') as unknown as SVGElement;
 const playBtn = document.getElementById('play') as HTMLButtonElement;
 const pauseBtn = document.getElementById('pause') as HTMLButtonElement;
 const stopBtn = document.getElementById('stop') as HTMLButtonElement;
@@ -576,6 +580,30 @@ function keepInView(container: HTMLElement, el: HTMLElement, horizontal = false)
 }
 
 // ------------------------------------------------------------------ events --
+
+// the styled 'add files' button opens the hidden multi-file input
+fileBtn.addEventListener('click', () => fileInput.click());
+
+// fullscreen toggle: hidden in the installed PWA (already fullscreen via
+// manifest display), shown in the plain browser
+function updateFullscreenUi(): void {
+  const isStandalone =
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as { standalone?: boolean }).standalone === true; // iOS
+  fullscreenBtn.classList.toggle('hidden', isStandalone);
+  const active = !!document.fullscreenElement;
+  fsEnterIcon.classList.toggle('hidden', active);
+  fsExitIcon.classList.toggle('hidden', !active);
+}
+fullscreenBtn.addEventListener('click', () => {
+  if (document.fullscreenElement) void document.exitFullscreen();
+  else void document.documentElement.requestFullscreen().catch(() => {});
+});
+document.addEventListener('fullscreenchange', updateFullscreenUi);
+window.matchMedia('(display-mode: standalone)').addEventListener('change', updateFullscreenUi);
+window.matchMedia('(display-mode: fullscreen)').addEventListener('change', updateFullscreenUi);
+updateFullscreenUi();
 
 fileInput.addEventListener('change', async () => {
   const files = [...(fileInput.files ?? [])];

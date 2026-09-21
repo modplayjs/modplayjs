@@ -1,10 +1,11 @@
 {
-  "name": "modplayjs demo",
+  "name": "modplayjs",
   "short_name": "modplayjs",
   "description": "Tracker module player (MOD/S3M/XM/IT and more) built on modplayjs",
   "start_url": "./",
   "scope": "./",
-  "display": "standalone",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
   "background_color": "#0b0b12",
   "theme_color": "#0b0b12",
   "icons": [

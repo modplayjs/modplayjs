@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>modplayjs demo</title>
+    <title>modplayjs</title>
     <meta name="description" content="Tracker module player (MOD/S3M/XM/IT and more) built on modplayjs" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icon-192.png" type="image/png" />
@@ -30,13 +30,28 @@
 
           <label class="sr-only" for="file">Module files</label>
           <input type="file" id="file" multiple
-            accept=".mod,.s3m,.xm,.it,.mtm,.stm,.669,.sfx,.digi,.asylum,.ice,.mdl,.ptm,.okt,.med,.mmd,.far,.xm,.pow,.p61,.utz,. ult"
-            class="file-input file-input-bordered file-input-xs grow max-w-none w-auto min-w-44" />
+            accept=".mod,.s3m,.xm,.it,.mtm,.stm,.669,.sfx,.digi,.asylum,.ice,.mdl,.ptm,.okt,.med,.mmd,.far,.pow,.p61,.utz"
+            class="sr-only" />
+
+          <button id="filebtn" type="button" class="btn btn-ghost btn-sm" title="Add module files to the playlist">
+            <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 4v10.586l-3.293-3.293-1.414 1.414L12 17.414l4.707-4.707-1.414-1.414L13 14.586V4h-1zM5 19h14v2H5z"/>
+            </svg>
+            add files
+          </button>
 
           <div class="join ml-auto">
             <button id="play" disabled class="btn btn-primary btn-sm join-item w-16">Play</button>
             <button id="pause" disabled class="btn btn-sm join-item w-16">Pause</button>
             <button id="stop" disabled class="btn btn-sm join-item w-14">Stop</button>
+            <button id="fullscreen" class="btn btn-sm join-item btn-square hidden" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+              <svg id="fs-enter-icon" xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M4 4h6v2H6v4H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 0h2v6h-6v-2h4v-4z"/>
+              </svg>
+              <svg id="fs-exit-icon" xmlns="http://www.w3.org/2000/svg" class="size-4 hidden" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M9 4H7v5H2v2h7V4zm12 7h-5V4h-2v7h7V7v4zM9 20H2v-7h2v5h5v2zm12-5v5h-7v-2h5v-3h2z"/>
+              </svg>
+            </button>
           </div>
         </div>
 
