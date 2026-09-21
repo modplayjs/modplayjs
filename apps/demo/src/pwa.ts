@@ -15,10 +15,21 @@ export function registerPwa(onUpdate?: (phase: 'found' | 'applied') => void): vo
 
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('sw.js', { scope: './' })
+      .register('sw.js', { scope: './', updateViaCache: 'none' })
       .then((reg) => {
         // check for an update on every page load
         void reg.update().catch(() => {});
+
+        // Android keeps the installed-PWA task alive: a launch may never
+        // reload the page. Re-check when the app is foregrounded and
+        // periodically while it runs.
+        const check = (): void => {
+          void reg.update().catch(() => {});
+        };
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') check();
+        });
+        setInterval(check, 60 * 60 * 1000);
 
         reg.addEventListener('updatefound', () => {
           const next = reg.installing;
@@ -37,19 +48,19 @@ export function registerPwa(onUpdate?: (phase: 'found' | 'applied') => void): vo
       });
 
     let playing = false;
+    let deferredReload = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       // a new SW took control → apply the update unless audio is live
       if (playing) {
+        deferredReload = true;
         onUpdate?.('applied');
-        return; // retry the reload once playback stops (page unload hook)
+        return; // apply once playback stops
       }
       location.reload();
     });
-
-    // expose a mute-flag for the player: main.ts marks live playback
-    (window as unknown as { __pwaAudioBusy?: () => boolean }).__pwaAudioBusy = () => playing;
     document.addEventListener('modplayjs:playing', ((e: CustomEvent<boolean>) => {
       playing = e.detail;
+      if (!playing && deferredReload) location.reload();
     }) as EventListener);
   });
 }
