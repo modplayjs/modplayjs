@@ -25,6 +25,7 @@ import { createPaulaPlugin } from '@modplayjs/dsp-paula';
 import { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
 import { WebAudioOutput } from '@modplayjs/out-webaudio';
 import { PlaylistStore, type PlaylistTrack } from './playlist-store';
+import { registerPwa } from './pwa';
 import './style.css';
 
 const fileInput = document.getElementById('file') as HTMLInputElement;
@@ -213,6 +214,7 @@ output.onEnded = () => {
     void playTrack(next);
     return;
   }
+  setPwaAudioBusy(false);
   show('end of track');
 };
 
@@ -770,6 +772,15 @@ void playlist.init().then(async () => {
  * auto-start) all song channels are silenced so only the auditioned
  * instrument/sample sounds — jam mode. */
 let jamMode = false;
+
+// PWA auto-update: suppress the page reload while audio is live; the
+// 'modplayjs:playing' event tells the SW-registration module when it is
+// safe to reload (no transport running).
+registerPwa();
+function setPwaAudioBusy(busy: boolean): void {
+  document.dispatchEvent(new CustomEvent('modplayjs:playing', { detail: busy }));
+}
+
 async function startPlayback(muteSong: boolean): Promise<void> {
   const deviceRate = await output.deviceSampleRate();
   core.setSampleRate(deviceRate);
@@ -792,6 +803,7 @@ async function startPlayback(muteSong: boolean): Promise<void> {
   paused = false;
   pauseBtn.disabled = false;
   stopBtn.disabled = false;
+  setPwaAudioBusy(true);
   show(
     (muteSong ? 'jam (song muted) | ' : 'playing | ') +
     'DSP: ' + core.dsp().name + ' | ' +
@@ -855,6 +867,7 @@ stopBtn.addEventListener('click', () => {
   pauseBtn.disabled = true;
   playBtn.textContent = 'Play';
   pauseBtn.textContent = 'Pause';
+  setPwaAudioBusy(false);
   show('stopped');
   jamMode = false;
 });

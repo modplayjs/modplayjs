@@ -4,12 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>modplayjs demo</title>
+    <meta name="description" content="Tracker module player (MOD/S3M/XM/IT and more) built on modplayjs" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <meta name="theme-color" content="#0b0b12" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   </head>
   <body class="min-h-screen bg-base-300 text-base-content">
-    <!-- coi-serviceworker: re-serves the page with COOP/COEP headers so
-         SharedArrayBuffer (the SAB audio transport) works on GitHub Pages,
-         which cannot set response headers. Reloads once to take control. -->
-    <script src="coi-serviceworker.js?v=2"></script>
+    <!-- Service worker (sw.js): COI headers for the SharedArrayBuffer
+         audio transport, precaching and auto-update. Registered in
+         src/pwa.ts; controls this page from the second visit on. -->
 
     <!-- ══ player bar: fixed at the top, full width ════════════════════ -->
     <header id="playerbar" class="sticky top-0 z-30 border-b border-base-300 bg-base-100/95 backdrop-blur">

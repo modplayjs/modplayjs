@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import pwaPrecache from './scripts/precache-plugin.mjs';
 
 // Short commit hash of the working tree — displayed in the demo header so
 // a deployed page is identifiable at a glance.
@@ -22,7 +23,7 @@ const GIT_HASH = (() => {
 // production build (project-page deployment).
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/modplayjs/' : '/',
-  plugins: [tailwindcss()],
+  plugins: [tailwindcss(), pwaPrecache()],
   build: {
     rollupOptions: {
       input: {
