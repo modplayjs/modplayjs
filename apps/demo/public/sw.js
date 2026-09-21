@@ -71,6 +71,14 @@ self.addEventListener('activate', (event) => {
         names.filter((n) => n !== CACHE).map((n) => caches.delete(n)),
       );
       await self.clients.claim();
+      // tell every client which build this SW serves (the cache name is
+      // derived from the precache manifest → per-build identity) so the
+      // page can flag "serving newer build than the loaded code".
+      const version = CACHE.replace('modplayjs-precache-', '');
+      const clients = await self.clients.matchAll({ includeUncontrolled: true });
+      for (const client of clients) {
+        client.postMessage({ type: 'sw-version', version });
+      }
     })(),
   );
 });

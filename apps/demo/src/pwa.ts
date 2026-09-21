@@ -9,9 +9,41 @@
 // actually loaded. The reload happens only while the player is NOT
 // playing — an update mid-song would kill the audio transport.
 
-export function registerPwa(onUpdate?: (phase: 'found' | 'applied') => void): void {
+export interface PwaState {
+  /** true while an updated service worker is installed but the page has
+   * not reloaded yet (deferred because audio was playing) */
+  updatePending: boolean;
+  /** the version marker the CONTROLLING service worker serves; null
+   * before the first message arrives */
+  swVersion: string | null;
+}
+
+type PwaListener = (state: PwaState) => void;
+
+let listener: PwaListener | null = null;
+const state: PwaState = { updatePending: false, swVersion: null };
+
+function emit(): void {
+  listener?.({ ...state });
+}
+
+/** Subscribe to PWA update state (badge coloring in main.ts). */
+export function onPwaState(cb: (state: PwaState) => void): void {
+  listener = cb;
+  if (state.updatePending || state.swVersion) emit();
+}
+
+export function registerPwa(): void {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
   if (!window.isSecureContext) return; // SW requires https or localhost
+
+  // the controlling SW announces which build it serves (activate handler)
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if ((e.data as { type?: string })?.type === 'sw-version') {
+      state.swVersion = (e.data as { version: string }).version;
+      emit();
+    }
+  });
 
   window.addEventListener('load', () => {
     navigator.serviceWorker
@@ -38,7 +70,7 @@ export function registerPwa(onUpdate?: (phase: 'found' | 'applied') => void): vo
             if (next.state === 'installed' && navigator.serviceWorker.controller) {
               // new version waiting; the SW already skipWaiting()s on
               // install, so once it activates the page just reloads
-              onUpdate?.('found');
+              // (deferred while audio plays — see controllerchange)
             }
           });
         });
@@ -53,7 +85,8 @@ export function registerPwa(onUpdate?: (phase: 'found' | 'applied') => void): vo
       // a new SW took control → apply the update unless audio is live
       if (playing) {
         deferredReload = true;
-        onUpdate?.('applied');
+        state.updatePending = true;
+        emit();
         return; // apply once playback stops
       }
       location.reload();
