@@ -1,5 +1,13 @@
 # @modplayjs/out-webaudio
 
+## 0.1.1
+
+### Patch Changes
+
+- [`0372d18`](https://github.com/modplayjs/modplayjs/commit/0372d182b5c4d69b5c90c78cf7d01981c5fc502d) - version packages (PR [#25](https://github.com/modplayjs/modplayjs/issues/25))
+
+- [`4681ddb`](https://github.com/modplayjs/modplayjs/commit/4681ddb2927e609ba591e9489490955963486acb) - playlist select-first + play-aware track switching (direct push, by @Bitti09)
+
 ## 0.1.0
 
 ### Minor Changes
