@@ -130,9 +130,11 @@ patternViewChk.addEventListener('change', () => {
   }
 }
 
+// pan slider is 0..100 with 50 = center; the core's separation scale is
+// 0..200 with 100 = center — multiply by 2.
 panSep.addEventListener('input', () => {
   const v = Number(panSep.value);
-  core.setPanSeparation(v);
+  core.setPanSeparation(v * 2);
   panSepV.textContent = String(v);
 });
 
@@ -143,6 +145,11 @@ volume.addEventListener('input', () => {
 });
 core.setVolume(Number(volume.value));
 volumeV.textContent = volume.value;
+// default pan 50 (= 100 in the core's 0..200 scale = neutral, same as
+// XMPlay's 50% panning-separation default) — applied up front, not just
+// on the first input event
+core.setPanSeparation(Number(panSep.value) * 2);
+panSepV.textContent = panSep.value;
 
 // Seek: drag updates the label live; release jumps. Seeking repositions
 // the player (ord + row); the pattern view snaps on the next frame().
@@ -818,7 +825,7 @@ async function startPlayback(muteSong: boolean): Promise<void> {
   // xmp_start_player) — re-apply the user's slider values so volume and
   // pan survive a load/replay.
   core.setVolume(Number(volume.value));
-  core.setPanSeparation(Number(panSep.value));
+  core.setPanSeparation(Number(panSep.value) * 2);
   await output.start(core, workletUrl); // click handler = user gesture
   jamMode = muteSong;
   const mod = core.module;
