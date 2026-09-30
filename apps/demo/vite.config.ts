@@ -80,6 +80,7 @@ export default defineConfig(({ command }) => ({
       { find: '@modplayjs/fmt-digi', replacement: resolve(__dirname, '../../packages/fmt-digi/src/index.ts') },
       { find: '@modplayjs/fmt-asylum', replacement: resolve(__dirname, '../../packages/fmt-asylum/src/index.ts') },
       { find: '@modplayjs/fmt-ice', replacement: resolve(__dirname, '../../packages/fmt-ice/src/index.ts') },
+      { find: '@modplayjs/fmt-med', replacement: resolve(__dirname, '../../packages/fmt-med/src/index.ts') },
       { find: '@modplayjs/fmt-prowizard', replacement: resolve(__dirname, '../../packages/fmt-prowizard/src/index.ts') },
       { find: '@modplayjs/dsp-paula', replacement: resolve(__dirname, '../../packages/dsp-paula/src/index.ts') },
       { find: '@modplayjs/dsp-softmixer', replacement: resolve(__dirname, '../../packages/dsp-softmixer/src/index.ts') },
