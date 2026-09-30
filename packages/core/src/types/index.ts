@@ -94,6 +94,14 @@ export interface Core {
   setSampleRate(hz: number): void;
   /** Set time factor (default 10.0). */
   setTempoFactor(f: number): void;
+  /** Set interpolation mode: 0 nearest, 1 linear, 2 spline (XMP_INTERP_*). */
+  setInterpolation(v: number): void;
+  /** Get interpolation mode. */
+  getInterpolation(): number;
+  /** Set the softmixer voice budget (XMP_PLAYER_VOICES); next startPlayer. */
+  setNumVoices(v: number): void;
+  /** Get the softmixer voice budget. */
+  getNumVoices(): number;
 
   // -- plugin registry --
   /** Select the active DSP by name. Only while the player is stopped. */

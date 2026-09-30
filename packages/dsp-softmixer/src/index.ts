@@ -40,7 +40,11 @@ export class SoftMixer implements DspPlugin {
   readonly name = 'softmixer';
   readonly channels = 64;
 
-  /** Interpolation setting: 0 nearest, 1 linear, 2 spline (XMP_INTERP_*). */
+  /**
+   * Interpolation setting mirror: 0 nearest, 1 linear, 2 spline
+   * (XMP_INTERP_*). Synced from `core.ctx.s.interp` at the top of every
+   * renderFrame; set it via CoreConfig.interp or setInterpolation().
+   */
   interp = 1;
   /** Master volume ratio m.mvol/m.mvolbase parity (default = no change). */
   mvol = 0;
@@ -55,6 +59,12 @@ export class SoftMixer implements DspPlugin {
   renderFrame(core: CoreIface, out: Float32Array, ticks: number): void {
     const mod = core.module!;
     const s = core.ctx.s;
+
+    // Interpolation setting: 0 nearest, 1 linear, 2 spline (XMP_INTERP_*).
+    // The authoritative value lives in s.interp (set via CoreConfig.interp /
+    // CorePlayer.setInterpolation, control.c:452-456 XMP_PLAYER_INTERP);
+    // sync the mirror field each frame so it always reflects it.
+    this.interp = s.interp;
 
     // mixer_prepare (mixer.c): mvol/mvolbase come from the module (IT
     // it_load.c:1528-1530; S3M s3m_load.c:714-715). 0 = no scaling.

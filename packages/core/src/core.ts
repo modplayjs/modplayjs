@@ -64,6 +64,8 @@ const ANTICLICK_SHIFT = 3;
 /** DEFAULT_TIME_FACTOR common.h:454; PAL_RATE common.h:135. */
 const DEFAULT_TIME_FACTOR = 10;
 const PAL_RATE = 250;
+/** Hard voice-pool ceiling (SMIX_NUMVOC default; XMP_MAX_VOICES equivalent). */
+const MAXVOICES_LIMIT = 128;
 
 /** mixer.c:426-446 libxmp_mixer_get_ticksize. */
 function getTicksize(freq: number, timeFactor: number, rrate: number, bpm: number): number {
@@ -399,8 +401,13 @@ export class Core implements CoreIface {
     });
     // xmp_start_player: libxmp_virt_on(ctx, mod->chn + smix->chn)
     // (player.c:1997) — the reserved smix channels extend the virtual
-    // layer so playNote()/stopNote() can address them.
-    this.virt.on(mod.chn + this.smixChannels, (mod.quirks & Quirk.VIRTUAL) !== 0);
+    // layer so playNote()/stopNote() can address them. C's virt_on reads
+    // the voice budget from s->numvoc (virtual.c:107) — pass it through.
+    this.virt.on(
+      mod.chn + this.smixChannels,
+      (mod.quirks & Quirk.VIRTUAL) !== 0,
+      this._s.numvoc,
+    );
     // f->loop = calloc(virt_channels) (player.c:2004) — the player's flow
     // state owns per-channel pattern-loop slots; scan uses its own copy.
     this._flow.loop = Array.from({ length: this.virt.virtChannels }, () => ({
@@ -455,6 +462,33 @@ export class Core implements CoreIface {
 
   getPanSeparation(): number {
     return this._s.mix;
+  }
+
+  /** Interpolation mode (xmp_set_player XMP_PLAYER_INTERP, control.c:452-456
+   * → s->interp): 0 nearest, 1 linear, 2 spline. Clamped to the valid range;
+   * takes effect on the next rendered frame (the softmixer reads s.interp
+   * per renderFrame). */
+  setInterpolation(v: number): void {
+    this._s.interp = Math.max(0, Math.min(v, 2));
+  }
+
+  getInterpolation(): number {
+    return this._s.interp;
+  }
+
+  /**
+   * Softmixer voice budget (xmp_set_player XMP_PLAYER_VOICES, control.c:506-508
+   * → s->numvoc). Caps the virtual-layer voice pool. C semantics
+   * (virtual.c:107-118): the pool holds `numvoc` voices total; the NNA
+   * overflow adds `numvoc` virtual channels for QUIRK_VIRTUAL modules.
+   * Takes effect on the next startPlayer (virt_on), like C's virt_on.
+   */
+  setNumVoices(v: number): void {
+    this._s.numvoc = Math.max(1, Math.min(v, MAXVOICES_LIMIT));
+  }
+
+  getNumVoices(): number {
+    return this._s.numvoc;
   }
 
   setTempoFactor(f: number): void {

@@ -379,27 +379,7 @@ export function fxItRowDelay(core: Core, fxp: number): void {
   }
 }
 
-/** Secondary volume-slide arms (effects.c:560-572) — IT volume column. */
-export function fxVslideUp2(xc: ChannelState, fxp: number): void {
-  if (fxp) {
-    SET(xc, VolSlideFlag.VOL_SLIDE_2);
-    const h = MSN(fxp), l = LSN(fxp);
-    xc.vol.slide2 = h ? h : -l;
-  }
-}
-
-export function fxVslFslideUp2(xc: ChannelState, fxp: number): void {
-  if (fxp) {
-    xc.vol.memory2 = fxp;
-    SET(xc, VolSlideFlag.FINE_VOLS_2);
-    xc.vol.fslide2 = fxp;
-  }
-}
-
-export function fxVslFslideDn2(xc: ChannelState, fxp: number): void {
-  if (fxp) {
-    xc.vol.memory2 = fxp;
-    SET(xc, VolSlideFlag.FINE_VOLS_2);
-    xc.vol.fslide2 = -fxp;
-  }
-}
+/** Secondary volume-slide arms (effects.c:560-577) — IT volume column.
+ * All four (VSLIDE_UP_2/DN_2, F_VSLIDE_UP_2/DN_2) write EFFECT_MEMORY into
+ * vol.memory2 — the OpenMPT VolColMemory.it memory, not shared with the Dxy
+ * effect column. Dispatched inline in processFx (see process.ts). */

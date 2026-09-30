@@ -26,7 +26,6 @@ import {
 } from './fx.js';
 import {
   fxVolSlide,
-  fxVslideUp2,
   fxVolSet,
   fxTrkVSlide,
   fxTrkFVSlide,
@@ -402,10 +401,13 @@ function processRest(
       fxVolSlide(core, xc, fxp);
       break;
     /* OpenMPT VolColMemory.it: a/b/c/d share one memory NOT shared with Dxy.
-     * effects.c:560-572 gate these through vol.memory2 via the reader for IT;
-     * the arm itself applies directly. */
+     * effects.c:560-577: all four _2 arms write EFFECT_MEMORY(fxp, xc->vol.memory2).
+     * FX_VOLSLIDE_2 (XM 6xy/7xy) is the no-memory variant (effects.c:368-374). */
     case FX.FX_VOLSLIDE_2:
-      fxVslideUp2(xc, fxp);
+      if (fxp !== 0) {
+        SET(xc, VolSlideFlag.VOL_SLIDE_2);
+        xc.vol.slide2 = MSN(fxp) ? MSN(fxp) : -LSN(fxp);
+      }
       break;
     case FX.FX_F_VSLIDE_UP_2:
       if (fxp !== 0) {
@@ -419,6 +421,20 @@ function processRest(
         xc.vol.memory2 = fxp;
         SET(xc, VolSlideFlag.FINE_VOLS_2);
         xc.vol.fslide2 = -fxp;
+      }
+      break;
+    case FX.FX_VSLIDE_UP_2:
+      if (fxp !== 0) {
+        xc.vol.memory2 = fxp;
+        SET(xc, VolSlideFlag.VOL_SLIDE_2);
+        xc.vol.slide2 = fxp;
+      }
+      break;
+    case FX.FX_VSLIDE_DN_2:
+      if (fxp !== 0) {
+        xc.vol.memory2 = fxp;
+        SET(xc, VolSlideFlag.VOL_SLIDE_2);
+        xc.vol.slide2 = -fxp;
       }
       break;
     case FX.FX_JUMP:

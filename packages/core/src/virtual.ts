@@ -118,9 +118,11 @@ export class VirtualLayer {
   /** Total virtual channels (tracks + overflow channels for NNA). */
   virtChannels = 0;
   private map: VirtChannelEntry[] = [];
-  /** Voice pool (preallocated one per channel; NNA reuses/steals slots). */
+  /** Voice pool (preallocated one per slot; NNA reuses/steals slots). */
   readonly voices: VoiceState[] = [];
   private used = 0;
+  /** Pool cap (C maxvoc = s->numvoc, virtual.c:107-118). */
+  private poolCap = 128;
 
 
   /** QUIRK_VIRTUAL — module requests NNA overflow channels. */
@@ -128,14 +130,16 @@ export class VirtualLayer {
 
 
   /** Allocate/reset for a new module + play session (virt_on, virtual.c:100). */
-  on(numTracks: number, quirkVirtual = false): void {
+  on(numTracks: number, quirkVirtual = false, numvoc = 128): void {
     this.off();
     this.numTracks = numTracks;
-    // C virtual.c:107-126: virt_channels = num_tracks (+maxvoc if VIRTUAL),
-    // then maxvoc = min(num, SMIX_NUMVOC). C's pool holds maxvoc voices —
-    // the extra overflow slots ARE the voice pool, so the pool cap is
-    // MAXVOICES for VIRTUAL modules and every pre-made slot is free.
-    this.virtChannels = numTracks + (quirkVirtual ? MAXVOICES : 0);
+    // C virtual.c:107-126: num = mixer_numvoices(ctx, -1) (= s->numvoc);
+    // virt_channels = num_tracks (+num if VIRTUAL); maxvoc = num for
+    // VIRTUAL modules, else min(num, virt_channels). C calloc's maxvoc
+    // voice slots — the pool cap IS numvoc, not a separate constant.
+    const poolCap = Math.max(1, Math.min(numvoc, MAXVOICES));
+    this.poolCap = poolCap;
+    this.virtChannels = numTracks + (quirkVirtual ? poolCap : 0);
     this.extChannels = quirkVirtual;
     for (let i = 0; i < this.virtChannels; i++) {
       this.map.push({ voice: VIRT_INVALID, tail: VIRT_INVALID });
@@ -143,7 +147,7 @@ export class VirtualLayer {
     this.used = 0;
     // virtual.c:119-126: C calloc's ALL maxvoc slots upfront so alloc_voice
     // always finds a free slot instead of having to lazily grow the pool.
-    for (let i = 0; i < MAXVOICES; i++) {
+    for (let i = 0; i < poolCap; i++) {
       this.voices.push(makeVoice(VIRT_INVALID));
     }
     this.setChannelMute([]);
@@ -195,7 +199,7 @@ export class VirtualLayer {
    * allocated slot whose chn was never bound, leaving map[chn] stale).
    */
   private allocVoice(chn: number): number {
-    if (this.used < MAXVOICES && this.used >= this.voices.length) {
+    if (this.used < this.poolCap && this.used >= this.voices.length) {
       this.voices.push(makeVoice(this.voices.length));
     }
     const bind = (i: number): number => {
@@ -231,7 +235,7 @@ export class VirtualLayer {
       this.resetVoice(steal, false);
       return bind(steal);
     }
-    if (this.voices.length < MAXVOICES) {
+    if (this.voices.length < this.poolCap) {
       const idx = this.voices.length;
       this.voices.push(makeVoice(VIRT_INVALID));
       return bind(idx);

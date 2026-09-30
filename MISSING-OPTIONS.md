@@ -39,23 +39,18 @@ Estimated only — nothing implemented yet except where noted.
 | Change | ~10 lines in the mixer pan split + a format/mode flag on `s` |
 | Side effects | Low - off by default; mono downmix would change ALL current output (stereo->mono), so opt-in per playback |
 
-### Interpolation
+### Interpolation — PLUMBING FIXED (2026-09-29)
 
 | | |
 |---|---|
-| Current | Kernels nearest/linear/spline all implemented (`kernels.ts`); softmixer picks via its own `interp` field (default 1 = linear = libxmp default) |
-| Gap | **Config plumbing broken**: `CoreConfig.interp` sets `core._s.interp`, but the softmixer reads its OWN `this.interp` field - the two are never synced. No setter on CorePlayer. Setting `config.interp` today does nothing |
-| Change | ~5 lines: softmixer reads `core.ctx.s.interp` per renderFrame (or Core pushes it), + optionally `setInterpolation(v)` on CorePlayer |
-| Side effects | None - nearest/spline kernels already verified (NBR/909dead rendered with linear; spline changes timbre but is a user choice) |
-
-### Virtual channels
+| Now | `CoreConfig.interp` / `core.setInterpolation(v)` (clamped 0-2) feed `s.interp`; the softmixer syncs its mirror field from `core.ctx.s.interp` at the top of every `renderFrame`, so the setting takes effect immediately. `getInterpolation()` reads it back. Verified end-to-end: config + setter + spline render |
+| Was | `CoreConfig.interp` set `core._s.interp` but the softmixer read its own never-synced `this.interp` field — the knob was dead |
+### Virtual channels — PLUMBING FIXED (2026-09-29)
 
 | | |
 |---|---|
-| Current | `MAXVOICES = 128` hardcoded in virtual.ts; `virtChannels = numTracks + (quirkVirtual ? 128 : 0)` (IT: 64 root + 128 overflow = 192). `CoreConfig.numVoices` sets `core._s.numvoc` but virtual.ts **never reads it** - the config knob is dead |
-| Gap | Wire `s.numvoc` into the virtual-layer pool size (C: `libxmp_mixer_numvoices` caps `num` at `s->numvoc`), + a setter; changes take effect on next load (same caveat as XMPlay) |
-| Change | ~10 lines: virtual.ts `init()` reads `s.numvoc` for the overflow pool; Core setter |
-| Side effects | Low - default 128 unchanged; raising raises memory (slots pre-allocated); lowering below the IT root count could starve NNA voices on dense modules (C clamps identically) |
+| Now | `CoreConfig.numVoices` / `core.setNumVoices(v)` (clamped 1-128) feed `s.numvoc`; `VirtualLayer.on()` receives it and sizes the pool + NNA overflow exactly like C `virt_on` (virtual.c:107-126: `num = mixer_numvoices(ctx, -1)`). Takes effect on the next `startPlayer`, like C. `getNumVoices()` reads it back. Verified end-to-end: config + setter + clamp + render |
+| Was | `MAXVOICES = 128` hardcoded; `CoreConfig.numVoices` set `core._s.numvoc` but virtual.ts never read it — the config knob was dead |
 
 ### StarTrekker FLT4/FLT8 loader (missing format)
 

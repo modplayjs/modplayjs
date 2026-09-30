@@ -432,12 +432,17 @@ export class Scanner {
           rowCount--;
           break endModule;
         }
-        this.scanCnt[ord]![row] = (this.scanCnt[ord]![row] ?? 0) + 1;
+        // scanCnt is a Uint8Array (C uint8): the ++ wraps 255→0, so this
+        // line both increments and reveals the overflow for the check below
+        // (scan.c:284-286; a scan count of 0 breaks the playback loop —
+        // storlek_11.it "infinite loop exploit" plays forever, it must NOT
+        // be treated as "module already ended").
+        this.scanCnt[ord]![row] = (this.scanCnt[ord]![row]! + 1) & 0xff;
         ordersSinceLastValid = 0;
         anyValid = 1;
 
         // If the scan count overflows (uint8), break (scan.c:256-259).
-        if ((this.scanCnt[ord]![row] ?? 0) === 0) {
+        if (this.scanCnt[ord]![row] === 0) {
           break endModule;
         }
 
