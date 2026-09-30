@@ -25,7 +25,6 @@ import type { Event } from '@modplayjs/core';
 import {
   C4_PAL_RATE,
   PeriodType,
-  Quirk,
   ReadEventType,
 } from '@modplayjs/core';
 import type { Channel, Instrument, Pattern, RawSample, SubInstrument } from '@modplayjs/core';
@@ -35,7 +34,6 @@ import { ParseError } from '@modplayjs/core';
 import { periodToNote } from './mod.js';
 
 /** SAMPLE_FLAG_FULLREP — ptkloop is always set in pw_load (protracker path). */
-const SF_FULLREP = 0x0200;
 
 /** libxmp_copy_adjust (common.c:237-253): keep printable ASCII, pad '.'. */
 function copyAdjust(r: Uint8Array, n: number): string {
@@ -184,7 +182,7 @@ export function loadDepackedMod(bytes: Uint8Array, ctx: LoadCtx, name: string): 
     const fin = (((hins.finetune << 4) & 0xff) << 24) >> 24; // (int8)((uint8)finetune << 4)
     const sub: SubInstrument = {
       vol: hins.volume,
-      gvl: 0,
+      gvl: 0x40, // no QUIRK_INSVOL: load_epilogue (load_helpers.c:377-383)
       pan: -1, // XMP_INST_NO_DEFAULT_PAN
       xpo: 0,
       fin,
@@ -244,9 +242,8 @@ export function loadDepackedMod(bytes: Uint8Array, ctx: LoadCtx, name: string): 
   let filePos = 1084 + pat * patlen;
   for (let i = 0; i < 31; i++) {
     const raw = rawSamples[i]!;
-    // ptkloop is always set on this path (protracker) → FULLREP when loop
-    // starts at 0, matching mod_load.c:1045 with st.ptkloop != 0.
-    if (raw.loopStart === 0) raw.flags |= SF_FULLREP;
+    // pw_load.c has NO FULLREP (that flag comes from the Protracker
+    // ptkloop logic in mod_load, which pw_load never runs).
     if (raw.length !== 0) {
       const remaining = Math.max(0, bytes.length - filePos);
       const take = Math.min(raw.length, remaining);
@@ -260,7 +257,9 @@ export function loadDepackedMod(bytes: Uint8Array, ctx: LoadCtx, name: string): 
   // pw_load.c:192 — m->period_type = PERIOD_MODRNG (no tracker detection).
   const periodType = PeriodType.MODRNG;
   const readEventType = ReadEventType.MOD;
-  const quirkFlags = Quirk.PROTRACK; // protracker path (mod_load.c:1104)
+  // pw_load.c sets NO quirks (prologue defaults) — QUIRK_PROTRACK only
+  // comes from mod_load's tracker switch, which pw_load never runs.
+  const quirkFlags = 0;
 
   // Channel defaults (load_helpers.c:334-339): pan LRLR, vol 0x40, flg 0.
   const channels: Channel[] = [];

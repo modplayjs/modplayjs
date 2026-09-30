@@ -54,7 +54,7 @@ export interface Core {
   // -- lifecycle --
   /** Load a module from raw bytes. Throws a typed error if no format
    *  plugin recognizes it. */
-  loadModule(bytes: Uint8Array): void;
+  loadModule(bytes: Uint8Array, opts?: { sidecarNt?: Uint8Array }): void;
   /** Begin playback. Throws a typed error if no module is loaded. */
   startPlayer(): void;
   /** Stop playback. */
@@ -161,6 +161,12 @@ export interface LoadCtx {
   addSample(raw: RawSample): number;
   /** Output rate hint (same as sampleRate in v0.1). */
   readonly outputRate: number;
+  /**
+   * Startrekker AM synth sidecar (.NT/.AS), if one was found next to the
+   * module (flt_load.c:338-352 flt_check_sample_file). Absent = plain
+   * FLT4/8 with no synth instruments. The harness/preview reads the file.
+   */
+  sidecarNt?: Uint8Array;
 }
 
 /**

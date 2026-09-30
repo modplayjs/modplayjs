@@ -697,6 +697,27 @@ export class VirtualLayer {
     return this.voices[vi]!.smp;
   }
 
+  /**
+   * libxmp_virt_setsmp (virtual.c:392-412): hot-swap the channel voice's
+   * sample, preserving the playback position. Used by the HMN synth
+   * (hmn_extras.c:66-69) to retarget waveform slots mid-note.
+   */
+  setSmp(chn: number, smp: number): void {
+    const vi = this.mapChannel(chn);
+    if (vi === VIRT_INVALID) return;
+    const v = this.voices[vi]!;
+    if (v.smp === smp) return;
+    const pos = this.getVoicePos(chn);
+    this.hotswapSample(v, smp);
+    // mixer_voicepos(voc, pos, 0) — restore the old position.
+    const xxs = this.getSampleFor(smp);
+    if (!xxs) return;
+    v.pos = pos;
+    v.frac = pos - Math.trunc(pos);
+    v.pos0 = Math.trunc(pos);
+    this.adjustVoiceEndV(v, xxs);
+  }
+
   get numVoices(): number {
     return this.voices.length;
   }

@@ -123,6 +123,7 @@ export const FX_669_VIBRATO = 0x64; // effects.h:81
 export const FX_ULT_TEMPO = 0x5f; // effects.h:96
 export const FX_ICE_SPEED = 0xa2; // effects.h:142
 export const FX_MED_HOLD = 0xb1; // effects.h:144
+export const FX_MEGAARP = 0xb2; // effects.h:145 — HMN Smaksak effect 7 (MegaArp)
 export const FX_VOL_ADD = 0xb6; // effects.h:146
 export const FX_VOL_SUB = 0xb7; // effects.h:147
 export const FX_PITCH_ADD = 0xb8; // effects.h:148

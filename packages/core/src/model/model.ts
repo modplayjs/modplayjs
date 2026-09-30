@@ -151,6 +151,41 @@ export const EnvelopeFlags = {
  * One instrument, mirroring struct xmp_instrument (xmp.h:204-219) plus the
  * per-key map and sub-instrument table flattened for the big-four formats.
  */
+/** HMN "Mupp" instrument extras (hmn_extras.h struct hmn_instrument_extras). */
+export interface HmnInstrumentExtras {
+  dataloopstart: number;
+  dataloopend: number;
+  /** 64-entry waveform index table. */
+  data: number[];
+  /** 64-entry program volume table (bit 0x80 = marker). */
+  progvolume: number[];
+}
+
+/** StarTrekker AM instrument extras (flt_extras.h struct
+ *  flt_instrument_extras): synth envelope params + pitch fall + FQ. */
+export interface FltInstrumentExtras {
+  l0: number;
+  a1l: number;
+  a1s: number;
+  a2l: number;
+  a2s: number;
+  sl: number;
+  ds: number;
+  st: number;
+  rs: number;
+  p_fall: number;
+  fq: number;
+}
+
+/** Format-specific extras attached by loaders (m->extra / xxi->extra /
+ *  xc->extra in libxmp). */
+export type ModuleExtras =
+  | { kind: 'hmn' }
+  | { kind: 'flt' }
+  | { kind: 'none' };
+
+export type InstrumentExtras = HmnInstrumentExtras | FltInstrumentExtras;
+
 export interface Instrument {
   name: string;
   /** Instrument volume (0-64 basevol for MOD/XM; 0-127 S3M/IT style is normalized at load). */
@@ -171,6 +206,8 @@ export interface Instrument {
   fei: Envelope;
   /** Pan envelope (S3M/IT; unused by XM/MOD). */
   pei: Envelope;
+  /** Format extras — set by the HMN/FLT (and MED) loaders. */
+  extras?: InstrumentExtras;
 }
 
 /** Flattened xmp_subinstrument fields (xmp.h:188-202) for the big four. */
@@ -388,6 +425,8 @@ export interface ModuleData {
   midi?: MidiConfig;
   /** Tracker version string (XM) / tracker id (other formats). */
   tracker: string;
+  /** m->extra module-level extras (HMN/FLT set kind; else 'none'). */
+  extras?: ModuleExtras;
 }
 
 // ---------------------------------------------------------------------------
@@ -572,6 +611,31 @@ export interface ChannelState {
   info_finalpan: number;
   /** Final pan with IT notepan applied. */
   info_notepan: number;
+  /** xc->extra channel extras: HMN synth wave position/volume or FLT AM
+   *  envelope state. Assigned at startPlayer via new_channel_extras
+   *  (player.c:2043). */
+  extras?: HmnChannelExtras | FltChannelExtras;
+}
+
+/** struct hmn_channel_extras. */
+export interface HmnChannelExtras {
+  datapos: number;
+  volume: number;
+}
+
+/** struct flt_channel_extras + enum flt_env_stage. */
+export const FltEnvStage = {
+  ATTACK_1: 0,
+  ATTACK_2: 1,
+  DECAY: 2,
+  SUSTAIN: 3,
+  RELEASE: 4,
+} as const;
+
+export interface FltChannelExtras {
+  volume: number;
+  sustain: number;
+  env_stage: number;
 }
 
 /**

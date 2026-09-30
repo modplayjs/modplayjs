@@ -15,6 +15,7 @@ import {
   hasQuirk,
   lfoSetWaveform,
 } from './helpers.js';
+import { hmnProcessFx } from './extras.js';
 import { setLfoNotzero, SET_PER, RESET_PER, PITCHBEND, TONEPORTA, VIBRATO, doToneporta, noteToPeriod } from './helpers.js';
 import { fxPanbrello, fxPanbrelloWf } from './fx.js';
 import { VolSlideFlag as VF } from './state.js';
@@ -902,6 +903,13 @@ function extendedFx(
     case FX.EX_INVLOOP:
       xc.invloop.speed = fxp;
       break;
+  }
+
+  /* libxmp_extras_process_fx (effects.c:1145 → extras.c:168-177): HMN's
+   * FX_MEGAARP arm runs in the default branch of the C switch — i.e. for
+   * every effect the switch above did not claim. */
+  if (core.module!.extras?.kind === 'hmn') {
+    hmnProcessFx(xc, fxt, fxp);
   }
   void ev;
 }

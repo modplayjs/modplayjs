@@ -71,7 +71,7 @@ if (!['.mod', '.s3m', '.xm', '.it'].includes(ext)) {
 const esbuild = (await import('esbuild')).default ?? (await import('esbuild'));
 const aliasMap = Object.fromEntries(
   ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it',
-   'dsp-paula', 'dsp-softmixer', 'out-webaudio', 'out-pcm']
+   'dsp-paula', 'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm']
     .map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
 const ourBundle = resolve(outDir, 'our-player.mjs');
 await esbuild.build({
@@ -90,14 +90,33 @@ const oursWav = resolve(outDir, `${name}-ours-48k.wav`);
 {
   const script = `
 import { readFileSync, writeFileSync } from 'fs';
-import { CorePlayer, modPlugin, s3mPlugin, xmPlugin, itPlugin, createSoftMixerPlugin, encodeWavStereo } from ${JSON.stringify(ourBundle)};
+import { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, createSoftMixerPlugin, encodeWavStereo } from ${JSON.stringify(ourBundle)};
 const core = new CorePlayer();
 core.registries.registerFormat(modPlugin);
+core.registries.registerFormat(hmnPlugin);
+core.registries.registerFormat(fltPlugin);
+core.registries.registerFormat(pwPlugin);
 core.registries.registerFormat(s3mPlugin);
 core.registries.registerFormat(xmPlugin);
 core.registries.registerFormat(itPlugin);
 core.registries.registerDsp(createSoftMixerPlugin());
-core.loadModule(new Uint8Array(readFileSync(${JSON.stringify(resolve(repo, file))})));
+{
+  // Startrekker AM sidecar (flt_load.c:338-352): .mod.nt / .NT / .AS next
+  // to the module file.
+  const { basename, join, dirname } = await import('path');
+  const full = ${JSON.stringify(resolve(repo, file))};
+  const base = basename(full);
+  const stem = base.replace(/\.[^.]*$/, '');
+  let sidecarNt;
+  for (const ext of ['.NT', '.nt', '.AS', '.as']) {
+    for (const stemTry of [base, stem]) {
+      try { sidecarNt = new Uint8Array(readFileSync(join(dirname(full), stemTry + ext))); break; } catch {}
+      if (sidecarNt) break;
+    }
+    if (sidecarNt) break;
+  }
+  core.loadModule(new Uint8Array(readFileSync(full)), { sidecarNt });
+}
 core.setDsp('softmixer');
 core.setSampleRate(48000);
 core.startPlayer();

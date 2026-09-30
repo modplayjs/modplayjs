@@ -68,7 +68,7 @@ int main(int argc, char **argv)
 			for (k = 0; k < e->npt; k++)
 				printf("ENVPT %s %d %d\n", tags[j], e->data[k * 2], e->data[k * 2 + 1]);
 		}
-		for (j = 0; j < xxi->nsm && j < 16; j++) {
+		for (j = 0; j < xxi->nsm && j < 32; j++) {
 			struct xmp_subinstrument *s = &xxi->sub[j];
 			printf("SUB %d/%d vol=%d gvl=%d pan=%08x xpo=%d fin=%d sid=%d ifc=%d ifr=%d vwf=%d vde=%d vra=%d vsw=%d rvv=%d nna=%d dct=%d dca=%d\n",
 				i, j, s->vol, s->gvl, s->pan, s->xpo, s->fin, s->sid, s->ifc, s->ifr,

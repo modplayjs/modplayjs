@@ -9,7 +9,7 @@
 
 import { CorePlayer, StateError } from '@modplayjs/core';
 import workletUrl from './worklet-url';
-import { plugin as modPlugin } from '@modplayjs/fmt-mod';
+import { plugin as modPlugin, hmnPlugin, fltPlugin } from '@modplayjs/fmt-mod';
 import { plugin as s3mPlugin } from '@modplayjs/fmt-s3m';
 import { plugin as xmPlugin } from '@modplayjs/fmt-xm';
 import { plugin as itPlugin } from '@modplayjs/fmt-it';
@@ -70,6 +70,8 @@ const plCard = document.getElementById('playlistcard') as HTMLElement;
 
 const core = new CorePlayer();
 core.registries.registerFormat(modPlugin);
+core.registries.registerFormat(hmnPlugin);
+core.registries.registerFormat(fltPlugin);
 core.registries.registerFormat(s3mPlugin);
 core.registries.registerFormat(xmPlugin);
 core.registries.registerFormat(itPlugin);

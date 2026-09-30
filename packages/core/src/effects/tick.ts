@@ -72,6 +72,7 @@ import {
   NOTE_SAMPLE_RELEASE,
 } from './helpers.js';
 import { updateMidiMacro } from './midi-macro.js';
+import { playExtras, extrasGetVolume } from './extras.js';
 
 // player.h:164-165
 export const TREMOR_ON = 0x80;
@@ -859,7 +860,9 @@ export function processVolume(core: Core, chn: number, act: number): void {
     return;
   }
 
-  let finalvol = xc.volume;
+  /* libxmp_extras_get_volume (extras.c:124-140): HMN synth volume and the
+   * FLT AM envelope OVERRIDE the channel volume (player.c:1064). */
+  let finalvol = extrasGetVolume(core, xc);
 
   if (IS_PLAYER_MODE_IT(core)) {
     finalvol = Math.trunc((xc.volume * (100 - xc.rvv)) / 100);
@@ -1297,6 +1300,10 @@ export function processTick(core: Core, chn: number): void {
   if (!isValidInstrumentOrSfx(core, xc.ins)) {
     return;
   }
+
+  /* libxmp_play_extras (extras.c:106-122, player.c:1649): HMN/FLT synth
+   * run before the cut/retrig + volume stages. */
+  playExtras(core, chn, xc);
 
   /* Do cut/retrig */
   if (TEST(xc, RETRIG) !== 0) {

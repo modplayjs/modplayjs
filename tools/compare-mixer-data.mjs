@@ -29,7 +29,7 @@ const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const esbuild = (await import('esbuild')).default;
 const aliasMap = Object.fromEntries(
   ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm', 'fmt-stm', 'fmt-669',
-   'dsp-paula', 'dsp-softmixer', 'out-webaudio', 'out-pcm']
+   'dsp-paula', 'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm']
     .map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
 const bundle = resolve(repo, 'out/mixer-dump.mjs');
 await esbuild.build({
@@ -38,7 +38,7 @@ await esbuild.build({
   alias: aliasMap, outfile: bundle, logLevel: 'silent',
 });
 
-const { CorePlayer, modPlugin, s3mPlugin, xmPlugin, itPlugin, mtmPlugin, stmPlugin, s69Plugin,
+const { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, mtmPlugin, stmPlugin, s69Plugin,
         createSoftMixerPlugin, dumpMixerState, dumpChannelInfo } = await import(
   'file://' + bundle);
 
@@ -77,6 +77,9 @@ for (const line of readFileSync(dataFile, 'utf8').split('\n')) {
 
 const core = new CorePlayer();
 core.registries.registerFormat(modPlugin);
+core.registries.registerFormat(hmnPlugin);
+core.registries.registerFormat(fltPlugin);
+core.registries.registerFormat(pwPlugin);
 core.registries.registerFormat(s3mPlugin);
 core.registries.registerFormat(xmPlugin);
 core.registries.registerFormat(itPlugin);
@@ -85,7 +88,15 @@ core.registries.registerFormat(stmPlugin);
 core.registries.registerFormat(s69Plugin);
 core.registries.registerDsp(createSoftMixerPlugin());
 try {
-  core.loadModule(new Uint8Array(readFileSync(modFile)));
+    // Startrekker AM sidecar (flt_load.c:338-352): <basename>.NT/.nt/.AS/.as.
+  const { basename, join, dirname } = await import('node:path');
+  const base = basename(modFile); const stem = base.replace(/\.[^.]*$/, '');
+  let sidecarNt;
+  for (const ext of ['.NT', '.nt', '.AS', '.as']) {
+    try { sidecarNt = new Uint8Array(readFileSync(join(dirname(modFile), base + ext))); break; } catch {}
+    try { sidecarNt = new Uint8Array(readFileSync(join(dirname(modFile), stem + ext))); break; } catch {}
+  }
+  core.loadModule(new Uint8Array(readFileSync(modFile)), { sidecarNt });
 } catch (e) {
   console.log(`SKIP ${basename(modFile)}: ${e.message}`);
   process.exit(2);

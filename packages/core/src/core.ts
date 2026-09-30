@@ -15,7 +15,11 @@
 // time_factor=10 (DEFAULT_TIME_FACTOR), rrate=250 (PAL_RATE) — release-pr smoke test.
 
 import { depackIce, isIcePacked } from './depack/ice.js';
-import { CoreState, FlowFlag, Quirk } from './model/constants.js';
+import { depackPp, isPpPacked } from './depack/pp.js';
+import { md5Hex } from './depack/md5.js';
+import { MODULE_QUIRKS, XmpFlag, XmpMode } from './depack/moduleQuirks.js';
+import { CoreState, FlowFlag, FLOW_MODE_GENERIC, PeriodType, Quirk, ReadEventType } from './model/constants.js';
+import type { FlowMode, PeriodType as PeriodTy, Quirks, ReadEventType as ReadEventTy } from './model/constants.js';
 import { ChannelFlags, XMP_KEY_OFF } from './model/model.js';
 
 import {
@@ -239,7 +243,7 @@ export class Core implements CoreIface {
    * the core normalizes samples into the store and rewrites mod.samples to
    * stored ids.
    */
-  loadModule(bytes: Uint8Array): void {
+  loadModule(bytes: Uint8Array, opts?: { sidecarNt?: Uint8Array }): void {
     if (this._state === CoreState.PLAYING) this.stopPlayer();
     // xmp_load_module releases the previous module first (load.c:584-604):
     // its samples are freed. Our store keys samples by a running ID, so
@@ -249,8 +253,13 @@ export class Core implements CoreIface {
     this.samples.clear();
     // libxmp_decrunch (depacker.c): packed wrappers are unwrapped BEFORE
     // format probing (load.c:364). ICE1's only signature sits at the file
-    // tail, so the check must precede every loader's test().
+    // tail, so the check must precede every loader's test(). PP20 comes
+    // first in C's depacker_list order (depacker.c depacker_list).
     let data = bytes;
+    if (isPpPacked(data)) {
+      const out = depackPp(data);
+      if (out) data = out;
+    }
     if (isIcePacked(data)) {
       data = depackIce(data);
     }
@@ -264,10 +273,11 @@ export class Core implements CoreIface {
       sampleRate: this._s.freq,
       outputRate: this._s.freq,
       addSample: (raw) => this.samples.add(raw),
+      sidecarNt: opts?.sidecarNt,
     };
 
     const mod = fmt.load(data, loaderCtx);
-    this.finalizeModule(mod);
+    this.finalizeModule(mod, data);
   }
 
   /**
@@ -288,7 +298,7 @@ export class Core implements CoreIface {
   }
 
   /** Shared loadModule/loadModuleData tail: scan + sequence setup + keys. */
-  private finalizeModule(mod: ModuleData): void {
+  private finalizeModule(mod: ModuleData, raw?: Uint8Array): void {
     // load.c:298-304 — libxmp_adjust_string over module title, instrument
     // and sample names: non-printables → ' ', then trailing spaces stripped.
     const adjust = (s: string): string => {
@@ -304,6 +314,59 @@ export class Core implements CoreIface {
     for (const smp of mod.samples) {
       if (smp.name) smp.name = adjust(smp.name);
     }
+
+    // module_quirks (load_helpers.c:407-421): set_md5sum (load.c:308) hashes
+    // the DEPACKED file, the table can override p->flags and force a play
+    // mode. Mirrors C only in loadModuleData paths where the raw file IS the
+    // module (loadModuleData callers pass metadata-only ModuleData without a
+    // file — the quirk table cannot apply there, matching C which needs one).
+    let md5 = '';
+    let quirkFlags = 0;
+    let forceMode: number = XmpMode.AUTO;
+    if (raw) {
+      md5 = md5Hex(raw);
+      for (const q of MODULE_QUIRKS) {
+        if (q.md5 === md5) {
+          quirkFlags |= q.flags;
+          if (q.mode !== XmpMode.AUTO) forceMode = q.mode;
+        }
+      }
+      if (md5 === '93f146aeb758c39d8b5fbc98bf237a43') {
+        quirkFlags |= XmpFlag.FIXLOOP; // mod.souvenir of china
+      }
+    }
+    // libxmp_set_player_mode (load_helpers.c:486-560) — a forced mode
+    // OVERRIDES the loader's quirk/read-event/period/c4rate bundle.
+    if (forceMode !== XmpMode.AUTO) {
+      const apply = (
+        c4rate: number,
+        quirk: Quirks,
+        flowMode: FlowMode,
+        readEventType: ReadEventTy,
+        periodType: PeriodTy,
+      ): void => {
+        mod.c4rate = c4rate;
+        mod.quirks = quirk;
+        mod.flowMode = flowMode;
+        mod.readEventType = readEventType;
+        mod.periodType = periodType;
+      };
+      switch (forceMode) {
+        case XmpMode.MOD:
+          apply(8287 /* C4_PAL_RATE */, 0, FLOW_MODE_GENERIC, ReadEventType.MOD, PeriodType.AMIGA);
+          break;
+        case XmpMode.NOISETRACKER:
+          apply(8287, Quirk.NOBPM, FLOW_MODE_GENERIC, ReadEventType.MOD, PeriodType.MODRNG);
+          break;
+        case XmpMode.PROTRACKER:
+          apply(8287, Quirk.PROTRACK, FLOW_MODE_GENERIC, ReadEventType.MOD, PeriodType.MODRNG);
+          break;
+      }
+    }
+    // p->flags = p->player_flags (channel control flags) — VBLANK/FIXLOOP
+    // bits ride on the player state for FX_SPEED/scan consumption.
+    this._p.flags = quirkFlags;
+    void md5;
 
     // Scan sequences (libxmp_scan_sequences): scan[chain] carries the
     // end point ord/row/num written by scan_module's end_module block.
@@ -993,6 +1056,13 @@ export class Core implements CoreIface {
       xc.old_ins = 0;
       xc.key = -1;
       xc.volume = this._module!.volbase;
+      // libxmp_new_channel_extras (extras.c:53-86, player.c:2038-2047) +
+      // libxmp_reset_channel_extras (player.c:700-712).
+      if (mod.extras?.kind === 'hmn') {
+        xc.extras = { datapos: 0, volume: 0 };
+      } else if (mod.extras?.kind === 'flt') {
+        xc.extras = { volume: 0, sustain: 0, env_stage: 0 };
+      }
     }
     this._xc = xcAll;
 

@@ -34,6 +34,7 @@ import { pwEu } from './pw-eureka.js';
 import { pwFcm } from './pw-fcm.js';
 import { pwFchs } from './pw-fuchs.js';
 import { pwSkyt } from './pw-skyt.js';
+import { pwStarpack } from './pw-starpack.js';
 
 /** pw_format (prowiz.h:28-32). */
 export interface PwFormat {
@@ -115,7 +116,7 @@ export const pwFormats: PwFormat[] = [
   pwUnic2,
   // pwCrb — pending
   // pwTdd — pending
-  // pwStarpack — pending
+  pwStarpack,
   // pwGmc — pending
   // pwTitanics — pending
 ];

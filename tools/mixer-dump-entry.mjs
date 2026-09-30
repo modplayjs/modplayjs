@@ -1,7 +1,8 @@
 // Bundle entry for the mixer-data harness: player + formats + a dump()
 // that emits C's per-frame mixer-state lines.
 export { CorePlayer } from '@modplayjs/core';
-export { plugin as modPlugin } from '@modplayjs/fmt-mod';
+export { plugin as modPlugin, hmnPlugin, fltPlugin } from '@modplayjs/fmt-mod';
+export { pwPlugin } from '@modplayjs/fmt-prowizard';
 export { plugin as s3mPlugin } from '@modplayjs/fmt-s3m';
 export { plugin as xmPlugin } from '@modplayjs/fmt-xm';
 export { plugin as itPlugin } from '@modplayjs/fmt-it';
