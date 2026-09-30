@@ -511,6 +511,7 @@ function loadInstruments(
   startPos: number,
   ctx: LoadCtx,
 ): { endPos: number; mptInsHeaders: number } {
+  void ctx;
   let mptInsHeaders = 0;
   // libxmp_init_instrument (xm_load.c:448) calloc's ALL mod->ins instruments
   // up front — a short header read (xm_load.c:465-471) breaks the loop but the
@@ -750,7 +751,11 @@ function loadInstruments(
       if (length > MAX_SAMPLE_SIZE) {
         throw new ParseError(`XM: sample ${j}: bad sample size`);
       }
-      const loopStart = readmem32l(sb, 4);
+      // C: xxs->lps/lpe are int; uint32 loop_start wraps to int32 on
+      // assignment, and lpe = loop_start + loop_length wraps at 32 bits
+      // (play_xm_bad_instrument_invloop.xm: lps=-2135249478, lpe=817540537).
+      const wrapI32 = (v: number): number => (v & 0xffffffff) | 0;
+      const loopStart = wrapI32(readmem32l(sb, 4));
       const loopLength = readmem32l(sb, 8);
       const volume = sb[12]!;
       const finetune = (sb[13]! << 24) >> 24; // int8
@@ -781,7 +786,7 @@ function loadInstruments(
         data: new Uint8Array(0),
         length,
         loopStart,
-        loopEnd: loopStart + loopLength,
+        loopEnd: wrapI32(loopStart + loopLength),
         sustainStart: 0,
         sustainEnd: 0,
         finetune,
@@ -792,9 +797,9 @@ function loadInstruments(
 
       // xxs->flg (xm_load.c:687-707)
       let flg = 0;
-      let len = length;
+      let len = wrapI32(length);
       let lps = loopStart;
-      let lpe = loopStart + loopLength;
+      let lpe = wrapI32(loopStart + loopLength);
       if (type & XM_SAMPLE_16BIT) {
         flg |= SampleFlags.BITS16;
         len >>= 1;
@@ -877,11 +882,10 @@ function loadInstruments(
   }
 
   // Final sample number adjustment (xm_load.c:766-769): mod->smp = sampleNum.
-  // Register every collected raw sample; store ids == sid == array index.
-  for (const raw of rawSamples) {
-    ctx.addSample(raw);
-  }
-
+  // Sample registration happens in xmLoad AFTER the 1.02 data read (the
+  // store snapshots raw.data at addSample time; XM 1.02 assigns data after
+  // the patterns). Registration order == mod.samples order, so store ids
+  // == sid == array index.
   mod.instruments = instruments;
   mod.samples = rawSamples;
   return { endPos: pos, mptInsHeaders };
@@ -939,9 +943,14 @@ export function xmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     fail(`XM: bad XM header length ${len}`);
   }
 
-  // Order table (xm_load.c:849-852): read AFTER the 80-byte fixed header.
+  // Order table (xm_load.c:825-829): C memsets xfh.order[256] to 0, then
+  // hio_read(xfh.order, len, 1, f) — a short read fails the load; file
+  // bytes only fill the first `len` entries, the rest stay zero.
+  // mod->xxo = memcpy(xxo, order, mod->len) — songlen entries from the
+  // 256-byte zero-filled buffer (xm_load.c:845).
   if (80 + len > size) fail('XM: error reading orders');
-  const order = bytes.subarray(80, 80 + len);
+  const order = new Uint8Array(256);
+  order.set(bytes.subarray(80, 80 + len), 0);
 
   // Title: 20 bytes at 17 (C strncpy of xfh.name).
   const titleBytes = bytes.subarray(17, 37);
@@ -1076,10 +1085,8 @@ export function xmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   }
 
   // XM 1.02 stores all samples after the patterns (xm_load.c:921-930) —
-  // sample data already read inline by loadInstruments; version<=0x0103
-  // skips the data read (C: `if (version > 0x0103)` guard) and reads it
-  // here. Our loadInstruments only reads data for version > 0x0103, so
-  // handle 1.02 data here.
+  // version<=0x0103 skips the inline data read (C: `if (version > 0x0103)`
+  // guard) and reads it here.
   if (version <= 0x0103) {
     let p2 = pos;
     for (let i = 0; i < mod.ins; i++) {
@@ -1098,6 +1105,12 @@ export function xmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
         p2 += bytelen;
       }
     }
+  }
+
+  // Register samples now that data is fully assigned (store ids assigned
+  // in registration order == mod.samples order == sub.sid indices).
+  for (const raw of mod.samples) {
+    ctx.addSample(raw);
   }
 
   // MPT extension chunks (xm_load.c:933-1010): 'text' comment, MIDI/PNAM/

@@ -98,11 +98,15 @@ function convertEndian(bytes: Uint8Array, len: number): void {
  */
 export function adpcm4Decode(inp: Uint8Array, tab: Int8Array | null, outp: Uint8Array): void {
   const t = tab ?? (() => {
+    // C: hio_read(table, 1, 16, f) reads the table as raw signed bytes and
+    // uses tab[b & 0x0f] directly (sample.c:334-341, 79-97) — no shift.
     const at = new Int8Array(16);
-    for (let i = 0; i < 16; i++) at[i] = signedByte(inp[i]!) >> 2;
+    for (let i = 0; i < 16; i++) at[i] = signedByte(inp[i]!);
     return at;
   })();
-  const offset = tab ? 0 : 16;
+  // tab == null: inp starts AFTER the 16-byte table (the store slices it
+  // off); tab != null: inp IS the packed nibbles (fmt-mod slices them off).
+  const offset = 0;
   const outLen = outp.length;
   const nibbles = (outLen + 1) >> 1;
   let delta = 0;
@@ -145,21 +149,28 @@ function normalize(raw: RawSample, id: number): SampleData {
   // never read the data).
   const framelen = (is16bit ? 2 : 1) * (stereo ? 2 : 1);
   const needed = len * framelen;
-  if (bytes.length === 0 && needed > 0) {
+  // ADPCM expands nibbles BEFORE the truncation clamp: the loader hands us
+  // the packed buffer (table + x2 nibble bytes ≈ half of `needed`), and
+  // C's libxmp_load_sample expands from the DECLARED length (sample.c:249-260
+  // handles truncation via the remaining-bytes bound, never by the packed
+  // size). Clamping first would halve len and corrupt the decode.
+  // adpcm4Decode writes outp.length bytes consuming (outLen+1)>>1 input
+  // bytes (sample.c:79-97: len=(len+1)/2 iterations, 2 output bytes each) —
+  // so outp must be sized to the FULL output (needed), not the packed size.
+  if (df & DecodeFlag.ADPCM) {
+    // In-file layout (sample.c:334-341): 16-byte signed table, then x2
+    // packed nibble bytes. Decode consumes the nibbles and writes
+    // 2 output bytes per input byte into the full-size buffer.
+    const tab = new Int8Array(16);
+    for (let i = 0; i < 16; i++) tab[i] = signedByte(bytes[i]!);
+    const expanded = new Uint8Array(needed);
+    adpcm4Decode(bytes.subarray(16), tab, expanded);
+    bytes = expanded;
+  } else if (bytes.length === 0 && needed > 0) {
     bytes = new Uint8Array(needed);
   } else if (bytes.length < needed) {
     const avail = bytes.length - (bytes.length % framelen);
     len = avail / framelen;
-  }
-
-  // ADPCM expands nibbles before other conversions.
-  if (df & DecodeFlag.ADPCM) {
-    const x2 = (needed + 1) >> 1;
-    const expanded = new Uint8Array(x2);
-    adpcm4Decode(bytes.subarray(0), null, expanded);
-    const out8 = new Uint8Array(needed);
-    out8.set(expanded.subarray(0, Math.min(expanded.length, needed)));
-    bytes = out8;
   }
 
   if (df & DecodeFlag.SEVENBIT) {

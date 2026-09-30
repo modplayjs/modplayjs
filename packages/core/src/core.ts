@@ -20,7 +20,7 @@ import { md5Hex } from './depack/md5.js';
 import { MODULE_QUIRKS, XmpFlag, XmpMode } from './depack/moduleQuirks.js';
 import { CoreState, FlowFlag, FLOW_MODE_GENERIC, PeriodType, Quirk, ReadEventType } from './model/constants.js';
 import type { FlowMode, PeriodType as PeriodTy, Quirks, ReadEventType as ReadEventTy } from './model/constants.js';
-import { ChannelFlags, XMP_KEY_OFF } from './model/model.js';
+import { ChannelFlags, EnvelopeFlags, XMP_KEY_OFF } from './model/model.js';
 
 import {
   RowDelay,
@@ -378,6 +378,38 @@ export class Core implements CoreIface {
     // bits ride on the player state for FX_SPEED/scan consumption.
     this._p.flags = quirkFlags;
     void md5;
+
+    // libxmp_load_epilogue (load_helpers.c:396-410 + 283-300):
+    // check_envelope + clamp_volume_envelope over every instrument.
+    {
+      const volbase = mod.volbase;
+      for (const ins of mod.instruments) {
+        for (const env of [ins.aei, ins.fei, ins.pei]) {
+          // check_envelope (load_helpers.c:283-300).
+          if (env.npt <= 0 || env.npt > 32 /* XMP_MAX_ENV_POINTS */) {
+            env.flags &= ~EnvelopeFlags.ON;
+          }
+          if (env.lps >= env.npt || env.lpe >= env.npt) {
+            env.flags &= ~EnvelopeFlags.LOOP;
+          }
+          if (env.sus >= env.npt || env.sue >= env.npt) {
+            env.flags &= ~EnvelopeFlags.SUS;
+          }
+        }
+        // clamp_volume_envelope (load_helpers.c:302-311): volume values
+        // clamped to m->volbase — C int16 data pairs (x, y), y clamped.
+        if (ins.aei.flags & EnvelopeFlags.ON) {
+          for (let k = 0; k < ins.aei.npt; k++) {
+            let y = ins.aei.y[k] ?? 0;
+            // CLAMP(int16) — C stores int16: our x/y arrays hold the same.
+            if (y !== ((y << 16) >> 16)) y = (y << 16) >> 16;
+            if (y < 0) y = 0;
+            else if (y > volbase) y = volbase;
+            ins.aei.y[k] = y;
+          }
+        }
+      }
+    }
 
     // Scan sequences (libxmp_scan_sequences): scan[chain] carries the
     // end point ord/row/num written by scan_module's end_module block.
