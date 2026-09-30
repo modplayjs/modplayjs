@@ -42,6 +42,7 @@ function copyAdjust(r: Uint8Array, n: number): string {
   let s = '';
   for (let i = 0; i < n && i < r.length; i++) {
     const c = r[i]!;
+    if (c === 0) break; // strncpy stops at NUL (common.c:244)
     s += c > 127 || c < 0x20 || c === 0x7f ? '.' : String.fromCharCode(c);
   }
   return s.replace(/ +$/, '');

@@ -24,7 +24,7 @@ import {
   type RawSample,
   type SubInstrument,
 } from '@modplayjs/core';
-import { SampleFlags } from '@modplayjs/core';
+import { SampleFlags, adpcm4Decode } from '@modplayjs/core';
 import { LSN, MSN, PERIOD_BASE } from '@modplayjs/core';
 import { ParseError } from '@modplayjs/core';
 import {
@@ -66,6 +66,7 @@ function copyAdjust(r: Uint8Array, n: number): string {
   let s = '';
   for (let i = 0; i < n && i < r.length; i++) {
     const c = r[i]!;
+    if (c === 0) break; // strncpy stops at NUL (common.c:244)
     s += c > 127 || c < 0x20 || c === 0x7f ? '.' : String.fromCharCode(c);
   }
   return s.replace(/ +$/, '');
@@ -384,7 +385,7 @@ export function modLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
 
     const sub: SubInstrument = {
       vol: hins.volume,
-      gvl: 0,
+      gvl: 0x40, // no QUIRK_INSVOL: load_epilogue sets gvl = volbase (load_helpers.c:377-383)
       pan: -1, // XMP_INST_NO_DEFAULT_PAN
       xpo: 0,
       fin: (((hins.finetune << 4) & 0xff) << 24) >> 24, // (int8)((uint8)finetune << 4)
@@ -407,7 +408,9 @@ export function modLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     instruments.push(ins);
 
     rawSamples.push({
-      name, // libxmp_copy_adjust(xxs->name, ish.name, 22) — the slot name
+      // mod_load.c never writes xxs->name (only the INSTRUMENT name at
+      // mod_load.c:283) — sample names stay empty in C.
+      name: '',
       data: new Uint8Array(0), // filled below; meta fields kept on raw
       length: xlen,
       loopStart: lps,
@@ -729,13 +732,24 @@ export function modLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
           const remaining = avail;
           const bound = 16 + x2;
           if (bound > remaining) {
+            // EOF truncation (sample.c:258-261): shrink the sample, then
+            // recompute x2 from the SHRUNK bytelen like C's load loop.
             bytelen = (remaining - 16) << 1;
           }
-          const data = bytes.subarray(filePos, filePos + Math.min(16 + x2, remaining));
-          raw.data = data;
+          const x2r = (bytelen + 1) >> 1;
+          // C decodes into dest BEFORE returning (sample.c:334-345): the
+          // table is 16 bytes, the packed nibbles follow, and the output
+          // is bytelen EXPANDED bytes. Feed the store expanded data so
+          // xxs->len stays bytelen (store-side truncation would shrink it
+          // to the packed size — the ice21_filter parity bug).
+          const table = Int8Array.from(bytes.subarray(filePos, filePos + 16));
+          const packed = bytes.subarray(filePos + 16, filePos + 16 + x2r);
+          const expanded = new Uint8Array(bytelen);
+          adpcm4Decode(packed, table, expanded);
+          raw.data = expanded;
           raw.length = bytelen;
-          raw.flags |= SF_ADPCM;
-          filePos += Math.min(16 + x2, remaining);
+          // Decode already applied — the store must NOT re-run ADPCM.
+          filePos += 16 + x2r;
         } else {
           const remaining = size - filePos;
           const take = Math.min(bytelen, Math.max(0, remaining));

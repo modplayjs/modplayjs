@@ -58,7 +58,8 @@ function copyAdjust(r: Uint8Array, n: number): string {
   let s = '';
   for (let i = 0; i < n && i < r.length; i++) {
     const c = r[i]!;
-    s += c > 127 || c < 0x20 || c === 0x7f ? ' ' : String.fromCharCode(c);
+    if (c === 0) break; // strncpy stops at NUL (common.c:244)
+    s += c > 127 || c < 0x20 || c === 0x7f ? '.' : String.fromCharCode(c);
   }
   return s.replace(/ +$/, '');
 }
@@ -203,7 +204,7 @@ function sfx1320Load(bytes: Uint8Array, ctx: LoadCtx, nins: number): ModuleData 
 
     const sub: SubInstrument = {
       vol: h.volume,
-      gvl: 0,
+      gvl: 0x40, // no QUIRK_INSVOL: load_epilogue sets gvl = volbase (load_helpers.c:377-383)
       pan: -1, // XMP_INST_NO_DEFAULT_PAN
       xpo: 0,
       fin: (((h.finetune << 4) & 0xff) << 24) >> 24, // (int8)(finetune << 4) — "unsure"
@@ -217,7 +218,8 @@ function sfx1320Load(bytes: Uint8Array, ctx: LoadCtx, nins: number): ModuleData 
     instruments.push(xi);
 
     rawSamples.push({
-      name: nameStr,
+      // The C loader names only the INSTRUMENT — xxs->name stays empty.
+      name: '',
       data: new Uint8Array(0),
       length: xlen,
       loopStart: lps,

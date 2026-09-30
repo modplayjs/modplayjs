@@ -20,7 +20,8 @@ function copyAdjust(r: Uint8Array, n: number): string {
   let s = '';
   for (let i = 0; i < n && i < r.length; i++) {
     const c = r[i]!;
-    s += c > 127 || c < 0x20 || c === 0x7f ? ' ' : String.fromCharCode(c);
+    if (c === 0) break; // strncpy stops at NUL (common.c:244)
+    s += c > 127 || c < 0x20 || c === 0x7f ? '.' : String.fromCharCode(c);
   }
   return s.replace(/ +$/, '');
 }
@@ -91,7 +92,7 @@ export function asylumLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
 
     const sub: SubInstrument = {
       vol,
-      gvl: 0,
+      gvl: 0x40, // no QUIRK_INSVOL: load_epilogue sets gvl = volbase (load_helpers.c:377-383)
       pan: -1, // XMP_INST_NO_DEFAULT_PAN
       xpo,
       fin,
@@ -114,7 +115,8 @@ export function asylumLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     instruments.push(xi);
 
     rawSamples.push({
-      name: nameStr,
+      // The C loader names only the INSTRUMENT — xxs->name stays empty.
+      name: '',
       data: new Uint8Array(0),
       length: xlen,
       loopStart: lps,

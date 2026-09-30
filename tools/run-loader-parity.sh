@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # tools/run-loader-parity.sh — full loader-parity sweep for IT/XM:
 # for every .it/.xm in reference/libxmp/test-dev/data and testfiles,
 # diff C libxmp's ModuleData dump against our loader's.

@@ -69,7 +69,8 @@ function copyAdjust(r: Uint8Array, n: number): string {
   let s = '';
   for (let i = 0; i < n && i < r.length; i++) {
     const c = r[i]!;
-    s += c > 127 || c < 0x20 || c === 0x7f ? ' ' : String.fromCharCode(c);
+    if (c === 0) break; // strncpy stops at NUL (common.c:244)
+    s += c > 127 || c < 0x20 || c === 0x7f ? '.' : String.fromCharCode(c);
   }
   return s.replace(/ +$/, '');
 }
@@ -311,7 +312,7 @@ export function stmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
 
     const sub: SubInstrument = {
       vol: h.volume,
-      gvl: 0,
+      gvl: 0x40, // no QUIRK_INSVOL: load_epilogue sets gvl = volbase (load_helpers.c:377-383)
       pan: -1, // XMP_INST_NO_DEFAULT_PAN
       xpo: 0,
       fin: 0,
@@ -330,7 +331,8 @@ export function stmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     instruments.push(xi);
 
     rawSamples.push({
-      name: copyAdjust(h.name.subarray(0, 12), 12),
+      // stm_load.c names only the INSTRUMENT — xxs->name stays empty in C.
+      name: '',
       data: new Uint8Array(0),
       length: h.length,
       loopStart: h.loopbeg,
