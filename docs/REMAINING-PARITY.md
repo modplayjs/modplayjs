@@ -5,7 +5,12 @@ working-tree goldens in `reference/libxmp/test-dev/data/*.data`
 (16 fixtures carry 12-field regen versions; the suite compares
 against whatever is in the working tree).
 
-**Current state: 105 passed / 0 failed** (65 fixtures without .data).
+**Current state: 110 passed / 0 failed** (60 fixtures without .data).
+The 2026-09-30 session added the HMN (His Master's Noise) and
+Startrekker FLT4/8 loaders with their AM/HMN synth extras, the PP20
+depacker, the MD5 module-quirk table, and the Starpack ProWizard
+converter — Gaffeltruck.mod and all five flt_am_* fixtures now reach
+byte-equal ModuleData / mixer-state parity.
 All five failures from the 2026-09-09 session are resolved:
 
 - `portamento_sustain.it` — STATE MATCH after regenerating the golden
