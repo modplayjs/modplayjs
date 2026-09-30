@@ -13,4 +13,5 @@ export * from './readevent.js';
 export * from './readevent-st3.js';
 export * from './readevent-ft2.js';
 export * from './readevent-it.js';
+export * from './extras.js';
 export * from './midi-macro.js';

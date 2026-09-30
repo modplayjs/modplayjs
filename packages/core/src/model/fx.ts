@@ -87,9 +87,12 @@ export const FX_F_VSLIDE_UP = 0xad; // MMD
 export const FX_F_VSLIDE_DN = 0xae; // MMD
 export const FX_F_PORTA_UP = 0xaf; // MMD
 export const FX_F_PORTA_DN = 0xb0; // MMD
+export const FX_VIBRATO2 = 0x92; // effects.h:124 — deep vibrato (MMD 04)
+export const FX_MED_RETRIG = 0x93; // effects.h:125 — MMD 1Fxy/F0F3
 export const FX_PATT_DELAY = 0xb3; // MMD
 export const FX_S3M_ARPEGGIO = 0xb4;
 export const FX_PANSL_NOMEM = 0xb5; // XM volume column
+export const FX_MED_HOLD = 0xb1; // effects.h:144 — MMD hold/decay
 
 // Oktalyzer arpeggio variants (effects.h:58-60)
 export const FX_OKT_ARP3 = 0x70;
@@ -122,7 +125,6 @@ export const FX_669_FINETUNE = 0x63; // effects.h:80
 export const FX_669_VIBRATO = 0x64; // effects.h:81
 export const FX_ULT_TEMPO = 0x5f; // effects.h:96
 export const FX_ICE_SPEED = 0xa2; // effects.h:142
-export const FX_MED_HOLD = 0xb1; // effects.h:144
 export const FX_MEGAARP = 0xb2; // effects.h:145 — HMN Smaksak effect 7 (MegaArp)
 export const FX_VOL_ADD = 0xb6; // effects.h:146
 export const FX_VOL_SUB = 0xb7; // effects.h:147

@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const esbuild = (await import('esbuild')).default;
 const aliasMap = Object.fromEntries(
-  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi', 'fmt-asylum', 'fmt-ice', 'fmt-prowizard']
+  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi', 'fmt-asylum', 'fmt-ice', 'fmt-prowizard', 'fmt-med']
     .map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
 const bundle = resolve(repo, 'out/xmpdump-core.mjs');
 await esbuild.build({
@@ -35,7 +35,7 @@ await esbuild.build({
   bundle: true, platform: 'node', format: 'esm',
   alias: aliasMap, outfile: bundle, logLevel: 'silent',
 });
-const { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, mtmPlugin, stmPlugin, s69Plugin, sfxPlugin, digiPlugin, asylumPlugin, icePlugin } = await import(
+const { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, mtmPlugin, stmPlugin, s69Plugin, sfxPlugin, digiPlugin, asylumPlugin, icePlugin, medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } = await import(
   'file://' + bundle);
 
 const file = resolve(process.argv[2]);
@@ -57,9 +57,23 @@ core.registries.registerFormat(sfxPlugin);
 core.registries.registerFormat(digiPlugin);
 core.registries.registerFormat(asylumPlugin);
 core.registries.registerFormat(icePlugin);
+core.registries.registerFormat(medPlugin);
+core.registries.registerFormat(mmd3Plugin);
+core.registries.registerFormat(med2Plugin);
+core.registries.registerFormat(med3Plugin);
+core.registries.registerFormat(med4Plugin);
   // Startrekker AM sidecar (flt_load.c:338-352).
   {
     const { basename, join, dirname } = await import('node:path');
+    opts.externalInstrument = (name) => {
+      if (!name) return null; // empty instrument names are never looked up
+      const clean = name.replace(/\0.*$/, '').replace(/[^A-Za-z0-9._\- ]/g, '_').trim();
+      if (!clean) return null;
+      for (const cand of [join(dirname(file), name), join(dirname(file), clean)]) {
+        try { return new Uint8Array(readFileSync(cand)); } catch {}
+      }
+      return null;
+    };
     const base = basename(file); const stem = base.replace(/\.[^.]*$/, '');
     for (const ext of ['.NT', '.nt', '.AS', '.as']) {
       try { opts.sidecarNt = new Uint8Array(readFileSync(join(dirname(file), base + ext))); break; } catch {}
@@ -136,4 +150,8 @@ for (let i = 0; i < mod.pat; i++) {
   }
 }
 
-console.log(out.join('\n'));
+// C writes the dump as raw bytes; comments can carry latin-1 (high-byte)
+// chars from module annotations. Node's stdout would UTF-8-encode U+00A9 as
+// two bytes — emit latin-1 so each U+0080-U+00FF char round-trips as one
+// byte, matching C byte-for-byte (ASCII content is unaffected).
+process.stdout.write(Buffer.from(out.join('\n') + '\n', 'latin1'));

@@ -16,7 +16,7 @@
 // FX_PATT_DELAY (OctaMED accumulate), FX_GLOBALVOL, FX_GVOL_SLIDE
 // (FINEFX/VSALL/gvol_memory).
 
-import { FlowFlag, Quirk } from './model/constants.js';
+import { FlowFlag, Quirk, ReadEventType } from './model/constants.js';
 import type { ModuleData, FlowState, Event } from './model/model.js';
 import * as FX from './model/fx.js';
 import {
@@ -291,8 +291,10 @@ export class Scanner {
       this.scanCnt[i] = new Uint8Array(rows);
     }
 
-    // row_limit (scan.c:74): 1024 (MED 3200 unused for big-four).
-    const rowLimit = 1024;
+    // row_limit (scan.c:74-80): 1024, or 3200 in MED player mode
+    // (defiance.crybaby.5 has blocks with 2048+ rows).
+    const rowLimit =
+      mod.readEventType === ReadEventType.MED ? 3200 : 1024;
 
     const f = makeScanFlow(mod.chn);
     f.loop_dest = -1;

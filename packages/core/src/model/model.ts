@@ -182,9 +182,36 @@ export interface FltInstrumentExtras {
 export type ModuleExtras =
   | { kind: 'hmn' }
   | { kind: 'flt' }
+  | { kind: 'med'; trackerVersion: number }
   | { kind: 'none' };
 
-export type InstrumentExtras = HmnInstrumentExtras | FltInstrumentExtras;
+/** MED synth/hybrid instrument extras (med_extras.h struct
+ *  med_instrument_extras + the per-instrument vol/wav tables of
+ *  med_module_extras, folded in here). */
+export interface MedInstrumentExtras {
+  vts: number;
+  wts: number;
+  vtlen: number;
+  wtlen: number;
+  hold: number;
+  decay: number;
+  /** InstrExt default_pitch (MED Soundstudio 2 mix mode note). */
+  default_pitch: number;
+  /** int8 finetune carried for read_event_med. */
+  finetune: number;
+  suppress_midi_off: number;
+  long_repeat: number;
+  long_replen: number;
+  /** Volume sequence table (voltbllen bytes; null = no synth tables). */
+  volTable: Uint8Array | null;
+  /** Waveform sequence table (wftbllen bytes; null = no synth tables). */
+  wavTable: Uint8Array | null;
+}
+
+export type InstrumentExtras =
+  | HmnInstrumentExtras
+  | FltInstrumentExtras
+  | MedInstrumentExtras;
 
 export interface Instrument {
   name: string;
@@ -362,7 +389,7 @@ export interface MidiConfig {
  */
 export interface ModuleData {
   title: string;
-  format: 'mod' | 's3m' | 'xm' | 'it' | 'mtm' | 'stm' | '669' | 'sfx' | 'digi' | 'amf' | 'ice';
+  format: 'mod' | 's3m' | 'xm' | 'it' | 'mtm' | 'stm' | '669' | 'sfx' | 'digi' | 'amf' | 'ice' | 'med';
   /** Comment (S3M/IT). */
   comment: string;
   /** Number of channels. */
@@ -611,10 +638,10 @@ export interface ChannelState {
   info_finalpan: number;
   /** Final pan with IT notepan applied. */
   info_notepan: number;
-  /** xc->extra channel extras: HMN synth wave position/volume or FLT AM
-   *  envelope state. Assigned at startPlayer via new_channel_extras
-   *  (player.c:2043). */
-  extras?: HmnChannelExtras | FltChannelExtras;
+  /** xc->extra channel extras: HMN synth wave position/volume, FLT AM
+   *  envelope state, or MED synth/hold-decay state. Assigned at startPlayer
+   *  via new_channel_extras (player.c:2043). */
+  extras?: HmnChannelExtras | FltChannelExtras | MedChannelExtras;
 }
 
 /** struct hmn_channel_extras. */
@@ -622,6 +649,40 @@ export interface HmnChannelExtras {
   datapos: number;
   volume: number;
 }
+
+/** struct med_channel_extras (med_extras.h:18-47). */
+export interface MedChannelExtras {
+  vp: number; // volume table pointer
+  vv: number; // volume slide value
+  vs: number; // volume speed
+  vc: number; // volume speed counter
+  vw: number; // volume wait counter
+  wp: number; // waveform table pointer
+  wv: number; // waveform slide value
+  ws: number; // waveform speed
+  wc: number; // waveform speed counter
+  ww: number; // waveform wait counter
+  period: number; // synth period for RES
+  arp: number; // arpeggio start
+  aidx: number; // arpeggio index
+  vwf: number; // vibrato waveform
+  vib_depth: number;
+  vib_speed: number;
+  vib_idx: number;
+  vib_wf: number;
+  volume: number; // synth note volume
+  hold_active: number;
+  hold_sustained: number;
+  hold_count: number;
+  decay_value: number;
+  env_wav: number;
+  env_idx: number;
+  /** MED_SYNTH_ENV_LOOP */
+  flags: number;
+}
+
+/** MED_SYNTH_ENV_LOOP (med_extras.h:45). */
+export const MED_SYNTH_ENV_LOOP = 1 << 0;
 
 /** struct flt_channel_extras + enum flt_env_stage. */
 export const FltEnvStage = {

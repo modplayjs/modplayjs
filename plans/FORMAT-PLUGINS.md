@@ -86,9 +86,9 @@ prowiz.c:81), pw_kris.
 
 | # | Plugin | C ref (LOC) | Modland files |
 |---|--------|-------------|---------------|
-| 22 | mmd_common.c (1,162) + MMD0/MMD1 | ~1,400 | 4,169 |
-| 23 | MMD2/MMD3 | 598 | 965 |
-| 24 | MED2/MED3/MED4 + IFF-SMUS | 1,626 | 10,394 |
+| 22 | mmd_common.c (1,162) + MMD0/MMD1 | ~1,400 | 4,169 | DONE (fmt-med, 2026-09-30)
+| 23 | MMD2/MMD3 | 598 | 965 | DONE (fmt-med, 2026-09-30)
+| 24 | MED2/MED3/MED4 + IFF-SMUS | 1,626 | 10,394 | DONE (fmt-med, 2026-09-30; SMUS/IFF-subtrees excluded)
 
 After Wave 2 because MED files are frequently PowerPacker-compressed (`PP20`).
 

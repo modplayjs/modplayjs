@@ -167,6 +167,13 @@ export interface LoadCtx {
    * FLT4/8 with no synth instruments. The harness/preview reads the file.
    */
   sidecarNt?: Uint8Array;
+  /**
+   * External-instrument resolver for song formats that reference sample
+   * files by instrument name (med_load_external_instrument,
+   * mmd_common.c:995). Receives the instrument name; returns the file
+   * contents or null. Column: the harness/preview reads the file.
+   */
+  externalInstrument?: (name: string) => Uint8Array | null;
 }
 
 /**

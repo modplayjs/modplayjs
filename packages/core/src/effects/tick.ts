@@ -72,7 +72,7 @@ import {
   NOTE_SAMPLE_RELEASE,
 } from './helpers.js';
 import { updateMidiMacro } from './midi-macro.js';
-import { playExtras, extrasGetVolume } from './extras.js';
+import { playExtras, extrasGetVolume, extrasGetPeriod, extrasGetLinearBend } from './extras.js';
 
 // player.h:164-165
 export const TREMOR_ON = 0x80;
@@ -1029,6 +1029,10 @@ export function processFrequency(core: Core, chn: number, act: number): void {
 
   let period = xc.period;
 
+  // libxmp_extras_get_period (player.c:1205, extras.c:143-151): MED synth
+  // vibrato adds to the period before the sanity clamp.
+  period += extrasGetPeriod(xc);
+
   if (hasQuirk(core, Quirk.ST3BUGS)) {
     if (period < 0.25) {
       core.virt.releaseChannel(chn, PastNote.CUT);
@@ -1092,7 +1096,12 @@ export function processFrequency(core: Core, chn: number, act: number): void {
     }
   }
 
+  // libxmp_extras_get_linear_bend (player.c:1274, extras.c:154-165):
+  // MED synth arpeggio adds to the linear bend.
+  linearBend += extrasGetLinearBend(core, xc);
+
   let finalPeriod = noteToPeriodMix(xc.note, linearBend);
+
 
   /* From OpenMPT PeriodLimit.s3m:
    * "ScreamTracker 3 limits the final output period to be at least 64,

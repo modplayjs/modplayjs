@@ -57,6 +57,7 @@ import {
   processTick,
   VolSlideFlag,
   TREMOR_FLAG,
+  RETRIG,
   RESET,
 } from './effects/index.js';
 
@@ -243,7 +244,7 @@ export class Core implements CoreIface {
    * the core normalizes samples into the store and rewrites mod.samples to
    * stored ids.
    */
-  loadModule(bytes: Uint8Array, opts?: { sidecarNt?: Uint8Array }): void {
+  loadModule(bytes: Uint8Array, opts?: { sidecarNt?: Uint8Array; externalInstrument?: (name: string) => Uint8Array | null }): void {
     if (this._state === CoreState.PLAYING) this.stopPlayer();
     // xmp_load_module releases the previous module first (load.c:584-604):
     // its samples are freed. Our store keys samples by a running ID, so
@@ -274,6 +275,7 @@ export class Core implements CoreIface {
       outputRate: this._s.freq,
       addSample: (raw) => this.samples.add(raw),
       sidecarNt: opts?.sidecarNt,
+      externalInstrument: opts?.externalInstrument,
     };
 
     const mod = fmt.load(data, loaderCtx);
@@ -311,6 +313,15 @@ export class Core implements CoreIface {
     };
     mod.title = adjust(mod.title);
     for (const ins of mod.instruments) ins.name = adjust(ins.name);
+    // Loaders that bypass ctx.addSample (MED family: the samples array is
+    // the hand-off) register through the store here so voices resolve
+    // sub.sid by id. Loaders that already called addSample store their
+    // array with matching ids in order — registering again would push the
+    // id counter past every sid, so skip when the count already matches
+    // what was registered (addSample leaves nextId == array length).
+    if (this.samples.size === 0 && mod.samples.length > 0) {
+      for (const raw of mod.samples) this.samples.add(raw);
+    }
     for (const smp of mod.samples) {
       if (smp.name) smp.name = adjust(smp.name);
     }
@@ -985,6 +996,19 @@ export class Core implements CoreIface {
       xc.delay = LSN(e.f2p) + 1;
       delayed = true;
     }
+    // MED retrigger (player.c:791-800): reset retrigger so it doesn't
+    // continue during the delay; the hi-nibble is the delay count.
+    if (!delayed) {
+      if (e.fxt === FX.FX_MED_RETRIG && MSN(e.fxp)) {
+        RESET(xc, RETRIG);
+        xc.delay = MSN(e.fxp) + 1;
+        delayed = true;
+      } else if (e.f2t === FX.FX_MED_RETRIG && MSN(e.f2p)) {
+        RESET(xc, RETRIG);
+        xc.delay = MSN(e.f2p) + 1;
+        delayed = true;
+      }
+    }
     if (!delayed) return 0;
 
     xc.delayed_event = { ...e };
@@ -1062,6 +1086,18 @@ export class Core implements CoreIface {
         xc.extras = { datapos: 0, volume: 0 };
       } else if (mod.extras?.kind === 'flt') {
         xc.extras = { volume: 0, sustain: 0, env_stage: 0 };
+      } else if (mod.extras?.kind === 'med') {
+        // libxmp_med_new_channel_extras (med_extras.c:476-485).
+        xc.extras = {
+          vp: 0, vv: 0, vs: 0, vc: 0, vw: 0,
+          wp: 0, wv: 0, ws: 0, wc: 0, ww: 0,
+          period: 0, arp: 0, aidx: 0, vwf: 0,
+          vib_depth: 0, vib_speed: 0, vib_idx: 0, vib_wf: 0,
+          volume: 0,
+          hold_active: 0, hold_sustained: 0,
+          hold_count: -1, decay_value: 0,
+          env_wav: 0, env_idx: 0, flags: 0,
+        };
       }
     }
     this._xc = xcAll;

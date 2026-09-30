@@ -18,6 +18,7 @@
     "@modplayjs/fmt-asylum": "*",
     "@modplayjs/fmt-digi": "*",
     "@modplayjs/fmt-ice": "*",
+    "@modplayjs/fmt-med": "*",
     "@modplayjs/fmt-it": "*",
     "@modplayjs/fmt-mod": "*",
     "@modplayjs/fmt-mtm": "*",

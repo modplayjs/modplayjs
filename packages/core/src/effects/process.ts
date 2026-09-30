@@ -15,7 +15,7 @@ import {
   hasQuirk,
   lfoSetWaveform,
 } from './helpers.js';
-import { hmnProcessFx } from './extras.js';
+import { hmnProcessFx, extrasProcessFx } from './extras.js';
 import { setLfoNotzero, SET_PER, RESET_PER, PITCHBEND, TONEPORTA, VIBRATO, doToneporta, noteToPeriod } from './helpers.js';
 import { fxPanbrello, fxPanbrelloWf } from './fx.js';
 import { VolSlideFlag as VF } from './state.js';
@@ -907,9 +907,13 @@ function extendedFx(
 
   /* libxmp_extras_process_fx (effects.c:1145 → extras.c:168-177): HMN's
    * FX_MEGAARP arm runs in the default branch of the C switch — i.e. for
-   * every effect the switch above did not claim. */
+   * every effect the switch above did not claim. MED's FX_MED_HOLD arm is
+   * dispatched the same way. */
   if (core.module!.extras?.kind === 'hmn') {
     hmnProcessFx(xc, fxt, fxp);
+  }
+  if (core.module!.extras?.kind === 'med') {
+    extrasProcessFx(xc, fxt, fxp, note, ev.ins);
   }
   void ev;
 }
