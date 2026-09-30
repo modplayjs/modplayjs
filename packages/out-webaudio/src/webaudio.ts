@@ -219,6 +219,22 @@ export class WebAudioOutput implements OutputPlugin {
     return this.paused;
   }
 
+  /** Arm the end-of-drain timer: stop() + onEnded once `bufferedFrames` of
+   * already-rendered audio have played out (+ a small margin so suspend()
+   * never lands before the last frames reach the device; the worklet
+   * zero-fills the overshoot). The duration must come from the transport's
+   * actual backlog — at end-of-module the SAB ring sits at
+   * HIGH_WATER_FRAMES (~0.7s) while the copy FIFO holds ~200ms — a fixed
+   * timeout tuned for one path truncates the other's tail. */
+  private armDrain(bufferedFrames: number, sampleRate: number): void {
+    const tailMs = (bufferedFrames / sampleRate) * 1000;
+    this.drainTimer = window.setTimeout(() => {
+      this.drainTimer = null;
+      this.stop();
+      this.onEnded?.();
+    }, tailMs + 60);
+  }
+
   /** The AudioContext sample rate — configure the core to match. */
   get audioContextSampleRate(): number {
     return this.ctx?.sampleRate ?? 0;
@@ -261,16 +277,16 @@ export class WebAudioOutput implements OutputPlugin {
       const n = core.playBuffer(scratch, frames * 2, 1);
       if (n <= 0) {
         // Module ended (playBuffer -1: start-of-buffer end-of-replay).
-        // The ring still holds ~150ms of rendered audio; let the worklet
-        // drain it before stopping the transport (suspending now would cut
-        // the final frames).
+        // The ring still holds up to HIGH_WATER_FRAMES (~0.7s) of rendered
+        // audio; let the worklet drain it before stopping the transport
+        // (suspending now would cut the final frames). The drain duration
+        // comes from the actual buffered frames — a fixed timer calibrated
+        // for copy mode (~200ms FIFO) truncates hard-ending modules.
         if (!this.endedFired) {
           this.endedFired = true;
-          this.drainTimer = window.setTimeout(() => {
-            this.drainTimer = null;
-            this.stop();
-            this.onEnded?.();
-          }, 250);
+          // `read` only ever advances, so re-load it here for the exact
+          // tail (the value taken at the top of renderAhead is stale).
+          this.armDrain(write - Atomics.load(header, 1), this.ctx!.sampleRate);
         }
         return;
       }
@@ -313,14 +329,12 @@ export class WebAudioOutput implements OutputPlugin {
     const n = core2.playBuffer(scratch, scratchFloats, 1);
     if (n <= 0) {
       // Copy mode: the worklet FIFO still holds posted chunks; drain before
-      // stopping (same rationale as the SAB path).
+      // stopping (same rationale as the SAB path). copyDepth is the last
+      // FIFO estimate — it does not decay between 'depth' corrections, so
+      // it overestimates and the computed tail is on the safe side.
       if (!this.endedFired) {
         this.endedFired = true;
-        this.drainTimer = window.setTimeout(() => {
-          this.drainTimer = null;
-          this.stop();
-          this.onEnded?.();
-        }, 250);
+        this.armDrain(this.copyDepth, this.ctx?.sampleRate ?? 44100);
       }
       return;
     }
