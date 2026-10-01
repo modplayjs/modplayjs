@@ -126,7 +126,7 @@ export class WebAudioOutput implements OutputPlugin {
       const ring = new Float32Array(new SharedArrayBuffer(RING_FRAMES * 2 * 4));
       this.header = header;
       this.ring = ring;
-      this.writePos = 0;
+      this.writePos = 0; // fresh ring — never resume old audio here
       this.renderScratch = new Float32Array(CHUNK_FRAMES * 2 * 4);
       const init: WorkletInitMessage = { mode: 'sab', header, data: ring };
       this.node.port.postMessage(init);
@@ -179,7 +179,16 @@ export class WebAudioOutput implements OutputPlugin {
       this.renderTimer = null;
     }
     if (this.node) {
+      // Flush whatever the worklet still holds (copy FIFO or SAB ring):
+      // without this, the first ~0.7s (SAB) / ~200ms (copy) of the NEXT
+      // start replays the tail of the previous module.
+      this.node.port.postMessage({ mode: 'clear' });
       this.node.disconnect();
+    }
+    if (this.header) {
+      this.writePos = 0;
+      Atomics.store(this.header, 0, 0);
+      Atomics.store(this.header, 1, 0);
     }
     if (this.ctx && this.ctx.state === 'running') {
       void this.ctx.suspend();

@@ -138,11 +138,14 @@ patternViewChk.addEventListener('change', () => {
   }
 }
 
-// pan slider is 0..100 with 50 = center; the core's separation scale is
-// 0..200 with 100 = center — multiply by 2.
 panSep.addEventListener('input', () => {
   const v = Number(panSep.value);
-  core.setPanSeparation(v * 2);
+  // libxmp XMP_PLAYER_MIX contract (control.c:445-449): -100..100 percent
+  // of the pan offset, DEFAULT_MIX = 100 (common.h:144) = full normal
+  // separation. The old ×2 mapping made everything ≥ 50 clamp identically
+  // (finalpan offsets beyond ±128 hit the 0/255 clamp) — "50 sounded like
+  // 100". 1:1 mapping with default 100 = libxmp parity.
+  core.setPanSeparation(v);
   panSepV.textContent = String(v);
 });
 
@@ -153,10 +156,9 @@ volume.addEventListener('input', () => {
 });
 core.setVolume(Number(volume.value));
 volumeV.textContent = volume.value;
-// default pan 50 (= 100 in the core's 0..200 scale = neutral, same as
-// XMPlay's 50% panning-separation default) — applied up front, not just
-// on the first input event
-core.setPanSeparation(Number(panSep.value) * 2);
+// default pan 100 = DEFAULT_MIX (libxmp parity, full normal separation) —
+// applied up front, not just on the first input event
+core.setPanSeparation(Number(panSep.value));
 panSepV.textContent = panSep.value;
 
 // Seek: drag updates the label live; release jumps. Seeking repositions
@@ -833,7 +835,7 @@ async function startPlayback(muteSong: boolean): Promise<void> {
   // xmp_start_player) — re-apply the user's slider values so volume and
   // pan survive a load/replay.
   core.setVolume(Number(volume.value));
-  core.setPanSeparation(Number(panSep.value) * 2);
+  core.setPanSeparation(Number(panSep.value));
   await output.start(core, workletUrl); // click handler = user gesture
   jamMode = muteSong;
   const mod = core.module;

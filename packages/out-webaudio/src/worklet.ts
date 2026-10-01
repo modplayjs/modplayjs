@@ -59,6 +59,13 @@ class ChunkFifo {
     return this.bufferedFrames;
   }
 
+  /** Drop all buffered audio (track switch / programmatic stop). */
+  clear(): void {
+    this.chunks.length = 0;
+    this.offset = 0;
+    this.bufferedFrames = 0;
+  }
+
   /** Drain up to need frames into L/R; returns frames actually drained. */
   drain(left: Float32Array, right: Float32Array): number {
     let done = 0;
@@ -108,6 +115,7 @@ class ModPlayProcessor extends AudioWorkletProcessor implements WorkletProcessor
     msg:
       | { mode: 'sab'; header: Int32Array; data: Float32Array }
       | { mode: 'copy' }
+      | { mode: 'clear' }
       | { mode: 'chunk'; data: Float32Array },
   ): void {
     if (msg.mode === 'sab') {
@@ -117,6 +125,17 @@ class ModPlayProcessor extends AudioWorkletProcessor implements WorkletProcessor
     } else if (msg.mode === 'copy') {
       // Copy-mode INIT: switch transport, no payload (webaudio.ts start()).
       this.mode = 'copy';
+    } else if (msg.mode === 'clear') {
+      // Track switch / programmatic stop: drop everything the worklet has
+      // not yet played so no audio from the previous module leaks out.
+      if (this.mode === 'sab' && this.header) {
+        // Reset the ring to empty: read = write. The main thread resets its
+        // writePos to 0 at the same time; write 0 into the header slot it
+        // reads so the two stay in sync.
+        Atomics.store(this.header, 0, 0);
+        Atomics.store(this.header, 1, 0);
+      }
+      this.fifo.clear();
     } else if (msg.data) {
       this.fifo.push(msg.data);
     }
