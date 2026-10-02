@@ -99,9 +99,13 @@ jobs:
           // i.e. everything since the last successful changeset run.
           let base = forceRange ? '' : pushBefore;
           if (isPush && (!base || /^0+$/.test(base))) {
+            // workflow_dispatch rerun: re-cover the LAST push window, i.e.
+            // anchor at the second-newest "chore(changeset): auto-generated
+            // from push" commit (the newest one only excludes the ci/docs
+            // commits made after it).
             base = require('child_process')
-              .execSync("git log --format=%H --grep='^chore(changeset): auto-generated from push' -1")
-              .toString().trim();
+              .execSync("git log --format=%H --grep='^chore(changeset): auto-generated from push' -2 --skip=1")
+              .toString().trim().split('\n')[0] || '';
           }
           if (!isPush) base = '';
 
