@@ -186,7 +186,9 @@ export type ModuleExtras =
   | { kind: 'hmn' }
   | { kind: 'flt' }
   | { kind: 'med'; trackerVersion: number }
-  | { kind: 'fc' }
+  | { kind: 'fc'; /** NoteMap (Load_fc.cpp:471-479): translated OpenMPT
+      *  notes, indexed 0..127 by played note minus NOTE_MIN. */
+      noteMap: number[] }
   | { kind: 'none' };
 
 /** MED synth/hybrid instrument extras (med_extras.h struct

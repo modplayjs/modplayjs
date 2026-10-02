@@ -8,7 +8,6 @@ export {
   SynthStates,
   SynthEventType,
   synthStateNextTick,
-  synthApplyChannelState,
   handleFcVolumeBend,
   channelSetSample,
   evStopScript, evJump, evJumpIfTrue, evDelay, evSetStepSpeed, evJumpMarker,

@@ -648,6 +648,10 @@ export function fcLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
 
   // Instruments (Load_fc.cpp:460-487).
   const instruments: Instrument[] = [];
+  // NoteMap is instrument-independent for FC (same formula every
+  // instrument — Load_fc.cpp:471-479): keep one copy for the synth's
+  // pitch block, which C reads as instr->NoteMap[].
+  const fcNoteMap = new Array<number>(128).fill(0);
   for (let ins = 1; ins <= numInstruments; ins++) {
     const volSeqOff = (ins - 1) * 64;
     const volSeq = volSequences.subarray(volSeqOff, volSeqOff + 64);
@@ -664,18 +668,20 @@ export function fcLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     //   else: note + NOTE_MIDDLEC - 36 - 60
     const map = new Array<number>(121).fill(0xff);
     const mapXpo = new Array<number>(121).fill(0);
-    // C: instr->NoteMap[note] remaps played notes (Load_fc.cpp:471-479).
-    // Our sub-instrument model expresses that as a per-key transpose:
-    // map[key] = 0 (the single sub), mapXpo[key] = NoteMap[note] - note.
+    // C: NoteMap does NOT remap the played note — the pattern note plays
+    // at its raw pitch; NoteMap only enters the synth's FC pitch/vibrato
+    // offset block (InstrumentSynth.cpp:505-535, stored in mod.extras).
+    // map[key] = 0 (the single sub), mapXpo = 0 everywhere.
     for (let note = 0; note <= 127; note++) {
       let mapped: number;
       if (note < 48) mapped = note + NOTE_MIDDLEC - 24;
       else if (note < 60 || note >= 120) mapped = NOTE_MIDDLEC + 23;
       else mapped = note + NOTE_MIDDLEC - 36 - 60;
+      fcNoteMap[note] = mapped;
       const key = note + 1; // our events store OpenMPT note values
       if (key >= 1 && key <= 120) {
         map[key - 1] = 0; // sub index 0
-        mapXpo[key - 1] = mapped - note;
+        mapXpo[key - 1] = 0;
       }
     }
 
@@ -817,7 +823,7 @@ export function fcLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     c4rate: C4_PAL_RATE,
     compare_vblank: false,
     tracker: isFc14 ? 'Future Composer 1.4' : 'Future Composer 1.0 - 1.3',
-    extras: { kind: 'fc' },
+    extras: { kind: 'fc', noteMap: fcNoteMap },
   };
 
   // SetupMODPanning(true) (Sndfile.cpp) — LRLR Amiga panning.
@@ -1036,19 +1042,23 @@ export const fcEffect: EffectPlugin = {
       void script;
     }
 
-    // kMODSampleSwap deferral (ChannelSetSample → swapSampleIndex):
-    // C swaps at the end of the running loop; our mixer performs the swap
-    // at loop end via queued samples. Apply now if the voice stopped.
+    // kMODSampleSwap: the queued swap is applied by the mixer at loop
+    // end (queuePatch). If the voice stopped before the loop ended, bind
+    // directly like C (ChannelSetSample non-deferred path).
     if (st.swapSampleIndex > 0) {
       const vi = core.virt.mapChannel(chn);
       const v: VoiceState | null = vi >= 0 ? (core.virt.voices[vi] ?? null) : null;
-      const stillActive = v !== null && v.smp >= 0 && v.end > v.start;
-      if (!stillActive) {
+      const stillActive = v !== null && v.smp >= 0 && voiceIsActive(v);
+      const queued =
+        v !== null && (v.flags & 0x20) !== 0; // VoiceFlag.SAMPLE_QUEUED
+      if (!stillActive && !queued) {
         const smp0 = st.swapSampleIndex - 1;
         if (smp0 >= 0 && smp0 < mod.samples.length) {
           core.virt.setPatchSmp(chn, xc.ins, smp0, xc.note);
         }
         st.swapSampleIndex = 0;
+      } else if (stillActive && v !== null && v.smp === st.swapSampleIndex - 1) {
+        st.swapSampleIndex = 0; // swap already applied
       }
     }
   },
@@ -1063,6 +1073,7 @@ function applyState(
   instr: Instrument,
   state: SynthState,
 ): boolean {
+  void instr;
   const vi = core.virt.mapChannel(chn);
   const v: VoiceState | null = vi >= 0 ? (core.virt.voices[vi] ?? null) : null;
 
@@ -1098,23 +1109,26 @@ function applyState(
       period += Math.trunc((state.medVibratoValue * state.medVibratoDepth) / 64);
     }
 
-    // FC pitch + vibrato (InstrumentSynth.cpp:505-535).
+    // FC pitch + vibrato (InstrumentSynth.cpp:505-535). C reads
+    // instr->NoteMap[fcNote] via GetPeriodFromNote(..., chn.nC5Speed);
+    // nLastNote is the played OpenMPT note.
+    const noteMap = core.module!.extras?.kind === 'fc' ? core.module!.extras.noteMap : null;
     const vibratoFc = state.fcVibratoValue - state.fcVibratoDepth;
     const doVibratoFc = vibratoFc !== 0 && state.fcVibratoDelay < 1;
-    if (state.fcPitch !== 0 || doVibratoFc) {
-      const lastNote = xc.note - 12; // OpenMPT note (nLastNote)
+    if ((state.fcPitch !== 0 || doVibratoFc) && noteMap) {
+      // xc.note is the 0-based played note; C nLastNote = xc.note + 1.
+      // fcNote = (fcPitch + nLastNote - NOTE_MIN) & 0x7f = fcPitch + xc.note.
+      const lastNote = xc.note;
       let fcNote: number;
       if (state.fcPitch >= 0) {
-        fcNote = (state.fcPitch + lastNote - 1) & 0x7f;
+        fcNote = (state.fcPitch + lastNote) & 0x7f;
       } else {
         fcNote = state.fcPitch & 0x7f;
       }
-      if (state.fcPitch !== 0 && lastNote >= 1 && lastNote <= 128) {
-        const mapped = instr.map[fcNote] ?? 0;
-        const base = instr.map[(lastNote - 1) & 0x7f] ?? 0;
-        if (mapped > 0 && base > 0) {
-          period += notePeriod(core, mapped) - notePeriod(core, base);
-        }
+      if (state.fcPitch !== 0 && lastNote >= 0 && lastNote <= 127) {
+        const p1 = notePeriod(core, noteMap[fcNote] ?? 0);
+        const p2 = notePeriod(core, noteMap[lastNote] ?? 0);
+        period += p1 - p2;
       }
       if (doVibratoFc) {
         let note = fcNote * 2 + 160;
@@ -1188,3 +1202,9 @@ export function setModEventReader(fn: (core: Core, chn: number, row: number) => 
   modReadEvent = fn;
 }
 
+
+/** A voice is actively producing audio (current sample bound and not
+ *  paused/exhausted). */
+function voiceIsActive(v: VoiceState): boolean {
+  return (v.flags & 0x40) === 0; // ~VoiceFlag.SAMPLE_PAUSED
+}

@@ -12,7 +12,6 @@
 // it verbatim.
 
 import type {
-  ChannelState,
   Core,
   Event,
   Instrument,
@@ -553,10 +552,15 @@ export function channelSetSample(
   if (smpIndex0 < 0 || smpIndex0 >= mod.samples.length) return;
   const vi = core.virt.mapChannel(chn);
   const v: VoiceState | null = vi >= 0 ? core.virt.voices[vi] ?? null : null;
-  const channelIsActive = v !== null && v!.smp >= 0 && v!.end > v!.start && v!.smp >= 0 && sampleExists(core, v!.smp) && voiceLength(v!) > 0;
-  // kMODSampleSwap: defer the swap to the end of the running loop.
+  const channelIsActive =
+    v !== null && v.smp >= 0 && sampleExists(core, v.smp) && voiceLength(v) > 0;
+  // kMODSampleSwap: defer the swap to the end of the running loop
+  // (C chn.swapSampleIndex → mixer swaps at loop end WITHOUT a
+  // retrigger). queuePatch is exactly that: it queues the sample and
+  // the mixer hot-swaps it when the current loop finishes.
   if (channelIsActive && swapAtEnd) {
-    state.swapSampleIndex = smpIndex0 + 1; // C SAMPLEINDEX is 1-based
+    core.virt.queuePatch(chn, v !== null ? v.ins : -1, smpIndex0, 0);
+    state.swapSampleIndex = smpIndex0 + 1; // bookkeeping for the idle case
     return;
   }
   // Direct binding (swapAtEnd false or channel inactive): bind like C —
@@ -663,8 +667,11 @@ export function synthStateNextTick(
   handleFtmInterrupt(state, 'ftmVolumeDownJump', ev.fxt === 0x86);
   handleFtmInterrupt(state, 'ftmPortamentoJump', ev.fxt === 0x87);
 
-  // FC volume bend + step timing (InstrumentSynth.cpp:285-338).
-  if (!handleFcVolumeBend(state, false) && state.stepSpeed !== 0 && state.stepsRemain === 0) {
+  // FC volume bend + step timing (InstrumentSynth.cpp:285-338). C's
+  // `!m_stepsRemain--` tests zero AND post-decrements every tick.
+  const stepsWasZero = state.stepsRemain === 0;
+  if (state.stepsRemain !== 0) state.stepsRemain--;  // post-decrement side effect (0 → -1 wrap impossible: unsigned)
+  if (!handleFcVolumeBend(state, false) && state.stepSpeed !== 0 && stepsWasZero) {
     // Yep, MED executes this before a potential SPD command may change the
     // step speed on this very row...
     state.stepsRemain = state.stepSpeed - 1;
@@ -1367,127 +1374,10 @@ export interface SynthApplied {
   fcVibratoDelay: number;
 }
 
-export function synthApplyChannelState(
-  core: Core,
-  state: SynthState,
-  xc: ChannelState,
-): SynthApplied | null {
-  const mod = core.module!;
-  const instr = xc.ins >= 0 ? mod.instruments[xc.ins] : null;
-  if (!instr) return null;
+// (synthApplyChannelState removed — fc.ts owns ApplyChannelState.)
 
-  // Compute the final period add exactly like C.
-  const period = xc.period;
-  let periodAdd = state.periodAdd;
-
-  // MED/FTM frequency slides (C: m_periodFreqSlide → DoFreqSlide).
-  if (state.periodFreqSlide !== 0) {
-    // DoFreqSlide(chn, period, m_periodFreqSlide) — MOD (non-linear):
-    // period -= amount
-    periodAdd += -state.periodFreqSlide;
-  }
-
-  if (state.linearPitchFactor !== 0) {
-    // ApplyLinearPitchSlide: target = muldivr(period, table[amount], 65536)
-    // then period = target - period (delta form for our period-add path).
-    const target = applyLinearPitchSlide(period, state.linearPitchFactor, false);
-    periodAdd += target - period;
-  }
-
-  // MED vibrato (C: period += m_medVibratoValue * m_medVibratoDepth / 64).
-  if (state.medVibratoDepth !== 0) {
-    periodAdd += Math.trunc((state.medVibratoValue * state.medVibratoDepth) / 64);
-  }
-
-  // Future Composer pitch/vibrato (C: InstrumentSynth.cpp:505-535).
-  const vibratoFc = state.fcVibratoValue - state.fcVibratoDepth;
-  const doVibratoFc = vibratoFc !== 0 && state.fcVibratoDelay < 1;
-  if (state.fcPitch !== 0 || doVibratoFc) {
-    const lastNote = xc.note;
-    let fcNote: number;
-    if (state.fcPitch >= 0) {
-      fcNote = (state.fcPitch + lastNote - 13) & 0x7f; // NOTE_MIN = 13
-    } else {
-      fcNote = state.fcPitch & 0x7f;
-    }
-    if (state.fcPitch !== 0 && isNote(lastNote) && instr) {
-      const p1 = modPeriodFromNote(core, instr, fcNote);
-      const p2 = modPeriodFromNote(core, instr, (lastNote - 13) & 0x7f);
-      periodAdd += p1 - p2;
-    }
-    if (doVibratoFc) {
-      let note = fcNote * 2 + 160;
-      let vf = vibratoFc;
-      while (note < 256) {
-        vf *= 2;
-        note += 24;
-      }
-      periodAdd += vf * 4;
-    }
-  }
-
-  const tremorMute = (state.flags & FcSynthFlags.kGTKTremorMute) !== 0 &&
-    (state.flags & FcSynthFlags.kGTKTremorEnabled) !== 0;
-
-  return {
-    volume: state.volumeFactor,
-    volumeAdd: state.volumeAdd,
-    panning: state.panning,
-    periodAdd,
-    periodFreqSlide: state.periodFreqSlide,
-    linearPitchFactor: state.linearPitchFactor,
-    ftmDetune: state.ftmDetune,
-    tremorMute,
-    fcPitch: state.fcPitch,
-    fcVibratoValue: state.fcVibratoValue,
-    fcVibratoDepth: state.fcVibratoDepth,
-    fcVibratoDelay: state.fcVibratoDelay,
-  };
-}
-
-/** modPeriodFromNote — CSoundFile::GetPeriodFromNote for MOD_TYPE_MOD
- *  (Snd_fx.cpp:6488-6492): 8363 * FreqS3MTable[note%12] << 5 / (c5spd << note/12). */
-function modPeriodFromNote(core: Core, instr: Instrument, note: number): number {
-  const FREQ_S3M_TABLE = [1712, 1616, 1524, 1440, 1356, 1280, 1208, 1140, 1076, 1016, 960, 907];
-  if (note < 0) return 0;
-  const midSmp = instr.map[60] ?? 0;
-  const smp = midSmp >= 0 && midSmp < core.module!.samples.length
-    ? core.getSample(midSmp)
-    : null;
-  const c5Speed = smp?.c5spd ?? 8363;
-  if (!c5Speed) c5Speed === 0 && void 0;
-  const idx = note % 12;
-  const oct = Math.floor(note / 12);
-  return Math.trunc((8363 * (FREQ_S3M_TABLE[idx]! << 5)) / (c5Speed << oct));
-}
-
-/** ApplyLinearPitchSlide (InstrumentSynth.cpp:120-135) — delta form. */
-function applyLinearPitchSlide(target: number, totalAmount: number, periodsAreFrequencies: boolean): number {
-  // LinearSlideUpTable/DownTable (Tables.cpp:4-84): 257-entry 1/65536 tables.
-  const up = LINEAR_SLIDE_UP_TABLE;
-  const down = LINEAR_SLIDE_DOWN_TABLE;
-  const table = (periodsAreFrequencies !== totalAmount < 0) ? up : down;
-  let value = Math.abs(totalAmount);
-  let t = target;
-  while (value > 0) {
-    const amount = Math.min(value, table.length - 1);
-    t = muldivr(t, table[amount]!, 65536);
-    value -= amount;
-  }
-  return t;
-}
-
-function muldivr(a: number, b: number, c: number): number {
-  // Util::muldivr: (a*b + c/2) / c with rounding away from zero for negatives.
-  const prod = a * b;
-  const r = c >> 1;
-  if (prod >= 0) return Math.trunc((prod + r) / c);
-  return Math.trunc((prod - r) / c);
-}
 
 import {
-  LINEAR_SLIDE_UP_TABLE,
-  LINEAR_SLIDE_DOWN_TABLE,
   IT_SINUS_TABLE,
 } from './linearTables.js';
 
