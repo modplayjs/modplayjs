@@ -20,6 +20,16 @@ export interface StreamedSource {
 export type StreamedFormat = 'wav' | 'mp3' | 'ogg';
 
 export function detectStreamedFormat(bytes: Uint8Array, name?: string): StreamedFormat | null {
+  // Tracker modules misnamed .wav/.mp3 in keygen packs: sniff the module
+  // magics first (XM 'Extended Module: ', 31-sample MOD 'M.K.' at 1080,
+  // IT 'IMPM', S3M 'SCRM' at 0x1c44-ish, MO3).
+  if (bytes.length > 38 && bytes[0] === 0x45 && bytes[1] === 0x78 && bytes[2] === 0x74 && bytes[3] === 0x65) return null; // 'Exte' = XM
+  if (bytes.length > 1084) {
+    const mk = String.fromCharCode(bytes[1080]!, bytes[1081]!, bytes[1082]!, bytes[1083]!);
+    if (mk === 'M.K.' || mk === 'M!K!' || mk === '4CHN' || mk === '6CHN' || mk === '8CHN' || mk === 'FLT4' || mk === 'FLT8') return null; // MOD family
+  }
+  if (bytes.length > 4 && bytes[0] === 0x49 && bytes[1] === 0x4d && bytes[2] === 0x50 && bytes[3] === 0x4d) return null; // IMPM = IT
+  if (bytes.length > 8 && bytes[0] === 0x4d && bytes[1] === 0x4f && bytes[2] === 0x33) return null; // MO3
   if (bytes.length > 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) return 'wav';
   if (bytes.length > 4 && bytes[0] === 0x4f && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) return 'ogg';
   if (bytes.length > 2 && bytes[0] === 0xff && (bytes[1]! & 0xe0) === 0xe0) return 'mp3';
