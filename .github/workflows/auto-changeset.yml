@@ -1,7 +1,8 @@
 name: Auto changeset
 
 # Generates changeset files automatically so the release workflow can
-# pick them up. Triggers on both PRs and direct pushes to main.
+# pick them up. Triggers on both PRs and direct pushes to main (plus a
+# manual workflow_dispatch for reruns).
 #
 #   PR title / commit message              → changeset
 #   ─────────────────────────────────────────────────────────────
@@ -10,9 +11,13 @@ name: Auto changeset
 #   "fix: …", "chore: …", anything else    → patch
 #
 # Packages are detected from the changed files. On PRs the changeset is
-# pushed to the PR branch; on direct pushes it's committed to main.
-# The release workflow picks up pending changesets when you merge the
-# auto-generated "chore: version packages" PR.
+# pushed to the PR branch; on direct pushes it covers ALL commits since
+# the last changeset run (the previous "chore(changeset):" commit), so a
+# multi-commit push gets one changeset listing every touched package at
+# the highest bump level found in the range. A push that introduces a new
+# publishable package bumps it at least minor. The release workflow picks
+# up pending changesets when you merge the auto-generated
+# "chore: version packages" PR.
 
 on:
   push:
@@ -21,6 +26,7 @@ on:
       - '.changeset/**'
       - '.github/**'
       - '**/*.md'
+  workflow_dispatch:
   pull_request_target:
     types: [opened, synchronize, reopened]
 
@@ -42,7 +48,8 @@ jobs:
        github.event.pull_request.base.ref == 'main' &&
        github.event.pull_request.head.ref != 'chore/version-packages') ||
       (github.event_name == 'push' &&
-       !startsWith(github.event.head_commit.message, 'chore: version packages'))
+       !startsWith(github.event.head_commit.message, 'chore: version packages')) ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -63,7 +70,11 @@ jobs:
           PR_TITLE: ${{ github.event.head_commit.message || github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_USER: ${{ github.event.pull_request.user.login || github.event.pusher.name }}
-          IS_PUSH: ${{ github.event_name == 'push' }}
+          IS_PUSH: ${{ github.event_name != 'pull_request_target' }}
+          PUSH_BEFORE: ${{ github.event_name == 'push' && github.event.before || '' }}
+          # workflow_dispatch rerun (IS_PUSH=1 with no push payload): force
+          # the grep fallback by pretending there is no "before" SHA.
+          FORCE_RANGE_MODE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
         run: |
           set -eu
           node <<'JSEOF'
@@ -71,6 +82,8 @@ jobs:
           const { execSync } = require('child_process');
 
           const isPush = process.env.IS_PUSH === 'true';
+          const pushBefore = process.env.PUSH_BEFORE || '';
+          const forceRange = process.env.FORCE_RANGE_MODE === '1';
           const title = isPush
             ? (process.env.COMMIT_TITLE || '')
             : (process.env.PR_TITLE || '');
@@ -78,21 +91,53 @@ jobs:
           const pr = process.env.PR_NUMBER || '';
           const user = process.env.PR_USER || 'unknown';
 
-          // For direct pushes, use the last commit message as the title.
-          const msg = isPush
-            ? require('child_process').execSync('git log -1 --pretty=%s').toString().trim()
-            : title;
+          // Range anchor for direct pushes: prefer the SHA just before the
+          // push (github.event.before), which covers exactly this push. If
+          // unavailable (workflow_dispatch rerun, or force-push where the
+          // "before" SHA is all zeros), fall back to the newest
+          // "chore(changeset): auto-generated from push" commit in history —
+          // i.e. everything since the last successful changeset run.
+          let base = forceRange ? '' : pushBefore;
+          if (isPush && (!base || /^0+$/.test(base))) {
+            base = require('child_process')
+              .execSync("git log --format=%H --grep='^chore(changeset): auto-generated from push' -1")
+              .toString().trim();
+          }
+          if (!isPush) base = '';
 
-          // bump level from conventional-commit message
+          // For direct pushes, cover every commit in the range — not just
+          // HEAD — so multi-commit pushes don't lose changesets.
+          let msgs = [];
+          if (isPush) {
+            const range = `${base}..HEAD`;
+            msgs = require('child_process')
+              .execSync(`git log --format=%s ${range}`)
+              .toString().split('\n').filter(Boolean);
+            if (msgs.length === 0) msgs = [require('child_process')
+              .execSync('git log -1 --pretty=%s').toString().trim()];
+          } else {
+            msgs = [title];
+          }
+          // "PR title" for pushes: the range's oldest non-chore commit
+          // subject (the headline change of the push; msgs is newest-first).
+          const summary = (msgs.slice().reverse().find(m => !/^chore(\(|:)/.test(m)) || msgs[0])
+            .replace(/^\w+(\([^)]*\))?!?:\s*/, '') || msgs[0];
+
+          // Bump level from conventional-commit messages: the highest level
+          // found anywhere in the range wins.
           let level = 'patch';
-          if (/^feat!|^fix!|BREAKING CHANGE/.test(msg + '\n' + body) || /!:\s/.test(msg)) level = 'major';
-          else if (/^feat(\(|:| )/.test(msg)) level = 'minor';
+          for (const m of msgs) {
+            if (/^feat!|^fix!|BREAKING CHANGE/.test(m) || /!:\s/.test(m)) { level = 'major'; break; }
+            if (/^feat(\(|:| )/.test(m)) level = 'minor';
+          }
 
-          // For PRs: packages from the PR diff. For pushes: packages from the
-          // commit diff (files changed in the pushed commit).
+          // For PRs: packages from the PR diff. For pushes: packages from
+          // the full commit range (files changed anywhere since the last
+          // changeset run).
           let dirs;
           if (isPush) {
-            const files = execSync('git diff --name-only HEAD~1 HEAD', { encoding: 'utf8' }).split('\n');
+            const range = `${base}..HEAD`;
+            const files = execSync(`git diff --name-only ${range}`, { encoding: 'utf8' }).split('\n');
             dirs = [...new Set(files.map(l => l.match(/^packages\/([^/]+)\//)?.[1]).filter(Boolean))];
           } else {
             const files = execSync(`gh pr diff ${pr} --name-only`, { encoding: 'utf8' }).split('\n');
@@ -112,7 +157,22 @@ jobs:
             process.exit(0);
           }
 
-          const summary = msg.replace(/^\w+(\([^)]*\))?!?:\s*/, '') || msg;
+          // "PR title" for pushes: the range's oldest non-chore commit
+          // subject (the headline change of the push; msgs is newest-first).
+          // Changeset body for pushes: a bullet per non-chore commit in the
+          // range (newest last), so multi-commit pushes are fully described.
+          let text;
+          if (isPush) {
+            const lines = msgs
+              .filter(m => !/^chore(\(|:)/.test(m))
+              .reverse()
+              .map(m => m.replace(/^\w+(\([^)]*\))?!?:\s*/, ''));
+            text = (lines.length ? lines : [msg])
+              .map(l => `- ${l} (${isPush ? 'direct push' : `PR #${pr}`})`)
+              .join('\n');
+          } else {
+            text = `${summary} (PR #${pr})`;
+          }
           const frontmatter = pkgs.map(p => `'${p}': ${level}`).join('\n');
           const name = isPush ? `push-${Date.now()}` : `auto-pr-${pr}`;
           const author = process.env.PR_USER || 'bitti09';
@@ -120,7 +180,7 @@ jobs:
           // "Thanks @<author>!" from the commit author, so the changeset
           // body stays free of redundant credit text.
           fs.writeFileSync(`.changeset/auto-${isPush ? 'push' : 'pr'}-${isPush ? Date.now() : pr}.md`,
-            `---\n${frontmatter}\n---\n\n${summary} (${isPush ? 'direct push' : `PR #${pr}`})\n`);
+            `---\n${frontmatter}\n---\n\n${text}\n`);
           console.log('changeset:', level, '→', pkgs.join(', '));
           JSEOF
           ls .changeset/
