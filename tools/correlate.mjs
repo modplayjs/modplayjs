@@ -62,8 +62,8 @@ mkdirSync(outDir, { recursive: true });
 const base = basename(file);
 const name = base.replace(/\.[^.]+$/, '');
 const ext = (base.match(/\.[^.]+$/) || [''])[0].toLowerCase();
-if (!['.mod', '.s3m', '.xm', '.it', '.mo3', '.fc13', '.fc14', '.smod'].includes(ext)) {
-  console.error(`unsupported extension ${ext} (need .mod/.s3m/.xm/.it)`);
+if (!['.mod', '.s3m', '.xm', '.it', '.mtm', '.stm', '.669', '.sfx', '.digi', '.asylum', '.ice', '.med', '.mmd1', '.mmd2', '.mmd3', '.mmdc', '.mo3', '.fc13', '.fc14', '.smod'].includes(ext)) {
+  console.error(`unsupported extension ${ext} (need .mod/.s3m/.xm/.it/mtm/stm/669/sfx/digi/asylum/ice)`);
   process.exit(2);
 }
 
@@ -90,7 +90,7 @@ const oursWav = resolve(outDir, `${name}-ours-48k.wav`);
 {
   const script = `
 import { readFileSync, writeFileSync } from 'fs';
-import { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, stPlugin, mo3Plugin, fcPlugin, fcEffect, createSoftMixerPlugin, encodeWavStereo } from ${JSON.stringify(ourBundle)};
+import { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, stPlugin, mtmPlugin, stmPlugin, s69Plugin, sfxPlugin, digiPlugin, asylumPlugin, icePlugin, medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin, mo3Plugin, fcPlugin, fcEffect, createSoftMixerPlugin, encodeWavStereo } from ${JSON.stringify(ourBundle)};
 const core = new CorePlayer();
 core.registries.registerFormat(modPlugin);
 core.registries.registerFormat(hmnPlugin);
@@ -100,6 +100,18 @@ core.registries.registerFormat(s3mPlugin);
 core.registries.registerFormat(xmPlugin);
 core.registries.registerFormat(itPlugin);
 core.registries.registerFormat(stPlugin);
+core.registries.registerFormat(mtmPlugin);
+core.registries.registerFormat(stmPlugin);
+core.registries.registerFormat(s69Plugin);
+core.registries.registerFormat(sfxPlugin);
+core.registries.registerFormat(digiPlugin);
+core.registries.registerFormat(asylumPlugin);
+core.registries.registerFormat(icePlugin);
+core.registries.registerFormat(medPlugin);
+core.registries.registerFormat(mmd3Plugin);
+core.registries.registerFormat(med2Plugin);
+core.registries.registerFormat(med3Plugin);
+core.registries.registerFormat(med4Plugin);
 core.registries.registerFormat(mo3Plugin);
 core.registries.registerFormat(fcPlugin);
 core.registries.registerEffect(fcEffect);
