@@ -33,6 +33,7 @@ import {
   SampleFlags,
 } from '@modplayjs/core';
 import {
+  setSiblingStatesAccessor,
   SynthEventType,
   SynthState,
   synthStateNextTick,
@@ -888,6 +889,8 @@ interface FcChannelExtras {
   /** C: TonePortamentoWithDuration state. */
   portaDurationActive: boolean;
   portamentoSlide: number;
+  /** C chn.nPortamentoDest — the target period of the running slide. */
+  portaDestPeriod: number;
 }
 
 const fcChannelState: FcChannelExtras[] = [];
@@ -905,11 +908,19 @@ function getChannelExtras(core: Core, chn: number): FcChannelExtras {
       fcPortaParam: 0,
       portaDurationActive: false,
       portamentoSlide: 0,
+      portaDestPeriod: 0,
     };
     fcChannelState[chn] = st;
   }
   return st;
 }
+
+// Wire the sibling-state accessor so FTM detune / MED_JumpScript /
+// FTM_CloneTrack can reach sibling script states (synth.ts).
+setSiblingStatesAccessor(0, (channel) => fcChannelState[channel] ?? null);
+setSiblingStatesAccessor(1, (channel) => fcChannelState[channel] ?? null);
+setSiblingStatesAccessor(2, (channel) => fcChannelState[channel] ?? null);
+setSiblingStatesAccessor(3, (channel) => fcChannelState[channel] ?? null);
 
 // ---------------------------------------------------------------------------
 // Effect plugin (drives the synth engine per tick)
@@ -949,17 +960,33 @@ export const fcEffect: EffectPlugin = {
       for (const s of st.states) s.reconstruct();
     }
 
-    // CMD_TONEPORTA_DURATION (Snd_fx.cpp:1284-1287 + :4535-4560):
-    if (ev.fxt === FX_FC_TONEPORTA_DURATION) {
-      if (ev.note > 0) {
-        st.portaDurationActive = ev.fxp !== 0;
-        if (ev.fxp === 0) {
-          // chn.nPeriod = chn.nPortamentoDest
-        } else {
-          const xc = core.ctx.channelStates[chn]!;
-          const speed = core.ctx.p.speed;
-          st.portamentoSlide = Math.trunc((Math.abs(xc.note - (xc.note)) * 64) / (speed * ev.fxp)) || 1;
-        }
+    // C autoSlide(0) per-tick semantics (Snd_fx.cpp:201 → :4687-4696): a
+    // new note on a row WITHOUT the duration effect snaps the period to
+    // the old destination and deactivates the slide.
+    if (st.portaDurationActive && ev.note > 0 && ev.fxt !== FX_FC_TONEPORTA_DURATION) {
+      const xc0 = core.ctx.channelStates[chn]!;
+      if (st.portaDestPeriod !== 0) xc0.period = st.portaDestPeriod;
+      st.portaDurationActive = false;
+      st.portaDestPeriod = 0;
+    }
+
+    // CMD_TONEPORTA_DURATION (Snd_fx.cpp:1284-1287 → :4686-4725): prepare
+    // the auto-slide toward the new note's period over `param` rows.
+    if (ev.fxt === FX_FC_TONEPORTA_DURATION && ev.note > 0) {
+      const xc = core.ctx.channelStates[chn]!;
+      st.portaDurationActive = ev.fxp !== 0;
+      if (ev.fxp === 0) {
+        // chn.nPeriod = chn.nPortamentoDest (the new note's period)
+        xc.period = notePeriod(core, ev.note);
+        st.portamentoSlide = 0;
+      } else {
+        const speed = core.ctx.p.speed;
+        const sourceNote = noteFromPeriod(core, xc.period);
+        // Util::muldivr_unsigned(|rowNote - sourceNote|, 64, speed * param)
+        const num = Math.abs(ev.note - sourceNote) * 64;
+        const den = speed * ev.fxp;
+        st.portamentoSlide = den > 0 ? Math.trunc((num + den / 2) / den) : 0;
+        st.portaDestPeriod = notePeriod(core, ev.note);
       }
     }
 
@@ -1015,6 +1042,29 @@ export const fcEffect: EffectPlugin = {
     const xc = core.ctx.channelStates[chn]!;
     const instr = xc.ins >= 0 ? mod.instruments[xc.ins] : null;
     if (!instr) return;
+
+    const vi = core.virt.mapChannel(chn);
+    const v2: VoiceState | null = vi >= 0 ? core.virt.voices[vi] ?? null : null;
+
+    // TonePortamentoWithDuration run phase (Snd_fx.cpp:200-202 →
+    // :4704-4723): slide the period toward nPortamentoDest each tick.
+    if (st.portaDurationActive && st.portaDestPeriod !== 0 && v2 !== null) {
+      const dest = st.portaDestPeriod;
+      const delta = st.portamentoSlide;
+      if (v2.period < dest) {
+        v2.period += delta;
+        if (v2.period >= dest) {
+          v2.period = dest;
+          st.portaDestPeriod = 0;
+        }
+      } else if (v2.period > dest) {
+        v2.period -= delta;
+        if (v2.period <= dest) {
+          v2.period = dest;
+          st.portaDestPeriod = 0;
+        }
+      }
+    }
 
     // PortamentoFC (Sndmix.cpp:4017-4019 → Snd_fx.cpp:4151-4159):
     if (st.fcPortaActive) {
@@ -1150,6 +1200,21 @@ function applyState(
   }
 
   return true;
+}
+
+/** C GetNoteFromPeriod for MOD: binary search the note whose
+ *  GetPeriodFromNote equals `period` (Snd_fx.cpp:6429-6460). */
+function noteFromPeriod(core: Core, period: number): number {
+  if (!period) return 0;
+  let minNote = 1, maxNote = 120;
+  while (minNote <= maxNote) {
+    const mid = (minNote + maxNote) >> 1;
+    const p = notePeriod(core, mid);
+    if (p > period) minNote = mid + 1;
+    else if (p < period) maxNote = mid - 1;
+    else return mid;
+  }
+  return (minNote + maxNote) >> 1;
 }
 
 function notePeriod(core: Core, openmptNote: number): number {

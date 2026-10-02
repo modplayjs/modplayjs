@@ -18,7 +18,6 @@ import type {
   ModuleData,
 } from '@modplayjs/core';
 import { NoteFlag } from '@modplayjs/core';
-import { noteToPeriod, PeriodType, PERIOD_BASE } from '@modplayjs/core';
 
 /** Event::Type (InstrumentSynth.h:37-113). Kept as a numeric enum with the
  *  exact C++ names. */
@@ -940,6 +939,28 @@ function translateGt2Pitch(pitch: number): number {
 // EvaluateEvent (InstrumentSynth.cpp:556-966) — the full event set.
 // ---------------------------------------------------------------------------
 
+/** Sibling-state accessor: the per-channel SynthStates collection lives in
+ *  fc.ts (fcChannelState); FTM detune and MED_JumpScript need to reach
+ *  SIBLING script states, so fc.ts registers a getter here. */
+export type SiblingStates = {
+  states: SynthState[];
+  scripts: readonly (readonly SynthEvent[])[] | null;
+  /** C chn.swapSampleIndex (kMODSampleSwap bookkeeping). */
+  swapSampleIndex?: number;
+  fcPortaActive?: boolean;
+  fcPortaParam?: number;
+  fcPortaTick?: boolean;
+  portaDurationActive?: boolean;
+  portamentoSlide?: number;
+};
+const siblingStatesAccessors: Array<((channel: number) => SiblingStates | null) | null> = [];
+export function setSiblingStatesAccessor(channel: number, fn: (channel: number) => SiblingStates | null): void {
+  siblingStatesAccessors[channel] = fn;
+}
+export function getSiblingStates(channel: number): SiblingStates | null {
+  return siblingStatesAccessors[channel]?.(channel) ?? null;
+}
+
 function evaluateEvent(
   core: Core,
   channel: number,
@@ -1129,9 +1150,16 @@ function evaluateEvent(
       return false;
     }
     case SynthEventType.MED_JumpScript: {
-      // Cross-script jump — handled by the caller engine (needs sibling
-      // states); FC doesn't emit it. Implemented for completeness when the
-      // engine has access to sibling states.
+      // Cross-script jump (InstrumentSynth.cpp:700-706): jump the given
+      // sibling script's state to the JumpMarker with the requested
+      // position and clear its step counter.
+      const sib = getSiblingStates(channel);
+      if (sib?.scripts && event.u8 < sib.states.length && event.u8 < sib.scripts.length) {
+        const targetState = sib.states[event.u8]!;
+        const script = sib.scripts[event.u8]!;
+        targetState.jumpToPosition(script, event.u16);
+        targetState.stepsRemain = 0;
+      }
       return false;
     }
     case SynthEventType.MED_SetEnvelope:
@@ -1218,11 +1246,20 @@ function evaluateEvent(
       xc.period = ftmPitchToPeriod(event.u16 * 2, core, channel);
       return false;
     case SynthEventType.FTM_SetDetune:
-      // Detune always applies to the first channel of a channel pair.
-      state.ftmDetune = satI16(event.u16 * -8);
+      // Detune always applies to the first channel of a channel pair
+      // (states.states[channel & ~1], InstrumentSynth.cpp:796-800).
+      {
+        const sib = getSiblingStates(channel);
+        const target = sib ? sib.states[channel & ~1] ?? state : state;
+        target.ftmDetune = satI16(event.u16 * -8);
+      }
       return false;
     case SynthEventType.FTM_AddDetune:
-      state.ftmDetune = satI16(state.ftmDetune - ((event.u16 << 16) >> 16) * 8);
+      {
+        const sib = getSiblingStates(channel);
+        const target = sib ? sib.states[channel & ~1] ?? state : state;
+        target.ftmDetune = satI16(target.ftmDetune - ((event.u16 << 16) >> 16) * 8);
+      }
       return false;
     case SynthEventType.FTM_AddPitch:
       if (((event.u16 << 16) >> 16) !== 0) {
@@ -1263,10 +1300,89 @@ function evaluateEvent(
       return false;
     }
     case SynthEventType.FTM_SetOneshotLength:
+      // InstrumentSynth.cpp:817-835.
+      {
+        const v = voiceAt(core, channel);
+        const smp = v !== null && v.smp >= 0 ? core.getSample(v.smp) : null;
+        if (smp && v !== null) {
+          const loopLength = smp.loopEnd - smp.loopStart;
+          let loopStart = event.u16 * 2;
+          if (event.u8 === 1) loopStart += smp.loopStart;
+          else if (event.u8 === 2) loopStart = smp.loopStart - loopStart;
+          loopStart = clamp(loopStart, 0, smp.length);
+          smp.loopStart = loopStart;
+          smp.loopEnd = Math.min(smp.loopStart + loopLength, smp.length);
+          // chn.nLength = chn.nLoopEnd — the voice's end tracks the loop.
+          const looped = smp.loopEnd > smp.loopStart;
+          if (v.pos >= smp.loopEnd && looped) v.pos = smp.loopStart;
+          if (looped) {
+            v.start = smp.loopStart;
+            v.end = smp.loopEnd;
+          } else {
+            v.end = smp.length;
+          }
+        }
+      }
+      return false;
     case SynthEventType.FTM_SetRepeatLength:
+      // InstrumentSynth.cpp:836-851.
+      {
+        const v = voiceAt(core, channel);
+        const smp = v !== null && v.smp >= 0 ? core.getSample(v.smp) : null;
+        if (smp && v !== null) {
+          let loopEnd = smp.loopStart + event.u16 * 2;
+          if (event.u8 === 1) loopEnd = smp.loopEnd + event.u16 * 2;
+          else if (event.u8 === 2) loopEnd = smp.loopEnd - event.u16 * 2;
+          loopEnd = clamp(loopEnd, smp.loopStart, smp.length);
+          smp.loopEnd = loopEnd;
+          const looped = smp.loopEnd > smp.loopStart;
+          if (v.pos >= smp.loopEnd && looped) v.pos = smp.loopStart;
+          if (looped) {
+            v.start = smp.loopStart;
+            v.end = smp.loopEnd;
+          } else {
+            v.end = smp.length;
+          }
+        }
+      }
+      return false;
     case SynthEventType.FTM_CloneTrack:
-      // FTM-only events (not exercised by FC); ported per C when the
-      // Face The Music loader lands.
+      // InstrumentSynth.cpp:852-900.
+      if (event.byte1 < core.module!.chn) {
+        const srcXc = core.ctx.channelStates[event.byte1]!;
+        const srcVi = core.virt.mapChannel(event.byte1);
+        const srcV: VoiceState | null = srcVi >= 0 ? core.virt.voices[srcVi] ?? null : null;
+        if ((event.byte2 & (0x01 | 0x08)) !== 0) {
+          xc.period = srcXc.period;
+        }
+        if ((event.byte2 & (0x02 | 0x08)) !== 0) {
+          xc.volume = srcXc.volume;
+        }
+        if ((event.byte2 & (0x04 | 0x08)) !== 0 && srcV !== null) {
+          const dstV = voiceAt(core, channel);
+          if (dstV !== null) {
+            dstV.ins = srcV.ins;
+            dstV.smp = srcV.smp;
+            dstV.pos = srcV.pos;
+            dstV.start = srcV.start;
+            dstV.end = srcV.end;
+          }
+        }
+        if ((event.byte2 & 0x08) !== 0) {
+          // Copies the running slide command state (C copies
+          // autoSlide toneporta/volumedown activity + slides).
+          const dstFc = getSiblingStates(channel);
+          const srcFc = getSiblingStates(event.byte1);
+          if (dstFc && srcFc) {
+            dstFc.fcPortaActive = srcFc.fcPortaActive;
+            dstFc.fcPortaParam = srcFc.fcPortaParam;
+            dstFc.fcPortaTick = srcFc.fcPortaTick;
+            dstFc.portaDurationActive = srcFc.portaDurationActive;
+            dstFc.portamentoSlide = srcFc.portamentoSlide;
+            dstFc.swapSampleIndex = srcFc.swapSampleIndex;
+          }
+        }
+      }
       return false;
     case SynthEventType.FTM_StartLFO: {
       const lfo = state.ftmLfo[event.u8 & 3]!;
@@ -1418,17 +1534,17 @@ function voiceAt(core: Core, chn: number): VoiceState | null {
 }
 
 /** FTM pitch (Face The Music) → period, for FTM_SetCondition. */
-function ftmPitchToPeriod(pitch: number, core: Core, chn: number): number {
-  void chn;
-  // C TranslateFTMPitch (Snd_fx.cpp:5879-5897): period =
-  //   8363*2^((pitch - 0x21E) / 4096 / 12)? — ported literally:
-  //   return GetPeriodFromNote(TranslateFTMPitchToNote(...)); The FTM events
-  //   are not exercised by FC; keep the sine-based placeholder exact enough:
-  const freq = 440.0 * Math.pow(2, (pitch - 8192) / 4096);
-  const mod = core.module!;
-  const periodType = mod.periodType;
-  return noteToPeriod(periodType, Math.trunc(69 + 12 * Math.log2(freq / 440)), 0, 1) +
-    (PeriodType.AMIGA === periodType ? PERIOD_BASE : 0);
+function ftmPitchToPeriod(pitch: number, _core: Core, _chn: number): number {
+  void _core; void _chn;
+  // C TranslateFTMPitch (InstrumentSynth.cpp:134-140):
+  //   period = GetPeriodFromNote(NOTE_MIDDLEC - 12 + pitch/16, fineTune, c5spd);
+  //   DoFreqSlide(chn, period, (pitch % 16) * 4);  → MOD: period -= amount.
+  const FREQ_S3M = [1712, 1616, 1524, 1440, 1356, 1280, 1208, 1140, 1076, 1016, 960, 907];
+  const note = 61 - 12 + Math.floor(pitch / 16); // NOTE_MIDDLEC=61
+  const idx = note % 12, oct = Math.floor(note / 12);
+  const c5Speed = 8363;
+  let period = Math.trunc((c5Speed * (FREQ_S3M[idx]! << 5)) / (c5Speed << oct));
+  // DoFreqSlide for MOD (non-linear, no PeriodsAreHertz): period -= amount.
+  period -= (pitch % 16) * 4;
+  return period < 1 ? 1 : period;
 }
-
-void PERIOD_BASE;
