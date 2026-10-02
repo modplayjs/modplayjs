@@ -1,7 +1,7 @@
 {
-  "name": "@modplayjs/fmt-mo3",
+  "name": "@modplayjs/stream-audio",
   "version": "0.1.0",
-  "description": "Un4seen MO3 container (XM/IT/S3M/MOD/MTM inner) format plugin for modplayjs (OpenMPT Load_mo3.cpp port).",
+  "description": "MP3 / WAV / OGG streamed-audio decode for modplayjs (minimp3 + stb_vorbis ports).",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,10 +9,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./minimp3.js": {
-      "types": "./dist/minimp3.d.ts",
-      "import": "./dist/minimp3.js"
     }
   },
   "files": [
@@ -23,17 +19,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.1.0",
-    "@modplayjs/fmt-mod": "^0.1.0"
+    "@modplayjs/fmt-mo3": "*",
+    "@modplayjs/stb-vorbis": "*"
   },
   "keywords": [
-    "mo3",
-    "stm",
-    "scream tracker",
-    "libxmp",
-    "chiptune",
-    "audio",
-    "music"
+    "mp3",
+    "wav",
+    "ogg",
+    "vorbis",
+    "audio"
   ],
   "sideEffects": false,
   "engines": {
@@ -42,14 +36,10 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/modplayjs/modplayjs.git",
-    "directory": "packages/fmt-mo3"
+    "directory": "packages/stream-audio"
   },
-  "bugs": "https://github.com/modplayjs/modplayjs/issues",
-  "homepage": "https://github.com/modplayjs/modplayjs#readme",
   "license": "BSD-3-Clause",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
-  },
-  "@modplayjs/core": "^0.1.0",
-  "@modplayjs/fmt-mod": "^0.1.0"
+  }
 }

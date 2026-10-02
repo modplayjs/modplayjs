@@ -20,6 +20,8 @@
     "@modplayjs/fmt-ice": "*",
     "@modplayjs/fmt-med": "*",
     "@modplayjs/fmt-st": "*",
+    "@modplayjs/fmt-fc": "*",
+    "@modplayjs/stream-audio": "*",
     "@modplayjs/fmt-it": "*",
     "@modplayjs/fmt-mod": "*",
     "@modplayjs/fmt-mtm": "*",

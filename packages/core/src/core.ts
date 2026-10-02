@@ -838,6 +838,9 @@ export class Core implements CoreIface {
         ep.onTick?.(this, i);
       }
       processTick(this, i);
+      for (const ep of this.registries.effectPlugins()) {
+        ep.onTickPost?.(this, i);
+      }
     }
 
     /* player.c:2170 — clear after the per-channel loop. */

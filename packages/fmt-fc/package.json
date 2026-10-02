@@ -1,7 +1,7 @@
 {
-  "name": "@modplayjs/fmt-mo3",
+  "name": "@modplayjs/fmt-fc",
   "version": "0.1.0",
-  "description": "Un4seen MO3 container (XM/IT/S3M/MOD/MTM inner) format plugin for modplayjs (OpenMPT Load_mo3.cpp port).",
+  "description": "Future Composer 1.0-1.4 (SMOD/FC14) format plugin for modplayjs (OpenMPT Load_fc.cpp + InstrumentSynth port).",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,9 +10,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./minimp3.js": {
-      "types": "./dist/minimp3.d.ts",
-      "import": "./dist/minimp3.js"
+    "./synth.js": {
+      "types": "./dist/synth.d.ts",
+      "import": "./dist/synth.js"
     }
   },
   "files": [

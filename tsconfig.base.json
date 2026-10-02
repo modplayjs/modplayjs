@@ -33,6 +33,8 @@
       "@modplayjs/fmt-asylum": ["packages/fmt-asylum/src/index.ts"],
       "@modplayjs/fmt-ice": ["packages/fmt-ice/src/index.ts"],
       "@modplayjs/fmt-st": ["packages/fmt-st/src/index.ts"],
+      "@modplayjs/stb-vorbis": ["packages/stb-vorbis/src/index.ts"],
+      "@modplayjs/stream-audio": ["packages/stream-audio/src/index.ts"],
       "@modplayjs/fmt-mod": ["packages/fmt-mod/src/index.ts"],
       "@modplayjs/dsp-paula": ["packages/dsp-paula/src/index.ts"],
       "@modplayjs/dsp-softmixer": ["packages/dsp-softmixer/src/index.ts"],

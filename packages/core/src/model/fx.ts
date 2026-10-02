@@ -104,6 +104,12 @@ export const FX_VSLIDE_UP_2 = 0xc0;
 export const FX_VSLIDE_DN_2 = 0xc1;
 export const FX_F_VSLIDE_UP_2 = 0xc2;
 export const FX_F_VSLIDE_DN_2 = 0xc3;
+
+// Future Composer (OpenMPT CMD_AUTO_PORTAMENTO_FC / CMD_TONEPORTA_DURATION /
+// CMD_MED_SYNTH_JUMP — project-assigned codes in the unused 0xc4.. range)
+export const FX_FC_AUTO_PORTA = 0xc4;
+export const FX_FC_TONEPORTA_DURATION = 0xc5;
+export const FX_FC_MED_SYNTH_JUMP = 0xc6;
 // Note-slide family (effects.h:132-135; player.c note_slide stage 1158)
 export const FX_NSLIDE_DN = 0x9c;
 export const FX_NSLIDE_UP = 0x9d;

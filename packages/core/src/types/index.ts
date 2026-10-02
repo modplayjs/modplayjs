@@ -208,6 +208,10 @@ export interface EffectPlugin {
   onRow?(core: Core, chn: number, ev: Event): void;
   /** Called for each channel on every tick. */
   onTick?(core: Core, chn: number): void;
+  /** Called for each channel after processTick (post volume/frequency).
+   *  OpenMPT's InstrumentSynth.ApplyChannelState timing (Sndmix.cpp:2371 —
+   *  after envelope/volume calc, before the mixer). */
+  onTickPost?(core: Core, chn: number): void;
 }
 
 // ---------------------------------------------------------------------------

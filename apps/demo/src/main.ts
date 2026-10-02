@@ -7,7 +7,7 @@
 // Pause freezes the render loop + suspends the AudioContext; player state
 // (order/row/voices) is preserved and Play/Resume continues from the same spot.
 
-import { CorePlayer, StateError } from '@modplayjs/core';
+import { CorePlayer, StateError, type Core } from '@modplayjs/core';
 import workletUrl from './worklet-url';
 import { plugin as modPlugin, hmnPlugin, fltPlugin } from '@modplayjs/fmt-mod';
 import { plugin as s3mPlugin } from '@modplayjs/fmt-s3m';
@@ -22,6 +22,9 @@ import { plugin as asylumPlugin } from '@modplayjs/fmt-asylum';
 import { plugin as icePlugin } from '@modplayjs/fmt-ice';
 import { plugin as medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } from '@modplayjs/fmt-med';
 import { plugin as stPlugin } from '@modplayjs/fmt-st';
+import { plugin as mo3Plugin } from '@modplayjs/fmt-mo3';
+import { plugin as fcPlugin, fcEffect, setModEventReader } from '@modplayjs/fmt-fc';
+import { createStreamedSource, detectStreamedFormat, type StreamedSource, type StreamedFormat } from '@modplayjs/stream-audio';
 import { pwPlugin } from '@modplayjs/fmt-prowizard';
 import { createPaulaPlugin } from '@modplayjs/dsp-paula';
 import { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
@@ -90,6 +93,13 @@ core.registries.registerFormat(med2Plugin);
 core.registries.registerFormat(med3Plugin);
 core.registries.registerFormat(med4Plugin);
 core.registries.registerFormat(stPlugin);
+core.registries.registerFormat(mo3Plugin);
+core.registries.registerFormat(fcPlugin);
+core.registries.registerEffect(fcEffect);
+setModEventReader((c: Core, chn: number, row: number) => {
+  // The shared MOD reader is the registered fmt-mod plugin's readEvent.
+  core.registries.format('mod').readEvent(c, chn, row);
+});
 core.registries.registerFormat(pwPlugin);
 core.registries.registerDsp(createPaulaPlugin());
 core.registries.registerDsp(createSoftMixerPlugin());
@@ -173,11 +183,37 @@ const fmtTime = (ms: number): string => {
 };
 
 function moduleDuration(): number {
+  if (streamed) return streamed.duration;
   const mod = core.module;
   if (!mod) return 0;
   let total = 0;
   for (const seq of mod.sequences) total += seq.duration;
   return total;
+}
+
+/** Info panel for streamed-audio tracks (no module data). */
+function renderInfoStreamed(src: StreamedSource, fmt: StreamedFormat): void {
+  const current = playlist.tracks.find((t) => t.id === currentTrackId);
+  const rows: [string, string][] = [
+    ['file', current?.name ?? '—'],
+    ['title', current?.name?.replace(/\.[^.]+$/, '') ?? ''],
+    ['format', fmt.toUpperCase() + ' (streamed)'],
+    ['channels', String(src.channels)],
+    ['sample rate', src.sampleRate + ' Hz'],
+    ['duration', fmtTime(src.duration)],
+  ];
+  infoEl.textContent = '';
+  const grid = document.createElement('div');
+  grid.className = 'grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5';
+  for (const [label, value] of rows) {
+    const l = document.createElement('span');
+    l.className = 'opacity-60';
+    l.textContent = label;
+    const v = document.createElement('span');
+    v.textContent = value;
+    grid.append(l, v);
+  }
+  infoEl.append(grid);
 }
 
 seek.addEventListener('input', () => {
@@ -644,13 +680,44 @@ async function addFiles(files: File[]): Promise<void> {
   else showThrottled(`playlist: +${files.length}`);
 }
 
-/** Load a module from a playlist entry (or raw file) into the player. */
+// Streamed-audio state (WAV/MP3/OGG): decoded source + pull shim.
+let streamed: StreamedSource | null = null;
+// Format of the currently loaded streamed track (WAV/MP3/OGG).
+const streamedFormat2: { v: StreamedFormat | null } = { v: null };
+
+/** Load a module from a playlist entry (or raw file) into the player.
+ *  Files the tracker plugins don't recognize fall back to streamed
+ *  audio (WAV/MP3/OGG) via @modplayjs/stream-audio. */
 async function loadTrack(file: Blob): Promise<void> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (playing || paused) {
     output.stop();
     playing = false;
     paused = false;
+  }
+  const fmt2 = detectStreamedFormat(bytes, file instanceof File ? file.name : undefined);
+  if (fmt2) {
+    const src = createStreamedSource(bytes, fmt2, 48000);
+    if (src) {
+      streamed = src;
+      streamedFormat2.v = fmt2;
+      loaded = true;
+      playBtn.disabled = false;
+      playBtn.textContent = 'Play';
+      pauseBtn.disabled = true;
+      stopBtn.disabled = true;
+      setAuditionButtons(false);
+      seek.disabled = false;
+      seek.value = '0';
+      timeCur.textContent = '0:00';
+      timeRem.textContent = '-' + fmtTime(streamed.duration);
+      curPattern = -1;
+      curRow = -1;
+      renderInfoStreamed(src, fmt2);
+      show('loaded | format: ' + fmt2.toUpperCase() + ' (streamed) | ' +
+        src.channels + 'ch | ' + src.sampleRate + ' Hz | ' + fmtTime(src.duration));
+      return;
+    }
   }
   core.loadModule(bytes);
   const mod = core.module;
@@ -830,6 +897,25 @@ function setPwaAudioBusy(busy: boolean): void {
 
 async function startPlayback(muteSong: boolean): Promise<void> {
   const deviceRate = await output.deviceSampleRate();
+  if (streamed) {
+    // Streamed-audio path: the source shim exposes playBuffer() with the
+    // same pull semantics as Core, so out-webaudio drives it unchanged.
+    const src = streamed;
+    const shim = {
+      playBuffer(out: Float32Array, size: number, loop?: number): number {
+        return src.playBuffer(out, size, loop);
+      },
+    };
+    core.setSampleRate(deviceRate);
+    await output.start(shim as unknown as Core, workletUrl);
+    playing = true;
+    paused = false;
+    pauseBtn.disabled = false;
+    stopBtn.disabled = false;
+    setPwaAudioBusy(true);
+    show('playing | streamed | rate: ' + output.audioContextSampleRate + ' Hz');
+    return;
+  }
   core.setSampleRate(deviceRate);
   core.startSmix(4); // reserve channels for instrument/sample audition
   core.startPlayer();

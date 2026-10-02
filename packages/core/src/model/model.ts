@@ -186,6 +186,7 @@ export type ModuleExtras =
   | { kind: 'hmn' }
   | { kind: 'flt' }
   | { kind: 'med'; trackerVersion: number }
+  | { kind: 'fc' }
   | { kind: 'none' };
 
 /** MED synth/hybrid instrument extras (med_extras.h struct
