@@ -987,8 +987,13 @@ export const fcEffect: EffectPlugin = {
         st.states[i] = state;
       }
       const xc = core.ctx.channelStates[chn]!;
-      if (xc.note !== 0 && (xc.note_flags & (1 << 6)) !== 0) {
-        // C: chn.triggerNote → reconstruct (new note this row)
+      if (
+        core.ctx.p.frame === 0 &&
+        xc.note !== 0 &&
+        (xc.note_flags & (1 << 6)) !== 0 // NoteFlag.SET — trigger this row
+      ) {
+        // C: chn.triggerNote → reconstruct (new note this row,
+        // InstrumentSynth.cpp:210 — first tick only)
         state.reconstruct();
       }
       synthStateNextTick(core, chn, script, state);
