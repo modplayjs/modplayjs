@@ -65,6 +65,7 @@ export function inverseMdct(buffer: Float32Array, n: number, f: Vorb, blocktype:
     }
   }
 
+
   // step 3
   const ld = ilog(n) - 1;
 
@@ -92,7 +93,8 @@ export function inverseMdct(buffer: Float32Array, n: number, f: Vorb, blocktype:
     let aOff = 0;
     let iOff = n2 - 1;
     for (let r = rlim; r > 0; --r) {
-      imdctStep3InnerSLoop(lim, buffer, 0, iOff, -k0_2, A, aOff, k0);
+      // C: imdct_step3_inner_s_loop(lim, u, i_off, -k0_2, A0, k1, k0)
+      imdctStep3InnerSLoop(lim, buffer, 0, iOff, -k0_2, A, aOff, k1, k0);
       aOff += k1 * 4;
       iOff -= 8;
     }
@@ -126,6 +128,7 @@ export function inverseMdct(buffer: Float32Array, n: number, f: Vorb, blocktype:
       bitrevOff += 2;
     }
   }
+
 
   // step 7 (in place on buf2)
   {
@@ -167,6 +170,7 @@ export function inverseMdct(buffer: Float32Array, n: number, f: Vorb, blocktype:
     }
     function C(i: number): number { return f.C[blocktype]![i]!; }
   }
+
 
   // step 8 + decode
   {

@@ -48,7 +48,9 @@ function drawLine(output: Float32Array, x0: number, y0: number, x10: number, y1:
   let x1 = x10;
   if (x1 > n) x1 = n;
   if (x < x1) {
-    output[x] = INVERSE_DB_TABLE[y & 255]!;
+    // LINE_OP(a,b) = a *= b (stb_vorbis.c:2032, deferred-floor flow):
+    // the floor multiplies the decoded residue.
+    output[x] = (output[x] ?? 0) * INVERSE_DB_TABLE[y & 255]!;
     for (++x; x < x1; ++x) {
       err += ady2;
       if (err >= adx) {
@@ -57,7 +59,7 @@ function drawLine(output: Float32Array, x0: number, y0: number, x10: number, y1:
       } else {
         y += base;
       }
-      output[x] = INVERSE_DB_TABLE[y & 255]!;
+      output[x] = (output[x] ?? 0) * INVERSE_DB_TABLE[y & 255]!;
     }
   }
 }
@@ -73,14 +75,17 @@ function predictPoint(x: number, x0: number, x1: number, y0: number, y1: number)
 }
 
 function neighborsOf(x: number[], n: number): [number, number] {
-  let low = -1;
-  let high = 65536;
+  // C neighbors() (stb_vorbis.c:1958-1969): the low/high LOCALS hold X
+  // coordinates; the returned *plow/*phigh are the INDICES of those
+  // neighbors.
+  let low = -1, lowI = -1;
+  let high = 65536, highI = -1;
   for (let i = 0; i < n; ++i) {
     const xi = x[i] ?? 0;
-    if (xi > low && xi < (x[n] ?? 0)) low = xi;
-    if (xi < high && xi > (x[n] ?? 0)) high = xi;
+    if (xi > low && xi < (x[n] ?? 0)) { low = xi; lowI = i; }
+    if (xi < high && xi > (x[n] ?? 0)) { high = xi; highI = i; }
   }
-  return [low, high];
+  return [lowI, highI];
 }
 
 function computeBlocksize(f: Vorb, b: number, n: number): boolean {
@@ -473,15 +478,19 @@ function startDecoder(f: Vorb): boolean {
     } else {
       m.couplingSteps = 0;
     }
+    // Allocate one channel entry PER CHANNEL (C: setup_malloc of
+    // f->channels entries, stb_vorbis.c:4081); the coupling loop above
+    // already wrote magnitude/angle into the first coupling_steps slots.
+    while (m.chan.length < f.channels) m.chan.push({ magnitude: 0, angle: 0, mux: 0 });
     if (getBits(f, 2)) return error(f, 20);
-    m.chan = [];
     for (let j = 0; j < f.channels; ++j) {
       if (m.submaps > 1) {
         const mux = getBits(f, 4);
         if (mux >= m.submaps) return error(f, 20);
-        m.chan.push({ magnitude: 0, angle: 0, mux });
+        m.chan[j]!.mux = mux;
       } else {
-        m.chan.push({ magnitude: 0, angle: 0, mux: 0 });
+        // @SPECIFICATION: this case is missing from the spec
+        m.chan[j]!.mux = 0;
       }
     }
     for (let j = 0; j < m.submaps; ++j) {
@@ -565,7 +574,7 @@ function doFloor(f: Vorb, map: Mapping, i: number, n: number, target: Float32Arr
   }
   if (lx < n2) {
     for (let j = lx; j < n2; ++j) {
-      target[j] = INVERSE_DB_TABLE[ly & 255]!;
+      target[j] = (target[j] ?? 0) * INVERSE_DB_TABLE[ly & 255]!;
     }
   }
   return true;
@@ -823,10 +832,10 @@ function decodeShared(f: Vorb, c: Codebook): number {
 }
 
 function codebookDecodeStartShared(z: Vorb, c: Codebook): number {
-  if (c.lookupType === 0) {
-    z.error = 11;
-    return -1;
-  }
+  // C DECODE/DECODE_RAW (stb_vorbis.c:1763-1773): the scalar huffman
+  // path has NO lookupType restriction — classmaster codebooks in floor1
+  // are lookupType 0 (pure huffman). Only codebook_decode_start (VQ)
+  // rejects type 0.
   prepHuffman(z);
   let zz = decodeRawShared(z, c);
   if (zz < 0) {

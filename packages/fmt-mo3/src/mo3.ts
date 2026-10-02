@@ -21,6 +21,7 @@ import { ReadEventType } from '@modplayjs/core';
 import { depackMO3Music, lastConsumed } from './mo3LZ.js';
 import { parseMPEGFrame } from './mpegFrame.js';
 import { mp3decInit, mp3decDecodeFrame, type Mp3Dec } from './minimp3.js';
+import { decodeOggStream, mergeSharedOggHeader } from './ogg.js';
 
 // MO3HeaderFlags (Load_mo3.cpp:69-85)
 const FLAG_LINEAR_SLIDES = 0x0001;
@@ -47,7 +48,8 @@ const SMP_16BIT = 0x01;
 // const _SMP_SUSTAIN_PINGPONG = 0x200;
 const SMP_STEREO = 0x400;
 const SMP_COMPRESSION_MPEG = 0x1000;
-// const _SMP_COMPRESSION_OGG = 0x3000;
+const SMP_COMPRESSION_OGG = 0x3000;          // Ogg sample
+const SMP_SHARED_OGG = 0x1000 | 0x2000 | 0x4000; // Ogg sample, shared header
 // const _SMP_SHARED_OGG = 0x7000;
 const SMP_DELTA_COMPRESSION = 0x2000;
 const SMP_DELTA_PREDICTION = 0x4000;
@@ -220,6 +222,9 @@ interface Parsed {
     sustainEnd: number;
     compressedSize: number;
     encoderDelay: number;
+    /** smp >= 5 + smpSharedOgg only: relative index of the sample whose
+     *  chunk holds this sample's shared vorbis header (Load_mo3.cpp:1368). */
+    sharedOggHeader: number;
     vibType: number; vibSweep: number; vibDepth: number; vibRate: number;
     globalVol: number;
     finetune: number;
@@ -609,11 +614,17 @@ function parseMO3(bytes: Uint8Array, fail: (m: string) => never): Parsed {
     const sustainEnd = rU32(r);
     const compressedSize = rI32(r);
     const encoderDelay = rU16(r);
+    // Load_mo3.cpp:1368-1372: shared-header index for smpSharedOgg.
+    let sharedOggHeader = 0;
+    if (version >= 5 && (sflags & SMP_COMPRESSION_MASK) === SMP_SHARED_OGG) {
+      sharedOggHeader = (rU16(r) << 16) >> 16;
+    }
     sampleNames.push(name);
     sampleHeaders.push({
       flags: sflags, length, loopStart, loopEnd, sustainStart, sustainEnd,
       compressedSize, encoderDelay, vibType, vibSweep, vibDepth, vibRate,
       globalVol, finetune: freqFinetune, transpose, volume: defaultVolume, panning,
+      sharedOggHeader,
     });
     void frequencyIsHertz;
   }
@@ -1123,8 +1134,59 @@ export function mo3Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
           c5spd: res.hz,
         };
       }
+    } else if (compression === SMP_COMPRESSION_OGG || compression === SMP_SHARED_OGG) {
+      // Ogg Vorbis sample (Load_mo3.cpp:1688-1990). For shared headers
+      // (MO3 v5) the vorbis identification/comment/setup pages live in
+      // another sample's chunk; remux them with this chunk's serials and
+      // stitch the two buffers together (C optimized path).
+      let merged: Uint8Array | null = null;
+      let sharedHeader = false;
+      if (compression === SMP_SHARED_OGG) {
+        const sharedHeaderSize = h.encoderDelay;
+        const sharedOggHeader = smp + h.sharedOggHeader > 0 ? smp + h.sharedOggHeader : smp;
+        sharedHeader =
+          sharedOggHeader !== smp && sharedOggHeader > 0 && sharedOggHeader <= sampleHeaders.length && sharedHeaderSize > 0;
+        if (sharedHeader) {
+          const head = sampleChunks[sharedOggHeader - 1]!;
+          merged = mergeSharedOggHeader(head.data.subarray(head.off, head.off + sharedHeaderSize), sharedHeaderSize, chunk.data, chunk.off, chunk.size);
+        }
+      }
+      if (!merged) {
+        merged = chunk.data.subarray(chunk.off, chunk.off + chunk.size);
+      }
+      const pcm = decodeOggStream(merged, h.length, numChannels);
+      if (!pcm || pcm.length === 0) {
+        raw = {
+          name: '', data: new Uint8Array(0), length: 0,
+          loopStart: h.loopStart, loopEnd: h.loopEnd,
+          sustainStart: h.sustainStart, sustainEnd: h.sustainEnd,
+          finetune: 0, volume: Math.min(h.volume, 64), flags: mo3LoopFlags(h.flags), c5spd: C4_NTSC_RATE,
+        };
+      } else {
+        // Interleaved float → 16-bit little-endian PCM (CopyAudio).
+        const frames = Math.floor(pcm.length / numChannels);
+        const out = new Uint8Array(pcm.length * 2);
+        const dv = new DataView(out.buffer);
+        for (let i = 0; i < pcm.length; i++) {
+          // Convert<int16, somefloat32> (SampleConvert.hpp:414-424):
+          // clamp, *32768, round-half-away, saturate.
+          let v = pcm[i]!;
+          v = v < -1 ? -1 : v > 1 ? 1 : v;
+          v *= 32768;
+          const r = v >= 0 ? Math.floor(v + 0.5) : Math.ceil(v - 0.5);
+          dv.setInt16(i * 2, Math.max(-32768, Math.min(32767, r)), true);
+        }
+        raw = {
+          name: '', data: out, length: frames,
+          loopStart: h.loopStart, loopEnd: h.loopEnd,
+          sustainStart: h.sustainStart, sustainEnd: h.sustainEnd,
+          finetune: 0, volume: Math.min(h.volume, 64),
+          flags: mo3LoopFlags(h.flags) | 0x01 | (stereo ? 0x80 : 0),
+          c5spd: C4_NTSC_RATE,
+        };
+      }
     } else {
-      // Ogg / OPL / unsupported — treat as empty
+      // OPL / unsupported — treat as empty
       raw = {
         name: '', data: new Uint8Array(0), length: 0,
         loopStart: h.loopStart, loopEnd: h.loopEnd,

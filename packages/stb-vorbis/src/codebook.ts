@@ -262,7 +262,9 @@ export function codebookDecodeDeinterleaveRepeat(
     }
     let effective = c.dimensions;
     if (cInter + pInter * ch + effective > len * ch) {
-      effective = len * ch - pInter * ch - cInter;
+      // C: effective = len*ch - (p_inter*ch - c_inter) — note the minus
+      // binds inside the parens (stb_vorbis.c:2275-2278).
+      effective = len * ch - (pInter * ch - cInter);
     }
     zz *= c.dimensions;
     if (c.sequenceP) {

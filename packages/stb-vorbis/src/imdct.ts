@@ -99,11 +99,15 @@ function imdctStep3InnerRLoop(lim: number, e: Float32Array, base: number, d0Off:
 }
 
 // imdct_step3_inner_s_loop (stb_vorbis.c:2512-2594)
-function imdctStep3InnerSLoop(n: number, e: Float32Array, base: number, iOff: number, kOff: number, A: Float32Array, aOff0: number, k0: number): void {
-  const A0 = A[0]!, A1 = A[1]!;
-  const A2 = A[aOff0]!, A3 = A[aOff0 + 1]!;
-  const A4 = A[aOff0 * 2]!, A5 = A[aOff0 * 2 + 1]!;
-  const A6 = A[aOff0 * 3]!, A7 = A[aOff0 * 3 + 1]!;
+function imdctStep3InnerSLoop(n: number, e: Float32Array, base: number, iOff: number, kOff: number, A: Float32Array, aOff0: number, aOff: number, k0: number): void {
+  // C (stb_vorbis.c:2512-2520 + caller :2770-2777) passes an ADVANCED base
+  // pointer A0 (= A + k1*4*r) plus a_off = k1 and reads A0[0], A0[1],
+  // A0[a_off], A0[a_off*2], A0[a_off*3]; the outer loop strides by k0.
+  const b = aOff0;
+  const A0 = A[b]!, A1 = A[b + 1]!;
+  const A2 = A[b + aOff]!, A3 = A[b + aOff + 1]!;
+  const A4 = A[b + aOff * 2]!, A5 = A[b + aOff * 2 + 1]!;
+  const A6 = A[b + aOff * 3]!, A7 = A[b + aOff * 3 + 1]!;
   let e0Off = base + iOff;
   let e2Off = e0Off + kOff;
   for (let i = n; i > 0; --i) {
@@ -117,10 +121,11 @@ function imdctStep3InnerSLoop(n: number, e: Float32Array, base: number, iOff: nu
       e[d2] = k00 * [A0, A2, A4, A6][q]! - k11 * [A1, A3, A5, A7][q]!;
       e[d2 - 1] = k11 * [A0, A2, A4, A6][q]! + k00 * [A1, A3, A5, A7][q]!;
     }
-    e0Off -= 8;
-    e2Off -= 8;
+    // C strides by k0 per outer iteration (stb_vorbis.c:2558-2559:
+    // `ee0 -= k0; ee2 -= k0;`), NOT by 8.
+    e0Off -= k0;
+    e2Off -= k0;
   }
-  void k0;
 }
 
 // imdct_step3_inner_s_loop_ld654 (stb_vorbis.c:2595-2637)
