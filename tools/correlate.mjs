@@ -62,7 +62,7 @@ mkdirSync(outDir, { recursive: true });
 const base = basename(file);
 const name = base.replace(/\.[^.]+$/, '');
 const ext = (base.match(/\.[^.]+$/) || [''])[0].toLowerCase();
-if (!['.mod', '.s3m', '.xm', '.it'].includes(ext)) {
+if (!['.mod', '.s3m', '.xm', '.it', '.mo3'].includes(ext)) {
   console.error(`unsupported extension ${ext} (need .mod/.s3m/.xm/.it)`);
   process.exit(2);
 }
@@ -90,9 +90,8 @@ const oursWav = resolve(outDir, `${name}-ours-48k.wav`);
 {
   const script = `
 import { readFileSync, writeFileSync } from 'fs';
-import { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, stPlugin, createSoftMixerPlugin, encodeWavStereo } from ${JSON.stringify(ourBundle)};
+import { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, stPlugin, mo3Plugin, createSoftMixerPlugin, encodeWavStereo } from ${JSON.stringify(ourBundle)};
 const core = new CorePlayer();
-core.registries.registerFormat(stPlugin);
 core.registries.registerFormat(modPlugin);
 core.registries.registerFormat(hmnPlugin);
 core.registries.registerFormat(fltPlugin);
@@ -100,6 +99,8 @@ core.registries.registerFormat(pwPlugin);
 core.registries.registerFormat(s3mPlugin);
 core.registries.registerFormat(xmPlugin);
 core.registries.registerFormat(itPlugin);
+core.registries.registerFormat(stPlugin);
+core.registries.registerFormat(mo3Plugin);
 core.registries.registerDsp(createSoftMixerPlugin());
 {
   // Startrekker AM sidecar (flt_load.c:338-352): .mod.nt / .NT / .AS next
@@ -150,6 +151,7 @@ if (!existsSync(oursWav)) {
 const refWav = resolve(outDir, `${name}-ref-48k.wav`);
 const refSrc = resolve(repo, 'tools/xmpref.c');
 const refBin = resolve(outDir, 'xmpref');
+const isMo3 = ext === '.mo3';
 if (!existsSync(libxmpA)) {
   console.error(
     `reference libxmp archive not found: ${libxmpA}\n` +
@@ -161,8 +163,14 @@ if (!skipBuild || !existsSync(refBin)) {
     '-I' + resolve(repo, 'reference/libxmp/include'), '-lm'], { stdio: 'pipe' });
 }
 const capFrames = seconds ? seconds * 48000 : 0;
+if (isMo3) {
+  const omptBin = '/tmp/omptref';
+  spawnSync(omptBin, [resolve(repo, file), refWav, String(capFrames || 4800 * 48000)],
+    { stdio: 'inherit' });
+} else {
 spawnSync(refBin, [resolve(repo, file), refWav, String(capFrames || 4800 * 48000)],
   { stdio: 'inherit' });
+}
 if (!existsSync(refWav) || statSync(refWav).size < 100) {
   console.error('reference render failed');
   process.exit(1);

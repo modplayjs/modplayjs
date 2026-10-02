@@ -9,3 +9,4 @@ export { plugin as itPlugin } from '@modplayjs/fmt-it';
 export { plugin as stPlugin } from '@modplayjs/fmt-st';
 export { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
 export { encodeWavStereo } from '@modplayjs/out-pcm';
+export { plugin as mo3Plugin } from '@modplayjs/fmt-mo3';
