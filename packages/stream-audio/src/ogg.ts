@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Whole-file Ogg Vorbis decode via the stb-vorbis port.
-import { stbVorbisOpenMemory, stbVorbisGetFrameFloat } from '@modplayjs/stb-vorbis/vorbis.js';
+import { stbVorbisOpenMemory, stbVorbisGetFrameFloat } from '@modplayjs/stb-vorbis';
 
 export function decodeOggFile(b: Uint8Array): { pcm: Float32Array; channels: number; sampleRate: number } | null {
   const err = { v: 0 };

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Whole-file MP3 decode via the minimp3 L3 port (from fmt-mo3).
-import { mp3decInit, mp3decDecodeFrame } from '@modplayjs/fmt-mo3/minimp3.js';
+import { mp3decInit, mp3decDecodeFrame } from '@modplayjs/fmt-mo3';
 
 export function decodeMp3File(b: Uint8Array): { pcm: Int16Array; channels: number; sampleRate: number } | null {
   const dec = {
