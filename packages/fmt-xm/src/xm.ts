@@ -52,7 +52,7 @@ import {
 import { EX_F_VSLIDE_DN, EX_F_VSLIDE_UP } from '@modplayjs/core';
 import { LSN, MSN, readEventFt2, TEST_NOTE, NoteFlag, SET_NOTE } from '@modplayjs/core';
 import { applyMptPreamp } from '@modplayjs/fmt-it';
-import { StbVorbis } from 'stb-vorbis';
+import { stbVorbisOpenMemory, stbVorbisGetFrameFloat } from '@modplayjs/stb-vorbis';
 
 // ---------------------------------------------------------------------------
 // Constants (xm.h)
@@ -456,12 +456,23 @@ function oggDecode(
 ): { pcm: Uint8Array; frames: number } {
   // hio_read32b(f) skips the size dword; data = next len-4 bytes.
   const data = bytes.subarray(pos + 4, pos + len);
-  const decoded = StbVorbis.decode(data);
   // C: stb_vorbis_decode_memory → interleaved s16; ch != 1 → error.
-  if (decoded.channels.length !== 1) {
+  const err = { v: 0 };
+  const vor = stbVorbisOpenMemory(data, err);
+  if (!vor) throw new ParseError('XM: Ogg sample failed to decode');
+  if (vor.channels !== 1) {
     throw new ParseError('XM: Ogg sample is not mono');
   }
-  const pcm16 = decoded.channels[0]!;
+  const pcm16: number[] = [];
+  {
+    const fl = { v: 0 };
+    for (;;) {
+      const out = stbVorbisGetFrameFloat(vor, fl);
+      if (!out || fl.v === 0) break;
+      const ch0 = out[0]!;
+      for (let j = 0; j < fl.v; j++) pcm16.push(ch0[j]!);
+    }
+  }
   let n = pcm16.length;
 
   const is16bit = (flg & SampleFlags.BITS16) !== 0;
@@ -960,16 +971,19 @@ function loadInstruments(
         const framelen = (raw.flags & SampleFlags.BITS16 ? 2 : 1) * (raw.flags & SampleFlags.STEREO ? 2 : 1);
         const bytelen = raw.length * framelen;
         const avail = Math.max(0, Math.min(bytelen, bytes.length - dataPos));
+        if ((globalThis as { process?: { stderr?: { write(s: string): void } } }).process?.stderr && (globalThis as { process?: { env?: Record<string, string> } }).process?.env?.XMDBG)
+          (globalThis as { process?: { stderr?: { write(s: string): void } } }).process!.stderr!.write('DBG sid' + sub.sid + ': dataPos=' + dataPos + ' len=' + raw.length + ' bytelen=' + bytelen + ' avail=' + avail + ' fileLen=' + bytes.length + ' is16=' + ((raw.flags & SampleFlags.BITS16) !== 0) + '\n');
         if (avail <= 0) {
           // Sample starts at/after EOF: libxmp skips it entirely and
           // xxs->data stays NULL (sample.c:216-228 "ignoring sample at
           // EOF"). Keep an empty buffer to mirror that.
           raw.data = new Uint8Array(0);
         } else if (avail < bytelen) {
-          // Short read → zero-fill the tail (sample.c:355-360).
-          const buf = new Uint8Array(bytelen);
-          buf.set(bytes.subarray(dataPos, dataPos + avail), 0);
-          raw.data = buf;
+          // C: sample goes past EOF → truncate: bytelen = remaining,
+          // frame-aligned, and xxs->len = bytelen (sample.c:262-282).
+          const aligned = avail - (avail % framelen);
+          raw.data = bytes.subarray(dataPos, dataPos + aligned);
+          raw.length = aligned / framelen;
         } else {
           raw.data = bytes.subarray(dataPos, dataPos + bytelen);
         }
