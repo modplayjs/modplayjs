@@ -168,7 +168,11 @@ function normalize(raw: RawSample, id: number): SampleData {
     adpcm4Decode(bytes.subarray(16), tab, expanded);
     bytes = expanded;
   } else if (bytes.length === 0 && needed > 0) {
+    // Sample-at-EOF / never-loaded case: xxs->data stays NULL in C. Silence
+    // here means SIGNED zero regardless of the loader's UNS flag — C never
+    // runs convert_signal on data it didn't load.
     bytes = new Uint8Array(needed);
+    raw.flags &= ~DecodeFlag.UNSIGNED;
   } else if (bytes.length < needed) {
     const avail = bytes.length - (bytes.length % framelen);
     len = avail / framelen;
@@ -190,7 +194,7 @@ function normalize(raw: RawSample, id: number): SampleData {
   // convert_signal (sample.c:386): dest, xxs->len * channels, is16bit —
   // `l` is a SAMPLE count (u16 iterations for 16-bit), so the byte count is
   // NOT pre-multiplied by 2 here.
-  if (df & DecodeFlag.UNSIGNED) convertSignal(bytes, len * (stereo ? 2 : 1), is16bit);
+  if ((df & DecodeFlag.UNSIGNED) !== 0 && !loaderDataEmpty) convertSignal(bytes, len * (stereo ? 2 : 1), is16bit);
 
   // Interleave planar stereo (non-interleaved layout: all L then all R).
   if (stereo && (df & DecodeFlag.INTERLEAVED) === 0) {

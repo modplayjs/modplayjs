@@ -19,6 +19,7 @@
     "@modplayjs/fmt-digi": "*",
     "@modplayjs/fmt-ice": "*",
     "@modplayjs/fmt-med": "*",
+    "@modplayjs/fmt-st": "*",
     "@modplayjs/fmt-it": "*",
     "@modplayjs/fmt-mod": "*",
     "@modplayjs/fmt-mtm": "*",

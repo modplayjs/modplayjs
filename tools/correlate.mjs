@@ -71,7 +71,7 @@ if (!['.mod', '.s3m', '.xm', '.it'].includes(ext)) {
 const esbuild = (await import('esbuild')).default ?? (await import('esbuild'));
 const aliasMap = Object.fromEntries(
   ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it',
-   'dsp-paula', 'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm']
+   'dsp-paula', 'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm', 'fmt-st']
     .map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
 const ourBundle = resolve(outDir, 'our-player.mjs');
 await esbuild.build({
@@ -90,8 +90,9 @@ const oursWav = resolve(outDir, `${name}-ours-48k.wav`);
 {
   const script = `
 import { readFileSync, writeFileSync } from 'fs';
-import { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, createSoftMixerPlugin, encodeWavStereo } from ${JSON.stringify(ourBundle)};
+import { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, stPlugin, createSoftMixerPlugin, encodeWavStereo } from ${JSON.stringify(ourBundle)};
 const core = new CorePlayer();
+core.registries.registerFormat(stPlugin);
 core.registries.registerFormat(modPlugin);
 core.registries.registerFormat(hmnPlugin);
 core.registries.registerFormat(fltPlugin);

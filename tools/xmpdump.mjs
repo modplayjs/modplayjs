@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const esbuild = (await import('esbuild')).default;
 const aliasMap = Object.fromEntries(
-  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi', 'fmt-asylum', 'fmt-ice', 'fmt-prowizard', 'fmt-med']
+  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi', 'fmt-asylum', 'fmt-ice', 'fmt-prowizard', 'fmt-med', 'fmt-st']
     .map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
 const bundle = resolve(repo, 'out/xmpdump-core.mjs');
 await esbuild.build({
@@ -35,7 +35,7 @@ await esbuild.build({
   bundle: true, platform: 'node', format: 'esm',
   alias: aliasMap, outfile: bundle, logLevel: 'silent',
 });
-const { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, mtmPlugin, stmPlugin, s69Plugin, sfxPlugin, digiPlugin, asylumPlugin, icePlugin, medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } = await import(
+const { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, mtmPlugin, stmPlugin, s69Plugin, sfxPlugin, digiPlugin, asylumPlugin, icePlugin, medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin, stPlugin } = await import(
   'file://' + bundle);
 
 const file = resolve(process.argv[2]);
@@ -62,6 +62,7 @@ core.registries.registerFormat(mmd3Plugin);
 core.registries.registerFormat(med2Plugin);
 core.registries.registerFormat(med3Plugin);
 core.registries.registerFormat(med4Plugin);
+core.registries.registerFormat(stPlugin);
   // Startrekker AM sidecar (flt_load.c:338-352).
   {
     const { basename, join, dirname } = await import('node:path');
@@ -122,16 +123,14 @@ for (let i = 0; i < mod.samples.length; i++) {
   const is16 = (s.flags & 0x01) !== 0; // SampleFlags.BITS16 = 1 << 0
   const stereo = (s.flags & 0x80) !== 0; // SampleFlags.STEREO
   const frames = s.length * (stereo ? 2 : 1); // interleaved sample values
-  const uns = ((s.decodeFlags ?? 0) & 0x400) !== 0; // DecodeFlag.UNSIGNED — 8-bit only
   const bytes = new Uint8Array(frames * (is16 ? 2 : 1));
   if (is16) {
     const dv = new DataView(bytes.buffer);
     for (let k = 0; k < frames; k++) dv.setInt16(k * 2, Math.round(s.data[k] * 32768), true);
-  } else if (uns) {
-    // C keeps xxs->data as the RAW UNSIGNED bytes; our store holds
-    // unsigned/128 - 1. Inverse: b = (f + 1) * 128.
-    for (let k = 0; k < frames; k++) bytes[k] = Math.round((s.data[k] + 1) * 128) & 0xff;
   } else {
+    // C's stored 8-bit data is ALWAYS signed post-load (convert_signal,
+    // sample.c:125-139, adds 0x80 to unsigned input). Our float v/128 for
+    // signed and v/128-1 for unsigned both invert via plain *128.
     for (let k = 0; k < frames; k++) bytes[k] = Math.round(s.data[k] * 128) & 0xff;
   }
   // C's unsigned long is 64-bit: FNV-1a accumulates mod 2^64.

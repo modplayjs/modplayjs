@@ -13,3 +13,4 @@ export { plugin as digiPlugin } from '@modplayjs/fmt-digi';
 export { plugin as asylumPlugin } from '@modplayjs/fmt-asylum';
 export { plugin as icePlugin } from '@modplayjs/fmt-ice';
 export { plugin as medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } from '@modplayjs/fmt-med';
+export { plugin as stPlugin } from '@modplayjs/fmt-st';

@@ -46,7 +46,7 @@ console.error(`scanning ${files.length} files...`);
 
 const esbuild = (await import('esbuild')).default;
 const aliasMap = Object.fromEntries(
-  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi', 'fmt-asylum', 'fmt-ice', 'fmt-prowizard', 'fmt-med']
+  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi', 'fmt-asylum', 'fmt-ice', 'fmt-prowizard', 'fmt-med', 'fmt-st']
     .map(p => [`@modplayjs/${p}`, join(repo, `packages/${p}/src/index.ts`)]));
 const bundle = join(repo, 'out/coverage-bundle.mjs');
 await esbuild.build({
@@ -54,7 +54,7 @@ await esbuild.build({
   bundle: true, platform: 'node', format: 'esm',
   alias: aliasMap, outfile: bundle, logLevel: 'silent',
 });
-const { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, mtmPlugin, stmPlugin, s69Plugin, sfxPlugin, digiPlugin, asylumPlugin, icePlugin, medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } = await import(
+const { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, mtmPlugin, stmPlugin, s69Plugin, sfxPlugin, digiPlugin, asylumPlugin, icePlugin, medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin, stPlugin } = await import(
   'file://' + bundle);
 const core = new CorePlayer();
 core.registries.registerFormat(modPlugin);
@@ -76,6 +76,7 @@ core.registries.registerFormat(mmd3Plugin);
 core.registries.registerFormat(med2Plugin);
 core.registries.registerFormat(med3Plugin);
 core.registries.registerFormat(med4Plugin);
+core.registries.registerFormat(stPlugin);
 
 function oursLoad(file) {
   try {

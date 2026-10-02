@@ -851,8 +851,12 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
 
     // Sample data (s3m_load.c:672-681)
     const sampleSegment = (sih.memseg + sih.memsegHi * 0x10000) >>> 0;
-    const dataPos = sampleSegment * 16;
-    if (dataPos > size) fail('S3M: seek error in sample data');
+    let dataPos = sampleSegment * 16;
+    // C hio_seek on the memory handle CLAMPS past-EOF to size (memio.c:62-80
+    // mseek: ofs > size → ofs = size, return 0) — never an error. The sample
+    // then starts at/after EOF and libxmp_load_sample early-returns
+    // ("ignoring sample at EOF") with xxs->data NULL.
+    if (dataPos > size) dataPos = size;
 
     if (sih.length > 0) {
       const framelen = (sih.flags & S3M_SAMP_16BIT ? 2 : 1) * (sih.flags & S3M_SAMP_STEREO ? 2 : 1);
