@@ -1005,7 +1005,10 @@ function loadItSample(
     // hio_seek(f, start + ish.sample_ptr, SEEK_SET)
     const dataPos = start + samplePtr;
     if (dataPos >= bytes.length) {
-      return -1;
+      // OpenMPT/libxmp sample.c:216-228: "If this sample starts at or
+      // after EOF, skip it entirely" — return 0, not an error. Keygen-pack
+      // files (SDV EarthTime) carry IT 2.17 samples truncated past EOF.
+      return 0;
     }
 
     if (raw.loopEnd > raw.length || raw.loopStart >= raw.loopEnd) {
@@ -1253,7 +1256,12 @@ function loadItPattern(
   // reads (it_load.c:1024-1029): 4 more bytes before the packed payload.
   patPos += 2 + 4;
   if (patPos + patLen > bytes.length) {
-    fail(`read error loading pattern`); // hio_read(patbuf,1,pat_len) short
+    // C hio_read short read → error return (it_load.c:1031-1034), BUT the
+    // pattern memory was already allocated by libxmp_alloc_tracks_in_pattern
+    // and stays (empty). IT 2.17 writers (sdvx pack files) emit patterns
+    // whose declared length exceeds the remaining file. Match the C side
+    // effect: the pattern stays empty, the load continues.
+    return;
   }
   const patbuf = bytes.subarray(patPos, patPos + patLen);
   patPos += patLen;
@@ -1451,8 +1459,10 @@ export function itLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     }
   }
   // Pointer tables start after the orders: position = start + 192 + len
-  // (mod->len is ALREADY clamped when C seeks; see it_load.c:1268-1275).
-  const opos = start + 192 + mod.len;
+  // (C it_load.c:1268-1275: reads min(len,256) entries then seeks
+  // `ordnum - 256` — for ordnum > 256 the stream lands at
+  // start + 192 + ordnum, NOT the clamped 256.)
+  const opos = start + 192 + (ifh.ordnum > XMP_MAX_MOD_LENGTH ? ifh.ordnum : mod.len);
 
   // Channel settings (it_load.c:1241-1266): 64 entries, pan/mute/surround.
   for (let i = 0; i < L_CHANNELS; i++) {

@@ -122,10 +122,15 @@ for (let i = 0; i < mod.samples.length; i++) {
   const is16 = (s.flags & 0x01) !== 0; // SampleFlags.BITS16 = 1 << 0
   const stereo = (s.flags & 0x80) !== 0; // SampleFlags.STEREO
   const frames = s.length * (stereo ? 2 : 1); // interleaved sample values
+  const uns = ((s.decodeFlags ?? 0) & 0x400) !== 0; // DecodeFlag.UNSIGNED — 8-bit only
   const bytes = new Uint8Array(frames * (is16 ? 2 : 1));
   if (is16) {
     const dv = new DataView(bytes.buffer);
     for (let k = 0; k < frames; k++) dv.setInt16(k * 2, Math.round(s.data[k] * 32768), true);
+  } else if (uns) {
+    // C keeps xxs->data as the RAW UNSIGNED bytes; our store holds
+    // unsigned/128 - 1. Inverse: b = (f + 1) * 128.
+    for (let k = 0; k < frames; k++) bytes[k] = Math.round((s.data[k] + 1) * 128) & 0xff;
   } else {
     for (let k = 0; k < frames; k++) bytes[k] = Math.round(s.data[k] * 128) & 0xff;
   }

@@ -7,3 +7,5 @@ testfiles/
 .omp/
 .turbo/
 out/
+testfiles2/
+main.zip

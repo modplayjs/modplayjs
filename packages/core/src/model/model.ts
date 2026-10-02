@@ -91,6 +91,9 @@ export interface SampleData {
   volume: number;
   /** SampleFlags bitmask. */
   flags: SampleFlags;
+  /** DecodeFlag bitmask (UNSIGNED/ADPCM/DIFF/…) kept for parity tooling;
+   *  NOT part of xmp_sample.flg. */
+  decodeFlags?: number;
   /** C-5 playback rate in Hz (xmp_sample.xtra c5spd; mixer.c:406-422). */
   c5spd?: number;
 }

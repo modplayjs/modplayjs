@@ -133,6 +133,7 @@ function normalize(raw: RawSample, id: number): SampleData {
 
   // Working byte buffer (copy so delta/ADPCM never mutate caller's memory).
   let bytes = raw.data.slice(0);
+  const loaderDataEmpty = raw.data.length === 0;
 
   let len = raw.length;
   if (stereo && (df & DecodeFlag.INTERLEAVED) === 0) {
@@ -222,14 +223,17 @@ function normalize(raw: RawSample, id: number): SampleData {
     for (let i = 0; i < len * chnCount; i++) floats[i] = signedByte(bytes[i]!) / 128;
   }
 
-  // Loop sanity (sample.c:286-300). C's libxmp_load_sample returns EARLY for
-  // len <= 0 (sample.c:196-199) — the sanity block never runs for empty
-  // samples, so loop flags survive on zero-length samples (4DNinja 3DAttack
-  // smp4: flg=06 with len=0).
+  // Loop sanity (sample.c:286-300). C's libxmp_load_sample returns EARLY
+  // (sanity never runs) for: len <= 0 (sample.c:196-199) AND for samples
+  // starting at/after EOF ("ignoring sample at EOF", sample.c:247-250 —
+  // xxs->data stays NULL, lps/lpe keep their loader-clamped values; e.g.
+  // tRUE Benutec smp7: len=2 lps=2 lpe=2). An EMPTY data buffer with
+  // declared length is exactly that EOF case — skip the sanity, keep the
+  // loader's loop points, zero-fill the PCM.
   let loopStart = raw.loopStart;
   let loopEnd = raw.loopEnd;
   let flags = raw.flags;
-  if (len > 0) {
+  if (len > 0 && !loaderDataEmpty) {
     if (loopEnd > len) loopEnd = len;
     if (loopStart >= len || loopStart >= loopEnd) {
       loopStart = loopEnd = 0;
@@ -250,8 +254,13 @@ function normalize(raw: RawSample, id: number): SampleData {
     flags &= ~(SampleFlags.SUSTAIN | SampleFlags.SUSTAIN_BIDIR);
   }
 
-  // FULLREP flag → LOOP_FULL after loop sanity (sample.c:400-406).
-  if ((raw.flags & 0x0200 /* SAMPLE_FLAG_FULLREP */) !== 0 && loopStart === 0 && len > loopEnd) {
+  // FULLREP flag → LOOP_FULL after loop sanity (sample.c:400-406). C only
+  // reaches this inside libxmp_load_sample's tail — a sample that
+  // early-returned at EOF never gets LOOP_FULL (CORE SU Podium smp30).
+  if (
+    !loaderDataEmpty &&
+    (raw.flags & 0x0200 /* SAMPLE_FLAG_FULLREP */) !== 0 && loopStart === 0 && len > loopEnd
+  ) {
     flags |= SampleFlags.LOOP_FULL;
   }
 
@@ -268,6 +277,7 @@ function normalize(raw: RawSample, id: number): SampleData {
     volume: raw.volume,
     c5spd: raw.c5spd,
     flags: flags & 0xff, // keep only SampleFlags bits on stored samples
+    decodeFlags: df,     // raw decode pipeline flags (UNSIGNED/ADPCM/DIFF)
   };
 }
 

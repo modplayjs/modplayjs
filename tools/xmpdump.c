@@ -14,6 +14,18 @@ static unsigned long long fnv(const unsigned char *p, size_t n) {
 	return h;
 }
 
+/* Hash n zero bytes without a NULL deref (sample-at-EOF case). */
+static unsigned long long fnv_zero(size_t n) {
+	unsigned long long h = 2166136261ULL;
+	size_t i;
+	for (i = 0; i < n; i++) { h ^= 0; h *= 16777619ULL; }
+	return h;
+}
+#define zero_bytes(n) ((size_t)(n))
+static unsigned long long fnv2(const unsigned char *p, size_t n) {
+	return p ? fnv(p, n) : fnv_zero(n);
+}
+
 int main(int argc, char **argv)
 {
 	xmp_context c;
@@ -90,7 +102,11 @@ int main(int argc, char **argv)
 			((s->flg & XMP_SAMPLE_STEREO) ? 2 : 1);
 		printf("SMP %d name=%s len=%d lps=%d lpe=%d flg=%02x fnv=%016llx\n",
 			i, s->name, s->len, s->lps, s->lpe, s->flg & 0xff,
-			(unsigned long long)fnv((const unsigned char *)s->data, bytes));
+			/* libxmp can report len>0 with data==NULL for samples
+			 * truncated at EOF (loaders keep the header, skip the
+			 * data at EOF, sample.c:216-228). Our TS store zero-fills
+			 * those — hash the same zero bytes so the dumps match. */
+			(unsigned long long)fnv2((const unsigned char *)s->data, bytes));
 		printf("SMPX %d sus=%d sue=%d\n", i, x ? x->sus : 0, x ? x->sue : 0);
 	}
 

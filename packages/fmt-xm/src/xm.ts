@@ -430,6 +430,12 @@ function isOggSample(bytes: Uint8Array, pos: number, len: number): boolean {
   // Bonnie's Bookstore music.oxm contains zero length samples followed
   // immediately by OGG samples.
   if (len < 4) return false;
+  // C (xm_load.c:352-371): hio_read32l + hio_read32b CONSUME 8 bytes even
+  // at EOF (the reads fail and peg the stream), then hio_seek(-8) fails at
+  // EOF and the stream stays there — so a truncated tail sample is read
+  // as all-zero. Emulate: only non-OGG when all 8 bytes exist AND the
+  // magic matches; near-EOF samples behave as "not ogg" but the caller's
+  // sample read then starts at EOF (zero-filled).
   if (pos + 8 > bytes.length) return false;
   // size = hio_read32l(f); id = hio_read32b(f) — id at pos+4, big-endian.
   const id = readmem32b(bytes, pos + 4);
@@ -560,10 +566,76 @@ function loadInstruments(
 
     // Sanity check (xm_load.c:478-487)
     if (xihSize < XM_INST_HEADER_SIZE) {
-      throw new ParseError(`XM: instrument ${i + 1}: header size ${xihSize}`);
+      // OpenMPT parity (Load_xm.cpp:736-754): OpenMPT never fails the load
+      // on a bad instrument header — ReadStructPartial(partialSize) copies
+      // min(size, 263, bytesLeft) real bytes, zero-fills the rest, and
+      // Skip(size) clamps at EOF. Keygen-pack XMs declare 256 instruments
+      // but truncate after the real ones, so the walk lands on garbage.
+      // Emulate that: take what's there, skip the declared size (clamped),
+      // and continue with a zeroed instrument.
+      const avail = bytes.length - instrPos;
+      const copyBytes = Math.min(xihSize, avail);
+      const pos2 = instrPos + Math.min(xihSize, avail);
+      void pos2;
+      const zeroIns: Instrument = {
+        name: copyAdjust(bytes.subarray(instrPos + 4, instrPos + 4 + Math.min(22, Math.max(0, copyBytes - 4))), 22),
+        volume: 0x40,
+        nsm: 0,
+        rls: 0,
+        map: new Array<number>(121).fill(0),
+        mapXpo: new Array<number>(121).fill(0),
+        sub: [],
+        aei: zeroEnvelope(),
+        fei: zeroEnvelope(),
+        pei: zeroEnvelope(),
+      };
+      instruments[i] = zeroIns;
+      pos = instrPos + Math.min(xihSize, avail);
+      continue;
     }
     if (xihSamples > XM_MAX_SAMPLES_PER_INST || (xihSamples > 0 && xihShSize > 0x100)) {
-      throw new ParseError(`XM: instrument ${i + 1}: samples ${xihSamples} sh_size ${xihShSize}`);
+      // OpenMPT parity (Load_xm.cpp:820-843): OpenMPT reads ALL declared
+      // sample headers (AllocateXMSamples caps the *stored* ones at 32 but
+      // the 40-byte header walk consumes every declared sample), then the
+      // sample data chunks, and never fails the load. libxmp rejects
+      // (xm_load.c:478-487) — for pack parity we clamp the stored samples
+      // to 32 but consume headers/data for the declared count.
+      const avail = bytes.length - instrPos;
+      const copyBytes = Math.min(xihSize, avail);
+      const declared = xihSamples;
+      const stored = Math.min(declared, XM_MAX_SAMPLES_PER_INST);
+      const zeroIns: Instrument = {
+        name: copyAdjust(bytes.subarray(instrPos + 4, instrPos + 4 + Math.min(22, Math.max(0, copyBytes - 4))), 22),
+        volume: 0x40,
+        nsm: 0,
+        rls: 0,
+        map: new Array<number>(121).fill(0),
+        mapXpo: new Array<number>(121).fill(0),
+        sub: [],
+        aei: zeroEnvelope(),
+        fei: zeroEnvelope(),
+        pei: zeroEnvelope(),
+      };
+      instruments[i] = zeroIns;
+      // Walk the (garbage) sample headers + data exactly as OpenMPT does,
+      // clamped at EOF: pos = instrPos + size + 40*declared + sum(lengths
+      // of the headers we could actually read). The lengths themselves may
+      // be garbage; OpenMPT's ReadChunk clamps at EOF, so the effective
+      // position is EOF — emulate by consuming what's declared and then
+      // clamping.
+      const hdrsPos = instrPos + Math.min(xihSize, avail);
+      const hdrsAvail = bytes.length - hdrsPos;
+      const hdrsSkip = Math.min(40 * declared, hdrsAvail);
+      let dataTotal = 0;
+      if (hdrsSkip === 40 * declared) {
+        for (let j = 0; j < declared; j++) {
+          dataTotal += readmem32l(bytes, hdrsPos + j * 40);
+          if (dataTotal > bytes.length) { dataTotal = bytes.length; break; }
+        }
+      }
+      pos = Math.min(bytes.length, hdrsPos + hdrsSkip + dataTotal);
+      void stored;
+      continue;
     }
 
     // Modplug Tracker tell (xm_load.c:490-496)
@@ -642,8 +714,27 @@ function loadInstruments(
       }
     } else {
       // Full instrument data: 208 bytes (xm_load.c:540-577).
+      // OpenMPT parity: zero-fill short reads instead of failing
+      // (ReadStructPartial semantics, Load_xm.cpp:754).
       if (pos + XM_INST_HEADER_SIZE + 4 + 208 > bytes.length) {
-        throw new ParseError('XM: short read in instrument data');
+        const avail = Math.max(0, bytes.length - (pos + XM_INST_HEADER_SIZE + 4));
+        const b = new Uint8Array(208);
+        b.set(bytes.subarray(pos + XM_INST_HEADER_SIZE + 4, pos + XM_INST_HEADER_SIZE + 4 + avail), 0);
+        const xxi: Instrument = {
+          name: '',
+          volume: 0x40,
+          nsm: 0,
+          rls: 0,
+          map: new Array<number>(121).fill(0),
+          mapXpo: new Array<number>(121).fill(0),
+          sub: [],
+          aei: zeroEnvelope(),
+          fei: zeroEnvelope(),
+          pei: zeroEnvelope(),
+        };
+        instruments[i] = xxi;
+        pos = bytes.length;
+        continue;
       }
       const b = bytes.subarray(pos + XM_INST_HEADER_SIZE + 4, pos + XM_INST_HEADER_SIZE + 4 + 208);
 
@@ -838,7 +929,7 @@ function loadInstruments(
       }
 
       if (version > 0x0103) {
-        const dataPos = pos;
+        let dataPos = pos;
         if (isOggSample(bytes, dataPos, raw.length)) {
           // oggdec: reads xsh[j].length raw bytes, sets xxs->len = n frames.
           const { pcm, frames } = oggDecode(bytes, dataPos, sh.length, raw.flags);
@@ -849,6 +940,12 @@ function loadInstruments(
           pos += sh.length;
           continue;
         }
+        if (dataPos + 8 > bytes.length) {
+          // C's is_ogg_sample probe consumed past EOF and the failed
+          // seek-back left the stream at EOF (xm_load.c:352-371) — the
+          // sample read then gets 0 bytes → zero-filled.
+          dataPos = bytes.length;
+        }
 
         // libxmp_load_sample(m, f, flags, xxs, NULL): reads bytelen =
         // xxs->len * framesize bytes, EOF zero-fills (sample.c:218-228,
@@ -858,7 +955,12 @@ function loadInstruments(
         const framelen = (raw.flags & SampleFlags.BITS16 ? 2 : 1) * (raw.flags & SampleFlags.STEREO ? 2 : 1);
         const bytelen = raw.length * framelen;
         const avail = Math.max(0, Math.min(bytelen, bytes.length - dataPos));
-        if (avail < bytelen) {
+        if (avail <= 0) {
+          // Sample starts at/after EOF: libxmp skips it entirely and
+          // xxs->data stays NULL (sample.c:216-228 "ignoring sample at
+          // EOF"). Keep an empty buffer to mirror that.
+          raw.data = new Uint8Array(0);
+        } else if (avail < bytelen) {
           // Short read → zero-fill the tail (sample.c:355-360).
           const buf = new Uint8Array(bytelen);
           buf.set(bytes.subarray(dataPos, dataPos + avail), 0);
@@ -916,12 +1018,17 @@ export function xmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   const flags = readmem16l(bytes, 74);
   const tempo = readmem16l(bytes, 76);
   const bpm = readmem16l(bytes, 78);
+  let modBpm = bpm;
 
   // Sanity checks (xm_load.c:807-829)
   if (songlen > 256) fail(`XM: bad song length ${songlen}`);
   if (patterns > 256) fail(`XM: bad pattern count ${patterns}`);
   if (instruments > 255) fail(`XM: bad instrument count ${instruments}`);
   if (channels > XMP_MAX_CHANNELS) fail(`XM: bad channel count ${channels}`);
+  // OpenMPT parity (Load_xm.cpp:700): clamp the declared count to
+  // MAX_INSTRUMENTS-1 — keygen-pack files (XMLiTE etc.) declare 256
+  // "placeholder" instruments; the file ends after the real ones.
+  const numInstruments = Math.min(instruments, 255);
 
   // FT2/MPT allow 255 BPM; OpenMPT 1000 (xm_load.c:832-838).
   const tracker = bytes.subarray(38, 58);
@@ -933,7 +1040,11 @@ export function xmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   })();
   if (tempo >= 32 || bpm < 32 || bpm > 1000) {
     if (!isMed2xm) {
-      fail(`XM: bad tempo or BPM ${tempo} ${bpm}`);
+      // OpenMPT parity (Load_xm.cpp:700-704): never reject — OpenMPT keeps
+      // loading, defaults speed 0 (no change) and clamps the tempo into
+      // xmEx's [32,1000] range. Keygen-pack files ship with a blank
+      // tracker name and garbage tempo/BPM fields.
+      modBpm = Math.min(Math.max(bpm, 32), 1000);
     }
   }
 
@@ -971,7 +1082,7 @@ export function xmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     comment: '',
     chn: channels,
     pat: patterns,
-    ins: instruments,
+    ins: numInstruments,
     len: songlen,
     restart: restart >= songlen ? 0 : restart,
     xxo: Array.from(order.subarray(0, songlen)),
@@ -982,7 +1093,7 @@ export function xmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     num_sequences: 0,
     sequences: [],
     speed: tempo,
-    bpm,
+    bpm: modBpm,
     volbase: 0x40,
     gvolbase: 0x40,
     gvol: 0x40,
