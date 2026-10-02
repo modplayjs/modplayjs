@@ -24,7 +24,8 @@
   },
   "dependencies": {
     "@modplayjs/core": "^0.1.0",
-    "@modplayjs/fmt-mod": "^0.1.0"
+    "@modplayjs/fmt-mod": "^0.1.0",
+    "@modplayjs/stb-vorbis": "*"
   },
   "keywords": [
     "mo3",
