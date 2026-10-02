@@ -268,7 +268,8 @@ function loadXmPattern(
       if (event.note === 0x61) {
         event.note = XMP_KEY_OFF;
       } else if (event.note > 0) {
-        event.note += 12;
+        // C: event->note is a uint8 — +12 wraps mod 256 (raw 0xf8 → 4).
+        event.note = (event.note + 12) & 0xff;
       }
 
       if (event.fxt === 0x0e) {
@@ -930,7 +931,11 @@ function loadInstruments(
 
       if (version > 0x0103) {
         let dataPos = pos;
-        if (isOggSample(bytes, dataPos, raw.length)) {
+        // C's is_ogg_sample requires len >= 4 BEFORE probing
+        // (xm_load.c:357-359) — shorter samples skip the probe entirely
+        // and their 2-byte tails load normally.
+        const probe = raw.length >= 4;
+        if (probe && isOggSample(bytes, dataPos, raw.length)) {
           // oggdec: reads xsh[j].length raw bytes, sets xxs->len = n frames.
           const { pcm, frames } = oggDecode(bytes, dataPos, sh.length, raw.flags);
           raw.data = pcm;
@@ -940,7 +945,7 @@ function loadInstruments(
           pos += sh.length;
           continue;
         }
-        if (dataPos + 8 > bytes.length) {
+        if (probe && dataPos + 8 > bytes.length) {
           // C's is_ogg_sample probe consumed past EOF and the failed
           // seek-back left the stream at EOF (xm_load.c:352-371) — the
           // sample read then gets 0 bytes → zero-filled.
@@ -1115,17 +1120,12 @@ export function xmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     trackerName += String.fromCharCode(tracker[i] ?? 0x20);
   }
   trackerName = trackerName.slice(0, 20);
-  // Trim trailing spaces (C loop replaces 0x20 with 0 from the end).
+  // C (xm_load.c:848-853): scan from index 20 down, converting spaces to
+  // NUL and stopping at the first non-NUL byte — i.e. strip ALL trailing
+  // spaces AND NULs, stopping at real content (' ' + 19 NULs → empty).
   let end = 20;
-  while (end > 0 && trackerName[end - 1] === ' ') end--;
+  while (end > 0 && (trackerName[end - 1] === ' ' || trackerName.charCodeAt(end - 1) === 0)) end--;
   trackerName = trackerName.slice(0, end);
-  // C's snprintf pads with spaces then the loop null-terminates runs of
-  // trailing spaces — embedded NULs in the tracker field already ended the
-  // string in our JS build (String.fromCharCode(0) kept); trim at first NUL:
-  {
-    const nul = trackerName.indexOf('\0');
-    if (nul >= 0) trackerName = trackerName.slice(0, nul);
-  }
 
   const claimsFt2 = (() => {
     // strncmp(tracker_name, "FastTracker v2.00", 17)

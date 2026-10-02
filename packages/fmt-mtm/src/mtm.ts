@@ -58,6 +58,18 @@ function readmem32l(m: Uint8Array, off: number): number {
 }
 
 /** libxmp_copy_adjust-style name (printable ASCII, trim). */
+function copyTitle(r: Uint8Array, n: number): string {
+  // C: strncpy(mod->name, name, n) is RAW — the control→' ' mapping happens
+  // later in libxmp_adjust_string (load.c:298). Only instrument/sample names
+  // go through libxmp_copy_adjust's dot substitution.
+  let s = '';
+  for (let i = 0; i < n && i < r.length; i++) {
+    const c = r[i]!;
+    if (c === 0) break;
+    s += String.fromCharCode(c);
+  }
+  return s.replace(/ +$/, '');
+}
 function copyAdjust(r: Uint8Array, n: number): string {
   let s = '';
   for (let i = 0; i < n && i < r.length; i++) {
@@ -325,7 +337,7 @@ export function mtmLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   }
 
   const mod: ModuleData = {
-    title: copyAdjust(name, 20),
+    title: copyTitle(name, 20),
     format: 'mtm',
     comment,
     chn: channels,

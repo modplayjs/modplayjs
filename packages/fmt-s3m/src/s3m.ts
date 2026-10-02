@@ -669,12 +669,17 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     tracksByEvent.push(tracks);
   }
 
-  // Read patterns (s3m_load.c:485-540)
+  // Read patterns (s3m_load.c:485-540). C allocates ALL pattern tracks
+  // first (alloc_pattern_tracks) and only skips the DATA read for a null
+  // parapointer — the pattern itself stays (empty) in the module.
   for (let i = 0; i < pat; i++) {
+    const tracks = tracksByEvent[i]!;
     if (ppPat[i] === 0) {
+      // C: alloc_pattern_tracks ran above; a null parapointer only skips
+      // the DATA read — the allocated (empty) pattern stays (s3m_load.c:489).
+      patterns.push({ rows: 64, tracks });
       continue;
     }
-
     const base = ppPat[i]! * 16;
     if (base + 2 > size) fail('S3M: read error in pattern header');
 
@@ -684,7 +689,6 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
 
     let r = 0;
     let remaining = patLen;
-    const tracks = tracksByEvent[i]!;
     while (remaining >= 0 && r < 64) {
       if (patPos >= size) fail('S3M: read error in pattern data');
       const b = bytes[patPos]!;
@@ -904,7 +908,11 @@ export function s3mLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     bpm,
     volbase: 0x40,
     gvolbase: 0x40,
-    gvol: sfh.gv,
+    // C ignores the S3M global-volume byte (s3m_load.c reads sfh.gv but
+    // never assigns it — "Claudio's fix: global volume ignored"); the
+    // module global volume stays at the libxmp_init default 0x40
+    // (load_helpers.c:304).
+    gvol: 0x40,
     quirks: quirk,
     flowMode,
     readEventType,

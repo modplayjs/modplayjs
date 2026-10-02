@@ -239,6 +239,18 @@ function zeroInstrument(name: string, sub: Instrument['sub']): Instrument {
 	};
 }
 
+function copyTitleName(r: Uint8Array, n: number): string {
+	// C: strncpy(mod->name, mh.name, 20) is RAW — the control→' ' mapping
+	// happens later in libxmp_adjust_string (load.c:298). Only instrument/
+	// sample names go through libxmp_copy_adjust's dot substitution.
+	let s = '';
+	for (let i = 0; i < n && i < r.length; i++) {
+		const c = r[i]!;
+		if (c === 0) break;
+		s += String.fromCharCode(c);
+	}
+	return s.replace(/ +$/, '');
+}
 function copyAdjustName(r: Uint8Array, n: number): string {
 	let s = '';
 	for (let i = 0; i < n && i < r.length; i++) {
@@ -447,7 +459,7 @@ export function stLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {	const size
 	}
 
 	const mod: ModuleData = {
-		title: copyAdjustName(mh.name, 20),
+		title: copyTitleName(mh.name, 20),
 		format: 'mod',
 		comment: '',
 		chn,

@@ -396,6 +396,13 @@ export class Core implements CoreIface {
             env.flags &= ~EnvelopeFlags.SUS;
           }
         }
+        // C's xmp_envelope.data is a fixed 32-pair array (calloc-zeroed);
+        // loaders memcpy only npt*4 bytes and points beyond npt stay zero.
+        // Zero-fill our sparse x/y so dumps and playback see the same.
+        for (const env of [ins.aei, ins.fei, ins.pei]) {
+          while (env.x.length < 32) env.x.push(0);
+          while (env.y.length < 32) env.y.push(0);
+        }
         // clamp_volume_envelope (load_helpers.c:302-311): volume values
         // clamped to m->volbase — C int16 data pairs (x, y), y clamped.
         if (ins.aei.flags & EnvelopeFlags.ON) {
@@ -409,6 +416,19 @@ export class Core implements CoreIface {
           }
         }
       }
+    }
+
+    // libxmp_load_epilogue parameter sanity (load_helpers.c:396-410):
+    // CLAMPs on len/pat/ins/smp/chn, restart fixup, and the tempo/BPM
+    // sanity (spd<=0||>255 → 6; bpm clamped to [XMP_MIN_BPM, 1000]).
+    {
+      mod.len = Math.max(0, Math.min(mod.len, 1024 /* XMP_MAX_MOD_LENGTH */));
+      mod.pat = Math.max(0, Math.min(mod.pat, 257));
+      mod.ins = Math.max(0, Math.min(mod.ins, 255));
+      mod.chn = Math.max(0, Math.min(mod.chn, 64 /* XMP_MAX_CHANNELS */));
+      if (mod.restart >= mod.len) mod.restart = 0;
+      if (mod.speed <= 0 || mod.speed > 255) mod.speed = 6;
+      mod.bpm = Math.max(20 /* XMP_MIN_BPM */, Math.min(1000, mod.bpm));
     }
 
     // Scan sequences (libxmp_scan_sequences): scan[chain] carries the

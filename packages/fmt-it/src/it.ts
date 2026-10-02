@@ -643,7 +643,8 @@ function loadOldItInstrument(bytes: Uint8Array, pos: number): { ins: Instrument;
       n++;
     }
     xxi.map[j] = instMap[c]!;
-    xxi.mapXpo[j] = keys[j * 2]! - j;
+    // C: xxi->map[j].xpo is int8 — wrap to signed (0xff → -1).
+    xxi.mapXpo[j] = ((keys[j * 2]! - j) << 24) >> 24;
   }
 
   xxi.nsm = n;
@@ -767,7 +768,8 @@ function loadNewItInstrument(bytes: Uint8Array, pos: number): { ins: Instrument;
       n++;
     }
     xxi.map[j] = instMap[c]!;
-    xxi.mapXpo[j] = keys[j * 2]! - j;
+    // C: xxi->map[j].xpo is int8 — wrap to signed (0xff → -1).
+    xxi.mapXpo[j] = ((keys[j * 2]! - j) << 24) >> 24;
   }
 
   xxi.nsm = n;
@@ -1058,6 +1060,12 @@ function loadItSample(
       const take = Math.min(bytelen, bytes.length - dataPos);
       raw.data = bytes.subarray(dataPos, dataPos + Math.max(0, take));
       if (cvt & SAMPLE_FLAG_UNS) raw.flags |= DecodeFlag.UNSIGNED;
+      // C: Modplug ADPCM4 (convert == 0xff) sets XMP_SAMPLE_ADPCM at
+      // it_load.c:935 regardless of the IT_SMP_COMP header flag — the
+      // sample then loads through libxmp_load_sample's SAMPLE_FLAG_ADPCM
+      // path (16-byte table + nibble expansion, no length truncation
+      // while the packed bound fits, sample.c:249-260).
+      if (cvt & SAMPLE_FLAG_ADPCM) raw.flags |= DecodeFlag.ADPCM;
     }
   }
 
@@ -1375,9 +1383,16 @@ export function itLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   if (readmem32b(bytes, 0) !== MAGIC_IMPM) fail('bad magic');
   const nameBuf = bytes.slice(4, 30);
   fixName(nameBuf, 26);
-  // Module title: libxmp_read_title(f, t, 26) → copy_adjust over 26 chars
-  // (it_load.c:51). Instrument/sample names use 25; the title uses 26.
-  const name = copyAdjust(nameBuf, 26);
+  // Module title: C it_load.c:1205 memcpy(mod->name, ifh.name, 26) is RAW —
+  // libxmp_adjust_string (load.c:298) maps control chars to ' ' afterwards.
+  // (libxmp_read_title only runs in the test function.)
+  let name = '';
+  for (let i = 0; i < 26 && i < nameBuf.length; i++) {
+    const c = nameBuf[i]!;
+    if (c === 0) break;
+    name += String.fromCharCode(c);
+  }
+  name = name.replace(/ +$/, '');
   const ifh: ItFileHeader = {
     name: nameBuf,
     hiliteMin: bytes[30]!,

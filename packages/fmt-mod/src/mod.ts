@@ -62,6 +62,18 @@ function isDigit(c: number): boolean {
 }
 
 /** libxmp_copy_adjust (common.c:237-253): keep printable ASCII, pad '.'. */
+function copyTitle(r: Uint8Array, n: number): string {
+  // C: strncpy(mod->name, name, n) is RAW — the control→' ' mapping happens
+  // later in libxmp_adjust_string (load.c:298). Only instrument/sample names
+  // go through libxmp_copy_adjust's dot substitution.
+  let s = '';
+  for (let i = 0; i < n && i < r.length; i++) {
+    const c = r[i]!;
+    if (c === 0) break;
+    s += String.fromCharCode(c);
+  }
+  return s.replace(/ +$/, '');
+}
 function copyAdjust(r: Uint8Array, n: number): string {
   let s = '';
   for (let i = 0; i < n && i < r.length; i++) {
@@ -815,7 +827,7 @@ export function modLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   }
 
   const mod: ModuleData = {
-    title: copyAdjust(patbuf0.subarray(0, 20), 20),
+    title: copyTitle(patbuf0.subarray(0, 20), 20),
     format: 'mod',
     comment: '',
     chn,
