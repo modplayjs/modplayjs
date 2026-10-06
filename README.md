@@ -99,7 +99,7 @@ contracts are documented in [docs/](docs/) —
 | `@modplayjs/fmt-prowizard` | ProWizard packed-MOD depackers (30 formats: PowerPacker, XPK, StoneArts, Starpack, …) |
 | `@modplayjs/fmt-mo3` | Un4seen MO3 container (XM/IT/S3M/MOD/MTM inner formats) |
 | `@modplayjs/fmt-fc` | Future Composer 1.0–1.4 (SMOD/FC14) with InstrumentSynth engine port |
-| `@modplayjs/fmt-sid` | Commodore 64 SID music (PSID/RSID) — full cRSID engine port (6510 CPU + SID chip + CIA/VIC) |
+| `@modplayjs/fmt-sid` | Commodore 64 SID music (PSID/RSID) — full cRSID engine port (6510 CPU + SID chip + CIA/VIC), live quality/stereo/volume + chip/video overrides |
 | `@modplayjs/stb-vorbis` | stb_vorbis Ogg Vorbis decoder (OpenMPT stb_vorbis.c port; bit-exact vs C) |
 | `@modplayjs/stream-audio` | WAV/MP3/OGG streamed-audio decode for file-based playback |
 | `@modplayjs/effects-shared` | Shared effect handlers and per-frame stages (frame-accurate C port) |

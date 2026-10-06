@@ -80,6 +80,9 @@ export interface cRSIDInterface {
   SongLengths: string | null;
   KERNALfileData: Uint8Array | null;
   BASICfileData: Uint8Array | null;
+  /** init-time override (settings UI): force 0=NTSC/1=PAL after the header
+   *  decode in cRSID_setC64 (undefined = follow the header). */
+  ForcedVideoStandard?: 0 | 1;
 }
 
 // ---------------------------------------------------------------------------

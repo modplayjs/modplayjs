@@ -143,6 +143,40 @@
             </div>
           </section>
 
+          <section class="card bg-base-100 shadow-sm border border-base-300" id="sidsection" hidden>
+            <div class="card-body p-3 gap-2">
+              <h2 class="text-[0.65rem] font-semibold uppercase tracking-[0.18em] opacity-50">SID settings</h2>
+              <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 items-center text-[0.72rem]">
+                <span class="opacity-60">chip</span>
+                <select id="sid-model" class="select select-sm w-full">
+                  <option value="0">header default</option>
+                  <option value="6581">MOS 6581</option>
+                  <option value="8580">MOS 8580</option>
+                </select>
+                <span class="opacity-60">video</span>
+                <select id="sid-video" class="select select-sm w-full">
+                  <option value="">header default</option>
+                  <option value="0">NTSC</option>
+                  <option value="1">PAL</option>
+                </select>
+                <span class="opacity-60" title="Light = sample-rate wave generation. HQ = cycle-based oversampled waveforms (cleaner combined waves).">quality</span>
+                <select id="sid-quality" class="select select-sm w-full" title="Light = sample-rate wave generation. HQ = cycle-based oversampled waveforms (cleaner combined waves).">
+                  <option value="light">light</option>
+                  <option value="hq">high quality</option>
+                  <option value="sinc">high quality + sinc resampler</option>
+                </select>
+                <span class="opacity-60" title="Channel mode for 2SID/3SID/4SID tunes">channels</span>
+                <select id="sid-stereo" class="select select-sm w-full" title="Channel mode for 2SID/3SID/4SID tunes">
+                  <option value="0">mono</option>
+                  <option value="1">stereo</option>
+                  <option value="3">narrow stereo</option>
+                </select>
+                <span class="opacity-60">engine vol</span>
+                <input type="range" id="sid-vol" class="range range-sm" min="0" max="255" value="255" />
+              </div>
+            </div>
+          </section>
+
         </div>
 
         <!-- center column: message (when present) + pattern -->

@@ -23,6 +23,7 @@
 import type { Core as CoreIface, DspPlugin, FormatPlugin, LoadCtx, ModuleData, Pattern } from '@modplayjs/core';
 
 import { cRSID_init, cRSID_initSIDtune, cRSID_generateSample, cRSID_processSIDfileData, cRSID_playSIDtune } from './loader.js';
+import { sidApplyInitOverrides } from './settings.js';
 import type { CRSIDheader } from './instance.js';
 
 /** Track count for the stub pattern: one silent channel. */
@@ -127,6 +128,7 @@ export function cRSID_sidLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
  */
 export function sidStartTune(bytes: Uint8Array, sampleRate: number, subtune = 1): void {
   cRSID_init(sampleRate, 0);
+  sidApplyInitOverrides(); // re-apply after cRSID_init wipes the globals
   const header = cRSID_processSIDfileData(bytes, bytes.length)!;
   cRSID_initSIDtune(header, subtune);
   cRSID_playSIDtune();

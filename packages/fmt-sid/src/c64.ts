@@ -137,6 +137,7 @@ export function cRSID_setC64(): void {
   let SIDchannel: number;
 
   cRSID.VideoStandard = ((h.ModelFormatStandard & 0x0c) >> 2) !== 2 ? 1 : 0;
+  if (cRSID.ForcedVideoStandard !== undefined) cRSID.VideoStandard = cRSID.ForcedVideoStandard; // settings override (init-time)
   if (cRSID_C64.SampleRate === 0) cRSID_C64.SampleRate = 44100;
   cRSID_C64.CPUfrequency = CPUspeeds[cRSID.VideoStandard]!;
   cRSID_C64.SampleClockRatio = ((cRSID_C64.CPUfrequency << CRSpecC64.CRSID_CLOCK_FRACTIONAL_BITS) / cRSID_C64.SampleRate) | 0; // shifting (multiplication) enhances SampleClockRatio precision

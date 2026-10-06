@@ -23,7 +23,7 @@ import { plugin as icePlugin } from '@modplayjs/fmt-ice';
 import { plugin as medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } from '@modplayjs/fmt-med';
 import { plugin as stPlugin } from '@modplayjs/fmt-st';
 import { plugin as mo3Plugin } from '@modplayjs/fmt-mo3';
-import { plugin as sidPlugin, sidDsp, sidStartTune } from '@modplayjs/fmt-sid';
+import { plugin as sidPlugin, sidDsp, sidStartTune, applySidSettingsLive, type SidSettings } from '@modplayjs/fmt-sid';
 import { plugin as fcPlugin, fcEffect, setModEventReader } from '@modplayjs/fmt-fc';
 import { createStreamedSource, detectStreamedFormat, type StreamedSource, type StreamedFormat } from '@modplayjs/stream-audio';
 import { pwPlugin } from '@modplayjs/fmt-prowizard';
@@ -55,6 +55,13 @@ const volumeV = document.getElementById('volumev') as HTMLSpanElement;
 const infoEl = document.getElementById('info') as HTMLElement;
 const msgEl = document.getElementById('message') as HTMLPreElement;
 const msgSection = document.getElementById('messagesection') as HTMLElement;
+// SID settings panel (visible only when a .sid is loaded)
+const sidSection = document.getElementById('sidsection') as HTMLElement;
+const sidModelSel = document.getElementById('sid-model') as HTMLSelectElement;
+const sidVideoSel = document.getElementById('sid-video') as HTMLSelectElement;
+const sidQualitySel = document.getElementById('sid-quality') as HTMLSelectElement;
+const sidStereoSel = document.getElementById('sid-stereo') as HTMLSelectElement;
+const sidVolRange = document.getElementById('sid-vol') as HTMLInputElement;
 const ordEl = document.getElementById('ordlist') as HTMLDivElement;
 const insEl = document.getElementById('inslist') as HTMLDivElement;
 const smpEl = document.getElementById('samplist') as HTMLDivElement;
@@ -732,8 +739,10 @@ async function loadTrack(file: Blob): Promise<void> {
   if (mod.format === 'sid') {
     sidBytes = bytes;
     core.setDsp('sid');
+    sidSection.hidden = false;
   } else {
     sidBytes = null;
+    sidSection.hidden = true;
     core.setDsp('softmixer');
   }
   loaded = true;
@@ -761,6 +770,45 @@ async function loadTrack(file: Blob): Promise<void> {
     ' | tracker: ' + mod.tracker,
   );
 }
+
+// ----------------------------------------------------- SID settings panel --
+
+/** Re-init the engine (model/video changes) and resume at the same play
+ *  state: sidStartTune re-runs initSIDtune which restarts the tune. */
+async function reinitSidEngine(): Promise<void> {
+  if (!sidBytes) return;
+  const wasPlaying = playing;
+  if (playing || paused) output.stop();
+  playing = false;
+  paused = false;
+  core.setSampleRate(await output.deviceSampleRate());
+  if (wasPlaying || paused) {
+    await startPlayback(false);
+  } else {
+    sidStartTune(sidBytes, await output.deviceSampleRate(), 1);
+  }
+}
+
+function readSidSettings(): SidSettings {
+  const q = sidQualitySel.value;
+  const hq = q !== 'light';
+  return {
+    volume: Number(sidVolRange.value),
+    highQualitySID: hq,
+    highQualityResampler: q === 'sinc',
+    stereo: Number(sidStereoSel.value) as 0 | 1 | 3,
+    model: Number(sidModelSel.value) as 0 | 6581 | 8580,
+    videoStandard: sidVideoSel.value === '' ? undefined : (Number(sidVideoSel.value) as 0 | 1),
+  };
+}
+
+sidVolRange.addEventListener('input', () => {
+  applySidSettingsLive(readSidSettings());
+});
+sidQualitySel.addEventListener('change', () => applySidSettingsLive(readSidSettings()));
+sidStereoSel.addEventListener('change', () => applySidSettingsLive(readSidSettings()));
+sidModelSel.addEventListener('change', () => void reinitSidEngine());
+sidVideoSel.addEventListener('change', () => void reinitSidEngine());
 
 // --------------------------------------------------------------- playlist --
 

@@ -60,6 +60,27 @@ The engine renders through the `sid` DSP plugin at exact host-buffer
 pacing; the tracker player just keeps the pipeline flowing. Loop
 semantics: the stub module loops forever (`loop=0` in `playBuffer`).
 
+## Settings
+
+```ts
+import { getSidSettings, applySidSettings } from '@modplayjs/fmt-sid';
+
+applySidSettings({
+  volume: 255,              // 0..255 engine master volume
+  highQualitySID: true,     // oversampled waveform path (light = sample-rate)
+  highQualityResampler: false, // Sinc FIR decimator (only with highQualitySID)
+  stereo: 0,                // 0 mono / 1 stereo / 3 narrow (2SID+ tunes)
+  model: 0,                 // 0 header default / 6581 / 8580 (forced)
+  videoStandard: undefined, // undefined header default / 0 NTSC / 1 PAL
+});
+```
+
+`volume`, `highQualitySID`, `highQualityResampler` and `stereo` apply
+**live** (the engine reads them through its per-sample shadow sync, as in
+the C host). `model` and `videoStandard` are **init-time** — they take
+effect on the next `sidStartTune` call (the C player re-inits the tune for
+these as well). `getSidSettings()` reads the current values back.
+
 ## Also exports
 
 Full engine surface for direct use without the player core:
