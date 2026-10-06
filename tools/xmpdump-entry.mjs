@@ -15,4 +15,5 @@ export { plugin as icePlugin } from '@modplayjs/fmt-ice';
 export { plugin as medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } from '@modplayjs/fmt-med';
 export { plugin as stPlugin } from '@modplayjs/fmt-st';
 export { plugin as mo3Plugin } from '@modplayjs/fmt-mo3';
+export { plugin as sidPlugin } from '@modplayjs/fmt-sid';
 export { plugin as fcPlugin } from '@modplayjs/fmt-fc';

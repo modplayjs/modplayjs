@@ -46,7 +46,7 @@ console.error(`scanning ${files.length} files...`);
 
 const esbuild = (await import('esbuild')).default;
 const aliasMap = Object.fromEntries(
-  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi', 'fmt-asylum', 'fmt-ice', 'fmt-prowizard', 'fmt-med', 'fmt-st', 'fmt-mo3', 'fmt-fc']
+  ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi', 'fmt-asylum', 'fmt-ice', 'fmt-prowizard', 'fmt-med', 'fmt-st', 'fmt-mo3', 'fmt-fc', 'fmt-sid']
     .map(p => [`@modplayjs/${p}`, join(repo, `packages/${p}/src/index.ts`)]));
 const bundle = join(repo, 'out/coverage-bundle.mjs');
 await esbuild.build({

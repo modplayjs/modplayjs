@@ -1,0 +1,50 @@
+{
+  "name": "@modplayjs/fmt-sid",
+  "version": "0.1.0",
+  "description": "Commodore 64 SID music (PSID/RSID) format plugin for modplayjs — pristine 1:1 TypeScript port of libcRSID 1.58 by Hermit (Mihaly Horvath).",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modplayjs/core": "^0.1.0"
+  },
+  "keywords": [
+    "sid",
+    "psid",
+    "rsid",
+    "c64",
+    "commodore 64",
+    "chiptune",
+    "audio",
+    "music",
+    "crsid"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/modplayjs/modplayjs.git",
+    "directory": "packages/fmt-sid"
+  },
+  "bugs": "https://github.com/modplayjs/modplayjs/issues",
+  "homepage": "https://github.com/modplayjs/modplayjs#readme",
+  "license": "BSD-3-Clause",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}

@@ -18,4 +18,5 @@ export { plugin as medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } f
 export { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
 export { encodeWavStereo } from '@modplayjs/out-pcm';
 export { plugin as mo3Plugin } from '@modplayjs/fmt-mo3';
+export { plugin as sidPlugin, sidDsp, sidStartTune } from '@modplayjs/fmt-sid';
 export { plugin as fcPlugin, fcEffect } from '@modplayjs/fmt-fc';

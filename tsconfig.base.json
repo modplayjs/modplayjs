@@ -35,6 +35,7 @@
       "@modplayjs/fmt-st": ["packages/fmt-st/src/index.ts"],
       "@modplayjs/stb-vorbis": ["packages/stb-vorbis/src/index.ts"],
       "@modplayjs/fmt-mo3": ["packages/fmt-mo3/src/index.ts"],
+      "@modplayjs/fmt-sid": ["packages/fmt-sid/src/index.ts"],
       "@modplayjs/fmt-fc": ["packages/fmt-fc/src/index.ts"],
       "@modplayjs/stream-audio": ["packages/stream-audio/src/index.ts"],
       "@modplayjs/fmt-mod": ["packages/fmt-mod/src/index.ts"],

@@ -83,6 +83,7 @@ export default defineConfig(({ command }) => ({
       { find: '@modplayjs/fmt-med', replacement: resolve(__dirname, '../../packages/fmt-med/src/index.ts') },
       { find: '@modplayjs/fmt-st', replacement: resolve(__dirname, '../../packages/fmt-st/src/index.ts') },
       { find: '@modplayjs/fmt-mo3', replacement: resolve(__dirname, '../../packages/fmt-mo3/src/index.ts') },
+      { find: '@modplayjs/fmt-sid', replacement: resolve(__dirname, '../../packages/fmt-sid/src/index.ts') },
       { find: '@modplayjs/fmt-fc', replacement: resolve(__dirname, '../../packages/fmt-fc/src/index.ts') },
       { find: '@modplayjs/stb-vorbis', replacement: resolve(__dirname, '../../packages/stb-vorbis/src/index.ts') },
       { find: '@modplayjs/stream-audio', replacement: resolve(__dirname, '../../packages/stream-audio/src/index.ts') },

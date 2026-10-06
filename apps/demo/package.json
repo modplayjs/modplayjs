@@ -28,6 +28,7 @@
     "@modplayjs/fmt-prowizard": "*",
     "@modplayjs/fmt-s3m": "*",
     "@modplayjs/fmt-sfx": "*",
+    "@modplayjs/fmt-sid": "*",
     "@modplayjs/fmt-stm": "*",
     "@modplayjs/fmt-xm": "*",
     "@modplayjs/out-pcm": "*",

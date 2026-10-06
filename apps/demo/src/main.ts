@@ -23,6 +23,7 @@ import { plugin as icePlugin } from '@modplayjs/fmt-ice';
 import { plugin as medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } from '@modplayjs/fmt-med';
 import { plugin as stPlugin } from '@modplayjs/fmt-st';
 import { plugin as mo3Plugin } from '@modplayjs/fmt-mo3';
+import { plugin as sidPlugin, sidStartTune } from '@modplayjs/fmt-sid';
 import { plugin as fcPlugin, fcEffect, setModEventReader } from '@modplayjs/fmt-fc';
 import { createStreamedSource, detectStreamedFormat, type StreamedSource, type StreamedFormat } from '@modplayjs/stream-audio';
 import { pwPlugin } from '@modplayjs/fmt-prowizard';
@@ -94,6 +95,7 @@ core.registries.registerFormat(med3Plugin);
 core.registries.registerFormat(med4Plugin);
 core.registries.registerFormat(stPlugin);
 core.registries.registerFormat(mo3Plugin);
+core.registries.registerFormat(sidPlugin);
 core.registries.registerFormat(fcPlugin);
 core.registries.registerEffect(fcEffect);
 setModEventReader((c: Core, chn: number, row: number) => {
@@ -682,6 +684,8 @@ async function addFiles(files: File[]): Promise<void> {
 
 // Streamed-audio state (WAV/MP3/OGG): decoded source + pull shim.
 let streamed: StreamedSource | null = null;
+// Raw bytes of the currently-loaded .sid (engine is started at play time).
+let sidBytes: Uint8Array | null = null;
 // Format of the currently loaded streamed track (WAV/MP3/OGG).
 const streamedFormat2: { v: StreamedFormat | null } = { v: null };
 
@@ -723,7 +727,14 @@ async function loadTrack(file: Blob): Promise<void> {
   const mod = core.module;
   if (!mod) throw new StateError('module did not load');
   // A/B against XMPlay: everything through softmixer (libxmp-parity mixer).
-  core.setDsp('softmixer');
+  // SID (.sid) drives its own sample-paced engine via the 'sid' DSP.
+  if (mod.format === 'sid') {
+    sidBytes = bytes;
+    core.setDsp('sid');
+  } else {
+    sidBytes = null;
+    core.setDsp('softmixer');
+  }
   loaded = true;
   playBtn.disabled = false;
   playBtn.textContent = 'Play';
@@ -917,6 +928,9 @@ async function startPlayback(muteSong: boolean): Promise<void> {
     return;
   }
   core.setSampleRate(deviceRate);
+  // SID: start the cRSID engine for this tune at the device rate before the
+  // player spins (the 'sid' DSP pulls samples from it inside renderFrame).
+  if (sidBytes && core.module?.format === 'sid') sidStartTune(sidBytes, deviceRate, 1);
   core.startSmix(4); // reserve channels for instrument/sample audition
   core.startPlayer();
   // startPlayer resets master_vol to 100 (parity with C's

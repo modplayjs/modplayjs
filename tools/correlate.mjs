@@ -62,8 +62,8 @@ mkdirSync(outDir, { recursive: true });
 const base = basename(file);
 const name = base.replace(/\.[^.]+$/, '');
 const ext = (base.match(/\.[^.]+$/) || [''])[0].toLowerCase();
-if (!['.mod', '.s3m', '.xm', '.it', '.mtm', '.stm', '.669', '.sfx', '.digi', '.asylum', '.ice', '.med', '.mmd1', '.mmd2', '.mmd3', '.mmdc', '.mo3', '.fc13', '.fc14', '.smod'].includes(ext)) {
-  console.error(`unsupported extension ${ext} (need .mod/.s3m/.xm/.it/mtm/stm/669/sfx/digi/asylum/ice)`);
+if (!['.mod', '.s3m', '.xm', '.it', '.mtm', '.stm', '.669', '.sfx', '.digi', '.asylum', '.ice', '.med', '.mmd1', '.mmd2', '.mmd3', '.mmdc', '.mo3', '.fc13', '.fc14', '.smod', '.sid'].includes(ext)) {
+  console.error(`unsupported extension ${ext} (need .mod/.s3m/.xm/.it/mtm/stm/669/sfx/digi/asylum/ice/sid)`);
   process.exit(2);
 }
 
@@ -71,7 +71,7 @@ if (!['.mod', '.s3m', '.xm', '.it', '.mtm', '.stm', '.669', '.sfx', '.digi', '.a
 const esbuild = (await import('esbuild')).default ?? (await import('esbuild'));
 const aliasMap = Object.fromEntries(
   ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it',
-   'dsp-paula', 'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm', 'fmt-st']
+   'dsp-paula', 'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm', 'fmt-st', 'fmt-sid']
     .map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
 const ourBundle = resolve(outDir, 'our-player.mjs');
 await esbuild.build({
@@ -90,7 +90,7 @@ const oursWav = resolve(outDir, `${name}-ours-48k.wav`);
 {
   const script = `
 import { readFileSync, writeFileSync } from 'fs';
-import { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, stPlugin, mtmPlugin, stmPlugin, s69Plugin, sfxPlugin, digiPlugin, asylumPlugin, icePlugin, medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin, mo3Plugin, fcPlugin, fcEffect, createSoftMixerPlugin, encodeWavStereo } from ${JSON.stringify(ourBundle)};
+import { CorePlayer, modPlugin, hmnPlugin, fltPlugin, pwPlugin, s3mPlugin, xmPlugin, itPlugin, stPlugin, mtmPlugin, stmPlugin, s69Plugin, sfxPlugin, digiPlugin, asylumPlugin, icePlugin, medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin, mo3Plugin, fcPlugin, fcEffect, sidPlugin, sidDsp, sidStartTune, createSoftMixerPlugin, encodeWavStereo } from ${JSON.stringify(ourBundle)};
 const core = new CorePlayer();
 core.registries.registerFormat(modPlugin);
 core.registries.registerFormat(hmnPlugin);
@@ -114,13 +114,16 @@ core.registries.registerFormat(med3Plugin);
 core.registries.registerFormat(med4Plugin);
 core.registries.registerFormat(mo3Plugin);
 core.registries.registerFormat(fcPlugin);
+core.registries.registerFormat(sidPlugin);
 core.registries.registerEffect(fcEffect);
 core.registries.registerDsp(createSoftMixerPlugin());
+core.registries.registerDsp(sidDsp);
+const isSid = ${JSON.stringify(ext)} === '.sid';
+const full = ${JSON.stringify(resolve(repo, file))};
 {
   // Startrekker AM sidecar (flt_load.c:338-352): .mod.nt / .NT / .AS next
   // to the module file.
   const { basename, join, dirname } = await import('path');
-  const full = ${JSON.stringify(resolve(repo, file))};
   const base = basename(full);
   const stem = base.replace(/\.[^.]*$/, '');
   let sidecarNt;
@@ -133,9 +136,16 @@ core.registries.registerDsp(createSoftMixerPlugin());
   }
   core.loadModule(new Uint8Array(readFileSync(full)), { sidecarNt });
 }
-core.setDsp('softmixer');
-core.setSampleRate(48000);
-core.startPlayer();
+if (isSid) {
+  core.setDsp('sid');
+  core.setSampleRate(48000);
+  core.startPlayer();
+  sidStartTune(new Uint8Array(readFileSync(full)), 48000, 1);
+} else {
+  core.setDsp('softmixer');
+  core.setSampleRate(48000);
+  core.startPlayer();
+}
 const out = new Float32Array(48000);
 const pcm = [];
 let frames = 0;
@@ -166,6 +176,7 @@ const refWav = resolve(outDir, `${name}-ref-48k.wav`);
 const refSrc = resolve(repo, 'tools/xmpref.c');
 const refBin = resolve(outDir, 'xmpref');
 const isMo3 = ext === '.mo3' || ext === '.fc13' || ext === '.fc14' || ext === '.smod';
+const isSid = ext === '.sid';
 if (!existsSync(libxmpA)) {
   console.error(
     `reference libxmp archive not found: ${libxmpA}\n` +
@@ -177,7 +188,17 @@ if (!skipBuild || !existsSync(refBin)) {
     '-I' + resolve(repo, 'reference/libxmp/include'), '-lm'], { stdio: 'pipe' });
 }
 const capFrames = seconds ? seconds * 48000 : 0;
-if (isMo3) {
+if (isSid) {
+  // SID reference = cRSID oracle (/tmp/sidref, built from reference/cRSID-1.58):
+  //   sidref <file.sid> <out.wav> <seconds> [subtune] [rate]
+  const sidrefBin = '/tmp/sidref';
+  if (!existsSync(sidrefBin)) {
+    console.error('SID oracle missing: build it from reference/cRSID-1.58 (tools/sidref main, see README)');
+    process.exit(1);
+  }
+  spawnSync(sidrefBin, [resolve(repo, file), refWav, String(seconds || 600), '1', '48000'],
+    { stdio: 'inherit' });
+} else if (isMo3) {
   const omptBin = '/tmp/omptref';
   spawnSync(omptBin, [resolve(repo, file), refWav, String(capFrames || 4800 * 48000)],
     { stdio: 'inherit' });
