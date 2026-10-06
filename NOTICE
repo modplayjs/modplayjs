@@ -28,3 +28,27 @@ copyrights and licenses remain in force for that material.
    src/platform/audio-web.js.
    License: MIT.
    https://github.com/RednibCoding/Paula-Tracker
+
+4. cRSID (libcRSID 1.58) — WTF license (public-domain style; author requests
+   attribution)
+   Copyright (C) 2025-2026 Mihály Horváth (Hermit)
+   Ported from: libcRSID/ — C64 SID emulation: 6510 CPU (C64/CPU.c),
+   SID chip (C64/SID*.c/h), CIA (C64/CIA.c), VIC (C64/VIC.c),
+   memory banking (C64/MEM.c), emulation core (C64/C64*.c), PSID/RSID
+   loader (host/file.c), API (libcRSID.c/h).
+   License: WTF — "do what the frick you want", original author asks to be
+   mentioned. All tables (combined waveforms, filter curves, Sinc window,
+   ADSR DAC) are verbatim copies from the reference.
+   https://csdb.dk/release/?id=261057 (reference copy: reference/cRSID-1.58)
+
+5. stb_vorbis — public domain
+   Originally by Sean Barrett (nothings), OpenMPT-bundled copy ported.
+   Ported from: reference/openmpt/include/stb_vorbis/stb_vorbis.c
+   (decoder verified bit-exact against the C build).
+   https://github.com/nothings/stb
+
+6. minimp3 — public domain / CC0
+   By lieff; OpenMPT-bundled copy ported to TypeScript.
+   Ported from: reference/openmpt/include/minimp3/minimp3.h
+   (Layer-III decoder used by fmt-mo3 for MP3-compressed samples).
+   https://github.com/lieff/minimp3
