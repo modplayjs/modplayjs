@@ -765,7 +765,7 @@ export class Core implements CoreIface {
       // C checks ret<0 || loop_count>=loop BEFORE copying the frame;
       // the crossing frame is discarded, and the NEXT call (filled==0)
       // returns -1 (player.c:2196-2206).
-      if (n < 0 || (loop > 0 && this._p.loop_count >= loop)) {
+      if (n < 0 || (loop > 0 && !this._module?.endless && this._p.loop_count >= loop)) {
         if (total === 0) return -1; // start of buffer → end of replay
         break; // last buffer: caller sees a short read
       }

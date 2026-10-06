@@ -112,6 +112,7 @@ export function cRSID_sidLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     c4rate: 8363,
     compare_vblank: false,
     tracker: `cRSID (PSID v${header.Version})`,
+    endless: true, // SID tunes never end — playBuffer treats loop as infinite
   };
   return mod;
 }

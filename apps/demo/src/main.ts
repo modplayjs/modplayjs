@@ -196,6 +196,7 @@ function moduleDuration(): number {
   if (streamed) return streamed.duration;
   const mod = core.module;
   if (!mod) return 0;
+  if (mod.endless) return 0; // endless engine (SID): no declared length
   let total = 0;
   for (const seq of mod.sequences) total += seq.duration;
   return total;
@@ -751,10 +752,10 @@ async function loadTrack(file: Blob): Promise<void> {
   pauseBtn.disabled = true;
   stopBtn.disabled = true;
   setAuditionButtons(false);
-  seek.disabled = false;
+  seek.disabled = !!core.module?.endless; // endless engines (SID): no seek bar
   seek.value = '0';
   timeCur.textContent = '0:00';
-  timeRem.textContent = '-' + fmtTime(moduleDuration());
+  timeRem.textContent = core.module?.endless ? '∞' : '-' + fmtTime(moduleDuration());
   curPattern = -1;
   curRow = -1;
   renderInfo();
@@ -1102,7 +1103,7 @@ function frame(): void {
         seek.style.setProperty('--fill', (pct / 10).toFixed(1) + '%');
       }
       timeCur.textContent = fmtTime(cur);
-      timeRem.textContent = '-' + fmtTime(dur - cur);
+      timeRem.textContent = dur > 0 ? '-' + fmtTime(dur - cur) : '∞';
     } else if (latched) {
       // Reposition pending: show the target while the audio thread catches up.
       timeCur.textContent = fmtTime(seekTarget);

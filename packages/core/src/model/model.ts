@@ -460,6 +460,9 @@ export interface ModuleData {
   tracker: string;
   /** m->extra module-level extras (HMN/FLT set kind; else 'none'). */
   extras?: ModuleExtras;
+  /** Endless module (sample-paced engines like SID): playback never ends —
+   *  playBuffer ignores loop-count termination (loop acts as infinite). */
+  endless?: boolean;
 }
 
 // ---------------------------------------------------------------------------
