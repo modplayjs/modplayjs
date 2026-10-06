@@ -86,6 +86,7 @@ export * from './model/model.js';
 export { ModplayError, UnknownFormatError, ParseError, PackedModuleError, StateError, PluginNotFoundError, SampleError } from './errors.js';
 export { VirtualLayer, PastNote, VIRT_INVALID, keyInstruments } from './virtual.js';
 export { SampleStore, DecodeFlag, adpcm4Decode } from './samples.js';
+export { md5Hex } from './depack/md5.js';
 export { Registries } from './registry.js';
 export {
   Scanner,

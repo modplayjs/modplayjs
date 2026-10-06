@@ -438,13 +438,19 @@ export class Core implements CoreIface {
     this.ordInfo = res.xxo_info;
     this._sequenceControl = res.sequence_control;
     mod.num_sequences = res.num_sequences;
+    // Endless engines (SID) declare their real tune length in the loader —
+    // the scanner only sees the stub pattern, so keep those durations.
+    const endlessDurations = mod.endless ? mod.sequences.map((sq) => sq.duration) : [];
     mod.sequences = [];
     for (let i = 0; i < res.num_sequences; i++) {
       const epOrd = res.entry_points[i] ?? 0;
       mod.sequences.push({
         ord: i,
         entry_point: epOrd,
-        duration: Math.max(0, Math.min(res.scan[i]?.time ?? 0, 2147483647)),
+        duration:
+          mod.endless && endlessDurations[i]
+            ? endlessDurations[i]!
+            : Math.max(0, Math.min(res.scan[i]?.time ?? 0, 2147483647)),
         time: res.scan[i]?.time ?? 0,
         speed: res.xxo_info[epOrd]?.speed ?? 0,
         bpm: res.xxo_info[epOrd]?.bpm ?? 0,

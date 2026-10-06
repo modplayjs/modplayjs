@@ -23,6 +23,7 @@
 import type { Core as CoreIface, DspPlugin, FormatPlugin, LoadCtx, ModuleData, Pattern } from '@modplayjs/core';
 
 import { cRSID_init, cRSID_initSIDtune, cRSID_generateSample, cRSID_processSIDfileData, cRSID_playSIDtune } from './loader.js';
+import { applySongLengthsFor } from './songlengths.js';
 import { sidApplyInitOverrides } from './settings.js';
 import type { CRSIDheader } from './instance.js';
 
@@ -57,6 +58,12 @@ export function cRSID_sidLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     throw new Error('fmt-sid: not a PSID/RSID file');
   }
 
+  // HVSC Songlengths lookup (no-op until a DB is loaded): fills
+  // cRSID.SubtuneDurations like the C host's cRSID_getPlaylengths.
+  const durations = applySongLengthsFor(bytes, header.SubtuneAmount);
+  const subtune = header.DefaultSubtune || 1;
+  const tuneSeconds = durations[subtune] ?? durations[1] ?? 0;
+
   // Stub tracker module: 1 order, 1 pattern, silent; the SID DSP produces
   // all audio. speed/bpm chosen so ticksize ≈ 25 samples/tick at 44.1kHz
   // (irrelevant to output, only paces playBuffer chunks).
@@ -89,7 +96,7 @@ export function cRSID_sidLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
       {
         ord: 0,
         entry_point: 0,
-        duration: 0,
+        duration: Math.round(tuneSeconds * 1000),
         time: 0,
         speed: 6,
         bpm: 125,
@@ -131,6 +138,7 @@ export function sidStartTune(bytes: Uint8Array, sampleRate: number, subtune = 1)
   cRSID_init(sampleRate, 0);
   sidApplyInitOverrides(); // re-apply after cRSID_init wipes the globals
   const header = cRSID_processSIDfileData(bytes, bytes.length)!;
+  applySongLengthsFor(bytes, header.SubtuneAmount); // re-fill SubtuneDurations (init resets)
   cRSID_initSIDtune(header, subtune);
   cRSID_playSIDtune();
 }

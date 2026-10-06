@@ -695,6 +695,24 @@ async function addFiles(files: File[]): Promise<void> {
 let streamed: StreamedSource | null = null;
 // Raw bytes of the currently-loaded .sid (engine is started at play time).
 let sidBytes: Uint8Array | null = null;
+// HVSC Songlengths.md5 loader (lazy, once) — gives SID tunes their runtime.
+let sidLengthsPromise: Promise<boolean> | null = null;
+async function ensureSidLengths(): Promise<boolean> {
+  if (isSidSongLengthDbLoaded()) return true;
+  if (!sidLengthsPromise) {
+    sidLengthsPromise = fetch('./Songlengths.md5')
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+      .then((t) => {
+        loadSidSongLengths(t);
+        return true;
+      })
+      .catch(() => {
+        console.warn('Songlengths.md5 not available — SID runtimes unknown');
+        return false;
+      });
+  }
+  return sidLengthsPromise;
+}
 // Format of the currently loaded streamed track (WAV/MP3/OGG).
 const streamedFormat2: { v: StreamedFormat | null } = { v: null };
 
@@ -738,6 +756,7 @@ async function loadTrack(file: Blob): Promise<void> {
   // A/B against XMPlay: everything through softmixer (libxmp-parity mixer).
   // SID (.sid) drives its own sample-paced engine via the 'sid' DSP.
   if (mod.format === 'sid') {
+    await ensureSidLengths();
     sidBytes = bytes;
     core.setDsp('sid');
     sidSection.hidden = false;
