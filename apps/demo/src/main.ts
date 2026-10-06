@@ -23,7 +23,7 @@ import { plugin as icePlugin } from '@modplayjs/fmt-ice';
 import { plugin as medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } from '@modplayjs/fmt-med';
 import { plugin as stPlugin } from '@modplayjs/fmt-st';
 import { plugin as mo3Plugin } from '@modplayjs/fmt-mo3';
-import { plugin as sidPlugin, sidStartTune } from '@modplayjs/fmt-sid';
+import { plugin as sidPlugin, sidDsp, sidStartTune } from '@modplayjs/fmt-sid';
 import { plugin as fcPlugin, fcEffect, setModEventReader } from '@modplayjs/fmt-fc';
 import { createStreamedSource, detectStreamedFormat, type StreamedSource, type StreamedFormat } from '@modplayjs/stream-audio';
 import { pwPlugin } from '@modplayjs/fmt-prowizard';
@@ -105,6 +105,7 @@ setModEventReader((c: Core, chn: number, row: number) => {
 core.registries.registerFormat(pwPlugin);
 core.registries.registerDsp(createPaulaPlugin());
 core.registries.registerDsp(createSoftMixerPlugin());
+core.registries.registerDsp(sidDsp);
 
 buildHashEl.textContent = __GIT_HASH__;
 
