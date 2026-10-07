@@ -24,6 +24,7 @@ import type { Core as CoreIface, DspPlugin, FormatPlugin, LoadCtx, ModuleData, P
 
 import { cRSID_init, cRSID_initSIDtune, cRSID_generateSample, cRSID_processSIDfileData, cRSID_playSIDtune } from './loader.js';
 import { applySongLengthsFor } from './songlengths.js';
+import { sidRememberTune } from './sidseek.js';
 import { sidApplyInitOverrides } from './settings.js';
 import type { CRSIDheader } from './instance.js';
 
@@ -139,6 +140,7 @@ export function sidStartTune(bytes: Uint8Array, sampleRate: number, subtune = 1)
   sidApplyInitOverrides(); // re-apply after cRSID_init wipes the globals
   const header = cRSID_processSIDfileData(bytes, bytes.length)!;
   applySongLengthsFor(bytes, header.SubtuneAmount); // re-fill SubtuneDurations (init resets)
+  sidRememberTune(bytes, header, subtune, sampleRate);
   cRSID_initSIDtune(header, subtune);
   cRSID_playSIDtune();
 }

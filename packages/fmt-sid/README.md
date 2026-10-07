@@ -85,6 +85,20 @@ Note: `stereo` only routes differently on multi-SID tunes (PSID v3+ with
 a SID2 address in the header) — single-SID tunes always play mono, so
 `getSidChipCount()` lets players disable the control for them.
 
+## Seek
+
+```ts
+import { sidSeek, getSidPlayTimeSeconds } from '@modplayjs/fmt-sid';
+
+sidSeek(180);                        // fast-forward the engine to 3:00
+const t = getSidPlayTimeSeconds();   // engine runtime in seconds
+```
+
+cRSID has no native seek — `sidSeek` fast-forwards the machine emulation
+(rendering the skipped samples into a discard buffer, ≈20× realtime) and
+restarts the tune first for backwards seeks. Pair with the Songlengths
+database for a working seek bar on known tunes.
+
 ## Also exports
 
 Full engine surface for direct use without the player core:

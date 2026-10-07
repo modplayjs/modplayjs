@@ -33,3 +33,4 @@ export { cRSID_init, cRSID_initSIDtune, cRSID_generateSample, cRSID_processSIDfi
 export { cRSID, cRSID_C64 } from './instance.js';
 export { getSidSettings, applySidSettings, applySidSettingsLive, getSidChipCount, type SidSettings, type SidModel, type SidStereo } from './settings.js';
 export { loadSidSongLengths, applySongLengthsFor, getSidSubtuneDuration, parseSongLength, isSidSongLengthDbLoaded } from './songlengths.js';
+export { sidSeek, getSidPlayTimeSeconds } from './sidseek.js';

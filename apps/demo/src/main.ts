@@ -23,7 +23,7 @@ import { plugin as icePlugin } from '@modplayjs/fmt-ice';
 import { plugin as medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } from '@modplayjs/fmt-med';
 import { plugin as stPlugin } from '@modplayjs/fmt-st';
 import { plugin as mo3Plugin } from '@modplayjs/fmt-mo3';
-import { plugin as sidPlugin, sidDsp, sidStartTune, applySidSettingsLive, loadSidSongLengths, isSidSongLengthDbLoaded, getSidChipCount, type SidSettings } from '@modplayjs/fmt-sid';
+import { plugin as sidPlugin, sidDsp, sidStartTune, applySidSettingsLive, loadSidSongLengths, isSidSongLengthDbLoaded, getSidChipCount, sidSeek, getSidPlayTimeSeconds, type SidSettings } from '@modplayjs/fmt-sid';
 import { plugin as fcPlugin, fcEffect, setModEventReader } from '@modplayjs/fmt-fc';
 import { createStreamedSource, detectStreamedFormat, type StreamedSource, type StreamedFormat } from '@modplayjs/stream-audio';
 import { pwPlugin } from '@modplayjs/fmt-prowizard';
@@ -238,6 +238,16 @@ seek.addEventListener('input', () => {
 seek.addEventListener('change', () => {
   const dur = moduleDuration();
   const targetMs = (Number(seek.value) / 1000) * dur;
+  // SID: seek the ENGINE (fast-forward through the machine emulation —
+  // backwards seeks restart the tune). The stub module has no meaningful
+  // ord/row mapping.
+  if (core.module?.format === 'sid') {
+    sidSeek(targetMs / 1000);
+    seekLatchUntil = performance.now() + 400;
+    timeCur.textContent = fmtTime(targetMs);
+    seeking = false;
+    return;
+  }
   // Locate the order + row for the target time. ordInfo[].time is the
   // absolute replay time at the START of each order, so the ord is the
   // last one whose start ≤ target, and the row is the remaining offset
@@ -1135,8 +1145,9 @@ function frame(): void {
         seek.value = String(pct);
         seek.style.setProperty('--fill', (pct / 10).toFixed(1) + '%');
       }
-      timeCur.textContent = fmtTime(cur);
-      timeRem.textContent = dur > 0 ? '-' + fmtTime(dur - cur) : '∞';
+      const shown = core.module?.format === 'sid' ? getSidPlayTimeSeconds() * 1000 : cur;
+      timeCur.textContent = fmtTime(shown);
+      timeRem.textContent = dur > 0 ? '-' + fmtTime(Math.max(0, dur - shown)) : '∞';
     } else if (latched) {
       // Reposition pending: show the target while the audio thread catches up.
       timeCur.textContent = fmtTime(seekTarget);
