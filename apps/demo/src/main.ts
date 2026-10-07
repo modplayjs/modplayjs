@@ -750,13 +750,15 @@ async function loadTrack(file: Blob): Promise<void> {
       return;
     }
   }
+  // Load the HVSC Songlengths database BEFORE the loader runs — the .sid
+  // loader consults it while building the module (tune duration).
+  await ensureSidLengths();
   core.loadModule(bytes);
   const mod = core.module;
   if (!mod) throw new StateError('module did not load');
   // A/B against XMPlay: everything through softmixer (libxmp-parity mixer).
   // SID (.sid) drives its own sample-paced engine via the 'sid' DSP.
   if (mod.format === 'sid') {
-    await ensureSidLengths();
     sidBytes = bytes;
     core.setDsp('sid');
     sidSection.hidden = false;
