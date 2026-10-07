@@ -1252,6 +1252,57 @@ export class Core implements CoreIface {
     this._p.master_vol = Math.max(0, Math.min(100, Math.round(percent)));
   }
 
+  /**
+   * seek_time (control.c:242-341): jump as close as possible to `ms`
+   * milliseconds into the current sequence. First the coarse step — the
+   * last order whose scan time ≤ target (skipping invalid patterns and
+   * other sequences) is set as position with dir=1, which keeps the
+   * sequence; jumpline comes from the order's scan start_row. Then the
+   * fine step — play frames until current_time crosses the target
+   * (bounded at 8192 frames), since only the scan knows per-row timing.
+   * The played frames are discarded, exactly like C's xmp_seek_time_frame.
+   */
+  seekTime(ms: number): number {
+    if (this._state < CoreState.PLAYING) return -1;
+    const mod = this._module!;
+    const p = this._p;
+
+    // coarse: control.c:252-270
+    let i = mod.len - 1;
+    for (; i >= 0; i--) {
+      const pat = mod.xxo[i]!;
+      if (pat >= mod.pat) continue;
+      if (this.getSequence(i) !== p.sequence) continue;
+      const t = Math.max(0, Math.min(this.ordInfo[i]?.time ?? 0, 0x7fffffff));
+      if (ms >= t) {
+        // set_position(ctx, i, 1) — dir=1 keeps the sequence
+        this.setPosition(i, 0);
+        break;
+      }
+    }
+    if (i < 0) this.setPosition(0, 0); // xmp_set_position(opaque, 0)
+
+    // fine: control.c:279-303 — recompute properties, then play through
+    const pos = p.pos >= 0 ? p.pos : mod.sequences[p.sequence]?.entry_point ?? 0;
+    const oinfo = this.ordInfo[pos];
+    if (oinfo) {
+      this._flow.jumpline = oinfo.start_row;
+      this._flow.force_reposition = 1;
+      p.current_time = oinfo.time;
+      p.bpm = oinfo.bpm;
+    }
+    const maxTime = (mod.sequences[p.sequence]?.duration ?? 0) - 0.1;
+    const t = Math.min(ms, maxTime);
+    const scratch = new Float32Array(65536);
+    for (let n = 0; n < 1 << 13; n++) {
+      const prev = p.current_time;
+      const frameTime = p.bpm !== 0 ? (mod.time_factor * mod.rrate) / p.bpm : 0;
+      if (p.current_time + frameTime > t) break;
+      if (this.frame(scratch) < 0 || p.current_time < prev) break;
+    }
+    return p.pos < 0 ? 0 : p.pos;
+  }
+
   getVolume(): number {
     return this._p.master_vol;
   }

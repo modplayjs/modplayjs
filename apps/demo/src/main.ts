@@ -238,40 +238,18 @@ seek.addEventListener('input', () => {
 seek.addEventListener('change', () => {
   const dur = moduleDuration();
   const targetMs = (Number(seek.value) / 1000) * dur;
+  // Seek the engine: core.seekTime is xmp_seek_time + the play-through
+  // refinement (control.c:242-341) — coarse order pick from the scan
+  // times, then frames are played (and discarded) until current_time
+  // crosses the target, so mid-order tempo changes land correctly.
   // SID: seek the ENGINE (fast-forward through the machine emulation —
   // backwards seeks restart the tune). The stub module has no meaningful
   // ord/row mapping.
   if (core.module?.format === 'sid') {
     sidSeek(targetMs / 1000);
-    seekLatchUntil = performance.now() + 400;
-    timeCur.textContent = fmtTime(targetMs);
-    seeking = false;
-    return;
+  } else {
+    core.seekTime(targetMs);
   }
-  // Locate the order + row for the target time. ordInfo[].time is the
-  // absolute replay time at the START of each order, so the ord is the
-  // last one whose start ≤ target, and the row is the remaining offset
-  // scaled by that order's row duration.
-  const mod = core.module;
-  let ord = 0;
-  let row = 0;
-  if (mod) {
-    for (let o = mod.len - 1; o >= 0; o--) {
-      const t = core.ordInfo?.[o]?.time ?? 0;
-      if (targetMs >= t) {
-        ord = o;
-        const rows = mod.patterns[mod.xxo[o] ?? 0]?.rows ?? 64;
-        const ordDur = (core.ordInfo?.[o + 1]?.time ?? dur) - t;
-        row = ordDur > 0
-          ? Math.min(rows - 1, Math.floor(((targetMs - t) / ordDur) * rows))
-          : 0;
-        break;
-      }
-    }
-  }
-  core.setPosition(ord, row);
-  // Latch: the reposition lands on the audio thread's next frame; until
-  // playState catches up, frame() must not overwrite the slider.
   seekLatchUntil = performance.now() + 400;
   timeCur.textContent = fmtTime(targetMs);
   seeking = false;
