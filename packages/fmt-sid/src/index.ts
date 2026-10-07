@@ -31,5 +31,5 @@
 export { cRSID_sidTest, cRSID_sidLoad, plugin, sidDsp, sidStartTune } from './sidplugin.js';
 export { cRSID_init, cRSID_initSIDtune, cRSID_generateSample, cRSID_processSIDfileData, cRSID_playSIDtune, cRSID_pauseSIDtune, cRSID_close } from './loader.js';
 export { cRSID, cRSID_C64 } from './instance.js';
-export { getSidSettings, applySidSettings, applySidSettingsLive, type SidSettings, type SidModel, type SidStereo } from './settings.js';
+export { getSidSettings, applySidSettings, applySidSettingsLive, getSidChipCount, type SidSettings, type SidModel, type SidStereo } from './settings.js';
 export { loadSidSongLengths, applySongLengthsFor, getSidSubtuneDuration, parseSongLength, isSidSongLengthDbLoaded } from './songlengths.js';

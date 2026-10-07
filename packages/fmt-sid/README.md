@@ -81,6 +81,10 @@ the C host). `model` and `videoStandard` are **init-time** — they take
 effect on the next `sidStartTune` call (the C player re-inits the tune for
 these as well). `getSidSettings()` reads the current values back.
 
+Note: `stereo` only routes differently on multi-SID tunes (PSID v3+ with
+a SID2 address in the header) — single-SID tunes always play mono, so
+`getSidChipCount()` lets players disable the control for them.
+
 ## Also exports
 
 Full engine surface for direct use without the player core:

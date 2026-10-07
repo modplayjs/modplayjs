@@ -88,3 +88,9 @@ export function applySidSettings(s: SidSettings): void {
   applySidSettingsLive(s);
   setSidInitOverrides(s.model, s.videoStandard);
 }
+
+/** Number of SID chips the loaded tune uses (1..4). The channel-mode
+ *  setting (mono/stereo/narrow) only routes differently when > 1. */
+export function getSidChipCount(): number {
+  return cRSID_C64.SIDchipCount;
+}

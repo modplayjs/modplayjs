@@ -23,7 +23,7 @@ import { plugin as icePlugin } from '@modplayjs/fmt-ice';
 import { plugin as medPlugin, mmd3Plugin, med2Plugin, med3Plugin, med4Plugin } from '@modplayjs/fmt-med';
 import { plugin as stPlugin } from '@modplayjs/fmt-st';
 import { plugin as mo3Plugin } from '@modplayjs/fmt-mo3';
-import { plugin as sidPlugin, sidDsp, sidStartTune, applySidSettingsLive, loadSidSongLengths, isSidSongLengthDbLoaded, type SidSettings } from '@modplayjs/fmt-sid';
+import { plugin as sidPlugin, sidDsp, sidStartTune, applySidSettingsLive, loadSidSongLengths, isSidSongLengthDbLoaded, getSidChipCount, type SidSettings } from '@modplayjs/fmt-sid';
 import { plugin as fcPlugin, fcEffect, setModEventReader } from '@modplayjs/fmt-fc';
 import { createStreamedSource, detectStreamedFormat, type StreamedSource, type StreamedFormat } from '@modplayjs/stream-audio';
 import { pwPlugin } from '@modplayjs/fmt-prowizard';
@@ -760,6 +760,9 @@ async function loadTrack(file: Blob): Promise<void> {
     sidBytes = bytes;
     core.setDsp('sid');
     sidSection.hidden = false;
+    // chip count is computed during engine init — enable the channel-mode
+    // select only for multi-SID tunes (1-SID always plays mono)
+    updateSidChannelUi();
   } else {
     sidBytes = null;
     sidSection.hidden = true;
@@ -797,6 +800,7 @@ async function loadTrack(file: Blob): Promise<void> {
  *  state: sidStartTune re-runs initSIDtune which restarts the tune. */
 async function reinitSidEngine(): Promise<void> {
   if (!sidBytes) return;
+  updateSidChannelUi();
   const wasPlaying = playing;
   if (playing || paused) output.stop();
   playing = false;
@@ -820,6 +824,14 @@ function readSidSettings(): SidSettings {
     model: Number(sidModelSel.value) as 0 | 6581 | 8580,
     videoStandard: sidVideoSel.value === '' ? undefined : (Number(sidVideoSel.value) as 0 | 1),
   };
+}
+
+function updateSidChannelUi(): void {
+  const multi = getSidChipCount() > 1;
+  sidStereoSel.disabled = !multi;
+  sidStereoSel.title = multi
+    ? 'Channel mode for multi-SID tunes'
+    : 'This tune uses a single SID chip — mono/stereo routing does not apply';
 }
 
 sidVolRange.addEventListener('input', () => {
