@@ -434,6 +434,12 @@ export class SoftMixer implements DspPlugin {
         volR = vol * (0x80 + pan);
       }
 
+      // The unbound/released voices (smp = -1 after virt_resetvoice):
+      // the C's = the slot freed (chn = FREE = -1) and skipped by the
+      // chn < 0 check; ours keeps the slot bound with the stale sample
+      // id — skip before getSample (which throws on the negative ids).
+      if (vi.smp < 0) continue;
+
       let xxs: SampleData;
       // Sample is paused — skip channel unless queued (mixer.c:571-583).
       if ((vi.flags & VoiceFlag.SAMPLE_PAUSED) !== 0) {
