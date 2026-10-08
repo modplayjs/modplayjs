@@ -652,6 +652,23 @@ export class SoftMixer implements DspPlugin {
       vi.old_vl = volL2;
       vi.old_vr = volR2;
     } // voices
+    if ((globalThis as { __MIX_DUMP__?: boolean }).__MIX_DUMP__) {
+      const p = core.ctx.p;
+      for (let v = 0; v < core.voiceStates.length; v++) {
+        const vi = core.voiceStates[v]!;
+        if (vi.smp >= 0) {
+          console.error(`TICK ${Math.trunc(p.current_time)} ch${vi.chn} voc${v} smp${vi.smp} pos${vi.pos.toFixed(6)} old_vl${vi.old_vl} old_vr${vi.old_vr} sleft${vi.sleft} sright${vi.sright} vol${vi.vol} pan${vi.pan}`);
+      if (vi.chn === 0) {
+        const g = globalThis as { __bufDumped?: Set<number> };
+        if (!g.__bufDumped) g.__bufDumped = new Set();
+        if (!g.__bufDumped.has(Math.trunc(p.current_time))) {
+          g.__bufDumped.add(Math.trunc(p.current_time));
+          console.error(`BUF t${Math.trunc(p.current_time)} ${Array.from(buf32.slice(0, ticksize * 2)).join(',')}`);
+        }
+      }
+        }
+      }
+    }
   }
 
   /**
@@ -798,16 +815,20 @@ export class SoftMixer implements DspPlugin {
     let n = 0;
     while ((stepmul -= stepval) > 0 && n < count) {
       const stepmulShifted = stepmul >> (ANTICLICK_FPSHIFT - 16);
-      // level = (stepmulShifted² × smp) >> 32 — but smp (sleft) is the
-      // int32 buffer delta, already in mix domain; C's smp is the same
-      // int32 value captured from buf32. So: out += (sm² × smp) >> 32.
-      // Plain (not imul!) square: stepmulShifted ≤ 65535 → sm² ≤ 2^32,
-      // exactly representable — Math.imul would wrap it negative.
-      const sm2 = stepmulShifted * stepmulShifted;
+      // C: uint32 stepmul_sq = stepmul >> 8; stepmul_sq *= stepmul_sq —
+      // the square is a 32-BIT UNSIGNED multiply and wraps mod 2^32. At
+      // the max (stepmul>>8 = 65536) the square = 2^32 → 0: the C's
+      // first discharge frame is silent where the naive exact square
+      // would put the full level. Math.imul reproduces the wrap (the
+      // signed bit pattern = the unsigned mod 2^32).
+      const sm2 = Math.imul(stepmulShifted, stepmulShifted) >>> 0;
       const idx = atPos + n * 2;
-      // JS doubles hold the product exactly here (|sm2*smp| < 2^53):
-      buf32[idx] = (buf32[idx] ?? 0) + Math.trunc((sm2 * sl) / 0x100000000);
-      buf32[idx + 1] = (buf32[idx + 1] ?? 0) + Math.trunc((sm2 * sr) / 0x100000000);
+      // C: *buf += (stepmul_sq * (int64)smp) >> 32 — the int64 product
+      // with an ARITHMETIC right shift (floors toward negative infinity),
+      // not truncation. JS doubles hold sm2*smp exactly (< 2^53), so
+      // Math.floor reproduces the >> 32 shift.
+      buf32[idx] = (buf32[idx] ?? 0) + Math.floor((sm2 * sl) / 0x100000000);
+      buf32[idx + 1] = (buf32[idx + 1] ?? 0) + Math.floor((sm2 * sr) / 0x100000000);
       n++;
     }
   }
