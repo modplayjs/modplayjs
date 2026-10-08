@@ -256,11 +256,13 @@ seek.addEventListener('change', () => {
   // target — the audible result matches the other players (the seek =
   // start playing from the new position).
   if (!playing && !paused && loaded) {
+    // The fresh startPlayback has a clean ring primed with the audio
+    // from the repositioned engine state - flushing it here would play
+    // ~1s and go silent (the user-visible bug). No flush on this path.
     void (async () => {
       await startPlayback(false);
       if (core.module?.format === 'sid') sidSeek(targetMs / 1000);
       else core.seekTime(targetMs);
-      output.flush();
     })();
     seekLatchUntil = performance.now() + 400;
     timeCur.textContent = fmtTime(targetMs);
@@ -272,14 +274,14 @@ seek.addEventListener('change', () => {
   } else {
     core.seekTime(targetMs);
   }
-  // The output ring holds the pre-seek audio (up to ~0.7s); without a
-  // flush it plays out before the repositioned audio arrives, which
-  // sounds like the song stopping. Drop the pending frames so the next
-  // renderAhead fills the ring with the seeked audio. (No pause/resume
-  // around the seek: the seek runs synchronously on this thread, the
-  // render timer cannot fire during it, and output.pause() would
-  // corrupt the play/pause state machine — its internal paused flag
-  // made the play button a no-op afterwards.)
+  // The output ring holds the pre-seek audio (up to ~0.7s). Flush it
+  // BEFORE the repositioning: the renderAhead then fills the ring with
+  // the seeked audio. A flush AFTER the seek would drop the freshly
+  // rendered audio and go silent. (No pause/resume around the seek:
+  // the seek runs synchronously on this thread, the render timer
+  // cannot fire during it, and output.pause() would corrupt the
+  // play/pause state machine - its internal paused flag made the play
+  // button a no-op afterwards.)
   output.flush();
   seekLatchUntil = performance.now() + 400;
   timeCur.textContent = fmtTime(targetMs);
