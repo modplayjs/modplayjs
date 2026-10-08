@@ -62,6 +62,9 @@
       "@modplayjs/out-pcm": [
         "packages/out-pcm/src/index.ts"
       ],
+      "@modplayjs/stream-audio": [
+        "packages/stream-audio/src/index.ts"
+      ],
       "worklet-url-impl": [
         "apps/demo/src/worklet-url-impl.ts"
       ]

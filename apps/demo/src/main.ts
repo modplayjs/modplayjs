@@ -255,6 +255,20 @@ seek.addEventListener('change', () => {
   // returns an error too), so start playback first and then land on the
   // target — the audible result matches the other players (the seek =
   // start playing from the new position).
+  if (streamed) {
+    // Streamed audio (WAV/MP3/OGG): the source decodes the whole file at
+    // the load, so the seek = a byte offset into the decoded PCM. This
+    // must come before the seek-while-stopped path below: that path calls
+    // core.seekTime, which needs a loaded module and throws otherwise
+    // (uncaught, killing the seek handler and the playback with it).
+    streamed.seek(targetMs);
+    streamPlayedMs = targetMs;
+    output.flush();
+    seekLatchUntil = performance.now() + 400;
+    timeCur.textContent = fmtTime(targetMs);
+    seeking = false;
+    return;
+  }
   if (!playing && !paused && loaded) {
     // The fresh startPlayback has a clean ring primed with the audio
     // from the repositioned engine state - flushing it here would play
@@ -713,6 +727,7 @@ async function addFiles(files: File[]): Promise<void> {
 
 // Streamed-audio state (WAV/MP3/OGG): decoded source + pull shim.
 let streamed: StreamedSource | null = null;
+let streamPlayedMs = 0; // the wall-clock position on the streamed path
 // Raw bytes of the currently-loaded .sid (engine is started at play time).
 let sidBytes: Uint8Array | null = null;
 // HVSC Songlengths.md5 loader (lazy, once) — gives SID tunes their runtime.
@@ -1071,10 +1086,15 @@ async function startPlayback(muteSong: boolean): Promise<void> {
   if (streamed) {
     // Streamed-audio path: the source shim exposes playBuffer() with the
     // same pull semantics as Core, so out-webaudio drives it unchanged.
+    // streamPlayedMs tracks the wall-clock position for the seekbar/time
+    // display (the core.playState is empty on this path).
     const src = streamed;
+    streamPlayedMs = 0;
     const shim = {
       playBuffer(out: Float32Array, size: number, loop?: number): number {
-        return src.playBuffer(out, size, loop);
+        const n = src.playBuffer(out, size, loop);
+        streamPlayedMs += (n / 2 / deviceRate) * 1000;
+        return n;
       },
     };
     core.setSampleRate(deviceRate);
@@ -1204,7 +1224,7 @@ function frame(): void {
     updatePatternHighlight();
     const ps = core.playState;
     const dur = moduleDuration();
-    const cur = seeking ? seekTarget : ps.timeMs;
+    const cur = seeking ? seekTarget : streamed ? streamPlayedMs : ps.timeMs;
     const latched = performance.now() < seekLatchUntil;
     if (!seeking && !latched) {
       if (dur > 0) {

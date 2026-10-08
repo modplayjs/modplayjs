@@ -12,6 +12,8 @@ export interface StreamedSource {
    *  fills `out` (≤ size floats), returns the number of floats written
    *  (0 = end of stream). */
   playBuffer(out: Float32Array, size: number, loop?: number): number;
+  /** Seek to a millisecond offset into the resampled stream. */
+  seek(ms: number): void;
   readonly channels: number;
   readonly sampleRate: number;
   readonly duration: number;
@@ -122,10 +124,18 @@ export function createStreamedSource(bytes: Uint8Array, format: StreamedFormat, 
       for (let i = frames * 2; i < size; i++) out[i] = 0;
       return frames * 2;
   };
+  const seek = (ms: number): void => {
+    // ms = the milliseconds into the resampled stream: the playPos = the
+    // interleaved float offset = ms × outputRate × channels / 1000.
+    playPos = Math.floor((ms * outputRate * decoded.channels) / 1000) * 2;
+    if (playPos < 0) playPos = 0;
+    if (playPos > total) playPos = total;
+  };
   return {
     channels: decoded.channels,
     sampleRate: outputRate,
     duration: total / (decoded.channels * outputRate),
     playBuffer,
+    seek,
   };
 }
