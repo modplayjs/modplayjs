@@ -251,13 +251,21 @@ seek.addEventListener('change', () => {
   // SID: seek the ENGINE (fast-forward through the machine emulation —
   // backwards seeks restart the tune). The stub module has no meaningful
   // ord/row mapping.
-  // Pause the output's render loop while seeking: seekTime's
-  // play-through consumes engine ticks synchronously, and the render
-  // timer would double-pull from the same engine (the repositioned
-  // audio would land in the middle of the still-draining ring).
-  const wasPlaying = playing && !paused;
-  if (wasPlaying && core.module?.format !== 'sid') {
-    output.pause();
+  // Seeking while STOPPED: core.seekTime needs the PLAYING state (the C
+  // returns an error too), so start playback first and then land on the
+  // target — the audible result matches the other players (the seek =
+  // start playing from the new position).
+  if (!playing && !paused && loaded) {
+    void (async () => {
+      await startPlayback(false);
+      if (core.module?.format === 'sid') sidSeek(targetMs / 1000);
+      else core.seekTime(targetMs);
+      output.flush();
+    })();
+    seekLatchUntil = performance.now() + 400;
+    timeCur.textContent = fmtTime(targetMs);
+    seeking = false;
+    return;
   }
   if (core.module?.format === 'sid') {
     sidSeek(targetMs / 1000);
@@ -267,15 +275,15 @@ seek.addEventListener('change', () => {
   // The output ring holds the pre-seek audio (up to ~0.7s); without a
   // flush it plays out before the repositioned audio arrives, which
   // sounds like the song stopping. Drop the pending frames so the next
-  // renderAhead fills the ring with the seeked audio.
+  // renderAhead fills the ring with the seeked audio. (No pause/resume
+  // around the seek: the seek runs synchronously on this thread, the
+  // render timer cannot fire during it, and output.pause() would
+  // corrupt the play/pause state machine — its internal paused flag
+  // made the play button a no-op afterwards.)
   output.flush();
-  if (wasPlaying && core.module?.format !== 'sid') {
-    void output.resume();
-  }
   seekLatchUntil = performance.now() + 400;
   timeCur.textContent = fmtTime(targetMs);
   seeking = false;
-  if (!playing && !paused && loaded) void startPlayback(false);
 });
 
 // end-of-track: reset the transport buttons (the output stops itself and
@@ -762,8 +770,13 @@ async function loadTrack(file: Blob): Promise<void> {
     }
   }
   // Load the HVSC Songlengths database BEFORE the loader runs — the .sid
-  // loader consults it while building the module (tune duration).
-  await ensureSidLengths();
+  // loader consults it while building the module (tune runtime). Only
+  // .sid tunes need it (the DB = 5 MB, loaded once, cached): the PSID/
+  // RSID magic = the first 4 bytes.
+  const head = String.fromCharCode(bytes[0]!, bytes[1]!, bytes[2]!, bytes[3]!);
+  if (head === 'PSID' || head === 'RSID') {
+    await ensureSidLengths();
+  }
   core.loadModule(bytes);
   const mod = core.module;
   if (!mod) throw new StateError('module did not load');
