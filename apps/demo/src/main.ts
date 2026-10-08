@@ -231,6 +231,9 @@ function renderInfoStreamed(src: StreamedSource, fmt: StreamedFormat): void {
     grid.append(l, v);
   }
   infoEl.append(grid);
+  // Keep the built panel: renderInfo() re-shows it when the playlist
+  // refreshes (the streamed track has no module for the module panel).
+  streamedInfo = grid;
 }
 
 seek.addEventListener('input', () => {
@@ -368,6 +371,16 @@ function fmtPad(n: number, w: number): string {
 }
 
 function renderInfo(): void {
+  // Streamed tracks have no module — the streamed panel (built by
+  // loadTrack) must survive renderPlaylist's info refresh; re-reading
+  // core.module here would show the PREVIOUS track's format.
+  if (streamed) {
+    if (streamedInfo) {
+      infoEl.replaceChildren(streamedInfo);
+      return;
+    }
+    return;
+  }
   const mod = core.module;
   if (!mod) return;
   // One info per row: a two-column grid of label → value.
@@ -750,6 +763,8 @@ async function ensureSidLengths(): Promise<boolean> {
 }
 // Format of the currently loaded streamed track (WAV/MP3/OGG).
 const streamedFormat2: { v: StreamedFormat | null } = { v: null };
+// The info panel element built by renderInfoStreamed (re-shown by renderInfo).
+let streamedInfo: HTMLDivElement | null = null;
 
 /** Load a module from a playlist entry (or raw file) into the player.
  *  Files the tracker plugins don't recognize fall back to streamed
@@ -765,6 +780,17 @@ async function loadTrack(file: Blob): Promise<void> {
   if (fmt2) {
     const src = createStreamedSource(bytes, fmt2, 48000);
     if (src) {
+      // Drop the previous track's module state: the pattern view, the
+      // SID panel, and the mixer panel belong to the old track. The core
+      // keeps the module (out-webaudio's shim is driven directly), but
+      // every UI surface must show the streamed track only.
+      sidBytes = null;
+      sidSection.hidden = true;
+      mixerSection.hidden = true;
+      if (patternViewChk.checked) {
+        patternViewChk.checked = false;
+        applyPatternView(false);
+      }
       streamed = src;
       streamedFormat2.v = fmt2;
       loaded = true;
@@ -824,6 +850,8 @@ async function loadTrack(file: Blob): Promise<void> {
       applyMixerOptions();
     }
   }
+  streamed = null;
+  streamedInfo = null;
   loaded = true;
   playBtn.disabled = false;
   playBtn.textContent = 'Play';
