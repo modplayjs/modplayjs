@@ -442,12 +442,15 @@ export class VirtualLayer {
     if (root >= 0 && root < this.channelMute.length && this.channelMute[root]) {
       vol = 0;
     }
-    // NOTE: C's mixer_setvol (mixer.c:946-954) arms anticlick on vol→0.
-    // Arming here regresses the IT goldens (pattern_loop_it1xx,
-    // portamento_sustain): our vol→0 arrives one player-phase earlier
-    // than C's, so the discharge consumes the cut voice's last level
-    // one tick before C does. The audible cut path runs through
-    // setPatchVoice (ac=1), which arms identically.
+    // mixer_setvol (mixer.c:946-954): volume→0 arms the voice's anticlick
+    // — the discharge drains its last mixed level over the next tick's
+    // ramp instead of cutting instantly. C-parity; verified alongside the
+    // per-tick adjustVoiceEnd (the two are independent paths).
+    if (vol === 0 && v.vol !== 0) {
+      v.flags |= VoiceFlag.ANTICLICK;
+      v.old_vl = 0;
+      v.old_vr = 0;
+    }
     v.vol = vol;
     if (vol === 0 && chn >= this.numTracks) {
       this.resetVoice(vi, true);
