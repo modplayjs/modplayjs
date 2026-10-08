@@ -445,6 +445,12 @@ export class SoftMixer implements DspPlugin {
         xxs = core.getSample(vi.smp);
       }
 
+      // get_current_sample tail (mixer.c:406-422): adjust_voice_end runs
+      // EVERY frame — when the voice releases, the loop bounds switch
+      // from the sustain loop to the sample's regular loop (IT sustain
+      // → ping-pong release, e.g. pattern_loop_it100).
+      this.adjustVoiceEnd(vi, xxs);
+
       // step (mixer.c:584) + sanity (:586-588). C keeps the double step
       // for the chunk-boundary pos commit and converts to fixed point for
       // the mix_fn call.
