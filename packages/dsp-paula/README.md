@@ -1,3 +1,18 @@
+> **DEPRECATED** — this package is superseded by
+> [`@modplayjs/dsp-softmixer`](https://www.npmjs.com/package/@modplayjs/dsp-softmixer)'s
+> built-in Paula mode:
+>
+> ```ts
+> import { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
+> core.registries.registerDsp(createSoftMixerPlugin({ mode: 'paula', layout: 'lrlr', amigaFilter: 'a500led' }));
+> ```
+>
+> The softmixer's Paula mode ports libxmp's own LIBXMP_PAULA_SIMULATOR
+> (mix_paula.c): band-limited step (BLEP) synthesis at the Paula clock,
+> A500 output-filter tables (LED off/on), and hard L/R channel layouts —
+> all inside the exact integer mixing domain. This package keeps working
+> (no breaking change) but receives no further development.
+>
 # @modplayjs/dsp-paula
 
 Amiga **Paula-emulating mixer** DSP plugin for `@modplayjs/core` — a

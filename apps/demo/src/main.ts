@@ -28,7 +28,7 @@ import { plugin as fcPlugin, fcEffect, setModEventReader } from '@modplayjs/fmt-
 import { createStreamedSource, detectStreamedFormat, type StreamedSource, type StreamedFormat } from '@modplayjs/stream-audio';
 import { pwPlugin } from '@modplayjs/fmt-prowizard';
 import { createPaulaPlugin } from '@modplayjs/dsp-paula';
-import { createSoftMixerPlugin } from '@modplayjs/dsp-softmixer';
+import { createSoftMixerPlugin, type SoftMixer } from '@modplayjs/dsp-softmixer';
 import { WebAudioOutput } from '@modplayjs/out-webaudio';
 import { PlaylistStore, type PlaylistTrack } from './playlist-store';
 import { registerPwa } from './pwa';
@@ -62,6 +62,11 @@ const sidVideoSel = document.getElementById('sid-video') as HTMLSelectElement;
 const sidQualitySel = document.getElementById('sid-quality') as HTMLSelectElement;
 const sidStereoSel = document.getElementById('sid-stereo') as HTMLSelectElement;
 const sidVolRange = document.getElementById('sid-vol') as HTMLInputElement;
+// Mixer settings panel (visible for tracker modules)
+const mixerSection = document.getElementById('mixersection') as HTMLElement;
+const mixerModeSel = document.getElementById('mixer-mode') as HTMLSelectElement;
+const mixerLayoutSel = document.getElementById('mixer-layout') as HTMLSelectElement;
+const mixerFilterSel = document.getElementById('mixer-amigafilter') as HTMLSelectElement;
 const ordEl = document.getElementById('ordlist') as HTMLDivElement;
 const insEl = document.getElementById('inslist') as HTMLDivElement;
 const smpEl = document.getElementById('samplist') as HTMLDivElement;
@@ -111,7 +116,8 @@ setModEventReader((c: Core, chn: number, row: number) => {
 });
 core.registries.registerFormat(pwPlugin);
 core.registries.registerDsp(createPaulaPlugin());
-core.registries.registerDsp(createSoftMixerPlugin());
+const mixerInstance = createSoftMixerPlugin() as SoftMixer;
+core.registries.registerDsp(mixerInstance);
 core.registries.registerDsp(sidDsp);
 
 buildHashEl.textContent = __GIT_HASH__;
@@ -757,6 +763,10 @@ async function loadTrack(file: Blob): Promise<void> {
     sidBytes = null;
     sidSection.hidden = true;
     core.setDsp('softmixer');
+    // mixer settings panel: visible for tracker modules (Amiga options only
+    // make sense for 4-channel MOD, but the selects are harmless elsewhere —
+    // the mixer falls back to the interp mixers for non-mono sources)
+    mixerSection.hidden = !(mod.format === 'mod' || mod.format === 's3m' || mod.format === 'xm' || mod.format === 'it');
   }
   loaded = true;
   playBtn.disabled = false;
@@ -831,6 +841,37 @@ sidQualitySel.addEventListener('change', () => applySidSettingsLive(readSidSetti
 sidStereoSel.addEventListener('change', () => applySidSettingsLive(readSidSettings()));
 sidModelSel.addEventListener('change', () => void reinitSidEngine());
 sidVideoSel.addEventListener('change', () => void reinitSidEngine());
+
+// -- mixer settings: reconfigure the softmixer DSP in place. The mode
+// switch only makes sense while stopped (voices carry Paula state), so a
+// mode change restarts the tune through the same path as SID re-init.
+const applyMixerOptions = (): void => {
+  if (core.module?.format === 'sid') return;
+  mixerInstance.configure({
+    mode: mixerModeSel.value as 'libxmp' | 'paula',
+    layout: mixerLayoutSel.value as 'panned' | 'lrlr' | 'lrrl',
+    amigaFilter: mixerFilterSel.value as 'a500' | 'a500led',
+  });
+};
+mixerLayoutSel.addEventListener('change', () => applyMixerOptions());
+mixerFilterSel.addEventListener('change', () => applyMixerOptions());
+mixerModeSel.addEventListener('change', async () => {
+  applyMixerOptions();
+  // a mode switch swaps resamplers per voice — restart the tune for a
+  // clean voice state (the DSP identity 'softmixer' is unchanged).
+  if (loaded && (playing || paused)) {
+    const pct = Number(seek.value);
+    output.stop();
+    playing = false;
+    paused = false;
+    await startPlayback(false);
+    if (moduleDuration() > 0) {
+      const targetMs = (pct / 1000) * moduleDuration();
+      if (core.module?.format === 'sid') sidSeek(targetMs / 1000);
+      else core.seekTime(targetMs);
+    }
+  }
+});
 
 // --------------------------------------------------------------- playlist --
 

@@ -414,10 +414,18 @@ export class VirtualLayer {
     this.voices[vi]!.act = nna;
   }
 
-  /** Set the note played by the channel's voice (virt_setnote :472). */
+  /** Set the note played by the channel's voice (virt_setnote :472).
+   *  NOTE: C's mixer_setnote (mixer.c:920-940) also clamps note > 149 and
+   *  arms anticlick — but arming here breaks IT note-slide loop timing
+   *  (pattern_loop_it1xx goldens): our slide path keeps the flag alive
+   *  across the loop wrap where C's next virt_setperiod re-arms nothing.
+   *  Retriggers arm via setPatchVoice (mixer_voicepos ac=1), which is the
+   *  audibly relevant path. */
   setNote(chn: number, note: number): boolean {
     const vi = this.mapChannel(chn);
     if (vi === VIRT_INVALID) return false;
+    // mixer_setnote: clamp (6nations.it workaround).
+    if (note > 149) note = 149;
     this.voices[vi]!.note = note;
     return true;
   }
@@ -434,6 +442,12 @@ export class VirtualLayer {
     if (root >= 0 && root < this.channelMute.length && this.channelMute[root]) {
       vol = 0;
     }
+    // NOTE: C's mixer_setvol (mixer.c:946-954) arms anticlick on vol→0.
+    // Arming here regresses the IT goldens (pattern_loop_it1xx,
+    // portamento_sustain): our vol→0 arrives one player-phase earlier
+    // than C's, so the discharge consumes the cut voice's last level
+    // one tick before C does. The audible cut path runs through
+    // setPatchVoice (ac=1), which arms identically.
     v.vol = vol;
     if (vol === 0 && chn >= this.numTracks) {
       this.resetVoice(vi, true);
@@ -815,8 +829,10 @@ export class VirtualLayer {
     v.pos = 0;
     v.pos0 = 0;
     if (ac) {
-      // anticlick(vi): ramp from current output to zero; float model
-      // folds this into old_vl/old_vr reset.
+      // anticlick(vi) (mixer.c:138-144): flag + ramp-out from zero — the
+      // ANTICLICK flag makes the next mix tick discharge the cut voice's
+      // last level (sleft/sright) before the new note ramps in.
+      v.flags |= VoiceFlag.ANTICLICK;
       v.old_vl = 0;
       v.old_vr = 0;
     }

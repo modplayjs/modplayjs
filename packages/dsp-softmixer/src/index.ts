@@ -1,40 +1,261 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026 Bitti09 — modplayjs contributors
-// Ported from: libxmp src/mixer.c (libxmp_mixer_softmixer).
-// Softmixer — multi-voice mixer for S3M/XM/IT (+ MOD via generic path).
+// dsp-softmixer — libxmp-parity software mixer.
 //
-// Port of libxmp libxmp_mixer_softmixer (reference/libxmp/src/mixer.c:474-787):
-//   - interp mixerset pick (:492-504)
-//   - bidir_adjust for IT (:520-523)
-//   - mixer_prepare: ticksize recompute + buffer clear (:449-469)
-//   - per-voice loop (:527-762): anticlick on ANTICLICK flag, period<1 kill
-//     (:546-550), pos clamp :552, step = C4_PERIOD*c5spd/freq/period (:584),
-//     step sanity <0.001 || >SHRT_MAX (:586-588), pan→vol split (:563-569),
-//     loop_reposition (:357-393), adjust_voice_end (:333-355),
-//     has_active_sustain_loop (:315-324), do_anticlick ramp (:148-195)
-//   - final downmix is float-domain here (downmix_int_* :73-138 semantics:
-//     scale then clamp).
+// Ported 1:1 from the C sources in reference/libxmp/src:
+//   - mixer.c       libxmp_mixer_softmixer: per-voice loop, gain/pan
+//     splitting, chunk loop, anticlick, queued swaps, loop reposition,
+//     wraparound patching, integer downmix (downmix_int_16bit).
+//   - mix_all.c     the eight interpolation mixers (+ IT filter variants):
+//     NEAREST_8BIT/16BIT, LINEAR_8BIT/16BIT, SPLINE_* with the verbatim
+//     integer macro math (VAR_NORM 16.16 chunk-local pos/frac, UPDATE_POS,
+//     MIX_STEREO_AC ramps at old_vl >> 8 + delta_l, FILTER_LEFT/RIGHT).
+//   - precomp_lut.h verbatim cubic spline tables (lut.ts).
+//   - paula.h + mix_paula.c + precomp_blep.h the LIBXMP_PAULA_SIMULATOR
+//     path: A500 BLEP band-limited-step output (paula.ts + blep-tables.ts),
+//     selected behind SoftMixerOptions.mode = 'paula' with the
+//     XMP_FLAGS_A500 semantics (Amiga 4-channel MOD only).
 //
-// Floating-point domain note: libxmp mixes in Q32 fixed point and downmixes
-// with DOWNMIX_SHIFT=12; here samples are normalized floats [-1,1) and the
-// voice volume ramps run in float. All thresholds/formulas preserve the C
-// behavior (vol_l/vol_r are the SAME integers as libxmp before >>8).
+// Everything mixes in the exact C integer domain: the per-tick buffer is
+// int32, samples are materialized to native int16/int8 (with the C guard
+// bytes), gains are those C integers (vol_l >> 8), and the downmix is
+// >> (DOWNMIX_SHIFT - amplify) with int16 clamping. Only the final output
+// handed to the OutputPlugin is converted to float (smp / 32768).
 
 import type { Core as CoreIface, DspPlugin } from '@modplayjs/core';
 import {
   SampleFlags,
   VoiceFlag,
-  Act,
   Quirk,
   NoteFlag,
   type VoiceState,
   type SampleData,
   type ChannelState,
 } from '@modplayjs/core';
-import { KERNELS, C4_PERIOD, SMIX_SHIFT, SMIX_MASK, type KernelName } from './kernels.js';
+import { PaulaState, BLEP_TABLE, MINIMUM_INTERVAL } from './paula.js';
+import {
+  cubic_spline_lut0,
+  cubic_spline_lut1,
+  cubic_spline_lut2,
+  cubic_spline_lut3,
+} from './lut.js';
 
-/** mixer.c:36 DOWNMIX_SHIFT — float model keeps relative amplitude parity. */
+/** mixer.h:9-10 — fixed-point fractional shift/mask (16.16). */
+const SMIX_SHIFT = 16;
+const SMIX_MASK = 0xffff;
+/** mixer.h:6. */
+const C4_PERIOD = 428.0;
+/** mixer.c:36 — the C downmix shift. */
+const DOWNMIX_SHIFT = 12;
+/** mixer.c:148 ANTICLICK_FPSHIFT. */
+const ANTICLICK_FPSHIFT = 24;
+/** mix_all.c:63 PREAMP_BITS. */
+const PREAMP_BITS = 15;
+/** mixer.h:12 FILTER_SHIFT. */
+const FILTER_SHIFT = 22;
+/** LIM16_* (mixer.c:33-35). */
+const LIM16_HI = 32767;
+const LIM16_LO = -32768;
+/** FILTER_MIN/MAX (mix_all.c:66-67). */
+const FILTER_MIN = -65536 * (1 << PREAMP_BITS);
+const FILTER_MAX = 65535 * (1 << PREAMP_BITS);
+/** SPLINE constants (mix_all.c:59-64). */
+const SPLINE_SHIFT = 14;
+const SPLINE_FRACBITS = 10;
+const SPLINE_FRACSHIFT = SMIX_SHIFT - SPLINE_FRACBITS - 2;
+const SPLINE_FRACMASK = (((1 << (SMIX_SHIFT - SPLINE_FRACSHIFT)) - 1) & ~3);
+
+/** libxmp DEFAULT_AMPLIFY (common.h:143). */
+const DEFAULT_AMPLIFY = 1;
+
 const SHRT_MAX = 0x7fff;
+
+/**
+ * Mixer behaviour configuration. Everything off = libxmp defaults.
+ */
+export interface SoftMixerOptions {
+  /**
+   * Rendering engine for resampling:
+   *  - `'libxmp'` (default): exact libxmp mix_all.c interpolation mixers
+   *    (nearest/linear/spline per the core's interp setting).
+   *  - `'paula'`: the LIBXMP_PAULA_SIMULATOR A500 path (BLEP synthesis on
+   *    the Paula clock, nearest-stepped source at PAULA_HZ granularity).
+   *    Intended for 4-channel Amiga MOD; the A500 mixers only support
+   *    mono 8-bit sources — other voices are skipped, exactly like the C
+   *    NULL entries in libxmp_a500_mixers[].
+   */
+  mode?: 'libxmp' | 'paula';
+  /**
+   * Output channel layout:
+   *  - `'panned'` (default): module pans (libxmp semantics).
+   *  - `'lrlr'`: hard left/right alternate — ch0 L, ch1 R, ch2 L, ch3 R
+   *    (chn < 4 only; channels 4+ keep their module pan).
+   *  - `'lrrl'`: OpenMPT/PaulaLib Amiga default — ch0 L, ch1 R, ch2 R,
+   *    ch3 L.
+   */
+  layout?: 'panned' | 'lrlr' | 'lrrl';
+  /**
+   * Paula mode filter table: `'a500'` (LED off) or `'a500led'` (LED on,
+   * the classic dimmed-power-light lowpass). Only meaningful with
+   * mode = 'paula'.
+   */
+  amigaFilter?: 'a500' | 'a500led';
+  /**
+   * libxmp XMP_PLAYER_AMPLIFY (s.amplify, DEFAULT_AMPLIFY = 1). Scales
+   * the integer downmix. 0 = default.
+   */
+  amplify?: number;
+}
+
+/** A materialized native sample: the C xxs->data layout —
+ *  [guard slots = 4 zero bytes][frames][tail ≥ 4 slots]. */
+interface NativeSample {
+  /** int16 or int8 view incl. pre-guard; data starts at slot `pre`. */
+  data: Int16Array | Int8Array;
+  pre: number;
+}
+
+const nativeCache = new WeakMap<SampleData, NativeSample>();
+
+const TAIL_SLOTS = 8;
+
+/**
+ * Materialize xxs->data in the C layout. Stored floats are exactly
+ * int/32768 (16-bit) or int/128 (8-bit), so the native ints are recovered
+ * losslessly with rounding — only values already out of int range clamp.
+ */
+function nativeOf(xxs: SampleData): NativeSample {
+  let nat = nativeCache.get(xxs);
+  if (nat) return nat;
+  const bits16 = (xxs.flags & SampleFlags.BITS16) !== 0;
+  const stereo = (xxs.flags & SampleFlags.STEREO) !== 0;
+  const chn = stereo ? 2 : 1;
+  const len = xxs.length * chn;
+  const scale = bits16 ? 32768 : 128;
+  if (bits16) {
+    const buf = new Int16Array(2 + len + TAIL_SLOTS * chn);
+    for (let i = 0; i < len; i++) {
+      let v = Math.round((xxs.data[i] ?? 0) * scale);
+      if (v > 32767) v = 32767;
+      else if (v < -32768) v = -32768;
+      buf[2 + i] = v;
+    }
+    nat = { data: buf, pre: 2 };
+  } else {
+    const buf = new Int8Array(4 + len + TAIL_SLOTS * chn);
+    for (let i = 0; i < len; i++) {
+      let v = Math.round((xxs.data[i] ?? 0) * scale);
+      if (v > 127) v = 127;
+      else if (v < -128) v = -128;
+      buf[4 + i] = v;
+    }
+    nat = { data: buf, pre: 4 };
+  }
+  nativeCache.set(xxs, nat);
+  return nat;
+}
+
+/**
+ * init_sample_wraparound storage (mixer.c:52-62 struct loop_data +
+ * :224-283 init_sample_wraparound). Slots are typed-array ELEMENTS
+ * (int16/int8): C's prologue_num/epilogue_num are in samples, ×2 for
+ * stereo (mixer.c:242-243) and ×2 for 16-bit byte multiplicities
+ * (:246-248, :252-253) — the byte counts divide back to the same slot
+ * counts, so one slot-based implementation covers both resolutions.
+ */
+const LOOP_PROLOGUE = 1;
+const LOOP_EPILOGUE = 2;
+
+interface LoopData {
+  active: boolean;
+  nat: NativeSample;
+  /** slot index of loop start (start * chn + pre). */
+  start: number;
+  /** slot index of loop end (end * chn + pre). */
+  end: number;
+  firstLoop: boolean;
+  bidir: boolean;
+  prologueNum: number;
+  epilogueNum: number;
+  prologue: number[];
+  epilogue: number[];
+}
+
+function newLoopData(): LoopData {
+  return {
+    active: false,
+    nat: { data: new Int16Array(0), pre: 0 },
+    start: 0,
+    end: 0,
+    firstLoop: false,
+    bidir: false,
+    prologueNum: 0,
+    epilogueNum: 0,
+    prologue: [],
+    epilogue: [],
+  };
+}
+
+/** Host interp mirror (synced each frame from core.ctx.s.interp). */
+let coreInterp = 1;
+
+/** init_sample_wraparound (mixer.c:224-283). */
+function initSampleWraparound(
+  ld: LoopData,
+  xxs: SampleData,
+  vi: VoiceState,
+  interp: number,
+): void {
+  ld.active = false;
+  if (interp === 0 /* XMP_INTERP_NEAREST */ ||
+    (xxs.flags & SampleFlags.LOOP) === 0) {
+    return;
+  }
+  const nat = nativeOf(xxs);
+  ld.nat = nat;
+  const stereo = (xxs.flags & SampleFlags.STEREO) !== 0;
+  ld.start = nat.pre + vi.start * (stereo ? 2 : 1);
+  ld.end = nat.pre + vi.end * (stereo ? 2 : 1);
+  ld.firstLoop = (vi.flags & VoiceFlag.SAMPLE_LOOP) === 0;
+  ld.active = true;
+
+  ld.prologueNum = LOOP_PROLOGUE * (stereo ? 2 : 1);
+  ld.epilogueNum = LOOP_EPILOGUE * (stereo ? 2 : 1);
+  ld.bidir = (vi.flags & VoiceFlag.VOICE_BIDIR) !== 0;
+
+  const sptr = nat.data;
+  const { start, end, prologueNum, epilogueNum } = ld;
+
+  for (let i = 0; i < prologueNum; i++) {
+    ld.prologue[i] = sptr[start - prologueNum + i]!;
+  }
+  for (let i = 0; i < epilogueNum; i++) {
+    ld.epilogue[i] = sptr[end + i]!;
+  }
+
+  if (!ld.firstLoop) {
+    for (let i = 0; i < prologueNum; i++) {
+      sptr[start - prologueNum + i] = ld.bidir
+        ? sptr[start + i]!
+        : sptr[end - prologueNum + i]!;
+    }
+  }
+  for (let i = 0; i < epilogueNum; i++) {
+    sptr[end + i] = ld.bidir ? sptr[end - 1 - i]! : sptr[start + i]!;
+  }
+}
+
+/** reset_sample_wraparound (mixer.c:289-310). */
+function resetSampleWraparound(ld: LoopData): void {
+  if (!ld.active) return;
+  const sptr = ld.nat.data;
+  for (let i = 0; i < ld.prologueNum; i++) {
+    sptr[ld.start - ld.prologueNum + i] = ld.prologue[i]!;
+  }
+  for (let i = 0; i < ld.epilogueNum; i++) {
+    sptr[ld.end + i] = ld.epilogue[i]!;
+  }
+}
 
 export class SoftMixer implements DspPlugin {
   readonly name = 'softmixer';
@@ -49,440 +270,387 @@ export class SoftMixer implements DspPlugin {
   /** Master volume ratio m.mvol/m.mvolbase parity (default = no change). */
   mvol = 0;
   mvolbase = 0;
-  /** IT bidirectional loop shortened by one sample (mixer.c:520-523). */
+  /** libxmp XMP_PLAYER_AMPLIFY (s.amplify, DEFAULT_AMPLIFY = 1). */
+  amplify = DEFAULT_AMPLIFY;
+  /** Runtime-safe mode/layout mirrors (set via configure()). */
+  mode: 'libxmp' | 'paula' = 'libxmp';
+  layout: 'panned' | 'lrlr' | 'lrrl' = 'panned';
+  amigaFilter: 'a500' | 'a500led' = 'a500';
+
   private bidirAdjust = 0;
   /** ticksize >> ANTICLICK_SHIFT — do_anticlick's tail length (:150). */
   private dischargeFrames = 0;
+  /** ticksize × 2 int accumulators (s->buf32). */
+  private buf32 = new Int32Array(0);
+  /** Per-voice Paula state (vi->paula; one per voice slot). */
+  private paula: PaulaState[] = [];
+  private paulaVoicesInited = -1;
 
-  reset(): void { /* per-voice state lives in the virtual layer */ }
+  private opts: Required<SoftMixerOptions> = {
+    mode: 'libxmp',
+    layout: 'panned',
+    amigaFilter: 'a500',
+    amplify: DEFAULT_AMPLIFY,
+  };
+
+  constructor(options?: SoftMixerOptions) {
+    this.applyOpts(options);
+  }
+
+  private applyOpts(options?: SoftMixerOptions): void {
+    if (options?.mode !== undefined) this.opts.mode = options.mode;
+    if (options?.layout !== undefined) this.opts.layout = options.layout;
+    if (options?.amigaFilter !== undefined) this.opts.amigaFilter = options.amigaFilter;
+    if (options?.amplify !== undefined && options.amplify > 0) this.opts.amplify = options.amplify;
+    this.mode = this.opts.mode;
+    this.layout = this.opts.layout;
+    this.amigaFilter = this.opts.amigaFilter;
+    this.amplify = this.opts.amplify;
+  }
+
+  /** Runtime re-configuration (safe while stopped; applies next frame). */
+  configure(options: SoftMixerOptions): void {
+    this.applyOpts(options);
+  }
+
+  reset(): void {
+    // Paula states re-init with the sample rate at the next frame
+    // (libxmp_paula_init runs from mixer_reset).
+    this.paulaVoicesInited = -1;
+  }
+
+  /** Per-voice paula init (libxmp_paula_init; one paula_state per voice). */
+  private initPaula(core: CoreIface): void {
+    const voices = core.voiceStates.length;
+    if (this.paulaVoicesInited !== voices) {
+      this.paula = Array.from({ length: voices }, () => new PaulaState());
+      this.paulaVoicesInited = voices;
+    }
+    const freq = core.sampleRate;
+    for (const p of this.paula) p!.init(freq);
+  }
 
   renderFrame(core: CoreIface, out: Float32Array, ticks: number): void {
     const mod = core.module!;
     const s = core.ctx.s;
 
-    // Interpolation setting: 0 nearest, 1 linear, 2 spline (XMP_INTERP_*).
-    // The authoritative value lives in s.interp (set via CoreConfig.interp /
-    // CorePlayer.setInterpolation, control.c:452-456 XMP_PLAYER_INTERP);
-    // sync the mirror field each frame so it always reflects it.
+    coreInterp = s.interp;
     this.interp = s.interp;
 
-    // mixer_prepare (mixer.c): mvol/mvolbase come from the module (IT
+    // mixer_prepare (mixer.c): mvol/mvolbase from the module (IT
     // it_load.c:1528-1530; S3M s3m_load.c:714-715). 0 = no scaling.
     this.mvol = mod.mvol ?? 0;
     this.mvolbase = mod.mvolbase ?? 0;
 
-    const kernelName: KernelName =
-      this.interp === 0 ? 'nearest' : this.interp === 2 ? 'spline' : 'linear';
-    const kernel = KERNELS[kernelName];
-
     // IT bidir shorten (mixer.c:520-523): IS_PLAYER_MODE_IT.
     this.bidirAdjust = mod.readEventType === 3 /* IT */ ? 1 : 0;
 
-    // mixer_prepare: our Core already computed s.ticksize via getTicksize.
-    // out holds ticks * ticksize * 2 interleaved frames.
     const ticksize = s.ticksize;
     this.dischargeFrames = ticksize >> 3 /* ANTICLICK_SHIFT */;
-    let bufPos = 0;
+
+    if (this.mode === 'paula') this.initPaula(core);
+
+    if (this.buf32.length < ticksize * 2) this.buf32 = new Int32Array(ticksize * 2);
+    const buf32 = this.buf32;
 
     for (let t = 0; t < ticks; t++) {
-      // Clear the tick's slice (memset :468).
-      for (let i = 0; i < ticksize * 2; i++) out[bufPos + i] = 0;
+      this.renderTick(core, buf32, ticksize);
 
-      // Per-voice loop (:527).
-      const voices = this.activeVoices(core);
-      const xcArr = core.channelStates;
-      for (let idx = 0; idx < voices.length; idx++) {
-        const vi = voices[idx]!;
-        if ((vi.flags & VoiceFlag.ANTICLICK) !== 0 && this.interp > 0) {
-          // do_anticlick(ctx, voc, NULL, 0) (mixer.c:166-168): buf == NULL
-          // means the discharge writes into s->buf32 (the NEXT tick's
-          // buffer start), count = discharge = ticksize >> 3. The cut
-          // voice's last sample values decay over the first frames of the
-          // new tick — NOT zeroed.
-          this.discharge(out, bufPos, this.dischargeFrames, vi);
-          vi.flags &= ~VoiceFlag.ANTICLICK;
-        }
-
-        // C's mixer: no act check — mixes all FLAG_ACTIVE voices.
-        // FLAG_ACTIVE is set at setpatch and cleared at reset; our
-        // equivalent is v.smp >= 0 (the voice has a sample to play).
-        if (vi.smp < 0) continue;
-
-        let xxsRef: SampleData;
-        if (vi.period < 1) {
-          // :546-550 — invalid period kills the voice via a FULL
-          // virt_resetvoice: act wipe alone would leave the voice's map
-          // slot bound (stale alias) while the slot gets re-allocated.
-          core.virt?.resetVoice(idx, true);
-          continue;
-        }
-
-        // Sample is paused — skip channel unless a new sample is queued
-        // (mixer.c:572-582).
-        if ((vi.flags & VoiceFlag.SAMPLE_PAUSED) !== 0) {
-          if (
-            (vi.flags & VoiceFlag.SAMPLE_QUEUED) === 0 ||
-            vi.queued.smp < 0
-          ) {
-            vi.flags &= ~VoiceFlag.SAMPLE_QUEUED;
-            continue;
-          }
-          this.hotswap(vi, vi.queued.smp);
-          xxsRef = core.getSample(vi.smp);
-          this.adjustVoiceEnd(vi, xxsRef);
-          vi.pos = vi.start;
-        } else {
-          xxsRef = core.getSample(vi.smp);
-        }
-
-        if (vi.pos < 0) vi.pos = 0;
-        vi.pos0 = vi.pos;
-
-        if (vi.smp < 0) continue;
-        let xxs = xxsRef;
-
-        // vol with S3M/IT global volume scaling (:556-560).
-        let vol = vi.vol;
-        if (this.mvolbase > 0 && this.mvol !== this.mvolbase) {
-          vol = Math.trunc((vol * this.mvol) / this.mvolbase);
-        }
-
-        // Pan → vol split (:563-569). PAN_SURROUND == 0x8000.
-        let volL: number, volR: number;
-        if (vi.pan === 0x8000) {
-          volL = vol * 0x80;
-          volR = -vol * 0x80;
-        } else {
-          volL = vol * (0x80 - vi.pan);
-          volR = vol * (0x80 + vi.pan);
-        }
-
-        // get_current_sample → adjust_voice_end (:406-422, :333-355).
-        this.adjustVoiceEnd(vi, xxs);
-        // NOTE: C's soft_mixer does NOT clamp pos past end per tick — the
-        // clamp + forward-loop restart live only in mixer_voicepos
-        // (mixer.c:821-833), i.e. on explicit position changes. A voice
-        // whose pos is past end is handled by the chunk logic below.
-        const sustainActiveRef = { v: false };
-        sustainActiveRef.v =
-          (xxs.flags & SampleFlags.SUSTAIN) !== 0 &&
-          (~vi.flags & VoiceFlag.RELEASE) !== 0;
-        let start = vi.start, end = vi.end;
-        // C re-reads VOICE_REVERSE per mix-loop iteration (mixer.c:604-624):
-        // loop_reposition's bidi XOR (mixer.c:375) flips direction
-        // mid-tick, so the direction must not be cached across chunks.
-        let reverse = (vi.flags & VoiceFlag.VOICE_REVERSE) !== 0;
-
-        // step (:584) + sanity (:586-588). C keeps the double step for the
-        // chunk-boundary pos commit (mixer.c:703) and converts to fixed
-        // point per chunk (mix_fn int parameter truncation).
-        const c5spd = xxs.c5spd ?? mod.c4rate;
-        const stepFloat = (C4_PERIOD * c5spd) / s.freq / vi.period;
-        if (!Number.isFinite(stepFloat) || stepFloat < 0.001 || stepFloat > SHRT_MAX) {
-          continue;
-        }
-
-        // Ramp setup (anticlick, :590-591 + :759-760 tail).
-        const rampsize = ticksize >> 3 /* ANTICLICK_SHIFT */;
-        const deltaL = rampsize > 0 ? (volL - vi.old_vl) / rampsize : 0;
-        const deltaR = rampsize > 0 ? (volR - vi.old_vr) / rampsize : 0;
-
-        let size = ticksize;
-        let rampLeft = rampsize;
-        // Frames of the anti-click ramp already consumed this tick — the
-        // ramp level is old_vl + delta × (frames into the ramp).
-        let rampDone = 0;
-
-        // IT lowpass biquad (mix_all.c FILTER_LEFT/FILTER_RIGHT :219-233,
-        // applied inside the _filter mixers selected by FLAG_FILTER set at
-        // mixer_setpatch :886-887 when QUIRK_FILTER && DSP_LOWPASS).
-        // mixer.c:659-663: cutoff >= 0xfe with resonance 0 bypasses it
-        // (See OpenMPT env-flt-max.it). a0/b0/b1 == 0 means the player tick
-        // hasn't computed coefficients yet — bypass rather than silence
-        // (C always runs filter_setup before the mixer for cutoff < 0xfe).
-        const useFilter =
-          (mod.quirks & Quirk.FILTER) !== 0 &&
-          !(vi.filter.cutoff >= 0xfe && vi.filter.resonance === 0) &&
-          (vi.filter.a0 !== 0 || vi.filter.b0 !== 0 || vi.filter.b1 !== 0);
-        // Filter state (C keeps l1/l2/fl and r1/r2/fr per voice across
-        // chunks; SAVE_FILTER_* at chunk end).
-        // PREAMP_BITS = 15 (mix_all.c:102); FILTER_SHIFT = 22 (mixer.h:12).
-        let fl1 = 0, fl2 = 0;
-        if (useFilter) {
-          fl1 = vi.filter.l1;
-          fl2 = vi.filter.l2;
-        }
-        // VAR_FILTER_STEREO (mix_all.c:226-230): R channel filter history,
-        // persisted per voice across chunks (SAVE_FILTER_STEREO).
-        let fr1 = 0, fr2 = 0;
-        if (useFilter) {
-          fr1 = vi.filter.r1;
-          fr2 = vi.filter.r2;
-        }
-        const sampleScale = (xxs.flags & SampleFlags.BITS16) !== 0 ? 32768 : 128;
-
-        let usmp = ticksize;
-        while (size > 0) {
-          // C re-reads the direction flag per iteration — loop_reposition's
-          // bidi XOR (mixer.c:375) may have flipped it in the previous chunk.
-          reverse = (vi.flags & VoiceFlag.VOICE_REVERSE) !== 0;
-          // Samples until loop break/end (:604-629). C keeps vi->pos as a
-          // DOUBLE in the voice struct (mixer.h:27) and advances it per
-          // chunk with the double step (mixer.c:703).
-          let samples: number;
-          let stepDir: number;
-          if (!reverse) {
-            if (vi.pos >= end) {
-              samples = 0;
-              if (--usmp <= 0) break;
-            } else {
-              let c = Math.ceil((end - vi.pos) / stepFloat);
-              if (c > size) c = size;
-              samples = c;
-            }
-            stepDir = stepFloat;
-          } else {
-            if (vi.pos <= start) {
-              samples = 0;
-              if (--usmp <= 0) break;
-            } else {
-              let c = Math.ceil((vi.pos - start) / stepFloat);
-              if (c > size) c = size;
-              samples = c;
-            }
-            stepDir = -stepFloat;
-          }
-
-          // VAR_NORM (mix_all.c:181-184): convert the double pos into the
-          // chunk-local integer pos + 16-bit frac. C resets this at every
-          // mix_fn call — the integer accumulation never crosses chunks.
-          // The frac term uses (int)vi->pos — C truncates toward zero (not
-          // rounding); keep identical or the first chunk's pos advance
-          // drifts by ±1 sample vs the C reference.
-          let posInt = Math.trunc(vi.pos);
-          // C stores frac in an int — the initial fractional part is
-          // truncated ((int)(65536 * fract)); keeping the fraction in our
-          // float accumulator compounds a ±1-2 sample pos0 drift vs C.
-          let frac = Math.trunc((vi.pos - posInt) * (1 << SMIX_SHIFT));
-          const stepFixed = Math.trunc(stepDir * (1 << SMIX_SHIFT));
-
-          // Mix `samples` frames (:631-714), when audible.
-          if (vi.vol !== 0) {
-            // C gain chain (mixer.c:686): kernels receive vol_l >> 8 and
-            // the fixed-point output is downshifted 11 bits, netting a
-            // per-channel float gain of vol/4096 over a ±1 sample.
-            // volL = vol × (0x80 − pan) → divisor 128 × 4096 = 0x80000.
-            const lVolF = volL / 0x80000;
-            const rVolF = volR / 0x80000;
-            // C MIX_STEREO_AC (mix_all.c:153-157): the ramp starts at the
-            // voice's OLD level (old_vl) and steps delta per frame toward
-            // vol_l — the anti-click fade between the previous and new
-            // gain. The mix output must use the RAMPED level, not volL.
-            const oldVlF = vi.old_vl / 0x80000;
-            const oldVrF = vi.old_vr / 0x80000;
-            const lRampF = deltaL / 0x80000;
-            const rRampF = deltaR / 0x80000;
-            // Hipolito anticlick capture (mixer.c:645-653): C samples the
-            // buffer at buf_pos[mix_size-1] — the LAST frame of this chunk,
-            // not the frame before it — then subtracts that pre-mix value
-            // from the post-mix value (buf_pos[-1]) to isolate the voice's
-            // own contribution.
-            const chunkPos = bufPos + (ticksize - size) * 2;
-            const probeIdx = chunkPos + samples * 2 - 1;
-            const prevL = out[probeIdx - 1] ?? 0;
-            const prevR = out[probeIdx] ?? 0;
-            // C LOOP_AC / LOOP split (mix_all.c:90,92): within a chunk the
-            // ramped macro runs for `ramp` frames and the plain macro for
-            // the rest; the level starts at old_vl and steps delta per
-            // frame — it never runs past the ramp budget.
-            // Source channel count (VAR_MONO/VAR_STEREO, mix_all.c:185-192):
-            // stereo sources read interleaved L/R pairs; pos advances ×chn.
-            const isStereoSrc = (xxs.flags & SampleFlags.STEREO) !== 0;
-            const srcChn = isStereoSrc ? 2 : 1;
-            const rampFrames = Math.min(samples, rampLeft);
-            for (let n = 0; n < samples; n++) {
-              const idx = chunkPos + n * 2;
-              // Kernels take the FRAME index; stride = source channels
-              // (LINEAR_8BIT/16BIT interp between pos and pos+chn,
-              // mix_all.c:48-58; SPLINE taps at ±chn, :74-88).
-              let lSmp = kernel(xxs.data, posInt, frac, srcChn);
-              let rSmp = isStereoSrc
-                ? kernel(xxs.data, posInt, frac, srcChn, 1)
-                : lSmp;
-              if (useFilter) {
-                // FILTER_LEFT (mix_all.c:219-227) in the C integer domain:
-                // smp_in is the interpolated sample in native sample units
-                // (±32768 16-bit / ±128 8-bit — our float × sampleScale).
-                // a0 * (smp << PREAMP_BITS) + b0*fl1 + b1*fl2, >> 22, clamp,
-                // shift history, then >> 15 back to sample units.
-                const smpC = Math.round(lSmp * sampleScale);
-                const sl64 =
-                  (vi.filter.a0 * (smpC * 32768) + vi.filter.b0 * fl1 +
-                    vi.filter.b1 * fl2) / (1 << 22);
-                let sl = sl64;
-                const FILTER_MIN = -65536 * 32768;
-                const FILTER_MAX = 65535 * 32768;
-                if (sl < FILTER_MIN) sl = FILTER_MIN;
-                else if (sl > FILTER_MAX) sl = FILTER_MAX;
-                sl = Math.trunc(sl);
-                fl2 = fl1;
-                fl1 = sl;
-                lSmp = sl / 32768 / sampleScale;
-                // FILTER_RIGHT (mix_all.c:229-235): R has its own
-                // fr1/fr2 history (VAR_FILTER_STEREO).
-                if (isStereoSrc) {
-                  let rSmpC = Math.round(rSmp * sampleScale);
-                  let sr64 =
-                    (vi.filter.a0 * (rSmpC * 32768) + vi.filter.b0 * fr1 +
-                      vi.filter.b1 * fr2) / (1 << 22);
-                  let sr = sr64;
-                  if (sr < FILTER_MIN) sr = FILTER_MIN;
-                  else if (sr > FILTER_MAX) sr = FILTER_MAX;
-                  sr = Math.trunc(sr);
-                  fr2 = fr1;
-                  fr1 = sr;
-                  rSmp = sr / 32768 / sampleScale;
-                }
-              }
-              // MIX_STEREO (mix_all.c:147-151): L gain × L sample, R gain
-              const gainL = n < rampFrames ? oldVlF + lRampF * (rampDone + n) : lVolF;
-              const gainR = n < rampFrames ? oldVrF + rRampF * (rampDone + n) : rVolF;
-              out[idx] = (out[idx] ?? 0) + lSmp * gainL;
-              out[idx + 1] = (out[idx + 1] ?? 0) + rSmp * gainR;
-              // UPDATE_POS (mix_all.c:94-98): C's loop pos is in SAMPLE
-              // units (VAR_NORM pre-multiplies by chn once at entry) and
-              // advances (frac>>16)*chn. Ours stays in FRAMES — the
-              // kernels take the frame index and stride by chn internally.
-              frac += stepFixed;
-              posInt += frac >> SMIX_SHIFT;
-              frac &= SMIX_MASK;
-            }
-            if (useFilter) {
-              // SAVE_FILTER_STEREO/SAVE_FILTER_MONO (mix_all.c:232-245):
-              // stereo sources persist separate R history; mono copies
-              // fl1/fl2 into r1/r2 "just in case".
-              vi.filter.l1 = fl1;
-              vi.filter.l2 = fl2;
-              vi.filter.r1 = isStereoSrc ? fr1 : fl1;
-              vi.filter.r2 = isStereoSrc ? fr2 : fl2;
-            }
-            // Commit back to the double pos (mixer.c:703): pos += step_dir
-            // × samples. The int/frac pair is discarded here.
-            vi.pos += stepDir * samples;
-            rampDone += rampFrames;
-            rampLeft -= rampFrames;
-            vi.old_vl += samples * deltaL;
-            vi.old_vr += samples * deltaR;
-            // Anticlick bookkeeping (mixer.c:708-712): buffer delta across
-            // the chunk = the voice's own last contribution.
-            const lastIdx = chunkPos + (samples - 1) * 2;
-            vi.sleft = (out[lastIdx] ?? 0) - prevL;
-            vi.sright = (out[lastIdx + 1] ?? 0) - prevR;
-          } else {
-            // Inaudible voice: C's zero-gain mixer fn still advances pos
-            // (mixer.c:703 — same double commit, no buffer writes).
-            vi.pos += stepDir * samples;
-          }
-
-          size -= samples;
-
-          // has_active_loop (mixer.c:326-330): LOOP flag OR active sustain
-          // loop — no lps<lpe guard (loop sanity is guaranteed at load).
-          const hasLoop = sustainActiveRef.v || (xxs.flags & SampleFlags.LOOP) !== 0;
-          // split_noloop (mixer.c:600-605): channel split forces loop split.
-          const splitNoloop =
-            vi.chn >= 0 &&
-            xcArr !== undefined &&
-            vi.chn < xcArr.length &&
-            xcArr[vi.chn]!.split !== 0;
-          // One-shot samples do not loop (:716-730); queued swap defers.
-          if (
-            (!hasLoop || splitNoloop) &&
-            (vi.flags & VoiceFlag.SAMPLE_QUEUED) === 0
-          ) {
-          if (size > 0) {
-            // The sample ended WITHIN this tick (leftover tick space):
-            // C runs do_anticlick + set_sample_end(1) — the voice is
-            // retired with a ramp (mixer.c:716-726). The voice slot is
-            // marked dead but keeps its channel (C: chn stays set; the
-            // slot is only reusable after a full reset_voice).
-            this.discharge(out, bufPos + (ticksize - size) * 2, size, vi);
-            vi.flags |= VoiceFlag.ANTICLICK;
-            this.setSampleEnd(core, vi, 1);
-            size = 0;
-            continue;
-          }
-          // size == 0: the sample filled the whole tick and is still
-          // mid-stream — the voice keeps playing (C: set_sample_end only
-          // runs when the tick has leftover space; the note continues).
-          break;
-          }
-
-          // Loop reposition / queued swap (:731-762).
-          if (
-            size > 0 ||
-            (!reverse && vi.pos >= end) ||
-            (reverse && vi.pos <= start)
-          ) {
-            if ((vi.flags & VoiceFlag.SAMPLE_QUEUED) !== 0) {
-              // Protracker sample swap (:734-755).
-              if (size > 0) {
-                this.discharge(out, bufPos + (ticksize - size) * 2, size, vi);
-              }
-              if (
-                vi.queued.smp < 0 ||
-                (!hasLoop &&
-                  !((core.getSample(vi.queued.smp).flags & SampleFlags.LOOP) !== 0))
-              ) {
-                // Invalid/one-shot→one-shot swaps stop the voice; a looped
-                // current sample pauses instead (PTStoppedSwap.mod).
-                vi.flags &= ~VoiceFlag.SAMPLE_QUEUED;
-                vi.flags |= VoiceFlag.SAMPLE_PAUSED;
-                vi.act = Act.NONE;
-                this.setSampleEnd(core, vi, 1);
-                vi.flags |= VoiceFlag.ANTICLICK;
-                size = 0;
-                continue;
-              }
-              this.hotswap(vi, vi.queued.smp);
-              const newXxs = core.getSample(vi.smp);
-              this.adjustVoiceEnd(vi, newXxs);
-              vi.pos = vi.start;
-              // Refresh local loop vars for the rest of this tick.
-              sustainActiveRef.v =
-                (newXxs.flags & SampleFlags.SUSTAIN) !== 0 &&
-                (~vi.flags & VoiceFlag.RELEASE) !== 0;
-              xxs = newXxs;
-              start = vi.start;
-              end = vi.end;
-              continue;
-            }
-            this.loopReposition(vi, xxs);
-          }
-        } // while size
-
-        vi.old_vl = volL;
-        vi.old_vr = volR;
-      } // voices
-
-      // Render final frame (mixer.c:764-784 downmix_int_*): C clamps every
-      // frame to LIM16_HI/LIM16_LO (±32767) — the float model clamps ±1.0.
-      // Without it our unbounded float sum drives the browser's output
-      // device into hard clipping (audible distortion).
-      const end = bufPos + ticksize * 2;
-      for (let i = bufPos; i < end && i < out.length; i++) {
-        const v = out[i]!;
-        if (v > 1) out[i] = 1;
-        else if (v < -1) out[i] = -1;
+      // downmix_int_16bit (mixer.c:106-131): shift = DOWNMIX_SHIFT - amp.
+      const shift = DOWNMIX_SHIFT - this.amplify;
+      for (let i = 0; i < ticksize * 2; i++) {
+        let smp = buf32[i]! >> shift;
+        if (smp > LIM16_HI) smp = LIM16_HI;
+        else if (smp < LIM16_LO) smp = LIM16_LO;
+        const fi = t * ticksize * 2 + i;
+        if (fi < out.length) out[fi] = smp / 32768;
       }
-
-      bufPos += ticksize * 2;
     }
   }
 
+  /** libxmp_mixer_softmixer core: one tick of mixing into buf32. */
+  private renderTick(core: CoreIface, buf32: Int32Array, ticksize: number): void {
+    const mod = core.module!;
+    const voices = core.voiceStates;
+    const xcArr = core.channelStates;
+
+    // libxmp_mixer_prepare (mixer.c:449-469): clear the tick buffer.
+    buf32.fill(0, 0, ticksize * 2);
+
+    for (let voc = 0; voc < voices.length; voc++) {
+      const vi = voices[voc]!;
+
+      // do_anticlick discharge of a cut voice (mixer.c:535-541): only
+      // when interp > NEAREST (mixer.c:537-539). C discharges into the
+      // NEXT tick's buffer (s->buf32 is cleared at prepare) — here the
+      // buffer is cleared per tick, and the discharge lands at its start.
+      if ((vi.flags & VoiceFlag.ANTICLICK) !== 0) {
+        if (coreInterp > 0) {
+          this.doAnticlick(buf32, 0, vi, this.dischargeFrames);
+        }
+        vi.flags &= ~VoiceFlag.ANTICLICK;
+      }
+
+      // mixer.c:543-545: C checks vi->chn < 0 (unbound slot).
+      if (vi.chn < 0) continue;
+
+      if (vi.period < 1) {
+        // :546-550 — invalid period kills the voice.
+        core.virt?.resetVoice(voc, true);
+        continue;
+      }
+
+      // Negative positions clamp (mixer.c:552-555).
+      if (vi.pos < 0.0) vi.pos = 0.0;
+      vi.pos0 = vi.pos;
+
+      let vol = vi.vol;
+
+      // Mix volume (S3M and IT) (mixer.c:556-560). C: int division.
+      if (this.mvolbase > 0 && this.mvol !== this.mvolbase) {
+        vol = Math.trunc((vol * this.mvol) / this.mvolbase);
+      }
+
+      // Pan → vol split (mixer.c:562-569). Pan domain: signed -0x80..0x7f
+      // (player.c:1413 finalpan = finalpan - 0x80). PAN_SURROUND 0x8000.
+      let pan = vi.pan;
+      // Layout overrides (Amiga hard panning; module pans elsewhere).
+      if (this.layout !== 'panned' && pan !== 0x8000 && vi.chn < 4) {
+        const hardLeft = this.layout === 'lrlr'
+          ? vi.chn % 2 === 0
+          : vi.chn === 0 || vi.chn === 3;
+        pan = hardLeft ? -0x80 : 0x7f;
+      }
+      let volL: number, volR: number;
+      if (pan === 0x8000) {
+        volL = vol * 0x80;
+        volR = -vol * 0x80;
+      } else {
+        volL = vol * (0x80 - pan);
+        volR = vol * (0x80 + pan);
+      }
+
+      let xxs: SampleData;
+      // Sample is paused — skip channel unless queued (mixer.c:571-583).
+      if ((vi.flags & VoiceFlag.SAMPLE_PAUSED) !== 0) {
+        if ((vi.flags & VoiceFlag.SAMPLE_QUEUED) === 0 || vi.queued.smp < 0) {
+          vi.flags &= ~VoiceFlag.SAMPLE_QUEUED;
+          continue;
+        }
+        this.hotswapSample(vi, vi.queued.smp, core);
+        xxs = core.getSample(vi.smp);
+        this.adjustVoiceEnd(vi, xxs);
+        vi.pos = vi.start;
+      } else {
+        xxs = core.getSample(vi.smp);
+      }
+
+      // step (mixer.c:584) + sanity (:586-588). C keeps the double step
+      // for the chunk-boundary pos commit and converts to fixed point for
+      // the mix_fn call.
+      const c5spd = xxs.c5spd ?? mod.c4rate;
+      const stepDouble = (C4_PERIOD * c5spd) / core.sampleRate / vi.period;
+      if (!Number.isFinite(stepDouble) || stepDouble < 0.001 || stepDouble > SHRT_MAX) {
+        continue;
+      }
+
+      // init_sample_wraparound (mixer.c:593).
+      const ld = newLoopData();
+      initSampleWraparound(ld, xxs, vi, coreInterp);
+
+      // Ramp size + deltas (mixer.c:595-597). C: int division. The
+      // ramp budget carries across chunks (mixer.c:672-680).
+      let rampBudget = ticksize >> 3 /* ANTICLICK_SHIFT */;
+      const rampsize = rampBudget;
+      const deltaL = rampsize > 0 ? Math.trunc((volL - vi.old_vl) / rampsize) : 0;
+      const deltaR = rampsize > 0 ? Math.trunc((volR - vi.old_vr) / rampsize) : 0;
+
+      let size = ticksize;
+      let usmp = ticksize;
+
+      const paula = this.mode === 'paula' ? this.paula[voc] ?? null : null;
+      const tabnum = this.amigaFilter === 'a500led' ? BLEP_TABLE.A500_LED : BLEP_TABLE.A500;
+
+      while (size > 0) {
+        // split_noloop (mixer.c:598-600): channel split forces loop split.
+        const splitNoloop =
+          vi.chn >= 0 && vi.chn < xcArr.length && xcArr[vi.chn]!.split !== 0;
+
+        // How many samples until loop break / sample end (mixer.c:603-629).
+        let samples: number;
+        let stepDir: number;
+        const reverse = (vi.flags & VoiceFlag.VOICE_REVERSE) !== 0;
+        if (!reverse) {
+          if (vi.pos >= vi.end) {
+            samples = 0;
+            if (--usmp <= 0) break;
+          } else {
+            let c = Math.ceil((vi.end - vi.pos) / stepDouble);
+            if (c > size) c = size;
+            samples = c;
+          }
+          stepDir = stepDouble;
+        } else {
+          if (vi.pos <= vi.start) {
+            samples = 0;
+            if (--usmp <= 0) break;
+          } else {
+            let c = Math.ceil((vi.pos - vi.start) / stepDouble);
+            if (c > size) c = size;
+            samples = c;
+          }
+          stepDir = -stepDouble;
+        }
+
+        let bufPos = (ticksize - size) * 2;
+
+        if (vi.vol !== 0) {
+          // mixer.c:631-761 — the C exact mixer body.
+          if (samples > 0) {
+            // VAR_NORM (mix_all.c:179-184): chunk-local int pos + frac.
+            // C's vi->pos is in SAMPLE units (one channel); the chunk pos
+            // multiplies by chn once (mix_all.c:180).
+            const chn = (xxs.flags & SampleFlags.STEREO) !== 0 ? 2 : 1;
+            const posInt = Math.trunc(vi.pos) * chn + nativeOf(xxs).pre;
+            const frac = Math.trunc((1 << SMIX_SHIFT) * (vi.pos - Math.trunc(vi.pos)));
+            // mix_fn step: step_dir * (1 << SMIX_SHIFT) (mixer.c:704).
+            const stepFixed = Math.trunc(stepDir * (1 << SMIX_SHIFT));
+
+            // rsize = frames WITHOUT ramping (mixer.c:656-671). The
+            // rampsize budget carries across chunks of the same tick.
+            let rsize = 0;
+            if (rampBudget > samples) {
+              rampBudget -= samples;
+            } else {
+              rsize = samples - rampBudget;
+              rampBudget = 0;
+            }
+            if (deltaL === 0 && deltaR === 0) rsize = samples;
+
+            // Hipolito capture pre-values (mixer.c:645-653): the LAST
+            // frame of this chunk, before this voice's mix.
+            const lastNeg = bufPos + (samples - 1) * 2;
+            const prevL = buf32[lastNeg] ?? 0;
+            const prevR = buf32[lastNeg + 1] ?? 0;
+
+            if (paula !== null) {
+              this.mixPaula(
+                buf32, bufPos, nativeOf(xxs), posInt, frac,
+                vlOf(volL), vrOf(volR), stepFixed, samples, tabnum, paula,
+              );
+            } else {
+              this.mixSample(
+                buf32, bufPos, xxs, posInt, frac, vi,
+                volL, volR, deltaL, deltaR,
+                stepFixed, samples, rsize,
+              );
+            }
+
+            // Hipolito post-capture (mixer.c:716-718): the voice's own
+            // last-frame contribution = post − pre of the LAST frame.
+            vi.sleft = (buf32[lastNeg] ?? 0) - prevL;
+            vi.sright = (buf32[lastNeg + 1] ?? 0) - prevR;
+
+            // old_vl bookkeeping (mixer.c:710-711).
+            vi.old_vl += samples * deltaL;
+            vi.old_vr += samples * deltaR;
+
+            // pos commit (mixer.c:703): the double pos advances by the
+            // chunk step × samples (the int/frac pair is discarded).
+            vi.pos += stepDir * samples;
+          } else {
+            // mixer.c:577-582 + :604-610: samples == 0 with a live voice —
+            // the --usmp guard; nothing mixed, pos unchanged.
+          }
+          size -= samples;
+        } else {
+          // Inaudible voice: pos advances without buffer writes (the C
+          // skip happens via vi->vol check before the mix call).
+          vi.pos += stepDir * samples;
+          size -= samples;
+        }
+
+        // has_active_loop (mixer.c:326-335).
+        const hasLoop =
+          (xxs.flags & SampleFlags.LOOP) !== 0 ||
+          ((xxs.flags & SampleFlags.SUSTAIN) !== 0 && (~vi.flags & VoiceFlag.RELEASE) !== 0);
+
+        // One-shot samples do not loop (mixer.c:716-730).
+        if (
+          (!hasLoop || splitNoloop) &&
+          (vi.flags & VoiceFlag.SAMPLE_QUEUED) === 0
+        ) {
+          if (size > 0) {
+            // do_anticlick + set_sample_end(1) (mixer.c:720-726).
+            this.doAnticlick(buf32, bufPos, vi, size);
+            this.setSampleEnd(core, vi, 1);
+          }
+          size = 0;
+          continue;
+        }
+
+        // Loop reposition / queued swap (mixer.c:730-762).
+        const reverse2 = (vi.flags & VoiceFlag.VOICE_REVERSE) !== 0;
+        if (
+          size > 0 ||
+          (!reverse2 && vi.pos >= vi.end) ||
+          (reverse2 && vi.pos <= vi.start)
+        ) {
+          if ((vi.flags & VoiceFlag.SAMPLE_QUEUED) !== 0) {
+            // Protracker sample swap (mixer.c:733-755).
+            if (size > 0) {
+              this.doAnticlick(buf32, bufPos, vi, size);
+            }
+            const queued = core.getSample(vi.queued.smp);
+            if (
+              vi.queued.smp < 0 ||
+              (!hasLoop && queued && (queued.flags & SampleFlags.LOOP) === 0)
+            ) {
+              vi.flags &= ~VoiceFlag.SAMPLE_QUEUED;
+              vi.flags |= VoiceFlag.SAMPLE_PAUSED;
+              this.setSampleEnd(core, vi, 1);
+              size = 0;
+              continue;
+            }
+            resetSampleWraparound(ld);
+            this.hotswapSample(vi, vi.queued.smp, core);
+            const newXxs = core.getSample(vi.smp);
+            this.adjustVoiceEnd(vi, newXxs);
+            initSampleWraparound(ld, newXxs, vi, coreInterp);
+            vi.pos = vi.start;
+            xxs = newXxs;
+            continue;
+          }
+          if (this.loopReposition(vi, xxs)) {
+            resetSampleWraparound(ld);
+            initSampleWraparound(ld, xxs, vi, coreInterp);
+          }
+        }
+      } // while size
+
+      // reset_sample_wraparound + old_vl/vr commit (mixer.c:765-767).
+      resetSampleWraparound(ld);
+      let panEnd = vi.pan;
+      let volEnd = vi.vol;
+      if (this.mvolbase > 0 && this.mvol !== this.mvolbase) {
+        volEnd = Math.trunc((volEnd * this.mvol) / this.mvolbase);
+      }
+      let volL2: number, volR2: number;
+      if (panEnd === 0x8000) {
+        volL2 = volEnd * 0x80;
+        volR2 = -volEnd * 0x80;
+      } else {
+        volL2 = volEnd * (0x80 - panEnd);
+        volR2 = volEnd * (0x80 + panEnd);
+      }
+      vi.old_vl = volL2;
+      vi.old_vr = volR2;
+    } // voices
+  }
+
   /**
-   * adjust_voice_end (mixer.c:333-355): recompute vi.start/end from the
-   * sample's loop state; clear/set VOICE_BIDIR.
+   * adjust_voice_end (mixer.c:333-355; the xtra/sustain part mirrors
+   * get_current_sample :406-422 semantics with our SampleData flags).
    */
   private adjustVoiceEnd(vi: VoiceState, xxs: SampleData): void {
     vi.flags &= ~VoiceFlag.VOICE_BIDIR;
@@ -515,13 +683,11 @@ export class SoftMixer implements DspPlugin {
     }
   }
 
-  /**
-   * hotswap_sample (mixer.c:393-404): replace the playing sample keeping
-   * vol/pan; forces SAMPLE_LOOP so the swap lands in the new sample's loop.
-   */
-  private hotswap(vi: VoiceState, smp: number): void {
+  /** hotswap_sample (mixer.c:395-404) + libxmp_mixer_setpatch(:855-888). */
+  private hotswapSample(vi: VoiceState, smp: number, core: CoreIface): void {
     const vol = vi.vol;
     const pan = vi.pan;
+    // libxmp_mixer_setpatch(ctx, voc, smp, 0):
     vi.smp = smp;
     vi.vol = 0;
     vi.pan = 0;
@@ -533,19 +699,23 @@ export class SoftMixer implements DspPlugin {
       VoiceFlag.VOICE_BIDIR
     );
     vi.fidx = 0;
+    this.setSampleEnd(core, vi, 0);
+    // mixer_voicepos(ctx, voc, 0, 0):
     vi.pos = 0;
+    // hotswap_sample continues:
     vi.flags |= VoiceFlag.SAMPLE_LOOP;
     vi.vol = vol;
     vi.pan = pan;
+    const xxs = core.getSample(vi.smp);
+    this.adjustVoiceEnd(vi, xxs);
   }
 
   /**
-   * loop_reposition (mixer.c:357-393): set SAMPLE_LOOP (recomputing the
-   * voice endpoints on first entry — matters for LOOP_FULL), then wrap or
-   * flip the position around vi.start/vi.end. Safety clamp is against the
-   * SAMPLE length + 1, not the loop end (:388-391).
+   * loop_reposition (mixer.c:357-393): wrap or flip the position;
+   * returns whether the loop state changed (C's return value gates the
+   * caller's wraparound re-init).
    */
-  private loopReposition(vi: VoiceState, xxs: SampleData): void {
+  private loopReposition(vi: VoiceState, xxs: SampleData): boolean {
     const loopChanged = (vi.flags & VoiceFlag.SAMPLE_LOOP) === 0;
     vi.flags |= VoiceFlag.SAMPLE_LOOP;
     if (loopChanged) this.adjustVoiceEnd(vi, xxs);
@@ -567,63 +737,15 @@ export class SoftMixer implements DspPlugin {
         vi.pos = vi.start * 2 - vi.pos;
       }
     }
-    // Safety check: pos should not be excessively past the sample end
-    // (:387-391). Only seems to happen with very low sample rates.
+    // Safety check (mixer.c:387-391).
     if (vi.pos > xxs.length + 1) {
       vi.pos = xxs.length + 1;
     }
+    return loopChanged;
   }
 
   /**
-   * do_anticlick (mixer.c:148-195): fade the voice's last level out over at
-   * most `ticksize >> ANTICLICK_SHIFT` frames. C clamps count to that
-   * discharge length (a full-tail request would otherwise smear one note's
-   * level across most of a tick and stack against the live mix), and
-   * decrements stepmul BEFORE each sample (:181-187) — so the first frame
-   * written carries (1 - 1/count)^2 and the full-level sample is dropped
-   * (the last mixed frame already contains it). The slope is squared.
-   */
-  private discharge(
-    out: Float32Array,
-    at: number,
-    count: number,
-    vi: VoiceState,
-  ): void {
-    // sleft/sright are captured from the mixed float output — already in
-    // the output domain; no fixed-point conversion.
-    const sl = vi.sleft;
-    const sr = vi.sright;
-    vi.sleft = 0;
-    vi.sright = 0;
-    if (sl === 0 && sr === 0) return;
-    if (count > this.dischargeFrames) count = this.dischargeFrames;
-    if (count <= 0) return;
-    // C do_anticlick (mixer.c:171-192): stepval = (1 << ANTICLICK_FPSHIFT
-    // (24)) / count; stepmul = stepval * count; per frame: stepmul -=
-    // stepval; the level = (stepmul >> (FPSHIFT - 16))² × smp >> 32 with
-    // smp = the last mixed ±2^15 output in the fixed domain. The float
-    // equivalent: the level = ((stepmul >> 8) / 2^16)² × smp.
-    const FPSHIFT = 24;
-    const stepval = Math.trunc((1 << FPSHIFT) / count);
-    let stepmul = stepval * count;
-    let n = 0;
-    while (stepmul > 0 && n < count) {
-      const stepmulSq = Math.trunc(stepmul / 256) ** 2;
-      const k = stepmulSq / 0x100000000;
-      const idx = at + n * 2;
-      out[idx] = (out[idx] ?? 0) + sl * k;
-      out[idx + 1] = (out[idx + 1] ?? 0) + sr * k;
-      stepmul -= stepval;
-      n++;
-    }
-  }
-
-  /**
-   * set_sample_end (mixer.c:197-217). `end` = 1: mark the channel's
-   * NOTE_SAMPLE_END (process_volume zeroes info_finalvol for it, and
-   * play_channel propagates NOTE_END); with QUIRK_RSTCHN the voice slot
-   * is fully freed (virt_resetvoice). `end` = 0: clear the flag — runs on
-   * every voice start (mixer.c:878).
+   * set_sample_end (mixer.c:197-217).
    */
   private setSampleEnd(core: CoreIface, vi: VoiceState, end: 0 | 1): void {
     const xcArr = core.channelStates;
@@ -639,12 +761,273 @@ export class SoftMixer implements DspPlugin {
     }
   }
 
-  private activeVoices(core: CoreIface): readonly VoiceState[] {
-    // All allocated voices incl. tails (NNA); act flags drive skipping.
-    return core.voiceStates;
+  /**
+   * do_anticlick (mixer.c:148-195). `atPos` is the slot offset; the
+   * mixer.c:166-168 buf == NULL variant (discharge into the next tick's
+   * buffer) lands at position 0 of the freshly cleared buffer here.
+   */
+  private doAnticlick(
+    buf32: Int32Array,
+    atPos: number,
+    vi: VoiceState,
+    count: number,
+  ): void {
+    const sl = vi.sleft;
+    const sr = vi.sright;
+    vi.sleft = 0;
+    vi.sright = 0;
+    if (sl === 0 && sr === 0) return;
+    if (count > this.dischargeFrames) count = this.dischargeFrames;
+    if (count <= 0) return;
+    // C: stepval = (1 << ANTICLICK_FPSHIFT) / count; stepmul = stepval ×
+    // count; per frame: stepmul -= stepval; level =
+    // ((stepmul >> (FPSHIFT - 16))² × smp) >> 32 with smp the last mixed
+    // output in the fixed domain. sleft/sright are int32-domain captures;
+    // the float model note in the old port does not apply here.
+    const stepval = Math.trunc((1 << ANTICLICK_FPSHIFT) / count);
+    let stepmul = stepval * count;
+    // C: while ((stepmul -= stepval) > 0) — the decrement happens FIRST,
+    // so the first written frame carries (1 − 1/count)², not the full
+    // level (the last mixed frame already contains it).
+    let n = 0;
+    while ((stepmul -= stepval) > 0 && n < count) {
+      const stepmulShifted = stepmul >> (ANTICLICK_FPSHIFT - 16);
+      // level = (stepmulShifted² × smp) >> 32 — but smp (sleft) is the
+      // int32 buffer delta, already in mix domain; C's smp is the same
+      // int32 value captured from buf32. So: out += (sm² × smp) >> 32.
+      // Plain (not imul!) square: stepmulShifted ≤ 65535 → sm² ≤ 2^32,
+      // exactly representable — Math.imul would wrap it negative.
+      const sm2 = stepmulShifted * stepmulShifted;
+      const idx = atPos + n * 2;
+      // JS doubles hold the product exactly here (|sm2*smp| < 2^53):
+      buf32[idx] = (buf32[idx] ?? 0) + Math.trunc((sm2 * sl) / 0x100000000);
+      buf32[idx + 1] = (buf32[idx + 1] ?? 0) + Math.trunc((sm2 * sr) / 0x100000000);
+      n++;
+    }
+  }
+
+  /**
+   * The eight libxmp interpolation mixers (mix_all.c), dispatched inline
+   * by width/source. All math is the C integer domain: chunk-local
+   * pos/frac 16.16, integer gains (vol_l >> 8), MIX_STEREO(_AC) ramps.
+   */
+  private mixSample(
+    buf32: Int32Array,
+    bufPos0: number,
+    xxs: SampleData,
+    posInt: number,
+    frac: number,
+    vi: VoiceState,
+    volL: number,
+    volR: number,
+    deltaL: number,
+    deltaR: number,
+    stepFixed: number,
+    samples: number,
+    rsize: number,
+  ): void {
+    const nat = nativeOf(xxs);
+    const sptr = nat.data;
+    const bits16 = (xxs.flags & SampleFlags.BITS16) !== 0;
+    const stereo = (xxs.flags & SampleFlags.STEREO) !== 0;
+    const chn = stereo ? 2 : 1;
+
+    // Filter selection (mixer.c:641-645 + mix_all.c LIST(linear_filter)):
+    // QUIRK_FILTER && XMP_DSP_LOWPASS set FLAG_FILTER at setpatch; the
+    // mixer applies the biquad when coefficients exist. See
+    // env-flt-max.it: cutoff >= 0xfe with resonance 0 bypasses.
+    const useFilter =
+      (vi.filter.a0 !== 0 || vi.filter.b0 !== 0 || vi.filter.b1 !== 0) &&
+      !(vi.filter.cutoff >= 0xfe && vi.filter.resonance === 0) &&
+      coreInterp > 0;
+    const family = coreInterp === 0 ? 0 : coreInterp === 2 ? 2 : 1;
+    const filterActive = useFilter && family !== 0;
+
+    const a0 = vi.filter.a0, b0 = vi.filter.b0, b1 = vi.filter.b1;
+    let fl1 = vi.filter.l1, fl2 = vi.filter.l2;
+    let fr1 = vi.filter.r1, fr2 = vi.filter.r2;
+
+    // mix_fn receives vl = vol_l >> 8 (mixer.c:708). The AC deltas are
+    // passed at full scale: MIX_*_AC adds delta_l to the running old_vl,
+    // whose >> 8 forms the level (mix_all.c:150-158).
+    const vl = Math.trunc(volL / 256);
+    const vr = Math.trunc(volR / 256);
+    const dvl = deltaL;
+    const dvr = deltaR;
+
+    let oldVlRun = vi.old_vl;
+    let oldVrRun = vi.old_vr;
+
+    let p = posInt;
+    let f = frac;
+    const rampFrames = samples - rsize;
+
+    let bufPos = bufPos0;
+    for (let n = 0; n < samples; n++) {
+      let smpL: number;
+      let smpR: number;
+      if (family === 0) {
+        // NEAREST_8BIT/16BIT (mix_all.c:40-46).
+        if (bits16) {
+          smpL = sptr[p]!;
+          smpR = stereo ? sptr[p + 1]! : smpL;
+        } else {
+          smpL = sptr[p]! << 8;
+          smpR = stereo ? (sptr[p + 1]! << 8) : smpL;
+        }
+      } else if (family === 1) {
+        // LINEAR_8BIT/16BIT (mix_all.c:48-58).
+        const l1 = bits16 ? sptr[p]! : sptr[p]! << 8;
+        const l2 = bits16 ? sptr[p + chn]! : sptr[p + chn]! << 8;
+        smpL = l1 + (((f >> 1) * (l2 - l1)) >> (SMIX_SHIFT - 1));
+        if (stereo) {
+          const r1 = bits16 ? sptr[p + 1]! : sptr[p + 1]! << 8;
+          const r2 = bits16 ? sptr[p + 1 + chn]! : sptr[p + 1 + chn]! << 8;
+          smpR = r1 + (((f >> 1) * (r2 - r1)) >> (SMIX_SHIFT - 1));
+        } else {
+          smpR = smpL;
+        }
+      } else {
+        // SPLINE_8BIT/16BIT (mix_all.c:73-88).
+        const fIdx = f >> SPLINE_FRACSHIFT;
+        const f2 = (fIdx & SPLINE_FRACMASK) >> 2;
+        const L0 = cubic_spline_lut0[f2]!;
+        const L1 = cubic_spline_lut1[f2]!;
+        const L2 = cubic_spline_lut2[f2]!;
+        const L3 = cubic_spline_lut3[f2]!;
+        const sh = bits16 ? SPLINE_SHIFT : SPLINE_SHIFT - 8;
+        const conv = (idx: number): number =>
+          (L0 * (sptr[idx - chn] ?? 0) + L1 * (sptr[idx] ?? 0) +
+            L3 * (sptr[idx + (chn << 1)] ?? 0) + L2 * (sptr[idx + chn] ?? 0)) >> sh;
+        smpL = conv(p);
+        smpR = stereo ? conv(p + 1) : smpL;
+      }
+
+      if (filterActive) {
+        // FILTER_LEFT (mix_all.c:111-117): C shifts (arithmetic), so
+        // negative values floor — keep the >> semantics.
+        let sl = (a0 * (smpL << PREAMP_BITS) + b0 * fl1 + b1 * fl2) >> FILTER_SHIFT;
+        if (sl < FILTER_MIN) sl = FILTER_MIN;
+        else if (sl > FILTER_MAX) sl = FILTER_MAX;
+        fl2 = fl1; fl1 = sl;
+        smpL = sl >> PREAMP_BITS;
+        if (stereo) {
+          // FILTER_RIGHT (mix_all.c:119-125).
+          let sr = (a0 * (smpR << PREAMP_BITS) + b0 * fr1 + b1 * fr2) >> FILTER_SHIFT;
+          if (sr < FILTER_MIN) sr = FILTER_MIN;
+          else if (sr > FILTER_MAX) sr = FILTER_MAX;
+          fr2 = fr1; fr1 = sr;
+          smpR = sr >> PREAMP_BITS;
+        }
+      }
+
+      // MIX_STEREO(_AC) (mix_all.c:146-159) — stereo out always.
+      if (n < rampFrames) {
+        // MIX_*_AC: level = old >> 8, stepped per frame.
+        buf32[bufPos] = (buf32[bufPos] ?? 0) + smpL * (oldVlRun >> 8);
+        buf32[bufPos + 1] = (buf32[bufPos + 1] ?? 0) + smpR * (oldVrRun >> 8);
+        oldVlRun += dvl;
+        oldVrRun += dvr;
+      } else {
+        buf32[bufPos] = (buf32[bufPos] ?? 0) + smpL * vl;
+        buf32[bufPos + 1] = (buf32[bufPos + 1] ?? 0) + smpR * vr;
+      }
+      bufPos += 2;
+
+      // UPDATE_POS (mix_all.c:94-98).
+      f += stepFixed;
+      p += f >> SMIX_SHIFT;
+      f &= SMIX_MASK;
+    }
+
+    // SAVE_FILTER_* (mix_all.c:229-245).
+    if (filterActive) {
+      vi.filter.l1 = fl1;
+      vi.filter.l2 = fl2;
+      if (stereo) {
+        vi.filter.r1 = fr1;
+        vi.filter.r2 = fr2;
+      } else {
+        vi.filter.r1 = fl1;
+        vi.filter.r2 = fl2;
+      }
+    }
+  }
+
+  /**
+   * libxmp_paula mixers (mix_paula.c:132-170): PAULA_SIMULATION per
+   * frame + MIX mono/stereo, int8 mono sources. The paula VAR re-shifts
+   * the gains <<8 (mix_paula.c:118-128) — vl/vr arrive as vol_l>>8.
+   * No AC ramp variants exist for the A500 mixers (mix_paula.c:172-180).
+   */
+  private mixPaula(
+    buf32: Int32Array,
+    bufPos0: number,
+    nat: NativeSample,
+    posInt: number,
+    frac: number,
+    vl: number,
+    vr: number,
+    stepFixed: number,
+    samples: number,
+    tabnum: number,
+    paula: PaulaState,
+  ): void {
+    const vlFull = vl << 8;
+    const vrFull = vr << 8;
+    const sptr = nat.data;
+
+    let pos = posInt;
+    let f = frac;
+    let count = samples;
+    let bufPos = bufPos0;
+
+    for (; count; count--) {
+      // PAULA_SIMULATION (mix_paula.c:107-133); step = fixed int step.
+      const step = stepFixed;
+      const numIn = Math.trunc(paula.remainder / MINIMUM_INTERVAL);
+      const ministep = numIn > 0 ? Math.trunc(step / numIn) : 0;
+
+      // input is always sampled at a higher rate than output
+      for (let i = 0; i < numIn - 1; i++) {
+        paula.inputSample(sptr[pos]!);
+        paula.doClock(MINIMUM_INTERVAL);
+        // UPDATE_POS(ministep) (mix_paula.c:99-105) — mono, no chn.
+        f += ministep;
+        pos += f >> SMIX_SHIFT;
+        f &= SMIX_MASK;
+      }
+      paula.inputSample(sptr[pos]!);
+      paula.remainder -= numIn * MINIMUM_INTERVAL;
+
+      paula.doClock(Math.trunc(paula.remainder));
+      const smpIn = paula.outputSample(tabnum);
+      paula.doClock(MINIMUM_INTERVAL - Math.trunc(paula.remainder));
+      f += step - (numIn - 1) * ministep;
+      pos += f >> SMIX_SHIFT;
+      f &= SMIX_MASK;
+
+      paula.remainder += paula.fdiv;
+
+      // MIX_STEREO (mix_paula.c:135-140).
+      buf32[bufPos] = (buf32[bufPos] ?? 0) + smpIn * vlFull;
+      buf32[bufPos + 1] = (buf32[bufPos + 1] ?? 0) + smpIn * vrFull;
+      bufPos += 2;
+    }
   }
 }
 
-export function createSoftMixerPlugin(): DspPlugin {
-  return new SoftMixer();
+/** mix_fn gain arguments (mixer.c:708): vl = vol_l >> 8. */
+function vlOf(volL: number): number {
+  return Math.trunc(volL / 256);
 }
+function vrOf(volR: number): number {
+  return Math.trunc(volR / 256);
+}
+
+export function createSoftMixerPlugin(options?: SoftMixerOptions): DspPlugin {
+  return new SoftMixer(options);
+}
+
+/** Raw Paula state introspection for players/tools. */
+export { PaulaState, PAULA_HZ, MINIMUM_INTERVAL, BLEP_SIZE } from './paula.js';

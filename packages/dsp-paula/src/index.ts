@@ -204,5 +204,17 @@ export class Paula implements DspPlugin {
 }
 
 export function createPaulaPlugin(): DspPlugin {
+  // Deprecated: prefer @modplayjs/dsp-softmixer's { mode: 'paula' } (the
+  // libxmp LIBXMP_PAULA_SIMULATOR port with A500/BLEP output and L/R
+  // layout options). This plugin keeps working but is feature-frozen.
+  // One-shot runtime nudge (README carries the details).
+  const g = globalThis as {
+    __MODPLAYJS_PAULA_DEPRECATION_WARNED?: boolean;
+    console?: { warn?: (message: string) => void };
+  };
+  if (!g.__MODPLAYJS_PAULA_DEPRECATION_WARNED) {
+    g.__MODPLAYJS_PAULA_DEPRECATION_WARNED = true;
+    g.console?.warn?.('[modplayjs] dsp-paula is deprecated — use createSoftMixerPlugin({ mode: "paula" }) from @modplayjs/dsp-softmixer');
+  }
   return new Paula();
 }

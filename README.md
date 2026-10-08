@@ -103,8 +103,8 @@ contracts are documented in [docs/](docs/) —
 | `@modplayjs/stb-vorbis` | stb_vorbis Ogg Vorbis decoder (OpenMPT stb_vorbis.c port; bit-exact vs C) |
 | `@modplayjs/stream-audio` | WAV/MP3/OGG streamed-audio decode for file-based playback |
 | `@modplayjs/effects-shared` | Shared effect handlers and per-frame stages (frame-accurate C port) |
-| `@modplayjs/dsp-paula` | Amiga Paula-emulating mixer (MOD) |
-| `@modplayjs/dsp-softmixer` | libxmp-parity software mixer (S3M/XM/IT, A500 optional) |
+| `@modplayjs/dsp-paula` | Amiga Paula-emulating mixer (MOD) — **deprecated**, superseded by `dsp-softmixer`'s Paula mode |
+| `@modplayjs/dsp-softmixer` | libxmp-parity software mixer (exact integer mixing domain) + A500 Paula BLEP mode (`mode: 'paula'`), L/R layouts, `XMP_PLAYER_AMPLIFY` |
 | `@modplayjs/out-webaudio` | AudioWorklet output: SAB ring (COOP/COEP) with automatic copy-mode fallback, pause/resume |
 | `@modplayjs/out-pcm` | Offline PCM render + WAV encoder |
 | `@modplayjs/demo` | Demo page (GitHub Pages): player with transport/seek/volume, channel mute strip, instrument/sample audition, file info, order list, tracker message, realtime pattern view |

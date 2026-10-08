@@ -143,6 +143,30 @@
             </div>
           </section>
 
+          <section class="card bg-base-100 shadow-sm border border-base-300" id="mixersection" hidden>
+            <div class="card-body p-3 gap-2">
+              <h2 class="text-[0.65rem] font-semibold uppercase tracking-[0.18em] opacity-50">mixer settings</h2>
+              <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 items-center text-[0.72rem]">
+                <span class="opacity-60" title="libxmp = exact reference software mixer. Paula = Amiga A500 BLEP resampler (4-channel MODs only).">engine</span>
+                <select id="mixer-mode" class="select select-sm w-full" title="libxmp = exact reference software mixer. Paula = Amiga A500 BLEP resampler (4-channel MODs only).">
+                  <option value="libxmp">libxmp</option>
+                  <option value="paula">Paula (A500)</option>
+                </select>
+                <span class="opacity-60" title="Channel → speaker layout. lrlr = L R L R (Amiga hardware order). lrrl = L R R L (OpenMPT/PaulaLib default).">layout</span>
+                <select id="mixer-layout" class="select select-sm w-full" title="Channel → speaker layout. lrlr = L R L R (Amiga hardware order). lrrl = L R R L (OpenMPT/PaulaLib default).">
+                  <option value="panned">module pans</option>
+                  <option value="lrlr">L R L R</option>
+                  <option value="lrrl">L R R L</option>
+                </select>
+                <span class="opacity-60" title="Amiga 500 output filter: LED off = the fixed 4.9 kHz RC network. LED on = the dimmed-power-light 3.3 kHz Sallen-Key stage on top (Paula mode only).">A500 filter</span>
+                <select id="mixer-amigafilter" class="select select-sm w-full" title="Amiga 500 output filter: LED off = the fixed 4.9 kHz RC network. LED on = the dimmed-power-light 3.3 kHz Sallen-Key stage on top (Paula mode only).">
+                  <option value="a500">LED off</option>
+                  <option value="a500led">LED on</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
           <section class="card bg-base-100 shadow-sm border border-base-300" id="sidsection" hidden>
             <div class="card-body p-3 gap-2">
               <h2 class="text-[0.65rem] font-semibold uppercase tracking-[0.18em] opacity-50">SID settings</h2>
