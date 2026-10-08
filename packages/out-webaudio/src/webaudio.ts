@@ -223,6 +223,24 @@ export class WebAudioOutput implements OutputPlugin {
     this.renderAhead();
   }
 
+  /**
+   * Discard all buffered audio after a seek: the ring keeps the pre-seek
+   * tail (up to ~0.7s in the SAB mode, the FIFO in the copy mode), which
+   * would play out before the repositioned audio arrives. After the
+   * flush the next renderAhead() fills the ring with the seeked audio.
+   */
+  flush(): void {
+    if (this.header !== null) {
+      // The SAB ring: jump the write pointer to the read pointer - the
+      // pending frames are dropped, the next renderAhead fills from the
+      // seek position.
+      const read = Atomics.load(this.header, 1);
+      this.writePos = read;
+    } else if (this.node) {
+      this.node.port.postMessage({ mode: 'clear' });
+    }
+  }
+
   /** True while playback is paused (started, but the render loop frozen). */
   get pausedState(): boolean {
     return this.paused;

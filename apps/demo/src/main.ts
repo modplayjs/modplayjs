@@ -251,10 +251,26 @@ seek.addEventListener('change', () => {
   // SID: seek the ENGINE (fast-forward through the machine emulation —
   // backwards seeks restart the tune). The stub module has no meaningful
   // ord/row mapping.
+  // Pause the output's render loop while seeking: seekTime's
+  // play-through consumes engine ticks synchronously, and the render
+  // timer would double-pull from the same engine (the repositioned
+  // audio would land in the middle of the still-draining ring).
+  const wasPlaying = playing && !paused;
+  if (wasPlaying && core.module?.format !== 'sid') {
+    output.pause();
+  }
   if (core.module?.format === 'sid') {
     sidSeek(targetMs / 1000);
   } else {
     core.seekTime(targetMs);
+  }
+  // The output ring holds the pre-seek audio (up to ~0.7s); without a
+  // flush it plays out before the repositioned audio arrives, which
+  // sounds like the song stopping. Drop the pending frames so the next
+  // renderAhead fills the ring with the seeked audio.
+  output.flush();
+  if (wasPlaying && core.module?.format !== 'sid') {
+    void output.resume();
   }
   seekLatchUntil = performance.now() + 400;
   timeCur.textContent = fmtTime(targetMs);
@@ -734,6 +750,7 @@ async function loadTrack(file: Blob): Promise<void> {
       setAuditionButtons(false);
       seek.disabled = false;
       seek.value = '0';
+      seek.style.setProperty('--fill', '0%');
       timeCur.textContent = '0:00';
       timeRem.textContent = '-' + fmtTime(streamed.duration);
       curPattern = -1;
@@ -785,6 +802,7 @@ async function loadTrack(file: Blob): Promise<void> {
   setAuditionButtons(false);
   seek.disabled = !!core.module?.endless; // endless engines (SID): no seek bar
   seek.value = '0';
+  seek.style.setProperty('--fill', '0%'); // the visual fill was left at the old track's position
   timeCur.textContent = '0:00';
   timeRem.textContent = core.module?.endless ? '∞' : '-' + fmtTime(moduleDuration());
   curPattern = -1;
