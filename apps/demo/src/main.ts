@@ -763,10 +763,19 @@ async function loadTrack(file: Blob): Promise<void> {
     sidBytes = null;
     sidSection.hidden = true;
     core.setDsp('softmixer');
-    // mixer settings panel: visible for tracker modules (Amiga options only
-    // make sense for 4-channel MOD, but the selects are harmless elsewhere —
-    // the mixer falls back to the interp mixers for non-mono sources)
+    // mixer settings panel: the Paula engine + the A500 filter only make
+    // sense for 4-channel Amiga MODs (the C A500 mixers are mono 8-bit
+    // only; on other formats those voices skip, leaving silence). Keep
+    // the selects enabled only there; the layout select is always valid.
+    const isMod = mod.format === 'mod' && mod.chn === 4;
     mixerSection.hidden = !(mod.format === 'mod' || mod.format === 's3m' || mod.format === 'xm' || mod.format === 'it');
+    mixerModeSel.disabled = !isMod;
+    mixerFilterSel.disabled = !isMod;
+    if (!isMod) {
+      mixerModeSel.value = 'libxmp';
+      mixerFilterSel.value = 'a500';
+      applyMixerOptions();
+    }
   }
   loaded = true;
   playBtn.disabled = false;
@@ -852,6 +861,12 @@ const applyMixerOptions = (): void => {
     layout: mixerLayoutSel.value as 'panned' | 'lrlr' | 'lrrl',
     amigaFilter: mixerFilterSel.value as 'a500' | 'a500led',
   });
+  // The lrlr/lrrl layouts hard-assign pan for chn < 4: the pan-separation
+  // slider has no effect on those channels (it only modulates the module
+  // pans, which the layout overrides). Disable the slider so it doesn't
+  // look like it's doing something.
+  panSep.disabled = mixerLayoutSel.value !== 'panned';
+  panSepV.textContent = panSep.disabled ? 'fixed' : panSep.value;
 };
 mixerLayoutSel.addEventListener('change', () => applyMixerOptions());
 mixerFilterSel.addEventListener('change', () => applyMixerOptions());

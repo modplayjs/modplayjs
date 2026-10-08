@@ -414,8 +414,12 @@ export class SoftMixer implements DspPlugin {
       // Pan → vol split (mixer.c:562-569). Pan domain: signed -0x80..0x7f
       // (player.c:1413 finalpan = finalpan - 0x80). PAN_SURROUND 0x8000.
       let pan = vi.pan;
-      // Layout overrides (Amiga hard panning; module pans elsewhere).
-      if (this.layout !== 'panned' && pan !== 0x8000 && vi.chn < 4) {
+      // Layout overrides (Amiga hard panning). Only meaningful in the
+      // Paula mode: the Amiga wiring exists to route the channels to the
+      // correct A500 speaker. With the libxmp mixers the module pans are
+      // the reference, and forcing hard L/R here would double the
+      // per-speaker amplitude and clip the output.
+      if (this.mode === 'paula' && this.layout !== 'panned' && pan !== 0x8000 && vi.chn < 4) {
         const hardLeft = this.layout === 'lrlr'
           ? vi.chn % 2 === 0
           : vi.chn === 0 || vi.chn === 3;
@@ -519,6 +523,8 @@ export class SoftMixer implements DspPlugin {
             const chn = (xxs.flags & SampleFlags.STEREO) !== 0 ? 2 : 1;
             const posInt = Math.trunc(vi.pos) * chn + nativeOf(xxs).pre;
             const frac = Math.trunc((1 << SMIX_SHIFT) * (vi.pos - Math.trunc(vi.pos)));
+            const bits16 = (xxs.flags & SampleFlags.BITS16) !== 0;
+            const stereo = (xxs.flags & SampleFlags.STEREO) !== 0;
             // mix_fn step: step_dir * (1 << SMIX_SHIFT) (mixer.c:704).
             const stepFixed = Math.trunc(stepDir * (1 << SMIX_SHIFT));
 
@@ -539,12 +545,15 @@ export class SoftMixer implements DspPlugin {
             const prevL = buf32[lastNeg] ?? 0;
             const prevR = buf32[lastNeg + 1] ?? 0;
 
-            if (paula !== null) {
+            if (paula !== null && !bits16 && !stereo) {
+              // The C's libxmp_a500_mixers[] only has mono 8-bit entries;
+              // other voices hit NULL mix_fn and are skipped silently
+              // (mixer.c:685 `if (mix_fn != NULL)`).
               this.mixPaula(
                 buf32, bufPos, nativeOf(xxs), posInt, frac,
                 vlOf(volL), vrOf(volR), stepFixed, samples, tabnum, paula,
               );
-            } else {
+            } else if (paula === null) {
               this.mixSample(
                 buf32, bufPos, xxs, posInt, frac, vi,
                 volL, volR, deltaL, deltaR,
