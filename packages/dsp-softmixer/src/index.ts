@@ -652,23 +652,6 @@ export class SoftMixer implements DspPlugin {
       vi.old_vl = volL2;
       vi.old_vr = volR2;
     } // voices
-    if ((globalThis as { __MIX_DUMP__?: boolean }).__MIX_DUMP__) {
-      const p = core.ctx.p;
-      for (let v = 0; v < core.voiceStates.length; v++) {
-        const vi = core.voiceStates[v]!;
-        if (vi.smp >= 0) {
-          console.error(`TICK ${Math.trunc(p.current_time)} ch${vi.chn} voc${v} smp${vi.smp} pos${vi.pos.toFixed(6)} old_vl${vi.old_vl} old_vr${vi.old_vr} sleft${vi.sleft} sright${vi.sright} vol${vi.vol} pan${vi.pan}`);
-      if (vi.chn === 0) {
-        const g = globalThis as { __bufDumped?: Set<number> };
-        if (!g.__bufDumped) g.__bufDumped = new Set();
-        if (!g.__bufDumped.has(Math.trunc(p.current_time))) {
-          g.__bufDumped.add(Math.trunc(p.current_time));
-          console.error(`BUF t${Math.trunc(p.current_time)} ${Array.from(buf32.slice(0, ticksize * 2)).join(',')}`);
-        }
-      }
-        }
-      }
-    }
   }
 
   /**
