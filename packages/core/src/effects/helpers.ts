@@ -368,8 +368,12 @@ export function setLfoNotzero(
   depth: number,
   rate: number,
 ): void {
-  if (depth !== 0 && rate !== 0) {
+  // C's SET_LFO_NOTZERO (effects.c:36-39) sets the depth and the rate
+  // independently — each only when its own value is nonzero.
+  if (depth !== 0) {
     lfo.depth = depth;
+  }
+  if (rate !== 0) {
     lfo.rate = rate;
   }
 }
