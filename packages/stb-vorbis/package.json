@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/stb-vorbis",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "stb_vorbis Ogg Vorbis decoder (OpenMPT stb_vorbis.c port) for modplayjs (OpenMPT stb_vorbis.c port).",
   "type": "module",
   "main": "dist/index.js",
@@ -23,8 +23,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.2.0",
-    "@modplayjs/fmt-mod": "^0.2.0"
+    "@modplayjs/core": "^0.2.1",
+    "@modplayjs/fmt-mod": "^0.2.1"
   },
   "keywords": [
     "mo3",

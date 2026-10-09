@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-mo3",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Un4seen MO3 container (XM/IT/S3M/MOD/MTM inner) format plugin for modplayjs (OpenMPT Load_mo3.cpp port).",
   "type": "module",
   "main": "dist/index.js",
@@ -23,9 +23,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.2.0",
-    "@modplayjs/fmt-mod": "^0.2.0",
-    "@modplayjs/stb-vorbis": "^0.2.0"
+    "@modplayjs/core": "^0.2.1",
+    "@modplayjs/fmt-mod": "^0.2.1",
+    "@modplayjs/stb-vorbis": "^0.2.1"
   },
   "keywords": [
     "mo3",

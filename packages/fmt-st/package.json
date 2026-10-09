@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-st",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Ultimate Soundtracker (ST/UST 15-instrument MOD family) format plugin for modplayjs (libxmp st_load.c port).",
   "type": "module",
   "main": "dist/index.js",
@@ -19,8 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.2.0",
-    "@modplayjs/fmt-mod": "^0.2.0"
+    "@modplayjs/core": "^0.2.1",
+    "@modplayjs/fmt-mod": "^0.2.1"
   },
   "keywords": [
     "tracker",
