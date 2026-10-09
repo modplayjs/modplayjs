@@ -3,7 +3,9 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "strict": true,
     "noImplicitAny": true,
     "noImplicitReturns": true,
@@ -17,33 +19,79 @@
     "useDefineForClassFields": true,
     "noEmit": true,
     "skipLibCheck": false,
-    "baseUrl": ".",
     "paths": {
-      "@modplayjs/core": ["packages/core/src/index.ts"],
-      "@modplayjs/effects-shared": ["packages/effects-shared/src/index.ts"],
-      "@modplayjs/fmt-mod": ["packages/fmt-mod/src/index.ts"],
-      "@modplayjs/fmt-s3m": ["packages/fmt-s3m/src/index.ts"],
-      "@modplayjs/fmt-xm": ["packages/fmt-xm/src/index.ts"],
-      "@modplayjs/fmt-it": ["packages/fmt-it/src/index.ts"],
-      "@modplayjs/fmt-mtm": ["packages/fmt-mtm/src/index.ts"],
-      "@modplayjs/fmt-stm": ["packages/fmt-stm/src/index.ts"],
-      "@modplayjs/fmt-669": ["packages/fmt-669/src/index.ts"],
-      "@modplayjs/fmt-sfx": ["packages/fmt-sfx/src/index.ts"],
-      "@modplayjs/fmt-digi": ["packages/fmt-digi/src/index.ts"],
-      "@modplayjs/fmt-asylum": ["packages/fmt-asylum/src/index.ts"],
-      "@modplayjs/fmt-ice": ["packages/fmt-ice/src/index.ts"],
-      "@modplayjs/fmt-st": ["packages/fmt-st/src/index.ts"],
-      "@modplayjs/stb-vorbis": ["packages/stb-vorbis/src/index.ts"],
-      "@modplayjs/fmt-mo3": ["packages/fmt-mo3/src/index.ts"],
-      "@modplayjs/fmt-sid": ["packages/fmt-sid/src/index.ts"],
-      "@modplayjs/fmt-fc": ["packages/fmt-fc/src/index.ts"],
-      "@modplayjs/stream-audio": ["packages/stream-audio/src/index.ts"],
-      "@modplayjs/fmt-mod": ["packages/fmt-mod/src/index.ts"],
-      "@modplayjs/dsp-paula": ["packages/dsp-paula/src/index.ts"],
-      "@modplayjs/dsp-softmixer": ["packages/dsp-softmixer/src/index.ts"],
-      "@modplayjs/out-webaudio": ["packages/out-webaudio/src/index.ts"],
-      "@modplayjs/out-pcm": ["packages/out-pcm/src/index.ts"]
+      "@modplayjs/core": [
+        "./packages/core/src/index.ts"
+      ],
+      "@modplayjs/effects-shared": [
+        "./packages/effects-shared/src/index.ts"
+      ],
+      "@modplayjs/fmt-mod": [
+        "./packages/fmt-mod/src/index.ts"
+      ],
+      "@modplayjs/fmt-s3m": [
+        "./packages/fmt-s3m/src/index.ts"
+      ],
+      "@modplayjs/fmt-xm": [
+        "./packages/fmt-xm/src/index.ts"
+      ],
+      "@modplayjs/fmt-it": [
+        "./packages/fmt-it/src/index.ts"
+      ],
+      "@modplayjs/fmt-mtm": [
+        "./packages/fmt-mtm/src/index.ts"
+      ],
+      "@modplayjs/fmt-stm": [
+        "./packages/fmt-stm/src/index.ts"
+      ],
+      "@modplayjs/fmt-669": [
+        "./packages/fmt-669/src/index.ts"
+      ],
+      "@modplayjs/fmt-sfx": [
+        "./packages/fmt-sfx/src/index.ts"
+      ],
+      "@modplayjs/fmt-digi": [
+        "./packages/fmt-digi/src/index.ts"
+      ],
+      "@modplayjs/fmt-asylum": [
+        "./packages/fmt-asylum/src/index.ts"
+      ],
+      "@modplayjs/fmt-ice": [
+        "./packages/fmt-ice/src/index.ts"
+      ],
+      "@modplayjs/fmt-st": [
+        "./packages/fmt-st/src/index.ts"
+      ],
+      "@modplayjs/stb-vorbis": [
+        "./packages/stb-vorbis/src/index.ts"
+      ],
+      "@modplayjs/fmt-mo3": [
+        "./packages/fmt-mo3/src/index.ts"
+      ],
+      "@modplayjs/fmt-sid": [
+        "./packages/fmt-sid/src/index.ts"
+      ],
+      "@modplayjs/fmt-fc": [
+        "./packages/fmt-fc/src/index.ts"
+      ],
+      "@modplayjs/stream-audio": [
+        "./packages/stream-audio/src/index.ts"
+      ],
+      "@modplayjs/dsp-paula": [
+        "./packages/dsp-paula/src/index.ts"
+      ],
+      "@modplayjs/dsp-softmixer": [
+        "./packages/dsp-softmixer/src/index.ts"
+      ],
+      "@modplayjs/out-webaudio": [
+        "./packages/out-webaudio/src/index.ts"
+      ],
+      "@modplayjs/out-pcm": [
+        "./packages/out-pcm/src/index.ts"
+      ]
     }
   },
-  "exclude": ["**/dist"]
+  "exclude": [
+    "**/dist"
+  ]
 }

@@ -11,7 +11,7 @@
     "skipLibCheck": true,
     "paths": {
       "@modplayjs/core": [
-        "packages/core/dist/index.d.ts"
+        "../../packages/core/dist/index.d.ts"
       ]
     }
   },

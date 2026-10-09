@@ -11,10 +11,10 @@
     "skipLibCheck": true,
     "paths": {
       "@modplayjs/core": [
-        "packages/core/dist/index.d.ts"
+        "../../packages/core/dist/index.d.ts"
       ],
       "@modplayjs/fmt-it": [
-        "packages/fmt-it/dist/index.d.ts"
+        "../../packages/fmt-it/dist/index.d.ts"
       ]
     }
   },

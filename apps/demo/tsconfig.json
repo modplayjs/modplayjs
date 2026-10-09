@@ -6,67 +6,66 @@
       "DOM",
       "DOM.Iterable"
     ],
-    "baseUrl": "../..",
     "paths": {
       "@modplayjs/core": [
-        "packages/core/src/index.ts"
+        "../../packages/core/src/index.ts"
       ],
       "@modplayjs/effects-shared": [
-        "packages/effects-shared/src/index.ts"
+        "../../packages/effects-shared/src/index.ts"
       ],
       "@modplayjs/fmt-mod": [
-        "packages/fmt-mod/src/index.ts"
+        "../../packages/fmt-mod/src/index.ts"
       ],
       "@modplayjs/fmt-s3m": [
-        "packages/fmt-s3m/src/index.ts"
+        "../../packages/fmt-s3m/src/index.ts"
       ],
       "@modplayjs/fmt-xm": [
-        "packages/fmt-xm/src/index.ts"
+        "../../packages/fmt-xm/src/index.ts"
       ],
       "@modplayjs/fmt-it": [
-        "packages/fmt-it/src/index.ts"
+        "../../packages/fmt-it/src/index.ts"
       ],
       "@modplayjs/fmt-mtm": [
-        "packages/fmt-mtm/src/index.ts"
+        "../../packages/fmt-mtm/src/index.ts"
       ],
       "@modplayjs/fmt-stm": [
-        "packages/fmt-stm/src/index.ts"
+        "../../packages/fmt-stm/src/index.ts"
       ],
       "@modplayjs/fmt-669": [
-        "packages/fmt-669/src/index.ts"
+        "../../packages/fmt-669/src/index.ts"
       ],
       "@modplayjs/fmt-sfx": [
-        "packages/fmt-sfx/src/index.ts"
+        "../../packages/fmt-sfx/src/index.ts"
       ],
       "@modplayjs/fmt-digi": [
-        "packages/fmt-digi/src/index.ts"
+        "../../packages/fmt-digi/src/index.ts"
       ],
       "@modplayjs/fmt-asylum": [
-        "packages/fmt-asylum/src/index.ts"
+        "../../packages/fmt-asylum/src/index.ts"
       ],
       "@modplayjs/fmt-ice": [
-        "packages/fmt-ice/src/index.ts"
+        "../../packages/fmt-ice/src/index.ts"
       ],
       "@modplayjs/fmt-prowizard": [
-        "packages/fmt-prowizard/src/index.ts"
+        "../../packages/fmt-prowizard/src/index.ts"
       ],
       "@modplayjs/dsp-paula": [
-        "packages/dsp-paula/src/index.ts"
+        "../../packages/dsp-paula/src/index.ts"
       ],
       "@modplayjs/dsp-softmixer": [
-        "packages/dsp-softmixer/src/index.ts"
+        "../../packages/dsp-softmixer/src/index.ts"
       ],
       "@modplayjs/out-webaudio": [
-        "packages/out-webaudio/src/index.ts"
+        "../../packages/out-webaudio/src/index.ts"
       ],
       "@modplayjs/out-pcm": [
-        "packages/out-pcm/src/index.ts"
+        "../../packages/out-pcm/src/index.ts"
       ],
       "@modplayjs/stream-audio": [
-        "packages/stream-audio/src/index.ts"
+        "../../packages/stream-audio/src/index.ts"
       ],
       "worklet-url-impl": [
-        "apps/demo/src/worklet-url-impl.ts"
+        "../../apps/demo/src/worklet-url-impl.ts"
       ]
     }
   },
