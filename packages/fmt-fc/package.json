@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-fc",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Future Composer 1.0-1.4 (SMOD/FC14) format plugin for modplayjs (OpenMPT Load_fc.cpp + InstrumentSynth port).",
   "type": "module",
   "main": "dist/index.js",
@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@modplayjs/core": "^0.2.0",
-    "@modplayjs/fmt-mod": "^0.1.1"
+    "@modplayjs/fmt-mod": "^0.2.0"
   },
   "keywords": [
     "mo3",
@@ -49,7 +49,5 @@
   "license": "BSD-3-Clause",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
-  },
-  "@modplayjs/core": "^0.1.0",
-  "@modplayjs/fmt-mod": "^0.1.0"
+  }
 }

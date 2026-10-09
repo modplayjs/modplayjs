@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/fmt-xm",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "FastTracker II Extended Module (.xm) format plugin for modplayjs (libxmp xm_load.c port).",
   "type": "module",
   "main": "dist/index.js",
@@ -20,8 +20,8 @@
   },
   "dependencies": {
     "@modplayjs/core": "^0.2.0",
-    "@modplayjs/fmt-it": "^0.1.1",
-    "@modplayjs/stb-vorbis": "*"
+    "@modplayjs/fmt-it": "^0.2.0",
+    "@modplayjs/stb-vorbis": "^0.2.0"
   },
   "keywords": [
     "tracker",
@@ -48,7 +48,5 @@
   "license": "BSD-3-Clause",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
-  },
-  "@modplayjs/core": "^0.1.0",
-  "@modplayjs/fmt-it": "^0.1.0"
+  }
 }

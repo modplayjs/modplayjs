@@ -1,7 +1,7 @@
 {
   "name": "@modplayjs/fmt-sid",
-  "version": "0.1.1",
-  "description": "Commodore 64 SID music (PSID/RSID) format plugin for modplayjs — pristine 1:1 TypeScript port of libcRSID 1.58 by Hermit (Mihaly Horvath).",
+  "version": "0.2.0",
+  "description": "Commodore 64 SID music (PSID/RSID) format plugin for modplayjs \u2014 pristine 1:1 TypeScript port of libcRSID 1.58 by Hermit (Mihaly Horvath).",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

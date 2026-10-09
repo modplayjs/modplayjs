@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/stream-audio",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "MP3 / WAV / OGG streamed-audio decode for modplayjs (minimp3 + stb_vorbis ports).",
   "type": "module",
   "main": "dist/index.js",
@@ -19,8 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/fmt-mo3": "*",
-    "@modplayjs/stb-vorbis": "*"
+    "@modplayjs/fmt-mo3": "^0.2.0",
+    "@modplayjs/stb-vorbis": "^0.2.0"
   },
   "keywords": [
     "mp3",
