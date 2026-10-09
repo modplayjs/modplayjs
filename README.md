@@ -224,7 +224,7 @@ review, debugging, verification and testing by Bitti09.
 
 ## Package registry
 
-> **⚠ All `@modplayjs/*` packages are published to [GitHub Packages](https://github.com/modplayjs?tab=packages&q=modplayjs) (`npm.pkg.github.com`), NOT npmjs.com.**
+> **⚠ All `@modplayjs/*` packages are published to [GitHub Packages](https://github.com/orgs/modplayjs/packages) (`npm.pkg.github.com`), NOT npmjs.com.**
 >
 > This is because npm Trusted Publisher OIDC doesn't work for first-time
 > publishes of new packages, and the npmjs.com account's 2FA blocks
