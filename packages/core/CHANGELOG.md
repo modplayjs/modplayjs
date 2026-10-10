@@ -1,5 +1,11 @@
 # @modplayjs/core
 
+## 0.2.2
+
+### Patch Changes
+
+- [`55f9461`](https://github.com/modplayjs/modplayjs/commit/55f946152b9dfcdcfa956e01a479a70d5451eeea) - - Merge pull request [#27](https://github.com/modplayjs/modplayjs/issues/27) from modplayjs/changeset-release/main (direct push)
+
 ## 0.2.0
 
 ### Minor Changes
