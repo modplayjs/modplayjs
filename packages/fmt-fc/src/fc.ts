@@ -45,6 +45,7 @@ import {
   evFcVolumeSlide,
   evJump,
   evJumpMarker,
+  evMedJumpScript,
   evMedSetVolume,
   evSetStepSpeed,
   evStopScript,
@@ -236,7 +237,13 @@ function translateFcScript(
           events.events.push(evStopScript());
           break;
         case 0xe2: // Set waveform (waveform)
+          // C: if(!isVolume) push(MED_JumpScript(1, 0)) then FALLS
+          // THROUGH to the E4 handler — the jump re-syncs the volume
+          // script's state before the waveform switch. Our port missed
+          // the MED_JumpScript, which desynced the volume script (the
+          // DEViANCE - Blood Rayne intro.fc14 synth sounded wrong).
           if (!isVolume) {
+            events.events.push(evMedJumpScript(1, 0));
             pos++; // waveform byte consumed (FC_SetWaveform)
             events.events.push(evFcSetWaveform(b, script[pos - 1]!, 0));
           } else {
