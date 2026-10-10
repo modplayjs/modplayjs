@@ -622,11 +622,19 @@ export class SoftMixer implements DspPlugin {
             if (size > 0) {
               this.doAnticlick(buf32, bufPos, vi, size);
             }
-            const queued = core.getSample(vi.queued.smp);
-            if (
-              vi.queued.smp < 0 ||
-              (!hasLoop && queued && (queued.flags & SampleFlags.LOOP) === 0)
-            ) {
+            // The C short-circuits the <0 check before touching the
+            // sample table (mixer.c:728) — this MOD hits it: voices
+            // queued with smp -1 while a one-shot ends.
+            const queuedSmp = vi.queued.smp;
+            if (queuedSmp < 0) {
+              vi.flags &= ~VoiceFlag.SAMPLE_QUEUED;
+              vi.flags |= VoiceFlag.SAMPLE_PAUSED;
+              this.setSampleEnd(core, vi, 1);
+              size = 0;
+              continue;
+            }
+            const queued = core.getSample(queuedSmp);
+            if (!hasLoop && queued && (queued.flags & SampleFlags.LOOP) === 0) {
               vi.flags &= ~VoiceFlag.SAMPLE_QUEUED;
               vi.flags |= VoiceFlag.SAMPLE_PAUSED;
               this.setSampleEnd(core, vi, 1);
