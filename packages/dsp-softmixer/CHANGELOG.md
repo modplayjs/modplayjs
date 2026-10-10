@@ -1,5 +1,15 @@
 # @modplayjs/dsp-softmixer
 
+## 0.2.2
+
+### Patch Changes
+
+- [`55f9461`](https://github.com/modplayjs/modplayjs/commit/55f946152b9dfcdcfa956e01a479a70d5451eeea) - - Merge pull request [#27](https://github.com/modplayjs/modplayjs/issues/27) from modplayjs/changeset-release/main (direct push)
+
+- [`de9d376`](https://github.com/modplayjs/modplayjs/commit/de9d3764d19b8479f03ae3bd6594c0f2242bd467) - - dsp-softmixer: guard the queued-swap getSample before the <0 check (direct push)
+- Updated dependencies [[`55f9461`](https://github.com/modplayjs/modplayjs/commit/55f946152b9dfcdcfa956e01a479a70d5451eeea)]:
+  - @modplayjs/core@0.2.2
+
 ## 0.1.1
 
 ### Patch Changes
