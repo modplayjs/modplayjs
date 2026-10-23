@@ -32,7 +32,8 @@
     "@modplayjs/fmt-stm": "^0.2.1",
     "@modplayjs/fmt-xm": "^0.2.1",
     "@modplayjs/out-pcm": "^0.2.1",
-    "@modplayjs/out-webaudio": "^0.2.1"
+    "@modplayjs/out-webaudio": "^0.2.1",
+    "@modplayjs/playhead": "^0.2.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

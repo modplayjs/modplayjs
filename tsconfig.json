@@ -59,6 +59,9 @@
       "@modplayjs/out-pcm": [
         "packages/out-pcm/src/index.ts"
       ],
+      "@modplayjs/playhead": [
+        "packages/playhead/src/index.ts"
+      ],
       "worklet-url-impl": [
         "apps/demo/src/worklet-url-impl.ts"
       ]

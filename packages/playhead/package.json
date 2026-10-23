@@ -1,0 +1,48 @@
+{
+  "name": "@modplayjs/playhead",
+  "version": "0.2.1",
+  "description": "Playback clock for modplayjs UIs: maps sink consumption time to the song row that is actually audible (pattern-view sync).",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {},
+  "keywords": [
+    "tracker",
+    "mod",
+    "libxmp",
+    "chiptune",
+    "playback-clock",
+    "latency",
+    "subtitles"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/modplayjs/modplayjs.git",
+    "directory": "packages/playhead"
+  },
+  "bugs": {
+    "url": "https://github.com/modplayjs/modplayjs/issues"
+  },
+  "homepage": "https://github.com/modplayjs/modplayjs#readme",
+  "license": "BSD-3-Clause",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}

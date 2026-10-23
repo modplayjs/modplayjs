@@ -61,6 +61,9 @@
       "@modplayjs/out-pcm": [
         "../../packages/out-pcm/src/index.ts"
       ],
+      "@modplayjs/playhead": [
+        "../../packages/playhead/src/index.ts"
+      ],
       "@modplayjs/stream-audio": [
         "../../packages/stream-audio/src/index.ts"
       ],

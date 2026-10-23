@@ -44,6 +44,11 @@ export class WebAudioOutput implements OutputPlugin {
 
   /** Diagnostics for the demo status line (T22/T23). */
   readonly debugInfo = { renderedFrames: 0, postedChunks: 0, copyDepth: 0 };
+  /** Playback-clock tap: called after every successful pull with the
+   * CUMULATIVE frames handed to the transport and the core whose state was
+   * just advanced. `@modplayjs/playhead` turns these into the row that is
+   * actually audible (the ring runs ~0.7 s ahead of the speaker). */
+  onRender: ((framesWritten: number, core: Core) => void) | null = null;
   /** Fired once when the module's playback reaches the end of the last
    * order (playBuffer returns -1 with an empty buffer). The transport has
    * been stopped by the time this fires; the player state remains. */
@@ -67,6 +72,55 @@ export class WebAudioOutput implements OutputPlugin {
   private ring: Float32Array | null = null;
   private writePos = 0; // monotonic frames written
   private renderScratch: Float32Array | null = null;
+  // copy mode: last exact "frames left the worklet FIFO" observation and
+  // when it was taken. Between 'depth' messages the count is extrapolated
+  // at the device rate, so a UI querying at 60 fps sees a smooth counter
+  // instead of a ~21 ms staircase.
+  private copyConsumedFrames = 0;
+  private copyConsumedAt = 0;
+
+  /**
+   * Frames that have LEFT the transport (i.e. reached the audio thread's
+   * output, not the buffer). This is the counter a playback clock needs:
+   * subtracting it from `debugInfo.renderedFrames` yields the render-ahead
+   * backlog. SAB mode reads the worklet's read pointer directly (exact,
+   * lock-free); copy mode uses the reported FIFO depth plus extrapolation.
+   */
+  get consumedFrames(): number {
+    if (this.header !== null) {
+      return Atomics.load(this.header, 1);
+    }
+    if (!this.running) return this.copyPostedFrames;
+    if (this.paused) return this.copyConsumedFrames; // frozen while suspended
+    const elapsed = this.now() - this.copyConsumedAt;
+    const extra = (elapsed * (this.ctx?.sampleRate ?? 44100)) / 1000;
+    const extrapolated = this.copyConsumedFrames + Math.max(0, extra);
+    // Never claim more than was posted, and never go backwards.
+    const cap = this.copyPostedFrames;
+    return extrapolated > cap ? cap : extrapolated;
+  }
+
+  /** Frames the device itself still holds after the worklet drained them
+   * (AudioContext baseLatency + outputLatency). Small (a few to tens of ms)
+   * but it is the difference between "handed to the device" and audibly
+   * playing. */
+  get deviceLatencyFrames(): number {
+    const ctx = this.ctx;
+    if (!ctx) return 0;
+    const base = Number.isFinite(ctx.baseLatency) ? ctx.baseLatency : 0;
+    const out = Number.isFinite(ctx.outputLatency) ? ctx.outputLatency : 0;
+    return Math.max(0, Math.round((base + out) * ctx.sampleRate));
+  }
+
+  /** Frames audible right now = consumed − device latency. Feed this to
+   * `Playhead.setConsumedProvider`. */
+  get audibleFrames(): number {
+    return Math.max(0, this.consumedFrames - this.deviceLatencyFrames);
+  }
+
+  private now(): number {
+    return typeof performance !== 'undefined' ? performance.now() : Date.now();
+  }
 
   /** Create/resume the AudioContext and the worklet node. Must be called
    * from a user gesture the first time (resume() needs it). `workletUrl`
@@ -140,10 +194,19 @@ export class WebAudioOutput implements OutputPlugin {
       // fills to the high-water mark. Prime the FIFO with ~150ms so the
       // first quantum never underruns.
       this.node.port.onmessage = (ev: MessageEvent) => {
-        const m = ev.data as { mode: string; buffered?: number };
+        const m = ev.data as { mode: string; buffered?: number; drained?: number };
         if (m.mode === 'depth' && typeof m.buffered === 'number') {
           this.copyDepth = m.buffered;
           this.debugInfo.copyDepth = m.buffered;
+          // Exact consumption from the worklet. An explicit `drained`
+          // count is authoritative; older worklets only report the FIFO
+          // depth, so derive the same quantity from what was posted.
+          const consumed =
+            typeof m.drained === 'number'
+              ? m.drained
+              : this.copyPostedFrames - m.buffered;
+          this.copyConsumedFrames = consumed;
+          this.copyConsumedAt = this.now();
         }
       };
       this.node.port.postMessage({ mode: 'copy' });
@@ -154,6 +217,8 @@ export class WebAudioOutput implements OutputPlugin {
     this.endedFired = false;
     this.copyPostedFrames = 0;
     this.copyDepth = 0; // worklet FIFO starts empty
+    this.copyConsumedFrames = 0;
+    this.copyConsumedAt = this.now();
     // Render-ahead loop: setInterval drives playBuffer; keeps the ring
     // between the low and high water marks (player.c:2178-2233 pull
     // model, timer-driven on the main thread).
@@ -200,7 +265,15 @@ export class WebAudioOutput implements OutputPlugin {
    * AudioContext suspends too, so device power draw drops. */
   pause(): void {
     if (!this.running || this.paused) return;
+    // Freeze the copy-mode consumption estimate at its current value: the
+    // getter extrapolates by wall clock, and a paused transport drains
+    // nothing. Read it BEFORE flipping `paused` (the getter consults it).
+    // SAB mode reads the worklet's read pointer, which stops on its own
+    // when the context suspends.
+    const frozen = this.consumedFrames;
     this.paused = true;
+    this.copyConsumedFrames = frozen;
+    this.copyConsumedAt = this.now();
     if (this.renderTimer !== null) {
       window.clearInterval(this.renderTimer);
       this.renderTimer = null;
@@ -216,6 +289,9 @@ export class WebAudioOutput implements OutputPlugin {
   async resume(): Promise<void> {
     if (!this.running || !this.paused) return;
     this.paused = false;
+    // Restart the copy-mode extrapolation from the frozen value (the clock
+    // is stale after an arbitrary pause).
+    this.copyConsumedAt = this.now();
     if (this.ctx) {
       await this.ctx.resume();
     }
@@ -238,6 +314,11 @@ export class WebAudioOutput implements OutputPlugin {
       this.writePos = read;
     } else if (this.node) {
       this.node.port.postMessage({ mode: 'clear' });
+      // The FIFO is gone: everything posted has effectively been consumed
+      // (it was discarded, not played), so the next depth report must not
+      // be read as a backlog.
+      this.copyConsumedFrames = this.copyPostedFrames;
+      this.copyConsumedAt = this.now();
     }
   }
 
@@ -328,6 +409,8 @@ export class WebAudioOutput implements OutputPlugin {
       this.writePos = write;
       this.debugInfo.renderedFrames = write;
       Atomics.store(header, 0, write);
+      // Tell the playback clock where the song is at this frame count.
+      this.onRender?.(write, core);
       // Sab diagnostics: report once per second of rendered audio.
       if (write - this.lastLoggedWrite >= this.ctx!.sampleRate) {
         this.lastLoggedWrite = write;
@@ -388,6 +471,9 @@ export class WebAudioOutput implements OutputPlugin {
       this.debugInfo.postedChunks++;
       this.node?.port.postMessage({ mode: 'chunk', data: chunk }, [chunk.buffer]);
     }
+    // The pull only becomes audible after the FIFO drains; the clock still
+    // needs the frame count and the position it was rendered from.
+    this.onRender?.(this.copyPostedFrames, core2);
   }
 
   private get mode(): 'sab' | 'copy' {

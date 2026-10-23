@@ -107,6 +107,7 @@ contracts are documented in [docs/](docs/) —
 | `@modplayjs/dsp-softmixer` | libxmp-parity software mixer (exact integer mixing domain) + A500 Paula BLEP mode (`mode: 'paula'`), L/R layouts, `XMP_PLAYER_AMPLIFY` |
 | `@modplayjs/out-webaudio` | AudioWorklet output: SAB ring (COOP/COEP) with automatic copy-mode fallback, pause/resume |
 | `@modplayjs/out-pcm` | Offline PCM render + WAV encoder |
+| `@modplayjs/playhead` | Playback clock for UIs: maps sink consumption to the row that is actually audible (pattern-view sync, latency compensation) |
 | `@modplayjs/demo` | Demo page (GitHub Pages): player with transport/seek/volume, channel mute strip, instrument/sample audition, file info, order list, tracker message, realtime pattern view |
 
 ## Interactive playback API

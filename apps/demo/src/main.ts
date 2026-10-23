@@ -30,6 +30,7 @@ import { pwPlugin } from '@modplayjs/fmt-prowizard';
 import { createPaulaPlugin } from '@modplayjs/dsp-paula';
 import { createSoftMixerPlugin, type SoftMixer } from '@modplayjs/dsp-softmixer';
 import { WebAudioOutput } from '@modplayjs/out-webaudio';
+import { Playhead } from '@modplayjs/playhead';
 import { PlaylistStore, type PlaylistTrack } from './playlist-store';
 import { registerPwa } from './pwa';
 import './style.css';
@@ -123,6 +124,22 @@ core.registries.registerDsp(sidDsp);
 buildHashEl.textContent = __GIT_HASH__;
 
 const output = new WebAudioOutput();
+
+// Playback clock (pattern-view sync). The renderer runs AHEAD of the
+// speaker by the ring's high-water mark (~0.7 s) plus the device latency,
+// so `core.playState` shows a row the listener has not heard yet. The
+// playhead records (frames rendered, position) on every pull and resolves
+// the position at the frame the sink has actually played out.
+const playhead = new Playhead();
+playhead.setConsumedProvider(() => output.audibleFrames);
+output.onRender = (frames, c) => {
+  // SID drives its own sample-paced engine and streamed audio has no
+  // pattern/row state — only a module's playState is meaningful here.
+  if (streamed || c.module?.format === 'sid') return;
+  const ps = c.playState;
+  playhead.setRate(c.sampleRate);
+  playhead.mark(frames, ps);
+};
 
 // light/dark theme: persisted, applied to <html data-theme>.
 const THEME_KEY = 'modplayjs-theme';
@@ -280,6 +297,9 @@ seek.addEventListener('change', () => {
       await startPlayback(false);
       if (core.module?.format === 'sid') sidSeek(targetMs / 1000);
       else core.seekTime(targetMs);
+      // startPlayback already rendered a few frames from the OLD position;
+      // drop those marks so the view does not replay them after the jump.
+      playhead.reset();
     })();
     seekLatchUntil = performance.now() + 400;
     timeCur.textContent = fmtTime(targetMs);
@@ -300,6 +320,9 @@ seek.addEventListener('change', () => {
   // play/pause state machine - its internal paused flag made the play
   // button a no-op afterwards.)
   output.flush();
+  // The positions recorded before the jump belong to the old location and
+  // copy-mode frame counters never go backwards, so drop the history.
+  playhead.reset();
   seekLatchUntil = performance.now() + 400;
   timeCur.textContent = fmtTime(targetMs);
   seeking = false;
@@ -620,9 +643,14 @@ function buildPatternView(patternIdx: number): void {
 
 function updatePatternHighlight(): void {
   if (!patternViewChk.checked) return; // pattern view disabled: skip all pattern work
+  // The audible position, not the render position: `core.playState` runs
+  // ahead by the ring backlog (~0.7 s) + device latency, which on a fast
+  // song is several rows. Falls back to the core before the first pull
+  // (and for SID / streamed audio, which do not mark).
+  const ap = playhead.positionAt();
   const ps = core.playState;
-  const ord = ps.ord;
-  const row = ps.row;
+  const ord = ap ? ap.ord : ps.ord;
+  const row = ap ? ap.row : ps.row;
 
   if (ord !== curPattern) {
     curPattern = ord;
@@ -1141,6 +1169,9 @@ async function startPlayback(muteSong: boolean): Promise<void> {
   if (sidBytes && core.module?.format === 'sid') sidStartTune(sidBytes, deviceRate, 1);
   core.startSmix(4); // reserve channels for instrument/sample audition
   core.startPlayer();
+  // Fresh transport: no marks from a previous run belong to this one.
+  playhead.setRate(deviceRate);
+  playhead.reset();
   // startPlayer resets master_vol to 100 (parity with C's
   // xmp_start_player) — re-apply the user's slider values so volume and
   // pan survive a load/replay.
@@ -1251,8 +1282,18 @@ function frame(): void {
   if (loaded && (playing || paused)) {
     updatePatternHighlight();
     const ps = core.playState;
+    // Playback clock: the renderer is ~0.7 s ahead of the speaker, so the
+    // seek bar and the status line read the audible row too (null before
+    // the first pull, and for SID/streamed audio).
+    const ap = playhead.positionAt();
     const dur = moduleDuration();
-    const cur = seeking ? seekTarget : streamed ? streamPlayedMs : ps.timeMs;
+    const cur = seeking
+      ? seekTarget
+      : streamed
+        ? streamPlayedMs
+        : ap
+          ? ap.timeMs
+          : ps.timeMs;
     const latched = performance.now() < seekLatchUntil;
     if (!seeking && !latched) {
       if (dur > 0) {
@@ -1270,12 +1311,12 @@ function frame(): void {
     }
     if (playing && !paused) {
       showThrottled(
-        'playing | ord ' + ps.ord + ' row ' + ps.row + ' | ' +
-        ps.speed + '/' + ps.bpm + ' | rate: ' +
+        'playing | ord ' + (ap ? ap.ord : ps.ord) + ' row ' + (ap ? ap.row : ps.row) + ' | ' +
+        (ap ? ap.speed : ps.speed) + '/' + (ap ? ap.bpm : ps.bpm) + ' | rate: ' +
         output.audioContextSampleRate + ' Hz',
       );
     } else if (paused) {
-      showThrottled('paused | ord ' + ps.ord + ' row ' + ps.row);
+      showThrottled('paused | ord ' + (ap ? ap.ord : ps.ord) + ' row ' + (ap ? ap.row : ps.row));
     }
   } else {
     showThrottled('');

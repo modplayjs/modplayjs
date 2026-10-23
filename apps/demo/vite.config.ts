@@ -92,6 +92,7 @@ export default defineConfig(({ command }) => ({
       { find: '@modplayjs/dsp-softmixer', replacement: resolve(__dirname, '../../packages/dsp-softmixer/src/index.ts') },
       { find: '@modplayjs/out-webaudio', replacement: resolve(__dirname, '../../packages/out-webaudio/src/index.ts') },
       { find: '@modplayjs/out-pcm', replacement: resolve(__dirname, '../../packages/out-pcm/src/index.ts') },
+      { find: '@modplayjs/playhead', replacement: resolve(__dirname, '../../packages/playhead/src/index.ts') },
       { find: 'worklet-url-impl', replacement: resolve(__dirname, 'src/worklet-url-impl.ts') },
     ],
   },
