@@ -358,8 +358,11 @@ let viewTracks = 0;
 let curPattern = -1;
 let curRow = -1;
 const rowEls: HTMLDivElement[] = [];
-// Pattern row pitch in px: --row-h 1.35em × 0.78rem font ≈ 17px (style.css).
+// Pattern row pitch in px (--row-h 1.35em × 0.78rem font, style.css).
+// Re-measured from the DOM after each build: fractional scrolling needs the
+// real pitch, and offsetHeight rounds it to an integer.
 const ROW_PX = 17;
+let rowPitch = ROW_PX;
 
 const NOTE_NAMES = [
   'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-',
@@ -634,6 +637,8 @@ function buildPatternView(patternIdx: number): void {
   }
   patRows.appendChild(frag);
   curRow = -1;
+  // Measure the real row pitch for the fractional follow scroll.
+  rowPitch = rowEls[0]?.getBoundingClientRect().height || ROW_PX;
   // Anchor the scroll immediately after the rebuild: the active row lands
   // ~1/3 from the top so the upcoming rows stay visible. Without this the
   // container starts at scrollTop 0 and visually 'chases' the row down
@@ -662,14 +667,17 @@ function updatePatternHighlight(): void {
     curRow = row;
     const el = rowEls[curRow]!;
     el.classList.add('active');
-    if (followChk.checked) {
-      glideScrollTo(
-        Math.max(0, Math.min(
-          (curRow + 0.5) * ROW_PX - patBody.clientHeight / 2,
-          patBody.scrollHeight - patBody.clientHeight,
-        )),
-      );
-    }
+  }
+  // Follow the playhead CONTINUOUSLY: rowProgress is the fraction of the
+  // audible row that has played, so the scroll anchor moves at the audio
+  // rate instead of stepping once per row. Small residuals track exactly
+  // (zero lag on a moving anchor); big ones ease in.
+  if (followChk.checked && curRow >= 0 && curRow < rowEls.length) {
+    const frac = curRow + (ap ? ap.rowProgress : 0);
+    glideTo(Math.max(0, Math.min(
+      (frac + 0.5) * rowPitch - patBody.clientHeight / 2,
+      patBody.scrollHeight - patBody.clientHeight,
+    )));
   }
   // Keep the current order entry visible in the order list panel.
   if (followChk.checked) {
@@ -678,21 +686,28 @@ function updatePatternHighlight(): void {
   }
 }
 
-/** Scroll glide state: rAF-interpolated approach to the centered anchor.
- * Native smooth scrollTo() restarts its easing on every row advance,
- * which reads as a twitch; interpolating the residual distance each
- * frame instead gives one continuous glide that never overshoots. */
+/** Scroll driver: rAF-interpolated approach to a MOVING anchor.
+ * The anchor is retargeted every frame from the audible position, so it is
+ * already continuous; resuming the easing from scratch each frame would
+ * only add a fixed lag behind the audio. Small residuals are therefore
+ * applied directly (zero lag, and the target itself is smooth), while a
+ * jump — a row rebuild, a seek, a mode switch — is eased over a few frames
+ * rather than snapped. */
+let glideTarget = 0;
 let glideRaf = 0;
-function glideScrollTo(target: number): void {
-  cancelAnimationFrame(glideRaf);
+function glideTo(target: number): void {
+  glideTarget = target;
+  if (glideRaf !== 0) return; // the running loop picks the new target up
   const step = (): void => {
-    const residual = target - patBody.scrollTop;
-    if (Math.abs(residual) <= 0.5) {
-      patBody.scrollTop = target;
+    const residual = glideTarget - patBody.scrollTop;
+    if (Math.abs(residual) <= 4) {
+      // Constant playhead motion: track it exactly. The next follow frame
+      // retargets, so stopping here costs nothing.
+      patBody.scrollTop = glideTarget;
       glideRaf = 0;
       return;
     }
-    // Exponential approach: 35% of the remaining distance per frame.
+    // A jump (rebuild / seek / mode switch): ease 35% of the way per frame.
     patBody.scrollTop += residual * 0.35;
     glideRaf = requestAnimationFrame(step);
   };
