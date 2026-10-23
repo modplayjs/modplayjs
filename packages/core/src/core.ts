@@ -65,6 +65,8 @@ const MSN = (v: number) => (v >> 4) & 0x0f;
 const LSN = (v: number) => v & 0x0f;
 
 const XMP_MARK_END = 0xff;
+/** XMP_MARK_SKIP (xmp.h:291) — S3M/IT skip position. */
+const XMP_MARK_SKIP = 0xfe;
 const ANTICLICK_SHIFT = 3;
 /** DEFAULT_TIME_FACTOR common.h:454; PAL_RATE common.h:135. */
 const DEFAULT_TIME_FACTOR = 10;
@@ -175,6 +177,7 @@ export class Core implements CoreIface {
       sequence: 0,
       loop_count: 0,
       sequence_control: [],
+      bad_sequence: 0,
       gvol: 64,
       master_vol: 100,
       smix_vol: 100,
@@ -495,6 +498,7 @@ export class Core implements CoreIface {
     p.current_time = 0;
     p.loop_count = 0;
     p.sequence = 0;
+    p.bad_sequence = 0;
     for (let i = 0; i < mod.chn + this.smixChannels; i++) {
       p.channel_mute[i] =
         i < mod.chn && (mod.channels[i]?.flg ?? 0) & 0x04 /* MUTE */
@@ -505,20 +509,18 @@ export class Core implements CoreIface {
     }
     this.virt.setChannelMute(p.channel_mute);
 
-    // Skip invalid patterns at start (player.c:1986-1992).
-    while (p.ord < mod.len && (mod.xxo[p.ord] ?? Infinity) >= mod.pat) {
-      p.ord++;
-    }
-    if (p.ord >= mod.len) mod.len = 0;
-
-    if (mod.len === 0) {
-      p.ord = this.scanEnd.ord = 0;
-      p.row = this.scanEnd.row = 0;
+    // Handle markers/invalid patterns at start (player.c:1996-2016). C no
+    // longer zeroes mod->len here: it only flags bad_sequence so playback
+    // ends until repositioned, while mod.len keeps the real order count.
+    if (this.skipInvalidOrders() < 0) {
+      p.ord = 0;
+      p.row = 0;
+      p.bad_sequence = 1;
       this._flow.end_point = 0;
       this._flow.num_rows = 0;
     } else {
       this._flow.num_rows = mod.patterns[mod.xxo[p.ord]!]?.rows ?? 0;
-      this._flow.end_point = this.scanEnd.num;
+      this._flow.end_point = this.seqScan().num;
     }
 
     this.updateFromOrdInfo();
@@ -794,6 +796,7 @@ export class Core implements CoreIface {
     // check reposition
     if (p.ord !== p.pos || f.force_reposition) {
       const start = this._module!.sequences[p.sequence]?.entry_point ?? 0;
+      const sc = this.seqScan();
       f.force_reposition = 0;
 
       if (p.pos === -2) return -1; /* that's all folks */
@@ -803,29 +806,35 @@ export class Core implements CoreIface {
       }
 
       if (p.pos === start) {
-        f.end_point = this.scanEnd.num;
+        f.end_point = sc.num;
       }
-      if (p.pos > this.scanEnd.ord) {
+      if (p.pos > sc.ord) {
         f.end_point = 0;
       }
       f.jump = -1;
       p.ord = p.pos - 1;
       if (p.ord < start) p.ord = start - 1;
 
-      this.nextOrder(-1);
+      // Current sequence contains no valid orders; playback can't continue
+      // (player.c:2130-2134).
+      if (this.nextOrder(-1) < 0) return -1;
       this.updateFromOrdInfo();
       this.virt.reset();
       this.resetChannels();
     } else {
+      // Sequences with no valid orders can't continue playing from here and
+      // require manual repositioning to another sequence (player.c:2141-2145).
+      if (p.bad_sequence) return -1;
+
       p.frame++;
       if (p.frame >= p.speed * (1 + f.delay)) {
         // If break during pattern delay, next row is skipped
         // (corruption.mod order 1D pattern 0D last line).
         if ((this.quirks & Quirk.PROTRACK) !== 0 && f.delay && f.pbreak) {
-          this.nextRow();
+          if (this.nextRow() < 0) return -1;
           this.checkEndOfModule();
         }
-        this.nextRow();
+        if (this.nextRow() < 0) return -1;
       }
     }
 
@@ -883,37 +892,71 @@ export class Core implements CoreIface {
     return 0;
   }
 
-  /** next_order (player.c:1736-1813). */
-  private nextOrder(lastOrd: number): void {
+  /** Current sequence's scan endpoint (C's p->scan[p->sequence]). */
+  private seqScan(): { ord: number; row: number; num: number } {
+    return this._scan[this._p.sequence] ?? this.scanEnd;
+  }
+
+  /**
+   * skip_invalid_orders (player.c:1737-1760): advance p->ord past invalid
+   * patterns (xxo >= pat) until a playable one, or fail at the order-list
+   * end / an end marker.
+   */
+  private skipInvalidOrders(): number {
+    const p = this._p;
+    const mod = this._module!;
+    if (p.ord < 0) p.ord = 0;
+    for (;;) {
+      if (
+        p.ord >= mod.len ||
+        ((this.quirks & Quirk.MARKER) !== 0 && mod.xxo[p.ord] === XMP_MARK_END)
+      ) {
+        return -1;
+      }
+      if ((mod.xxo[p.ord] ?? Infinity) < mod.pat) break;
+      p.ord++;
+    }
+    return 0;
+  }
+
+  /** next_order (player.c:1762-1837). Returns -1 when the sequence has no
+   *  reachable valid order (p->bad_sequence set). */
+  private nextOrder(lastOrd: number): number {
     const p = this._p;
     const f = this._flow;
     const mod = this._module!;
-    let resetGvol = false;
 
-    do {
-      p.ord++;
-      const mark = (this.quirks & Quirk.MARKER) !== 0 && p.ord < mod.len &&
-        mod.xxo[p.ord] === XMP_MARK_END;
-      if (p.ord >= mod.len || mark) {
-        const ep = this._module!.sequences[p.sequence]?.entry_point ?? 0;
-        if (
-          mod.restart > mod.len ||
-          (mod.xxo[mod.restart] ?? Infinity) >= mod.pat ||
-          p.ord < ep
-        ) {
-          p.ord = ep;
-        } else if (this.getSequence(mod.restart) === p.sequence) {
-          p.ord = mod.restart;
-        } else {
-          p.ord = ep;
-        }
-        resetGvol = true;
-        lastOrd = -1;
+    p.ord++;
+
+    if (this.skipInvalidOrders() < 0) {
+      /* Restart module */
+      const ep = this._module!.sequences[p.sequence]?.entry_point ?? 0;
+      if (
+        mod.restart > mod.len ||
+        (mod.xxo[mod.restart] ?? Infinity) >= mod.pat ||
+        p.ord < ep
+      ) {
+        p.ord = ep;
+      } else if (this.getSequence(mod.restart) === p.sequence) {
+        p.ord = mod.restart;
+      } else {
+        p.ord = ep;
       }
-    } while ((mod.xxo[p.ord] ?? Infinity) >= mod.pat);
+      /* Nothing valid, even from the entry point? Fail. */
+      if (this.skipInvalidOrders() < 0) {
+        p.bad_sequence = 1;
+        return -1;
+      }
+      p.gvol = this.ordInfo[p.ord]?.gvl ?? this._module!.gvol;
 
-    if (resetGvol) p.gvol = this.ordInfo[p.ord]?.gvl ?? this._module!.gvol;
+      /* Module restart should always reset the play time. */
+      lastOrd = -1;
+    }
+    /* Playback now has a valid position. */
+    p.bad_sequence = 0;
 
+    /* Bxx+Dxx within same position, Archimedes line jump, etc. should not
+     * reset time tracking. */
     if (lastOrd !== p.ord) p.current_time = this.ordInfo[p.ord]?.time ?? 0;
 
     const pat = mod.patterns[mod.xxo[p.ord]!];
@@ -936,10 +979,11 @@ export class Core implements CoreIface {
     if ((this.quirks & Quirk.PERPAT) !== 0) {
       for (let chn = 0; chn < mod.chn; chn++) this._xc[chn]!.per_flags = 0;
     }
+    return 0;
   }
 
-  /** next_row (player.c:1815-1849). */
-  private nextRow(): void {
+  /** next_row (player.c:1839-1873). */
+  private nextRow(): number {
     const p = this._p;
     const f = this._flow;
     const lastOrd = p.ord;
@@ -955,7 +999,7 @@ export class Core implements CoreIface {
         p.ord = f.jump - 1;
         f.jump = -1;
       }
-      this.nextOrder(lastOrd);
+      return this.nextOrder(lastOrd);
     } else {
       if (f.rowdelay === 0) {
         p.row++;
@@ -967,20 +1011,23 @@ export class Core implements CoreIface {
         p.row = f.loop_dest;
         f.loop_dest = -1;
       }
+      /* check end of pattern */
       if (p.row >= f.num_rows) {
-        this.nextOrder(lastOrd);
+        return this.nextOrder(lastOrd);
       }
     }
+    return 0;
   }
 
   /** check_end_of_module (player.c:2047-2061). */
   private checkEndOfModule(): void {
     const p = this._p;
     const f = this._flow;
-    if (p.ord === this.scanEnd.ord && p.row === this.scanEnd.row) {
+    const sc = this.seqScan();
+    if (p.ord === sc.ord && p.row === sc.row) {
       if (f.end_point === 0) {
         p.loop_count++;
-        f.end_point = this.scanEnd.num;
+        f.end_point = sc.num;
       }
       f.end_point--;
     }
@@ -1204,26 +1251,27 @@ export class Core implements CoreIface {
    * marker walk, resets flow state so no stale pattern jump fires, and
    * adjusts end_point for the new scan position.
    */
-  setPosition(ord: number, row = 0): void {
+  setPosition(ord: number, row = 0, dir = 0): void {
     if (this._state < CoreState.PLAYING) return;
     const mod = this._module!;
     const p = this._p;
     const f = this._flow;
     if (ord < 0 || ord >= mod.len) return;
 
-    const seq = this.getSequence(ord);
+    const seq = dir === 0 ? this.getSequence(ord) : p.sequence;
     if (seq < 0 || seq >= mod.num_sequences) return;
     p.sequence = seq;
 
     const hasMarker = (mod.quirks & Quirk.MARKER) !== 0;
     let pos = ord;
-    if (hasMarker) {
-      while (pos > 0 && pos < mod.len - 1 && (mod.xxo[pos] ?? 0xff) >= mod.pat) {
-        pos--;
-      }
-      if (pos >= mod.len) return;
+    // Skip S3M/IT skip markers (control.c:79-86) in the walk direction.
+    while (hasMarker && pos > 0 && pos < mod.len - 1 && mod.xxo[pos] === XMP_MARK_SKIP) {
+      pos += dir < 0 ? -1 : 1;
     }
+    if (pos >= mod.len) return;
     const pat = mod.xxo[pos]!;
+    // End marker is not a valid target (control.c:90-92).
+    if (hasMarker && pat === XMP_MARK_END) return;
     if (pat < mod.pat) {
       if (pos > this._scan[seq]!.ord) {
         f.end_point = 0;
@@ -1276,7 +1324,7 @@ export class Core implements CoreIface {
       const t = Math.max(0, Math.min(this.ordInfo[i]?.time ?? 0, 0x7fffffff));
       if (ms >= t) {
         // set_position(ctx, i, 1) — dir=1 keeps the sequence
-        this.setPosition(i, 0);
+        this.setPosition(i, 0, 1);
         break;
       }
     }

@@ -118,25 +118,45 @@ for (let i = 0; i < mod.ins; i++) {
 // CONVERTED PCM in xxs->data (8-bit signed, or 16-bit LE; stereo interleaved
 // post-load). Our store keeps Float32; re-encode exactly as samples.ts
 // normalized (v/32768 and v/128 — lossless for the values produced).
+// C's unsigned long is 64-bit: FNV-1a accumulates mod 2^64.
+const M64 = (1n << 64n) - 1n;
+/** FNV-1a over `n` zero bytes via modular exponentiation of the step
+ *  h -> h*prime (xor 0 leaves h unchanged), so n can be ~1e9
+ *  (load_mmd1_5octave_overflow.med: data==NULL, len=1.1e9). */
+function fnvZeros(h, n) {
+  let base = 16777619n;
+  let exp = BigInt(n);
+  let acc = 1n;
+  while (exp > 0n) {
+    if (exp & 1n) acc = (acc * base) & M64;
+    base = (base * base) & M64;
+    exp >>= 1n;
+  }
+  return (h * acc) & M64;
+}
 for (let i = 0; i < mod.samples.length; i++) {
   const s = store.get(i);
   const is16 = (s.flags & 0x01) !== 0; // SampleFlags.BITS16 = 1 << 0
   const stereo = (s.flags & 0x80) !== 0; // SampleFlags.STEREO
   const frames = s.length * (stereo ? 2 : 1); // interleaved sample values
-  const bytes = new Uint8Array(frames * (is16 ? 2 : 1));
-  if (is16) {
-    const dv = new DataView(bytes.buffer);
-    for (let k = 0; k < frames; k++) dv.setInt16(k * 2, Math.round(s.data[k] * 32768), true);
-  } else {
-    // C's stored 8-bit data is ALWAYS signed post-load (convert_signal,
-    // sample.c:125-139, adds 0x80 to unsigned input). Our float v/128 for
-    // signed and v/128-1 for unsigned both invert via plain *128.
-    for (let k = 0; k < frames; k++) bytes[k] = Math.round(s.data[k] * 128) & 0xff;
-  }
-  // C's unsigned long is 64-bit: FNV-1a accumulates mod 2^64.
-  const M64 = (1n << 64n) - 1n;
+  const nbytes = frames * (is16 ? 2 : 1);
   let h = 2166136261n;
-  for (let k = 0; k < bytes.length; k++) { h ^= BigInt(bytes[k]); h = (h * 16777619n) & M64; }
+  if (s.data.length === 0 && nbytes > 0) {
+    // C: xxs->data == NULL (oversized or at-EOF sample) -> fnv over zeros.
+    h = fnvZeros(h, nbytes);
+  } else {
+    const bytes = new Uint8Array(nbytes);
+    if (is16) {
+      const dv = new DataView(bytes.buffer);
+      for (let k = 0; k < frames; k++) dv.setInt16(k * 2, Math.round(s.data[k] * 32768), true);
+    } else {
+      // C's stored 8-bit data is ALWAYS signed post-load (convert_signal,
+      // sample.c:125-139, adds 0x80 to unsigned input). Our float v/128 for
+      // signed and v/128-1 for unsigned both invert via plain *128.
+      for (let k = 0; k < frames; k++) bytes[k] = Math.round(s.data[k] * 128) & 0xff;
+    }
+    for (let k = 0; k < bytes.length; k++) { h ^= BigInt(bytes[k]); h = (h * 16777619n) & M64; }
+  }
   out.push(`SMP ${i} name=${s.name} len=${s.length} lps=${s.loopStart} lpe=${s.loopEnd} flg=${(s.flags & 0xff).toString(16).padStart(2, '0')} fnv=${h.toString(16).padStart(16, '0')}`);
   out.push(`SMPX ${i} sus=${s.sustainStart} sue=${s.sustainEnd}`);
 }

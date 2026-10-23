@@ -444,6 +444,24 @@ function isOggSample(bytes: Uint8Array, pos: number, len: number): boolean {
 }
 
 /**
+ * FAST_SCALED_FLOAT_TO_INT(x, SHIFT) from stb_vorbis.c:5170-5177:
+ * `temp.f = x + MAGIC(s); temp.i - ADDEND(s)` where MAGIC/ADDEND use the
+ * float32 "add 1<<23 then subtract" trick, then clamp to the s16 range.
+ * Plain Math.round(x*32768) differs by 1 LSB on some values (beep.oxm).
+ */
+const S16_TEMP = new DataView(new ArrayBuffer(4));
+/** MAGIC(15) = 1.5f * (1 << (23-15)) + 0.5f/(1 << 15). */
+const S16_MAGIC = Math.fround(1.5 * (1 << (23 - 15)) + 0.5 / (1 << 15));
+/** ADDEND(15) = ((150-15) << 23) + (1 << 22). */
+const S16_ADDEND = ((150 - 15) << 23) + (1 << 22);
+function fastFloatToS16(x: number): number {
+  S16_TEMP.setFloat32(0, Math.fround(x + S16_MAGIC), true);
+  let v = S16_TEMP.getInt32(0, true) - S16_ADDEND;
+  if ((v + 32768) >>> 0 > 65535) v = v < 0 ? -32768 : 32767;
+  return v;
+}
+
+/**
  * oggdec (xm_load.c:374-421): decode via bundled stb-vorbis. Returns the
  * byte buffer libxmp_load_sample would consume with SAMPLE_FLAG_NOLOAD and
  * the resulting xxs->len. flg is the decoded xxs->flg (BITS16/STEREO).
@@ -470,17 +488,18 @@ function oggDecode(
       const out = stbVorbisGetFrameFloat(vor, fl);
       if (!out || fl.v === 0) break;
       const ch0 = out[0]!;
-      for (let j = 0; j < fl.v; j++) pcm16.push(ch0[j]!);
+      // stb_vorbis copy_samples: each float → s16 via the magic-add trick.
+      for (let j = 0; j < fl.v; j++) pcm16.push(fastFloatToS16(ch0[j]!));
     }
   }
   let n = pcm16.length;
 
   const is16bit = (flg & SampleFlags.BITS16) !== 0;
   if (!is16bit && n > 0) {
-    // 8-bit: take the high byte of each s16 frame.
+    // 8-bit: take the high byte of each s16 frame (pcm[i] = pcm16[i] >> 8).
     const pcm = new Uint8Array(n);
     for (let i = 0; i < n; i++) {
-      pcm[i] = (Math.round(pcm16[i]! * 32768) >> 8) & 0xff;
+      pcm[i] = (pcm16[i]! >> 8) & 0xff;
     }
     if ((flg & SampleFlags.STEREO) !== 0) {
       // OXM stereo is a single channel non-interleaved stream.
@@ -492,7 +511,7 @@ function oggDecode(
   const pcm = new Uint8Array(n * 2);
   const dv = new DataView(pcm.buffer);
   for (let i = 0; i < n; i++) {
-    dv.setInt16(i * 2, Math.round(pcm16[i]! * 32768) | 0, true);
+    dv.setInt16(i * 2, pcm16[i]!, true);
   }
   if ((flg & SampleFlags.STEREO) !== 0) {
     n >>= 1;

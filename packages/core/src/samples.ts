@@ -300,10 +300,31 @@ export class SampleStore {
 
   /** Add a raw sample from a loader; returns its stable ID. Throws on invalid input. */
   add(raw: RawSample): number {
-    if (raw.length > MAX_SAMPLE_SIZE) {
-      throw new SampleError(`sample too large (${raw.length} > ${MAX_SAMPLE_SIZE})`);
-    }
     const id = this.nextId++;
+    if (raw.length > MAX_SAMPLE_SIZE) {
+      // libxmp_load_sample skips oversized samples without failing the load
+      // (sample.c:196-206): xxs->len is kept, xxs->data stays NULL, and the
+      // loop/delta/conversion steps never run. Mirror that with an empty
+      // data array (no allocation possible for ~1e9 samples).
+      this.entries.set(id, {
+        sample: {
+          id,
+          name: raw.name ?? '',
+          data: new Float32Array(0),
+          length: raw.length,
+          loopStart: raw.loopStart,
+          loopEnd: raw.loopEnd,
+          sustainStart: raw.sustainStart,
+          sustainEnd: raw.sustainEnd,
+          finetune: raw.finetune,
+          volume: raw.volume,
+          c5spd: raw.c5spd,
+          flags: raw.flags & 0xff,
+          decodeFlags: raw.flags,
+        },
+      });
+      return id;
+    }
     this.entries.set(id, { sample: normalize(raw, id) });
     return id;
   }

@@ -187,3 +187,165 @@ overflow break. The wrapped `num=0` now behaves like C: uncapped
 playback (`playBuffer loop=0`) loops indefinitely; `loop=1` stops after
 the first cycle exactly like `xmp_play_buffer(loop=1)`. Sequence
 duration computes 61.3s per cycle (was 0).
+
+## Session: reference refresh to libxmp 4.7.4 + full-corpus audit (2026-10-23)
+
+Reference checkouts updated first:
+- `reference/libxmp` fast-forwarded 4.7.2+11 → **libxmp 4.7.4**
+  (release 4.7.3 scan/player fixes, 4.7.4 IMF/RTM sample-count fixes,
+  `load_epilogue` MAX_SAMPLES clamp removal); the local golden-regen
+  commit for `it_multi_retrigger.data`/`portamento_sustain.data` was
+  rebased on top and kept.
+- `reference/openmpt` fast-forwarded to master (`dc49d5638`,
+  2026-10-09). The only soundlib change in the window is
+  `Snd_fx.cpp` `kITDoublePortamentoSlides` volume-column portamento
+  memory (OpenMPT behaviour; libxmp has no such play flag, so no port
+  change) and a DLS/SF2 fix for code we don't ship.
+- `reference/Paula-Tracker` already at `origin/master`.
+- `reference/cRSID-1.58` is a vendored release tarball copy with no git
+  remote; the README states 1.58 (2025) is the current release, so no
+  update was possible or needed.
+
+Fixes in this session (each verified against the C oracle):
+
+1. **Sequencing** (`packages/core/src/core.ts`, `scan.ts`) — ported
+   libxmp 4.7.3's `skip_invalid_orders` / `bad_sequence` design:
+   `next_order`/`next_row` return success, an empty first sequence no
+   longer throws at load (warn only), playback ends cleanly when a
+   sequence has no reachable valid order, `mod.len` is no longer zeroed
+   at `startPlayer`, and `check_end_of_module` uses the per-sequence
+   `p->scan[p->sequence]`. `setPosition` now walks only
+   `XMP_MARK_SKIP` in the walk direction and rejects `XMP_MARK_END`
+   targets like `set_position` (control.c:63-132).
+   Verified: `play_s3m_marker_sequence.s3m` loads byte-identically and
+   `play_mod_bad_marker_sequence.mod` no longer crashes.
+2. **MOD order table** (`fmt-mod/mod.ts`) — C copies all 128 order
+   bytes into `mod->xxo` and only stops counting patterns at the first
+   byte > 0x7f; the old port truncated `xxo` at that point, so marker
+   modules had short/undefined order arrays.
+3. **IT zero-sample instruments** (`fmt-it/it.ts`) — removed an invented
+   "instruments without samples" rejection; libxmp accepts the file and
+   leaves `mod->smp = 0` (play_it_zero_samples.it now byte-identical).
+4. **Invert loop bad parameters** (`core/effects/tick.ts`) — ported
+   1700535e: `lps=-1/lpe=-1/len`, `lps <= lpe` gate and the
+   `data == NULL || lps >= len || lpe > len` guard.
+5. **Protracker sample change bounds check**
+   (`fmt-mod/readevent.ts`) — ported a60c8581: `queuePatch` receives
+   `IS_VALID_SAMPLE(sub->sid) ? sub->sid : -1`.
+6. **Startrekker AM stream advance** (`fmt-mod/flt.ts`) — the per-sample
+   stream skip uses the header length (`xxs->len` *before*
+   `read_am_instrument` rewrites it), fixing sample offsets after AM
+   instruments (flt_am_override.mod now byte-identical).
+7. **XM Ogg sample conversion** (`fmt-xm/xm.ts`) — replace
+   `Math.round(x*32768)` with stb_vorbis'
+   `FAST_SCALED_FLOAT_TO_INT(x,15)` magic-add conversion (exact for
+   `copy_samples`); this removed 1-LSB differences.
+8. **Vorbis window** (`stb-vorbis/imdct.ts`) — `compute_window` now
+   rounds exactly where C's float32 locals round; the Ogg-decoded PCM is
+   now bit-identical for beep.oxm/beep2.oxm/stereo.oxm/jerry-boleti.oxm.
+9. **MED loader validation** (`fmt-med/mmd1.ts`, `mmd3.ts`, `med4.ts`) —
+   signed offset reads (EOF → 0xffffffff, negative seek fails), signed
+   expdata sanity checks, sample-count `> MAX_SAMPLES` rejection and no
+   placeholder sample for song-file instruments without an external
+   file. `load_mmd0_truncated`, `load_mmd0_sample_count`,
+   `load_mmd1_invalid_expdata{,2}`, `load_mmd1_invalid_inst*`,
+   `load_mmd1_5octave_overflow`, `load_med4_invalid_iff{,2}` now match C
+   (load/reject and dump bytes).
+
+Measured after the changes:
+- mixer-state golden suite: **110 passed / 0 failed** (60 fixtures
+  without `.data`).
+- IT/XM loader parity: **146 passed / 0 failed**.
+- libxmp `test-dev/data` (all formats we ship): 212 byte-identical, 0
+  diffs; 63 rejects are formats with no modplayjs package (FAR, LIQ,
+  DTM, IMF, ULT, PTM, FNK, AMF, DSYM, GDM, DBM, RTM, MDL, XMF, archive
+  containers).
+- Known non-determinism: `flt_am_envelope.mod` sample 2 is the AM noise
+  waveform generated from `time(NULL)` in C (`rng.c`), so its FNV
+  changes on every C run; it is not a parity signal.
+
+## Session: bit-exact render pipeline (2026-10-23, second part)
+
+Three defects in the sample materialization / output path were found and
+fixed against the C sources; the reference render of
+`SnD - Ashampoo Antispyware 1.61 crk.mod` is now **byte-identical** to
+libxmp for the full 250 s render (12,000,000 frames, past the 184.32 s
+loop point), and the previously 0.999x test modules reach 1.0000.
+
+1. **WAV encoder rounding** (`out-pcm/src/pcm.ts`). The mixer hands out
+   int16 values scaled by 1/32768 (`downmix_int_16bit`, mixer.c:106-131 →
+   `smp / 32768` in the softmixer). The encoder wrote
+   `floor(sample * 32767)`, which shifts every non-zero sample by one
+   LSB and accumulates a small DC/scale error across the file. It now
+   uses `round(sample * 32768)` clamped to int16, which recovers the
+   exact integer PCM that libxmp writes.
+
+2. **Sample guard bytes** (`dsp-softmixer/src/index.ts`, `nativeOf`).
+   `libxmp_load_sample` does not zero the interpolation guard slots
+   (sample.c:408-417):
+
+   ```c
+   for (i = 0; i < extralen; i++)
+       xxs->data[bytelen + i] = xxs->data[bytelen - framelen + i];
+   for (i = -1; i >= -4; i--)
+       xxs->data[i] = xxs->data[framelen + i];
+   ```
+
+   `extralen` is 4/8/16 bytes depending on 16-bit/stereo, i.e. 4 frames
+   of `chn` slots; the last frame is repeated at the end and the first
+   frame at the start. `nativeOf` now materializes exactly those slots
+   after the payload. The linear and spline mixers read
+   `sptr[pos + chn]` and `sptr[pos ± chn]`, so a zero guard produced a
+   one-frame interpolation error at each sample end and at each loop
+   wrap. The stale comment in `core/samples.ts` claiming the tail guard
+   never reaches the output was wrong; it stays only because the
+   Float32 store has its own padding, and the mixer builds its own
+   native view.
+
+3. **Anticlick cursor** (`dsp-softmixer/src/index.ts`). `mixer.c`
+   advances `buf_pos` by `mix_size` immediately after `mix_fn`
+   (mixer.c:704) and the one-shot / queued-swap paths then call
+   `do_anticlick(ctx, voc, buf_pos, size)` with the ADVANCED pointer
+   (mixer.c:720-726, :733-736). The port passed the pre-mix pointer, so
+   the discharge was written over the frames that had just been mixed
+   instead of into the remaining silence. Both call sites now use
+   `bufPosAfter`.
+
+4. **Biquad coefficient table and arithmetic** (`core/effects/tick.ts`).
+   `resonance_table` in `reference/libxmp/src/filter.c:39-66` is a list of
+   float literals, not a `pow()` call at runtime; the port generated it with
+   `Math.pow`, which differs in the last bit for many entries. The table is
+   now copied verbatim. `filter_setup` reproduces C's mixed float/double
+   evaluation (`Math.fround` where C stores to a `float`) — the `fb0`
+   numerator `(d + e + e)` is float arithmetic because both operands of the
+   inner `d + e` are float. Verified against 8,192 coefficient triples
+   generated by the C `libxmp_filter_setup` at 44.1 and 48 kHz
+   (cutoff 0..255, resonance 0..255 step 17): zero mismatches.
+
+   The mixer's `FILTER_LEFT`/`FILTER_RIGHT` accumulator is int64 in C
+   (`mix_all.c:112,119`, `int64 sl64`) and is now evaluated exactly by
+   `filterSum64` (split into high/low halves) instead of a double sum.
+
+5. **Anticlick product precision** (`dsp-softmixer/src/index.ts`).
+   `do_anticlick` computes `(stepmul_sq * (int64)smp) >> 32`
+   (mixer.c:189-190) where `stepmul_sq` is uint32 and `smp` int32: the
+   product reaches 2^63, above the 53-bit exact range of a double. Replaced
+   `Math.floor((sm2 * sl) / 2**32)` with `mulShift32`, which splits the
+   unsigned factor into 2^16 halves. Verified against 200,000 random
+   `(uint32, int32)` pairs evaluated by the C expression: zero mismatches.
+
+Verification (all fresh renders, C reference rebuilt from
+`reference/libxmp` at libxmp 4.7.4 with `tools/xmpref.c` and the new
+`tools/xmpchmask.c`; our side via `tools/render-ours.mjs`, `cmp` on the
+WAV files):
+
+| Check | Result |
+|---|---|
+| `SnD - Ashampoo Antispyware 1.61 crk.mod`, 190 s, full mix | identical |
+| same file, 250 s (spans the loop) | identical |
+| same file, per-channel masks 1000/0100/0010/0001/1100 | identical |
+| KHG — HitFilm Ultimate x64, KHG — Vegas Pro 12, 4DNinja — 3DAttack, 15 s | identical |
+| 909DEAD — Adobe CS6, 15 s | 4,184 of 1,440,000 samples differ by ≤ 3 (0.29 %) |
+| NBR — Light Image Resizer 4, 15 s | residual differences, same order |
+| mixer-state golden suite | 110 passed / 0 failed |
+| IT/XM loader parity | 146 passed / 0 failed |

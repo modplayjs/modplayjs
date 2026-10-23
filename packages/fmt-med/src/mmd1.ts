@@ -81,17 +81,37 @@ export function mmdReadTitle(bytes: Uint8Array, start = 0): string {
 export function mmd1Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   const start = 0;
   let pos = start;
-  const u8 = () => bytes[pos++] ?? 0;
+  // hio_read8/16b/32b return all-ones on EOF (dataio.c read8/read16b/
+  // read32b error returns) — a truncated header must be seen as 0xffff...,
+  // not as zeros (load_mmd0_truncated.med).
+  const u8 = () => {
+    const v = pos < bytes.length ? bytes[pos]! : 0xff;
+    pos++;
+    return v;
+  };
   const s8 = () => ((u8() << 24) >> 24);
-  const u16 = () => { const v = (bytes[pos]! << 8) | bytes[pos + 1]!; pos += 2; return v; };
+  const u16 = () => {
+    if (pos + 2 > bytes.length) { pos += 2; return 0xffff; }
+    const v = (bytes[pos]! << 8) | bytes[pos + 1]!;
+    pos += 2;
+    return v;
+  };
   const s16 = () => (u16() << 16) >> 16;
   const u32 = () => {
+    if (pos + 4 > bytes.length) { pos += 4; return 0xffffffff; }
     const v = ((bytes[pos]! << 24) | (bytes[pos + 1]! << 16) |
       (bytes[pos + 2]! << 8) | bytes[pos + 3]!) >>> 0;
     pos += 4;
     return v;
   };
-  const seek = (p: number) => { pos = p; };
+  /** C `int` read of a 32-bit field (offset fields are signed ints). */
+  const s32 = () => u32() | 0;
+  const seek = (p: number) => {
+    // hio_seek fails (C: goto err) for negative targets; offsets are C
+    // `int`, so 0xffffffff is -1 (load_mmd0_truncated.med).
+    if (p < 0) throw new ParseError('MED: seek error');
+    pos = p;
+  };
   const skip = (n: number) => { pos += n; };
   const raw = (n: number) => { const s = bytes.subarray(pos, pos + n); pos += n; return s; };
 
@@ -106,13 +126,13 @@ export function mmd1Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   // Header (mmd1_load.c:107-128).
   seek(start + 4);
   u32(); // modlen
-  const songOffset = u32();
+  const songOffset = s32();
   skip(4); // psecnum + pseq
-  const blockarrOffset = u32();
+  const blockarrOffset = s32();
   u32(); // reserved
-  const smplarrOffset = u32();
+  const smplarrOffset = s32();
   u32(); // reserved2
-  const expdataOffset = u32();
+  const expdataOffset = s32();
   u32(); // reserved3
   skip(10); // pstate/pblock/pline/pseqnum/actplayline
   u8(); // counter
@@ -172,7 +192,7 @@ export function mmd1Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   seek(start + smplarrOffset);
   for (let i = 0; i < ins; i++) {
     if (pos >= bytes.length) throw new ParseError(`MED: read error at smplarr pos ${i}`);
-    smplarr.push(u32());
+    smplarr.push(s32());
   }
 
   // Sample count scan (mmd1_load.c:221-250).
@@ -196,6 +216,12 @@ export function mmd1Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     }
   }
 
+  // Sample count sanity (libxmp_init_instrument, loaders/common.c:46-52):
+  // an initial sample count above MAX_SAMPLES fails the load.
+  if (smp > 1024 /* MAX_SAMPLES */) {
+    throw new ParseError(`MED: too many samples (${smp})`);
+  }
+
   // Expdata (mmd1_load.c:255-315).
   const expdata = zeroExpData();
   let expsmpOffset = 0;
@@ -207,25 +233,25 @@ export function mmd1Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   if (expdataOffset) {
     seek(start + expdataOffset);
     u32(); // nextmod
-    expsmpOffset = u32();
+    expsmpOffset = s32();
     expdata.s_ext_entries = u16();
     expdata.s_ext_entrsz = u16();
-    annotxtOffset = u32();
+    annotxtOffset = s32();
     expdata.annolen = u32();
-    iinfoOffset = u32();
+    iinfoOffset = s32();
     expdata.i_ext_entries = u16();
     expdata.i_ext_entrsz = u16();
 
-    // Sanity check.
-    if (expdata.annolen > 0x10000) {
-      throw new ParseError(`MED: invalid expdata (annolen=0x${expdata.annolen.toString(16)})`);
+    // Sanity check (mmd1_load.c:278-288).
+    if (expsmpOffset < 0 || annotxtOffset < 0 || expdata.annolen > 0x10000 || iinfoOffset < 0) {
+      throw new ParseError(`MED: invalid expdata (annotxt=0x${(annotxtOffset >>> 0).toString(16)} annolen=0x${expdata.annolen.toString(16)})`);
     }
 
     u32(); // jumpmask
     u32(); // rgbtable
     skip(4); // channelsplit
     u32(); // n_info
-    songnameOffset = u32();
+    songnameOffset = s32();
     expdata.songnamelen = u32();
 
     seek(start + songnameOffset);
@@ -422,6 +448,9 @@ export function mmd1Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
       expdata,
       false,
     );
+    // hio_error(f) after each entry read (mmd1_load.c:553-556): reading past
+    // EOF fails the instrument-extras block.
+    if (pos > bytes.length) throw new ParseError('MED: read error at expsmp');
     for (let i = 0; i < list.length; i++) expSmp[i] = list[i]!;
   }
 

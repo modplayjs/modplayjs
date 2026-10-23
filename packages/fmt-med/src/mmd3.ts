@@ -59,17 +59,36 @@ export { mmdReadTitle } from './mmd1.js';
 export function mmd3Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   const start = 0;
   let pos = start;
-  const u8 = () => bytes[pos++] ?? 0;
+  // hio_read8/16b/32b return all-ones on EOF (dataio.c read8/read16b/
+  // read32b error returns) — a truncated header must be seen as 0xffff...,
+  // not as zeros (load_mmd0_truncated.med).
+  const u8 = () => {
+    const v = pos < bytes.length ? bytes[pos]! : 0xff;
+    pos++;
+    return v;
+  };
   const s8 = () => ((u8() << 24) >> 24);
-  const u16 = () => { const v = (bytes[pos]! << 8) | bytes[pos + 1]!; pos += 2; return v; };
+  const u16 = () => {
+    if (pos + 2 > bytes.length) { pos += 2; return 0xffff; }
+    const v = (bytes[pos]! << 8) | bytes[pos + 1]!;
+    pos += 2;
+    return v;
+  };
   const s16 = () => (u16() << 16) >> 16;
   const u32 = () => {
+    if (pos + 4 > bytes.length) { pos += 4; return 0xffffffff; }
     const v = ((bytes[pos]! << 24) | (bytes[pos + 1]! << 16) |
       (bytes[pos + 2]! << 8) | bytes[pos + 3]!) >>> 0;
     pos += 4;
     return v;
   };
-  const seek = (p: number) => { pos = p; };
+  /** C `int` read of a 32-bit field (offset fields are signed ints). */
+  const s32 = () => u32() | 0;
+  const seek = (p: number) => {
+    // hio_seek fails for negative targets; offsets are C `int`.
+    if (p < 0) throw new ParseError('MED: seek error');
+    pos = p;
+  };
   const skip = (n: number) => { pos += n; };
   const raw = (n: number) => { const s = bytes.subarray(pos, pos + n); pos += n; return s; };
 
@@ -80,13 +99,13 @@ export function mmd3Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   // Header (mmd3_load.c:117-123).
   seek(start + 4);
   u32(); // modlen
-  const songOffset = u32();
+  const songOffset = s32();
   skip(4); // psecnum + pseq
-  const blockarrOffset = u32();
+  const blockarrOffset = s32();
   u32(); // reserved
-  const smplarrOffset = u32();
+  const smplarrOffset = s32();
   u32(); // reserved2
-  const expdataOffset = u32();
+  const expdataOffset = s32();
   u32(); // reserved3
   skip(10); // pstate/pblock/pline/pseqnum/actplayline
   u8(); // counter
@@ -167,7 +186,7 @@ export function mmd3Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   seek(start + smplarrOffset);
   for (let i = 0; i < ins; i++) {
     if (pos >= bytes.length) throw new ParseError(`MED: read error at smplarr pos ${i}`);
-    smplarr.push(u32());
+    smplarr.push(s32());
   }
 
   // Sample count scan (mmd3_load.c:238-258).
@@ -188,6 +207,11 @@ export function mmd3Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     if (pos > bytes.length) throw new ParseError(`MED: read error at sample ${i}`);
   }
 
+  // Sample count sanity (libxmp_init_instrument, loaders/common.c:46-52).
+  if (smp > 1024 /* MAX_SAMPLES */) {
+    throw new ParseError(`MED: too many samples (${smp})`);
+  }
+
   // Expdata (mmd3_load.c:263-322).
   const expdata = zeroExpData();
   let expsmpOffset = 0;
@@ -199,12 +223,12 @@ export function mmd3Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   if (expdataOffset) {
     seek(start + expdataOffset);
     u32(); // nextmod
-    expsmpOffset = u32();
+    expsmpOffset = s32();
     expdata.s_ext_entries = u16();
     expdata.s_ext_entrsz = u16();
     u32(); // annotxt
     u32(); // annolen
-    iinfoOffset = u32();
+    iinfoOffset = s32();
     expdata.i_ext_entries = u16();
     expdata.i_ext_entrsz = u16();
 
@@ -216,7 +240,7 @@ export function mmd3Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     u32(); // rgbtable
     u32(); // channelsplit
     u32(); // n_info
-    songnameOffset = u32();
+    songnameOffset = s32();
     expdata.songnamelen = u32();
     u32(); // dumps
     mmdinfoOffset = u32();
@@ -376,6 +400,8 @@ export function mmd3Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
       expdata,
       true,
     );
+    // hio_error(f) after each entry read (mmd3_load.c:492-495).
+    if (pos > bytes.length) throw new ParseError('MED: read error at expsmp');
     for (let i = 0; i < list.length; i++) expSmp[i] = list[i]!;
   }
 

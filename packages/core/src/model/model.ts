@@ -872,6 +872,9 @@ export interface PlayState {
   loop_count: number;
   /** Sequence control (one byte per order; -1 = none). */
   sequence_control: number[];
+  /** 1 = current sequence has no reachable valid order (player.c:614
+   *  bad_sequence): playback must stop until repositioned. */
+  bad_sequence: number;
   /** Global volume. */
   gvol: number;
   /** Master volume (128). */

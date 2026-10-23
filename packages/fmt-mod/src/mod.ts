@@ -360,17 +360,18 @@ export function modLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     rst = mh.restart;
   }
 
-  // Order table → pat count (mod_load.c:613-622).
+  // Order table → pat count (mod_load.c:613-622). C copies all 128 order
+  // bytes into mod->xxo (memcpy at :609) and only STOPS SCANNING for pat at
+  // the first byte > 0x7f ("fixes dragnet.mod"); the tail is still present
+  // in xxo and can be reached by len/jumps (play_mod_bad_marker_sequence.mod
+  // has FF FF 00 with len 3).
   let pat = 0;
-  const xxo: number[] = [];
-  let xxoCount = 0;
+  const xxo: number[] = Array.from(mh.order);
   for (let i = 0; i < 128; i++) {
     const x = mh.order[i]!;
     // This fixes dragnet.mod (garbage in the order list).
     if (x > 0x7f) break;
-    xxo.push(x);
     if (x > pat) pat = x;
-    xxoCount++;
   }
   pat++;
   const len = mh.len;
@@ -835,7 +836,7 @@ export function modLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     ins: 31,
     len,
     restart: epilogueRst,
-    xxo: xxo.slice(0, Math.max(len, xxoCount)),
+    xxo,
     channels,
     patterns,
     instruments,

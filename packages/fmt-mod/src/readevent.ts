@@ -215,7 +215,11 @@ export function readEventMod(core: Core, e: Event, chn: number): void {
     (core.quirks & Quirk.PROTRACK) !== 0 &&
     TEST_NOTE(xc, NoteFlag.SET) !== 0
   ) {
-    core.virt.queuePatch(chn, e.ins - 1, sub.sid, xc.note);
+    // Missing bounds check on the sample id (read_event.c:406-411): a
+    // Protracker-mode module with instruments but no samples (e.g. a
+    // Digitrakker MDL) has mod->xxs == NULL, so sub->sid must be validated.
+    const smp = isValidSample(core, sub.sid) ? sub.sid : -1;
+    core.virt.queuePatch(chn, e.ins - 1, smp, xc.note);
     xc.smp = sub.sid;
   }
 

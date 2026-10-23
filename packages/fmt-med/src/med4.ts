@@ -668,19 +668,9 @@ export function med4Load(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
     for (let i = 0; i < numIns; i++) {
       instruments[i]!.name = tempInst[i]!.name;
       instruments[i]!.nsm = 0;
-      samples.push({
-        name: '',
-        data: new Uint8Array(0),
-        length: 0,
-        loopStart: tempInst[i]!.loop_start,
-        loopEnd: tempInst[i]!.loop_end,
-        sustainStart: 0,
-        sustainEnd: 0,
-        finetune: 0,
-        volume: tempInst[i]!.volume,
-        flags: tempInst[i]!.loop_end > 2 ? SampleFlags.LOOP : 0,
-        c5spd: 8287,
-      });
+      // No placeholder sample: C sets mod->smp = mod->ins and then shrinks
+      // it to smp_idx (med4_load.c:839, 857-861) — instruments with no
+      // external file contribute NO sample (load_med4_invalid_iff.med).
     }
 
     // Load externals (med4_load.c:844-856 → med4_load_external_instrument

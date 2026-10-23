@@ -413,17 +413,20 @@ export function fltLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   void amIdx;
   for (let i = 0; i < smp; i++) {
     const raw = rawSamples[i]!;
+    // The stream advance uses the HEADER length (xxs->len at the point C
+    // seeks), before read_am_instrument rewrites xxs->len to the synth size.
+    const streamLen = 2 * insHeaders[i]!.size;
     if (amSynth && sidecar && isAmInstrument(sidecar, i)) {
       // flt_load.c:507-511 — skip the PCM, synth already generated data.
-      filePos += raw.length;
+      filePos += streamLen;
       continue;
     }
     if (raw.loopStart === 0) raw.flags |= SF_FULLREP;
-    if (raw.length !== 0) {
+    if (streamLen !== 0) {
       const remaining = Math.max(0, bytes.length - filePos);
-      const take = Math.min(raw.length, remaining);
+      const take = Math.min(streamLen, remaining);
       raw.data = bytes.subarray(filePos, filePos + take);
-      filePos += raw.length;
+      filePos += streamLen;
     }
   }
   for (const raw of rawSamples) ctx.addSample(raw);

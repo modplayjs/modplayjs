@@ -1424,7 +1424,9 @@ export function itLoad(bytes: Uint8Array, ctx: LoadCtx): ModuleData {
   if (ifh.insnum > 255 || ifh.smpnum > 255 || ifh.patnum > 255) {
     fail('too many instruments or patterns');
   }
-  if (ifh.insnum > 0 && ifh.smpnum === 0) fail('instruments without samples');
+  // No instruments-without-samples rejection here: libxmp's it_load accepts
+  // such files (play_it_zero_samples.it); sub->sid pointing past mod->smp=0
+  // is handled by IS_VALID_SAMPLE at read time.
   const sampleMode = (~ifh.flags & IT_USE_INST) !== 0;
   let cmwt = ifh.cmwt;
 

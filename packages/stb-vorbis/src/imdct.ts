@@ -18,8 +18,15 @@ export function computeTwiddleFactors(n: number, A: Float32Array, B: Float32Arra
 
 export function computeWindow(n: number, window: Float32Array): void {
   const n2 = n >> 1;
+  // stb_vorbis.c:1336-1341 — window[i] = (float) sin(0.5*M_PI *
+  // square((float) sin((i+0.5)/n2 * 0.5*M_PI))). The two sin() calls and
+  // the 0.5*M_PI multiply are double math with float32 casts at the
+  // boundaries; square() is a float32 multiply. Math.fround at exactly
+  // those points reproduces the C bits.
   for (let i = 0; i < n2; ++i) {
-    window[i] = Math.sin(0.5 * Math.PI * Math.sin(((i + 0.5) / n2) * 0.5 * Math.PI) ** 2);
+    const s = Math.fround(Math.sin(((i + 0.5) / n2) * 0.5 * Math.PI));
+    const sq = Math.fround(s * s);
+    window[i] = Math.fround(Math.sin(0.5 * Math.PI * sq));
   }
 }
 

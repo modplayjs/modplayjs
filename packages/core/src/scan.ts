@@ -204,7 +204,9 @@ export class Scanner {
     }
 
     if (scan[0]!.time < 0) {
-      throw new Error('scan was not able to find any valid orders');
+      // C only warns here (scan.c:755-757): the main sequence has no valid
+      // orders, so playback ends until the caller repositions. Do not fail
+      // the load (play_s3m_marker_sequence.s3m).
     }
 
     // Discover remaining sequences (scan.c:766-786).

@@ -51,11 +51,16 @@ export function encodeWavStereo(
   writeString(36, 'data');
   view.setUint32(40, dataSize, true);
 
-  // Samples: clamp to [-1,1], scale to int16 (floor like the reference)
+  // Samples: the mixer hands us int16 values scaled by 1/32768
+  // (downmix_int_16bit in mixer.c:106-131 → smp / 32768), so scaling back
+  // by 32768 recovers the exact integer PCM. Using 32767 + floor instead
+  // shifts every non-zero sample by 1 LSB.
   let offset = 44;
   for (let i = 0; i < numSamples; i++) {
     const sample = Math.max(-1, Math.min(1, pcm[i]!));
-    const int16 = Math.floor(sample * 32767);
+    let int16 = Math.round(sample * 32768);
+    if (int16 > 32767) int16 = 32767;
+    else if (int16 < -32768) int16 = -32768;
     view.setInt16(offset, int16, true);
     offset += 2;
   }

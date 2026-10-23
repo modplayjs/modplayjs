@@ -49,6 +49,29 @@ const C4_PERIOD = 428.0;
 const DOWNMIX_SHIFT = 12;
 /** mixer.c:148 ANTICLICK_FPSHIFT. */
 const ANTICLICK_FPSHIFT = 24;
+/**
+ * C `(int64)(uint32_sq) * (int64)sample >> 32` — the arithmetic shift of a
+ * 64-bit product. `sq` is a uint32 (do_anticlick's stepmul_sq) and
+ * `sample` an int32; the product reaches 2^63 and a double only holds 53
+ * bits, so the unsigned factor is split into 2^16 halves:
+ *   sq = hi*2^16 + lo        (both exact, hi <= 2^16)
+ *   product = hi*sample*2^16 + lo*sample
+ * Every term stays below 2^48, so each is exact, and the >> 32 shift is
+ * applied to the two parts separately with the low part floored (the C
+ * shift floors toward -infinity).
+ */
+function mulShift32(sq: number, sample: number): number {
+  const hi = Math.floor(sq / 65536);
+  const lo = sq - hi * 65536;
+  const hiPart = hi * sample;      // <= 2^16 * 2^31 = 2^47
+  const loPart = lo * sample;      // <= 2^16 * 2^31 = 2^47
+  // value = hiPart*2^16 + loPart, and
+  // floor(value / 2^32) = floor(hiPart / 2^16) + floor(((hiPart mod 2^16)*2^16 + loPart)/2^32)
+  const q = Math.floor(hiPart / 65536);
+  const rem = hiPart - q * 65536;  // 0 <= rem < 2^16
+  return q + Math.floor((rem * 65536 + loPart) / 0x100000000);
+}
+
 /** mix_all.c:63 PREAMP_BITS. */
 const PREAMP_BITS = 15;
 /** mixer.h:12 FILTER_SHIFT. */
@@ -150,6 +173,25 @@ function nativeOf(xxs: SampleData): NativeSample {
       buf[4 + i] = v;
     }
     nat = { data: buf, pre: 4 };
+  }
+  // sample.c:408-417 — the extra samples are NOT zero:
+  //   for (i = 0; i < extralen; i++)
+  //       xxs->data[bytelen + i] = xxs->data[bytelen - framelen + i];
+  //   for (i = -1; i >= -4; i--)
+  //       xxs->data[i] = xxs->data[framelen + i];
+  // extralen is 4 (8-bit mono), 8 (16-bit mono / 8-bit stereo) or 16
+  // (16-bit stereo) BYTES, i.e. 4 frames of chn slots: the last frame is
+  // repeated at the end, the first frame at the start. Linear/spline
+  // interpolators read these slots (sptr[pos + chn], spline taps).
+  const nat2 = nat;
+  const sptr = nat2.data;
+  const pre = nat2.pre;
+  const tailSlots = 4 * chn;
+  for (let i = 0; i < tailSlots; i++) {
+    sptr[pre + len + i] = sptr[pre + len - chn + (i % chn)]!;
+  }
+  for (let i = 1; i <= pre; i++) {
+    sptr[pre - i] = sptr[pre + ((pre - i) % chn)]!;
   }
   nativeCache.set(xxs, nat);
   return nat;
@@ -278,6 +320,7 @@ export class SoftMixer implements DspPlugin {
   amigaFilter: 'a500' | 'a500led' = 'a500';
 
   private bidirAdjust = 0;
+
   /** ticksize >> ANTICLICK_SHIFT — do_anticlick's tail length (:150). */
   private dischargeFrames = 0;
   /** ticksize × 2 int accumulators (s->buf32). */
@@ -519,6 +562,11 @@ export class SoftMixer implements DspPlugin {
         }
 
         let bufPos = (ticksize - size) * 2;
+        // C advances buf_pos by mix_size right after mixing (mixer.c:704)
+        // and then uses the ADVANCED pointer for do_anticlick in both the
+        // one-shot and queued-swap paths. Keep a separate cursor so the
+        // discharge lands after the frames that were actually mixed.
+        let bufPosAfter = bufPos;
 
         if (vi.vol !== 0) {
           // mixer.c:631-761 — the C exact mixer body.
@@ -571,6 +619,7 @@ export class SoftMixer implements DspPlugin {
             // last-frame contribution = post − pre of the LAST frame.
             vi.sleft = (buf32[lastNeg] ?? 0) - prevL;
             vi.sright = (buf32[lastNeg + 1] ?? 0) - prevR;
+            bufPosAfter = bufPos + samples * 2;
 
             // old_vl bookkeeping (mixer.c:710-711).
             vi.old_vl += samples * deltaL;
@@ -603,7 +652,7 @@ export class SoftMixer implements DspPlugin {
         ) {
           if (size > 0) {
             // do_anticlick + set_sample_end(1) (mixer.c:720-726).
-            this.doAnticlick(buf32, bufPos, vi, size);
+            this.doAnticlick(buf32, bufPosAfter, vi, size);
             this.setSampleEnd(core, vi, 1);
           }
           size = 0;
@@ -620,7 +669,7 @@ export class SoftMixer implements DspPlugin {
           if ((vi.flags & VoiceFlag.SAMPLE_QUEUED) !== 0) {
             // Protracker sample swap (mixer.c:733-755).
             if (size > 0) {
-              this.doAnticlick(buf32, bufPos, vi, size);
+              this.doAnticlick(buf32, bufPosAfter, vi, size);
             }
             // The C short-circuits the <0 check before touching the
             // sample table (mixer.c:728) — this MOD hits it: voices
@@ -829,14 +878,48 @@ export class SoftMixer implements DspPlugin {
       // signed bit pattern = the unsigned mod 2^32).
       const sm2 = Math.imul(stepmulShifted, stepmulShifted) >>> 0;
       const idx = atPos + n * 2;
-      // C: *buf += (stepmul_sq * (int64)smp) >> 32 — the int64 product
-      // with an ARITHMETIC right shift (floors toward negative infinity),
-      // not truncation. JS doubles hold sm2*smp exactly (< 2^53), so
-      // Math.floor reproduces the >> 32 shift.
-      buf32[idx] = (buf32[idx] ?? 0) + Math.floor((sm2 * sl) / 0x100000000);
-      buf32[idx + 1] = (buf32[idx + 1] ?? 0) + Math.floor((sm2 * sr) / 0x100000000);
+      // C: *buf += (stepmul_sq * (int64)smp) >> 32 — a 64-bit signed
+      // product with an ARITHMETIC shift. stepmul_sq reaches 2^32-1 and
+      // smp 2^31, so the product exceeds 2^53 and a double cannot hold it
+      // exactly. mulShift32() splits the unsigned factor into 2^16 halves
+      // to keep every intermediate exact.
+      buf32[idx] = (buf32[idx] ?? 0) + mulShift32(sm2, sl);
+      buf32[idx + 1] = (buf32[idx + 1] ?? 0) + mulShift32(sm2, sr);
       n++;
     }
+  }
+
+  /**
+   * FILTER_LEFT / FILTER_RIGHT accumulator (mix_all.c:112,119):
+   *   sl64 = (a0*ASL(smp,PREAMP_BITS) + b0*fl1 + b1*fl2) >> FILTER_SHIFT
+   * evaluated in int64 in the C. A double sum is not exact: each product
+   * reaches 2^23 * 2^31 = 2^54 and the total 2^56. The split below keeps
+   * every intermediate exact:
+   *   c = cHi*2^11 + cLo         (0 <= cLo < 2^11, |cHi| <= 2^12)
+   *   P = sum cHi*s  (|P| <= 2^46, exact in a double)
+   *   Q = sum cLo*s  (|Q| <= 2^45, exact)
+   *   sum = P*2^11 + Q  =>  floor(sum / 2^22)
+   *       = floor(P/2^11) + floor(((P mod 2^11)*2^11 + Q) / 2^22)
+   * with `P mod 2^11` non-negative, which is what the arithmetic shift
+   * does (floor toward -infinity).
+   */
+  private filterSum64(
+    a0: number, s0: number,
+    b0: number, s1: number,
+    b1: number, s2: number,
+  ): number {
+    const SPLIT_BITS = 11;
+    const SPLIT = 1 << SPLIT_BITS; // 2048
+    const cHi = (c: number): number => Math.floor(c / SPLIT);
+    const cLo = (c: number): number => c - Math.floor(c / SPLIT) * SPLIT;
+    const P =
+      cHi(a0) * s0 + cHi(b0) * s1 + cHi(b1) * s2;
+    const Q =
+      cLo(a0) * s0 + cLo(b0) * s1 + cLo(b1) * s2;
+    const q = Math.floor(P / SPLIT);
+    const rem = P - q * SPLIT; // 0 <= rem < SPLIT
+    const t = rem * SPLIT + Q;
+    return q + Math.floor(t / (1 << FILTER_SHIFT));
   }
 
   /**
@@ -937,16 +1020,21 @@ export class SoftMixer implements DspPlugin {
       }
 
       if (filterActive) {
-        // FILTER_LEFT (mix_all.c:111-117): C shifts (arithmetic), so
-        // negative values floor — keep the >> semantics.
-        let sl = (a0 * (smpL << PREAMP_BITS) + b0 * fl1 + b1 * fl2) >> FILTER_SHIFT;
+        // FILTER_LEFT / FILTER_RIGHT (mix_all.c:111-125). C evaluates
+        //   sl64 = (a0 * XMP_ASL(smp, PREAMP_BITS) + b0*fl1 + b1*fl2) >> 22
+        // in int64: b0*fl1 alone reaches 2^54 (b0 <= 2^23, fl1 clamped to
+        // ±65536*2^15 = 2^31), so a double sum is NOT exact and loses the
+        // low bits that decide the arithmetic shift. filterSum64 splits
+        // each product into a 2^16 high part and a [0,65535] low part, both
+        // exact in doubles, and reassembles the shifted value.
+        let sl = this.filterSum64(a0, smpL << PREAMP_BITS, b0, fl1, b1, fl2);
         if (sl < FILTER_MIN) sl = FILTER_MIN;
         else if (sl > FILTER_MAX) sl = FILTER_MAX;
         fl2 = fl1; fl1 = sl;
         smpL = sl >> PREAMP_BITS;
         if (stereo) {
           // FILTER_RIGHT (mix_all.c:119-125).
-          let sr = (a0 * (smpR << PREAMP_BITS) + b0 * fr1 + b1 * fr2) >> FILTER_SHIFT;
+          let sr = this.filterSum64(a0, smpR << PREAMP_BITS, b0, fr1, b1, fr2);
           if (sr < FILTER_MIN) sr = FILTER_MIN;
           else if (sr > FILTER_MAX) sr = FILTER_MAX;
           fr2 = fr1; fr1 = sr;

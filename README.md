@@ -25,13 +25,12 @@ Playback correlation against reference renders, typical in-tune files:
 
 | Module | Format | Correlation |
 |---|---|---|
-| KHG — HitFilm Ultimate x64 | MOD | 0.9998 |
-| KHG — Vegas Pro 12 | MOD | 0.9996 |
-| 909DEAD — Adobe CS6 | IT | 0.9999 |
-| NBR — Light Image Resizer 4 | IT | 0.9999 |
-| 3DAttack LSD 1.01 | XM | 0.9997 |
-| Knetus — UltraEdit-32 | XM | 0.9995 |
-| MANtiCORE — IRLink 3 | S3M | 0.9980 |
+| SnD — Ashampoo Antispyware 1.61 | MOD | 1.0000 (bit-identical, 250 s) |
+| KHG — HitFilm Ultimate x64 | MOD | 1.0000 (bit-identical) |
+| KHG — Vegas Pro 12 | MOD | 1.0000 (bit-identical) |
+| 4DNinja — 3DAttack LSD 1.01 | XM | 1.0000 (bit-identical) |
+| 909DEAD — Adobe CS6 | IT | 1.0000 (0.4 % of frames, ≤ 0.02 LSB-scale) |
+| NBR — Light Image Resizer 4 | IT | 1.0000 (residual frames) |
 
 ### SID (cRSID port) — sample-exact
 
