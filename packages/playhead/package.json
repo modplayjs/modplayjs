@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/playhead",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Playback clock for modplayjs UIs: maps sink consumption time to the song row that is actually audible (pattern-view sync).",
   "type": "module",
   "main": "dist/index.js",

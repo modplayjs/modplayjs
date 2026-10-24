@@ -1,5 +1,14 @@
 # @modplayjs/stream-audio
 
+## 0.2.2
+
+### Patch Changes
+
+- [`55f9461`](https://github.com/modplayjs/modplayjs/commit/55f946152b9dfcdcfa956e01a479a70d5451eeea) - - Merge pull request [#27](https://github.com/modplayjs/modplayjs/issues/27) from modplayjs/changeset-release/main (direct push)
+- Updated dependencies [[`55f9461`](https://github.com/modplayjs/modplayjs/commit/55f946152b9dfcdcfa956e01a479a70d5451eeea), [`6dad01c`](https://github.com/modplayjs/modplayjs/commit/6dad01cc49d2481860459ee92dfe4a75582c9032), [`bec6175`](https://github.com/modplayjs/modplayjs/commit/bec6175ff939601e871a1898980776908c0332b7)]:
+  - @modplayjs/fmt-mo3@0.2.2
+  - @modplayjs/stb-vorbis@0.2.2
+
 ## 0.1.1
 
 ### Patch Changes

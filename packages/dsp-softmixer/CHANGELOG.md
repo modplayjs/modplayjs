@@ -1,5 +1,76 @@
 # @modplayjs/dsp-softmixer
 
+## 0.2.2
+
+### Patch Changes
+
+- [`55f9461`](https://github.com/modplayjs/modplayjs/commit/55f946152b9dfcdcfa956e01a479a70d5451eeea) - - Merge pull request [#27](https://github.com/modplayjs/modplayjs/issues/27) from modplayjs/changeset-release/main (direct push)
+
+- [`de9d376`](https://github.com/modplayjs/modplayjs/commit/de9d3764d19b8479f03ae3bd6594c0f2242bd467) - - dsp-softmixer: guard the queued-swap getSample before the <0 check (direct push)
+
+- [`6dad01c`](https://github.com/modplayjs/modplayjs/commit/6dad01cc49d2481860459ee92dfe4a75582c9032) - - libxmp 4.7.4 + bit-exact render pipeline (direct push)
+
+- [`bec6175`](https://github.com/modplayjs/modplayjs/commit/bec6175ff939601e871a1898980776908c0332b7) - Sync player and loader behaviour with libxmp 4.7.4 and make the render
+  pipeline bit-exact against the C reference.
+  
+  Loader/player:
+  - `bad_sequence` sequencing (skip_invalid_orders, next_order/next_row return
+    status, per-sequence scan endpoints, no `mod.len` zeroing, warn-only empty
+    first sequence) — libxmp 4.7.3.
+  - MOD order table keeps all 128 order bytes like `mod->xxo`.
+  - IT accepts instruments without samples (`mod->smp = 0`).
+  - Invert-loop guards for bad loop parameters.
+  - Protracker sample-change bounds check in `queuePatch`.
+  - Startrekker AM sample stream offset uses the header length.
+  - MED: signed offset reads, expdata sanity, MAX_SAMPLES rejection, no
+    placeholder sample for missing external instruments.
+  
+  Mixer/output:
+  - Sample guard bytes replicate `libxmp_load_sample` (last frame repeated at
+    the end, first frame at the start) instead of zeros.
+  - Anticlick discharge starts at the advanced buffer position.
+  - `resonance_table` copied from filter.c; `filter_setup` follows C's
+    float/double evaluation; filter accumulator and anticlick product use
+    exact 64-bit decomposition.
+  - WAV encoder writes `round(sample * 32768)`.
+  
+  Verified: `SnD - Ashampoo Antispyware 1.61 crk.mod` renders byte-identically
+  to libxmp for the full 250 s, also per channel; the mixer-state golden suite
+  (110) and IT/XM loader parity (146) stay green.
+
+- [`14d86ba`](https://github.com/modplayjs/modplayjs/commit/14d86ba1e2457cc193700379d0881a695d4c1e47) - Six player fixes that make the 48 kHz render bit-identical to libxmp for the
+  whole `testfiles/` + `testfiles2/KEYGENMUSiC MusicPack/BetaMaster` corpus:
+  
+  - **Anticlick arming** (`core/src/virtual.ts`). `mixer_setvol` arms the
+    anticlick on every `vol == 0` write (mixer.c:946-950) — there is no
+    previous-volume guard — and `libxmp_virt_resetvoice` calls it before wiping
+    the voice (virtual.c:88-90), so a note cut still discharges its last mixed
+    level. Ours skipped both paths.
+  - **`voicePos` anticlick** (`core/src/virtual.ts`). `libxmp_mixer_voicepos`
+    ends with `if (ac) anticlick(vi)` (mixer.c:834-836); `libxmp_virt_voicepos`
+    always passes `ac = 1` (virtual.c:599). The port only zeroed the ramp
+    accumulator.
+  - **Linear pitch-bend truncation** (`core/src/effects/helpers.ts`).
+    `libxmp_period_to_bend` returns `int` (period.c:223) and its LINEAR branch
+    has no `libxmp_round` — the conversion truncates toward zero.
+  - **Default MIDI macro** (`core/src/effects/tick.ts`). `update_midi_macro` is
+    called for every channel regardless of `module->midi`; without a MIDI config
+    it still applies the default macro (fixed → resonance, parameterized 0 →
+    cutoff, player.c:532-541).
+  - **Mono-sample filter** (`dsp-softmixer`). `FILTER_MONO` filters only the
+    left value and `MIX_STEREO` then duplicates it; the port duplicated the
+    *pre-filter* sample into the right channel.
+  - **`playBuffer` frame carry** (`core/src/core.ts`). `xmp_play_buffer` keeps
+    a partially copied frame in `p->buffer_data` and resumes it on the next
+    call (player.c:2244-2257); the port dropped the remainder, so every buffer
+    boundary shifted the stream.
+  
+  The parity harness builds the C oracle with `-ffp-contract=off`
+  (`tools/build-ref-libxmp.sh`) so the reference is not fused into FMAs on
+  targets that have them.
+- Updated dependencies [[`55f9461`](https://github.com/modplayjs/modplayjs/commit/55f946152b9dfcdcfa956e01a479a70d5451eeea), [`6dad01c`](https://github.com/modplayjs/modplayjs/commit/6dad01cc49d2481860459ee92dfe4a75582c9032), [`bec6175`](https://github.com/modplayjs/modplayjs/commit/bec6175ff939601e871a1898980776908c0332b7), [`14d86ba`](https://github.com/modplayjs/modplayjs/commit/14d86ba1e2457cc193700379d0881a695d4c1e47)]:
+  - @modplayjs/core@0.2.2
+
 ## 0.1.1
 
 ### Patch Changes
