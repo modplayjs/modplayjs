@@ -444,9 +444,13 @@ export class VirtualLayer {
     }
     // mixer_setvol (mixer.c:946-954): volume→0 arms the voice's anticlick
     // — the discharge drains its last mixed level over the next tick's
-    // ramp instead of cutting instantly. C-parity; verified alongside the
-    // per-tick adjustVoiceEnd (the two are independent paths).
-    if (vol === 0 && v.vol !== 0) {
+    // ramp instead of cutting instantly. C arms it on EVERY vol == 0
+    // write, not only when the voice was audible before: `if (vol == 0)
+    // anticlick(vi);` has no previous-volume guard. Gating it on
+    // v.vol !== 0 dropped the discharge of voices whose volume was
+    // already 0 when the reset reached them (909DEAD IT, first click at
+    // 8.307 s).
+    if (vol === 0) {
       v.flags |= VoiceFlag.ANTICLICK;
       v.old_vl = 0;
       v.old_vr = 0;
@@ -551,8 +555,10 @@ export class VirtualLayer {
       v.pos = v.end;
     }
 
-    // ac (virt_voicepos passes 1): anticlick(vi) — float model folds this
-    // into the old_vl/old_vr ramp reset.
+    // ac (virt_voicepos passes 1): anticlick(vi) (mixer.c:834-836) — flag
+    // the voice so the next tick discharges its last mixed level
+    // (sleft/sright) and restart the volume ramp from zero.
+    v.flags |= VoiceFlag.ANTICLICK;
     v.old_vl = 0;
     v.old_vr = 0;
     return true;
@@ -752,6 +758,14 @@ export class VirtualLayer {
     // pool counter, which then steered allocVoice differently from C.
     this.used--;
     if (mute) {
+      // libxmp_virt_resetvoice calls libxmp_mixer_setvol(ctx, voc, 0)
+      // before wiping (virtual.c:88-90); mixer_setvol (mixer.c:946-950)
+      // arms the anticlick and zeroes the ramp accumulator. The flag and
+      // sleft/sright survive do_virt_resetvoice (:61-72), so the note cut
+      // discharges its last level on the next tick.
+      v.flags |= VoiceFlag.ANTICLICK;
+      v.old_vl = 0;
+      v.old_vr = 0;
       v.vol = 0;
     }
     if (v.root >= 0 && v.root < this.map.length && this.map[v.root]) {

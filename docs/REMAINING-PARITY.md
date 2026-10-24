@@ -349,3 +349,87 @@ WAV files):
 | NBR — Light Image Resizer 4, 15 s | residual differences, same order |
 | mixer-state golden suite | 110 passed / 0 failed |
 | IT/XM loader parity | 146 passed / 0 failed |
+
+## Session 4 (2026-10-24): render byte-parity
+
+The 48 kHz full-mix comparison (`tools/xmpref.c` vs `tools/render-ours.mjs`,
+`cmp`-level diff) is now bit-identical across the whole
+`testfiles/` corpus (14 modules) and
+`testfiles2/KEYGENMUSiC MusicPack/BetaMaster` (21 of 22; the one exception is
+`Nero 9.0 kg_1.it`, whose playback is seeded from the wall clock — see below),
+up from 9 passing files before this session.
+
+### Fixed
+
+1. **Anticlick arming without a previous-volume guard**
+   (`core/src/virtual.ts`, `mixer_setvol` / `libxmp_virt_resetvoice`).
+   C arms the anticlick on *every* `vol == 0` write, and
+   `libxmp_virt_resetvoice` calls `libxmp_mixer_setvol(ctx, voc, 0)` before
+   wiping the voice, so a cut still discharges its last mixed level. The port
+   required `v.vol !== 0` and never armed from the reset path.
+   `909DEAD - Adobe CS6` and `NBR - Light Image Resizer 4` (both IT) are now
+   bit-identical for 60 s; they were the open residual from session 3.
+
+2. **`voicePos` must arm the anticlick** (`core/src/virtual.ts`).
+   `libxmp_mixer_voicepos` ends with `if (ac) anticlick(vi)` and
+   `libxmp_virt_voicepos` always passes `ac = 1`; the port only zeroed
+   `old_vl`/`old_vr`. Broke every retrigger/offset note (QuickTime 7.0 XM,
+   UltraISO 6.52 XM).
+
+3. **Linear pitch bend truncates** (`core/src/effects/helpers.ts`).
+   `libxmp_period_to_bend` returns `int` and its `PERIOD_LINEAR` branch is the
+   one case without `libxmp_round`, so the conversion truncates toward zero.
+   Amiga/CSPD modes round; linear does not. (Alcohol 120% 1.9.5, XM.)
+
+4. **Default MIDI macro path** (`core/src/effects/tick.ts`).
+   `update_midi_macro` runs on every channel regardless of `module->midi`
+   (player.c:1628); with no MIDI config it still applies the default macro:
+   fixed (0x80..0x8f) → resonance, parameterized 0 → cutoff
+   (player.c:532-541). Gating the call on `module.midi` left the IT filter
+   untouched. (Pavel Kocourek — uTorrent Plus.)
+
+5. **Mono samples filter only the left value** (`dsp-softmixer`).
+   `FILTER_MONO` filters `smpl` only and `MIX_STEREO(smpl, smpl)` then
+   duplicates the filtered result. The port copied the pre-filter sample into
+   the right channel, so mono samples with an IT filter had an unfiltered
+   right side. (Pavel Kocourek — uTorrent Plus, ch9-11.)
+
+6. **`playBuffer` partial-frame carry** (`core/src/core.ts`).
+   `xmp_play_buffer` stores the un-copied remainder of a frame in
+   `p->buffer_data` and resumes it on the next call (player.c:2244-2257).
+   The port rendered only whole frames that fit and dropped the rest, so
+   every buffer boundary shifted the stream by up to one tick. Only showed up
+   when the tick size was not a divisor of the caller's buffer
+   (UltraISO 6.52, 7500-sample ticks into a 48000-sample buffer).
+
+7. **Reference oracle build flag** (`tools/build-ref-libxmp.sh`).
+   GCC defaults to `-ffp-contract=fast`, which fuses
+   `vi->pos += step_dir * samples` (mixer.c:703) into one FMA on aarch64 and
+   rounds once instead of twice. That 1-ulp difference showed up as 73
+   one-LSB right-channel frames at t≈278 s in CuteFTP 8kg. libxmp is not
+   bit-reproducible across architectures for this reason; the oracle is
+   pinned to the unfused evaluation (`-ffp-contract=off`), which is what
+   x86-64 SSE2 builds produce.
+
+### Verification
+
+Fresh renders, 48 kHz stereo s16, C oracle rebuilt from `reference/libxmp`
+(libxmp 4.7.4) with the new flag, ours via `tools/render-ours.mjs`:
+
+| Check | Result |
+|---|---|
+| `testfiles/` (14 modules), 12 s | 14/14 identical |
+| `testfiles2/…/BetaMaster` (22 modules), 12 s | 21/22 identical |
+| `CuteFTP 8kg crk.mod` full 298.74 s cycle | identical (14,400,000 frames) |
+| `909DEAD — Adobe CS6`, `NBR — Light Image Resizer 4`, 60 s | identical |
+| `Pavel Kocourek — uTorrent Plus 3.4`, 12 s + full state dump | identical / STATE MATCH |
+| mixer-state golden suite | 110 passed / 0 failed |
+| loader parity (XM) | 146 passed / 0 failed |
+
+`Nero 9.0 kg_1.it` uses IT random pan swing (`rvv` ≠ 0 on its
+instruments), and libxmp seeds that RNG from `time(NULL)`
+(`libxmp_init_random`, rng.c:49-54): two consecutive C renders of the same
+file differ from each other, so no render comparison is meaningful for it.
+
+New harness for this: `tools/sweep-render.sh` (parallel corpus sweep, reads a
+file list on stdin).

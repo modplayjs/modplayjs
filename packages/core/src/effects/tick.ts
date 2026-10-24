@@ -1322,10 +1322,13 @@ export function processTick(core: Core, chn: number): void {
   }
 
   /* IT MIDI macros need to update regardless of the current voice state
-   * (player.c:1625-1628). */
-  if (core.module!.midi) {
-    updateMidiMacro(core, chn);
-  }
+   * (player.c:1625-1628). C calls update_midi_macro unconditionally; the
+   * function itself handles a NULL midicfg by applying the default macro
+   * (player.c:532-541: fixed macro → resonance, parameterized macro 0 →
+   * cutoff). Gating the call on module->midi skipped that default path,
+   * so a module without a MIDI config never moved its filter cutoff
+   * (Pavel Kocourek — uTorrent Plus, IT, ch9/ch10/ch11). */
+  updateMidiMacro(core, chn);
 
   /* Map our VoiceState.act (Act.* codes) onto libxmp's VIRT_ACTION_* codes
    * (virtual.h:6-12) that play_channel compares against. cstat already

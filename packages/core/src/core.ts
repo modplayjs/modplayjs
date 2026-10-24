@@ -752,34 +752,76 @@ export class Core implements CoreIface {
     if (this._state < CoreState.PLAYING) {
       throw new StateError('player not started');
     }
+    const n = this.renderFrameToBuf();
+    if (n < 0) return n;
+    const copy = Math.min(n, out.length);
+    out.set(this._frameBuf.subarray(0, copy), 0);
+    return n;
+  }
+
+  /** Stage buffer for one rendered frame (see renderFrameToBuf). */
+  private _frameBuf = new Float32Array(0);
+  /** Consumed samples of the staged frame (xmp_play_buffer buffer_data). */
+  private _bufConsumed = 0;
+  /** Total samples of the staged frame. */
+  private _bufSize = 0;
+
+  /**
+   * Render one tick into the staging buffer, returning its sample count
+   * (interleaved), or a negative value at end-of-module. The staging
+   * buffer is what xmp_play_buffer carries between calls as
+   * p->buffer_data (player.c:2244-2250): a frame that does not fit the
+   * caller's buffer is split and the remainder is copied on the next
+   * call, not dropped.
+   */
+  private renderFrameToBuf(): number {
     const rc = this.playFrame();
     if (rc < 0) return rc;
     this.recomputeTicksize();
-    return this.mixTick(out);
+    const need = this.ticksize * 2;
+    if (this._frameBuf.length < need) this._frameBuf = new Float32Array(need);
+    this.mixTick(this._frameBuf);
+    return need;
   }
 
   /**
-   * xmp_play_buffer (player.c:2178-2233): render whole ticks until out is
-   * filled. `loop` > 0 stops replay once loop_count reaches it (module end);
-   * -1 return signals end-of-replay with nothing written. C pads the tail
-   * of the LAST buffer with silence before returning 0 — preserved here by
-   * writing zeros into the remainder (out is caller-owned; we only stop).
+   * xmp_play_buffer (player.c:2178-2260): render whole ticks until `size`
+   * samples are filled, carrying a partially copied frame into the next
+   * call exactly like C's p->buffer_data. `loop` > 0 stops replay once
+   * loop_count reaches it; -1 signals end-of-replay with nothing written,
+   * and the finishing call pads the tail with silence.
    */
   playBuffer(out: Float32Array, size: number, loop = 1): number {
-    let total = 0;
-    const frameSamples = this.ticksize * 2;
-    while (total + frameSamples <= size) {
-      const n = this.frame(out.subarray(total));
-      // C checks ret<0 || loop_count>=loop BEFORE copying the frame;
-      // the crossing frame is discarded, and the NEXT call (filled==0)
-      // returns -1 (player.c:2196-2206).
-      if (n < 0 || (loop > 0 && !this._module?.endless && this._p.loop_count >= loop)) {
-        if (total === 0) return -1; // start of buffer → end of replay
-        break; // last buffer: caller sees a short read
+    let filled = 0;
+    while (filled < size) {
+      if (this._bufConsumed === this._bufSize) {
+        const ret = this.renderFrameToBuf();
+        // C checks ret<0 || loop_count>=loop BEFORE copying the frame;
+        // the crossing frame is discarded, and the NEXT call (filled==0)
+        // returns -1 (player.c:2196-2206).
+        if (ret < 0 || (loop > 0 && !this._module?.endless && this._p.loop_count >= loop)) {
+          if (filled === 0) {
+            this._bufConsumed = 0;
+            this._bufSize = 0;
+            return -1; // start of buffer → end of replay
+          }
+          out.fill(0, filled, size); // fill the rest of this buffer
+          return 0;
+        }
+        this._bufConsumed = 0;
+        this._bufSize = ret;
       }
-      total += n;
+
+      // Copy frame data to the caller's buffer (player.c:2252-2257).
+      const copySize = Math.min(size - filled, this._bufSize - this._bufConsumed);
+      out.set(
+        this._frameBuf.subarray(this._bufConsumed, this._bufConsumed + copySize),
+        filled,
+      );
+      this._bufConsumed += copySize;
+      filled += copySize;
     }
-    return total;
+    return filled;
   }
 
   // ------------------------------------------------------------------

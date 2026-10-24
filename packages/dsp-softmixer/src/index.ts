@@ -1039,6 +1039,13 @@ export class SoftMixer implements DspPlugin {
           else if (sr > FILTER_MAX) sr = FILTER_MAX;
           fr2 = fr1; fr1 = sr;
           smpR = sr >> PREAMP_BITS;
+        } else {
+          // FILTER_MONO (mix_all.c:127-131) filters only the left value,
+          // and the caller then mixes it to both channels:
+          // MIX_STEREO(smpl, smpl). Our copy of the pre-filter sample in
+          // smpR must move after the filter, otherwise the right channel
+          // plays the unfiltered signal (Pavel Kocourek IT, ch9-11).
+          smpR = smpL;
         }
       }
 

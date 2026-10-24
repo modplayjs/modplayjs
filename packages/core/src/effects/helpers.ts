@@ -236,7 +236,11 @@ export function periodToBend(
 
   switch (periodType) {
     case PeriodType.LINEAR:
-      return 100 * (8 * ((240 - n) * 16 - p));
+      // C: libxmp_period_to_bend returns int (period.c:223), and the
+      // linear branch is the only one with no libxmp_round() — the
+      // conversion to int truncates toward zero. The fractional part
+      // changes the final period otherwise (Alcohol 120% XM, ch11).
+      return Math.trunc(100 * (8 * ((240 - n) * 16 - p)));
     case PeriodType.CSPD: {
       const d = noteToPeriod(periodType, n, 0, adj);
       return libxmpRound((100.0 * (1536.0 / M_LN2)) * Math.log(p / d));
