@@ -1,5 +1,45 @@
 # @modplayjs/fmt-xm
 
+## 0.2.2
+
+### Patch Changes
+
+- [`55f9461`](https://github.com/modplayjs/modplayjs/commit/55f946152b9dfcdcfa956e01a479a70d5451eeea) - - Merge pull request [#27](https://github.com/modplayjs/modplayjs/issues/27) from modplayjs/changeset-release/main (direct push)
+
+- [`6dad01c`](https://github.com/modplayjs/modplayjs/commit/6dad01cc49d2481860459ee92dfe4a75582c9032) - - libxmp 4.7.4 + bit-exact render pipeline (direct push)
+
+- [`bec6175`](https://github.com/modplayjs/modplayjs/commit/bec6175ff939601e871a1898980776908c0332b7) - Sync player and loader behaviour with libxmp 4.7.4 and make the render
+  pipeline bit-exact against the C reference.
+  
+  Loader/player:
+  - `bad_sequence` sequencing (skip_invalid_orders, next_order/next_row return
+    status, per-sequence scan endpoints, no `mod.len` zeroing, warn-only empty
+    first sequence) — libxmp 4.7.3.
+  - MOD order table keeps all 128 order bytes like `mod->xxo`.
+  - IT accepts instruments without samples (`mod->smp = 0`).
+  - Invert-loop guards for bad loop parameters.
+  - Protracker sample-change bounds check in `queuePatch`.
+  - Startrekker AM sample stream offset uses the header length.
+  - MED: signed offset reads, expdata sanity, MAX_SAMPLES rejection, no
+    placeholder sample for missing external instruments.
+  
+  Mixer/output:
+  - Sample guard bytes replicate `libxmp_load_sample` (last frame repeated at
+    the end, first frame at the start) instead of zeros.
+  - Anticlick discharge starts at the advanced buffer position.
+  - `resonance_table` copied from filter.c; `filter_setup` follows C's
+    float/double evaluation; filter accumulator and anticlick product use
+    exact 64-bit decomposition.
+  - WAV encoder writes `round(sample * 32768)`.
+  
+  Verified: `SnD - Ashampoo Antispyware 1.61 crk.mod` renders byte-identically
+  to libxmp for the full 250 s, also per channel; the mixer-state golden suite
+  (110) and IT/XM loader parity (146) stay green.
+- Updated dependencies [[`55f9461`](https://github.com/modplayjs/modplayjs/commit/55f946152b9dfcdcfa956e01a479a70d5451eeea), [`6dad01c`](https://github.com/modplayjs/modplayjs/commit/6dad01cc49d2481860459ee92dfe4a75582c9032), [`bec6175`](https://github.com/modplayjs/modplayjs/commit/bec6175ff939601e871a1898980776908c0332b7), [`14d86ba`](https://github.com/modplayjs/modplayjs/commit/14d86ba1e2457cc193700379d0881a695d4c1e47)]:
+  - @modplayjs/core@0.2.2
+  - @modplayjs/fmt-it@0.2.2
+  - @modplayjs/stb-vorbis@0.2.2
+
 ## 0.1.1
 
 ### Patch Changes
