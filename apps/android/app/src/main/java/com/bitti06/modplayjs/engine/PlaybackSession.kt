@@ -399,8 +399,9 @@ class PlaybackSession(
                 } else {
                     Thread.sleep(IDLE_SLEEP_MS)
                 }
-                val now = System.currentTimeMillis()
-                if (now - lastSnapshotAt > 250) refresh()
+                // The snapshot is a second V8 round trip; it must not run on the
+                // thread that has to keep the ring filled.
+                refreshThrottled()
             } catch (t: Throwable) {
                 Log.e(TAG, "render loop", t)
                 Thread.sleep(20)
@@ -422,6 +423,14 @@ class PlaybackSession(
             currentSettings.playback.autoAdvance && items.isNotEmpty() -> next()
             else -> stop()
         }
+    }
+
+    /** Snapshot for the UI, at most four times a second, off the render thread. */
+    private fun refreshThrottled() {
+        val now = System.currentTimeMillis()
+        if (now - lastSnapshotAt <= 250) return
+        lastSnapshotAt = now
+        scope.launch { refresh() }
     }
 
     private fun refreshSoon() = scope.launch { refresh() }

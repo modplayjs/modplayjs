@@ -8,6 +8,8 @@ import android.media.AudioTrack
 import android.os.Build
 import android.os.Process
 import android.util.Log
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -30,6 +32,13 @@ class AudioTrackOutput(
     private val paused = AtomicBoolean(false)
     private var ring: PcmRing? = null
     private var scratch = FloatArray(0)
+
+    /**
+     * Released by the drain thread after its first write following [resume].
+     * [resume] waits on it so the track has audio in its buffer before it
+     * starts consuming.
+     */
+    @Volatile private var firstWrite: CountDownLatch? = null
 
     /**
      * Underruns reported by the audio framework for the current track. This is
@@ -168,6 +177,7 @@ class AudioTrackOutput(
             }
             try {
                 t.write(scratch, 0, n * 2, AudioTrack.WRITE_BLOCKING)
+                firstWrite?.countDown()
             } catch (t2: Throwable) {
                 if (running.get()) Log.e(TAG, "write failed", t2)
                 Thread.sleep(5)
@@ -181,11 +191,19 @@ class AudioTrackOutput(
     }
 
     fun resume() {
+        val t = track ?: return
         // Drop audio buffered before a pause so playback resumes at the
         // current engine position instead of replaying stale frames.
-        runCatching { if (track?.playState == AudioTrack.PLAYSTATE_PAUSED) track?.flush() }
-        runCatching { track?.play() }
+        runCatching { if (t.playState == AudioTrack.PLAYSTATE_PAUSED) t.flush() }
+        // Let the drain thread put a block into the buffer before play(): a
+        // track that starts playing empty is one guaranteed underrun on the
+        // framework's first pull, which is what a +1 per track switch was.
+        val primed = CountDownLatch(1)
+        firstWrite = primed
         paused.set(false)
+        runCatching { primed.await(20, TimeUnit.MILLISECONDS) }
+        firstWrite = null
+        runCatching { t.play() }
     }
 
     private companion object {
