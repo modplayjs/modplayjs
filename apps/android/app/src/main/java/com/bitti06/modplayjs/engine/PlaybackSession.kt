@@ -16,6 +16,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import java.util.concurrent.Executors
+import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -114,18 +115,16 @@ class PlaybackSession(
 
     fun setSettings(settings: AndroidSettings) {
         currentSettings = settings
-        // Called from the UI thread on every slider move, so queue the work
-        // instead of waiting for the V8 round trip. Output is fixed to the
-        // AudioTrack rate, so the engine is told that rate again here.
-        scope.launch {
-            send(
-                buildJsonObject {
-                    put("type", "setSettings")
-                    put("settings", EngineJson.encodeToJsonElement(AndroidSettings.serializer(), settings))
-                }.toString(),
-            )
-            applyDeviceSampleRate()
-        }
+        // Called from the UI thread on every slider move, so post instead of
+        // waiting for the V8 round trip. Output is fixed to the AudioTrack
+        // rate, so the engine is told that rate again here.
+        post(
+            buildJsonObject {
+                put("type", "setSettings")
+                put("settings", EngineJson.encodeToJsonElement(AndroidSettings.serializer(), settings))
+            }.toString(),
+        )
+        applyDeviceSampleRate()
     }
 
     fun setQueue(
@@ -231,8 +230,10 @@ class PlaybackSession(
         }
         cancelPendingOutput()
         val generation = transportGeneration.incrementAndGet()
+        // Posted from this thread so commands keep their order; only the
+        // priming work goes to a background coroutine.
+        post(buildJsonObject { put("type", "play") }.toString())
         scope.launch {
-            send(buildJsonObject { put("type", "play") }.toString())
             if (paused || !playing) primeOutput()
             // A pause or stop arrived while priming; leave audio alone.
             if (transportGeneration.get() != generation) return@launch
@@ -249,10 +250,7 @@ class PlaybackSession(
         audio.pause()
         // Frames already rendered are ahead of the pause point; drop them.
         ring.clear()
-        scope.launch {
-            send(buildJsonObject { put("type", "pause") }.toString())
-            refresh()
-        }
+        post(buildJsonObject { put("type", "pause") }.toString(), refresh = true)
     }
 
     fun stop() {
@@ -262,25 +260,20 @@ class PlaybackSession(
         paused = true
         audio.pause()
         ring.clear()
-        scope.launch {
-            send(buildJsonObject { put("type", "stop") }.toString())
-            refresh()
-        }
+        post(buildJsonObject { put("type", "stop") }.toString(), refresh = true)
     }
 
     fun seek(ms: Long) {
         // Drop audio rendered for the old position so it is not heard after
         // the seek.
         ring.clear()
-        scope.launch {
-            send(
-                buildJsonObject {
-                    put("type", "seek")
-                    put("positionMs", ms)
-                }.toString(),
-            )
-            refresh()
-        }
+        post(
+            buildJsonObject {
+                put("type", "seek")
+                put("positionMs", ms)
+            }.toString(),
+            refresh = true,
+        )
     }
 
     fun next() {
@@ -301,13 +294,13 @@ class PlaybackSession(
         type: String,
         block: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit = {},
     ) {
-        val json =
+        post(
             buildJsonObject {
                 put("type", type)
                 block()
-            }.toString()
-        scope.launch { send(json) }
-        refreshSoon()
+            }.toString(),
+            refresh = true,
+        )
     }
 
     fun toggleChannelMute(index: Int) = command("toggleChannelMute") { put("index", index) }
@@ -321,12 +314,30 @@ class PlaybackSession(
     fun resetChannels() = command("resetChannels")
 
     /**
+     * Hands a command to the V8 thread without waiting for the result. Calls are
+     * made from the UI thread, and the single-thread executor keeps them in
+     * that order; the engine-creation task was queued before all of them.
+     */
+    private fun post(
+        json: String,
+        refresh: Boolean = false,
+    ) {
+        v8Exec.execute {
+            engine?.command(json)
+            // Snapshot from the IO scope; refresh() queues its own V8 call.
+            if (refresh) refreshSoon()
+        }
+    }
+
+    /**
      * Waits for the V8 creation task that was queued before any other command.
      * Only call this from a background thread: at startup the wait covers the
      * engine.js compile.
      */
     private fun awaitEngine(): V8Engine? {
-        runCatching { v8Exec.submit {}.get(20, TimeUnit.SECONDS) }
+        // A Callable barrier: the empty task only completes after the engine
+        // creation task that was queued before it.
+        runCatching { v8Exec.submit(Callable { Unit }).get(20, TimeUnit.SECONDS) }
         return engine
     }
 
