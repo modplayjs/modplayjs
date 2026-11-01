@@ -529,6 +529,9 @@ private fun InfoBox(
             Column(
                 Modifier
                     .weight(1f)
+                    // Without fillMaxWidth the scrollable area only spans the
+                    // widest text line, so a drag beside the text did nothing.
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 10.dp),
             ) {
