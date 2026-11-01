@@ -162,7 +162,13 @@ private fun AppRoot(vm: AppViewModel) {
                             libraryTracks = libraryTracks,
                             folders = folders,
                             filters = filters,
-                            rootId = libraryRoot,
+                            // A removed folder or an empty library drops back to
+                            // the folder list instead of an empty browser.
+                            rootId =
+                                libraryRoot?.takeIf { root ->
+                                    (root == ALL_ROOTS && libraryTracks.isNotEmpty()) ||
+                                        folders.any { it.id == root }
+                                },
                             path = libraryPath,
                             onNavigate = { root, path ->
                                 libraryRoot = root

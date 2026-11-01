@@ -162,6 +162,16 @@ fun LibraryScreen(
         Spacer(Modifier.height(4.dp))
 
         when {
+            // Nothing indexed: no browser, no all-tracks list, no search.
+            folders.isEmpty() ->
+                RootList(
+                    folders = folders,
+                    tracks = libraryTracks,
+                    onOpen = { onNavigate(it, emptyList()) },
+                    onAll = { onNavigate(ALL_ROOTS, emptyList()) },
+                    onAddFolder = onAddFolder,
+                    onFolderMenu = { folderMenu = it },
+                )
             filters.search.isNotBlank() ->
                 SearchResults(
                     tracks = tracks,
@@ -292,25 +302,31 @@ private fun RootList(
     onFolderMenu: (FolderEntity) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
-        item {
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "Folders",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                Text("${tracks.size} tracks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (folders.isNotEmpty()) {
+            item {
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Folders",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "${tracks.size} tracks",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-        }
-        item {
-            FolderRow(
-                name = "All tracks",
-                trackCount = tracks.size,
-                onClick = onAll,
-            )
+            item {
+                FolderRow(
+                    name = "All tracks",
+                    trackCount = tracks.size,
+                    onClick = onAll,
+                )
+            }
         }
         items(folders, key = { it.id }) { folder ->
             FolderRow(
