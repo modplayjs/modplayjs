@@ -269,7 +269,9 @@ fun PlayerScreen(
                                 MaterialTheme.colorScheme.secondary,
                             ) {
                                 samples.forEach { sample ->
-                                    val line =
+                                    // An empty slot keeps its blank line so the
+                                    // list still lines up with the slot numbers.
+                                    Text(
                                         sampleLine(
                                             sample.index + 1,
                                             sample.name,
@@ -277,14 +279,10 @@ fun PlayerScreen(
                                             sample.loop,
                                             settings.view.sampleNumbers,
                                             settings.view.sampleLoopFlags,
-                                        )
-                                    if (line.isNotEmpty()) {
-                                        Text(
-                                            line,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontFamily = FontFamily.Monospace,
-                                        )
-                                    }
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                    )
                                 }
                             }
                         }
@@ -760,7 +758,7 @@ fun DetailsScreen(
             if (track.sampleList.isNotEmpty()) {
                 item { SectionTitle(stringResource(R.string.details_samples)) }
                 items(track.sampleList, key = { "s${it.index}" }) { sample ->
-                    val line =
+                    Text(
                         sampleLine(
                             sample.index + 1,
                             sample.name,
@@ -768,14 +766,10 @@ fun DetailsScreen(
                             sample.loop,
                             settings.view.sampleNumbers,
                             settings.view.sampleLoopFlags,
-                        )
-                    if (line.isNotEmpty()) {
-                        Text(
-                            line,
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
+                        ),
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
             item { SectionTitle(stringResource(R.string.details_channels, snap.channels.size)) }
