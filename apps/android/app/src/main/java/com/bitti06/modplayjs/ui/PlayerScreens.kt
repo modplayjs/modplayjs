@@ -412,12 +412,15 @@ fun PlayerScreen(
             // and this window can be short and wide.
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val wide = maxWidth > maxHeight && maxWidth >= 480.dp
+                // A fixed 380 dp column left the info panes ~50 dp wide on a
+                // 480 dp window; scale it with the window instead.
+                val transportWidth = (maxWidth * 0.55f).coerceIn(240.dp, 380.dp)
                 if (wide) {
                     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         infoBoxes(Modifier.weight(1f).fillMaxHeight())
                         transport(
                             Modifier
-                                .width(380.dp)
+                                .width(transportWidth)
                                 .fillMaxHeight()
                                 .verticalScroll(rememberScrollState()),
                         )

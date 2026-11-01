@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +47,8 @@ fun HomeScreen(
     onPlay: (TrackEntity) -> Unit,
     onToggleFavorite: (TrackEntity) -> Unit,
 ) {
+    // One pass over the library instead of a count per folder row.
+    val trackCounts = remember(tracks) { tracks.groupingBy { it.folderId }.eachCount() }
     LazyColumn(
         Modifier.fillMaxSize().safeContentPadding().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -151,7 +154,7 @@ fun HomeScreen(
             items(folders, key = { "folder:${it.id}" }) { folder ->
                 FolderRow(
                     name = folder.name,
-                    trackCount = tracks.count { it.folderId == folder.id },
+                    trackCount = trackCounts[folder.id] ?: 0,
                     onClick = { onOpenFolder(folder.id) },
                 )
             }

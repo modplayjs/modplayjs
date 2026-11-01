@@ -9,7 +9,9 @@ import androidx.media3.common.Player
 import androidx.media3.common.SimpleBasePlayer
 import androidx.media3.common.util.UnstableApi
 import com.bitti06.modplayjs.engine.AndroidSnapshot
+import com.bitti06.modplayjs.engine.AndroidTrack
 import com.bitti06.modplayjs.engine.PlaybackSession
+import com.bitti06.modplayjs.engine.QueueItem
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 
@@ -25,6 +27,17 @@ class ModplayPlayer(
 ) : SimpleBasePlayer(looper) {
     @Volatile private var snapshot: AndroidSnapshot? = null
     private var lastLoggedState: String? = null
+
+    // The playlist is rebuilt only when something in it changed. Media3 asks
+    // for the state on every snapshot (4x/s) and a queue can hold the whole
+    // library, so mapping it each time allocated thousands of MediaItems.
+    private var cachedQueue: List<QueueItem>? = null
+    private var cachedIndex = -1
+    private var cachedTitle = ""
+    private var cachedArtist = ""
+    private var cachedDurationUs = C.TIME_UNSET
+    private var cachedSeekable = false
+    private var cachedItems: List<MediaItemData> = emptyList()
 
     fun onSnapshot(value: AndroidSnapshot?) {
         snapshot = value
@@ -47,42 +60,7 @@ class ModplayPlayer(
             engine?.name?.let { name -> queue.indexOfFirst { it.name == name } } ?: -1
         val currentIndex =
             if (byName >= 0) byName else playback.queueIndex.value.coerceIn(0, maxOf(0, queue.lastIndex))
-        val items =
-            queue.mapIndexed { index, item ->
-                val current = index == currentIndex
-                MediaItemData
-                    .Builder(item.id)
-                    .setMediaItem(
-                        MediaItem
-                            .Builder()
-                            .setMediaId(item.id)
-                            .setMediaMetadata(
-                                MediaMetadata
-                                    .Builder()
-                                    .setTitle(
-                                        if (current) {
-                                            engine?.title?.takeIf { it.isNotBlank() } ?: item.name
-                                        } else {
-                                            item.name
-                                        },
-                                    )
-                                    .setArtist(
-                                        if (current) {
-                                            engine?.tracker?.takeIf { it.isNotBlank() } ?: item.format.uppercase()
-                                        } else {
-                                            item.format.uppercase()
-                                        },
-                                    ).build(),
-                            ).build(),
-                    ).setDurationUs(
-                        if (snap != null && index == currentIndex && snap.state.durationKnown) {
-                            (snap.state.durationMs * 1000).toLong()
-                        } else {
-                            C.TIME_UNSET
-                        },
-                    ).setIsSeekable(snap?.capabilities?.seekable == true)
-                    .build()
-            }
+        val items = playlistFor(queue, currentIndex, engine, snap)
 
         val builder =
             State
@@ -133,6 +111,72 @@ class ModplayPlayer(
             Log.i(TAG, summary)
         }
         return builder.build()
+    }
+
+    /** Cached so the 4 Hz state refresh does not rebuild every queue item. */
+    private fun playlistFor(
+        queue: List<QueueItem>,
+        currentIndex: Int,
+        engine: AndroidTrack?,
+        snap: AndroidSnapshot?,
+    ): List<MediaItemData> {
+        val title = engine?.title.orEmpty()
+        val artist = engine?.tracker.orEmpty()
+        val durationUs =
+            if (snap != null && snap.state.durationKnown) {
+                (snap.state.durationMs * 1000).toLong()
+            } else {
+                C.TIME_UNSET
+            }
+        val seekable = snap?.capabilities?.seekable == true
+        if (cachedQueue === queue &&
+            cachedIndex == currentIndex &&
+            cachedTitle == title &&
+            cachedArtist == artist &&
+            cachedDurationUs == durationUs &&
+            cachedSeekable == seekable
+        ) {
+            return cachedItems
+        }
+        val built =
+            queue.mapIndexed { index, item ->
+                val current = index == currentIndex
+                MediaItemData
+                    .Builder(item.id)
+                    .setMediaItem(
+                        MediaItem
+                            .Builder()
+                            .setMediaId(item.id)
+                            .setMediaMetadata(
+                                MediaMetadata
+                                    .Builder()
+                                    .setTitle(
+                                        if (current) {
+                                            engine?.title?.takeIf { it.isNotBlank() } ?: item.name
+                                        } else {
+                                            item.name
+                                        },
+                                    )
+                                    .setArtist(
+                                        if (current) {
+                                            engine?.tracker?.takeIf { it.isNotBlank() } ?: item.format.uppercase()
+                                        } else {
+                                            item.format.uppercase()
+                                        },
+                                    ).build(),
+                            ).build(),
+                    ).setDurationUs(if (current) durationUs else C.TIME_UNSET)
+                    .setIsSeekable(seekable)
+                    .build()
+            }
+        cachedQueue = queue
+        cachedIndex = currentIndex
+        cachedTitle = title
+        cachedArtist = artist
+        cachedDurationUs = durationUs
+        cachedSeekable = seekable
+        cachedItems = built
+        return built
     }
 
     override fun handlePrepare(): ListenableFuture<*> = Futures.immediateVoidFuture()

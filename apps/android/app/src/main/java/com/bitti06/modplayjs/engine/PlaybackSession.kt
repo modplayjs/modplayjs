@@ -32,10 +32,21 @@ class PlaybackSession(
         Executors.newSingleThreadExecutor { r ->
             Thread(r, "v8-engine").apply { priority = Thread.MAX_PRIORITY }
         }
-    private val v8: V8Engine = v8Exec.submit<V8Engine> { V8Engine(context) }.get(20, TimeUnit.SECONDS)
+
+    /**
+     * Handed over by [v8Exec] once the isolate and engine.js are ready. Every
+     * other V8 call is queued behind that task, so inside the executor it is
+     * always non-null; outside it, read it as "may still be starting" instead
+     * of waiting for the compile.
+     */
+    @Volatile private var engine: V8Engine? = null
     private val audio = AudioTrackOutput(context)
     private val ring = PcmRing(4096)
     val sampleRate: Int get() = audio.sampleRate
+
+    init {
+        v8Exec.execute { engine = V8Engine(context) }
+    }
 
     private val _snapshot = MutableStateFlow<AndroidSnapshot?>(null)
     val snapshot: StateFlow<AndroidSnapshot?> = _snapshot.asStateFlow()
@@ -66,6 +77,9 @@ class PlaybackSession(
     private val running = AtomicBoolean(true)
     private val playGeneration = AtomicInteger(0)
 
+    /** Bumped by every transport tap so a late play cannot override a pause. */
+    private val transportGeneration = AtomicInteger(0)
+
     /**
      * A freshly loaded track waits here until the now-playing screen has drawn
      * it, so the UI is not a second behind the sound. Incremented every time a
@@ -75,8 +89,8 @@ class PlaybackSession(
     val awaitingStart: StateFlow<Int> = awaitingOutput.asStateFlow()
     private val outputPending = AtomicBoolean(false)
 
-    val v8Available: Boolean get() = v8.available
-    val v8Error: String? get() = v8.initError
+    val v8Available: Boolean get() = engine?.available == true
+    val v8Error: String? get() = engine?.initError
     val underruns: Int get() = audio.underruns
     val audioSessionId: Int get() = audio.audioSessionId
 
@@ -95,22 +109,23 @@ class PlaybackSession(
     }
 
     private fun applyDeviceSampleRate() {
-        if (!v8.available) return
-        runCatching { v8Exec.submit { v8.setSampleRate(audio.sampleRate) }.get(2, TimeUnit.SECONDS) }
-            .onFailure { Log.e(TAG, "setSampleRate failed", it) }
+        v8Exec.execute { engine?.setSampleRate(audio.sampleRate) }
     }
 
     fun setSettings(settings: AndroidSettings) {
         currentSettings = settings
-        send(
-            buildJsonObject {
-                put("type", "setSettings")
-                put("settings", EngineJson.encodeToJsonElement(AndroidSettings.serializer(), settings))
-            }.toString(),
-        )
-        // The settings screen may carry a sample rate, but output is fixed to
-        // the AudioTrack rate; keep the engine rendering at that rate.
-        applyDeviceSampleRate()
+        // Called from the UI thread on every slider move, so queue the work
+        // instead of waiting for the V8 round trip. Output is fixed to the
+        // AudioTrack rate, so the engine is told that rate again here.
+        scope.launch {
+            send(
+                buildJsonObject {
+                    put("type", "setSettings")
+                    put("settings", EngineJson.encodeToJsonElement(AndroidSettings.serializer(), settings))
+                }.toString(),
+            )
+            applyDeviceSampleRate()
+        }
     }
 
     fun setQueue(
@@ -144,7 +159,7 @@ class PlaybackSession(
                 val bytes =
                     readBytes(item.uri)
                         ?: throw IllegalStateException("cannot open ${item.uri}")
-                v8Exec.submit { v8.load(bytes, item.name) }.get(20, TimeUnit.SECONDS)
+                v8Exec.submit { engine?.load(bytes, item.name) }.get(20, TimeUnit.SECONDS)
                 if (playGeneration.get() != generation) return@launch
                 ring.clear()
                 check(send(buildJsonObject { put("type", "play") }.toString())) {
@@ -206,50 +221,66 @@ class PlaybackSession(
         outputPending.set(false)
     }
 
+    // Transport calls arrive from the UI thread. The V8 round trip waits behind
+    // the render task, so it never runs on the frame that handled the tap.
+
     fun play() {
         if (currentItem == null || _snapshot.value?.track == null) {
             playIndex(_queueIndex.value)
             return
         }
         cancelPendingOutput()
-        send(buildJsonObject { put("type", "play") }.toString())
-        if (paused || !playing) primeOutput()
-        paused = false
-        playing = true
-        audio.resume()
+        val generation = transportGeneration.incrementAndGet()
+        scope.launch {
+            send(buildJsonObject { put("type", "play") }.toString())
+            if (paused || !playing) primeOutput()
+            // A pause or stop arrived while priming; leave audio alone.
+            if (transportGeneration.get() != generation) return@launch
+            paused = false
+            playing = true
+            audio.resume()
+        }
     }
 
     fun pause() {
+        transportGeneration.incrementAndGet()
         cancelPendingOutput()
         paused = true
-        send(buildJsonObject { put("type", "pause") }.toString())
         audio.pause()
         // Frames already rendered are ahead of the pause point; drop them.
         ring.clear()
-        refresh()
+        scope.launch {
+            send(buildJsonObject { put("type", "pause") }.toString())
+            refresh()
+        }
     }
 
     fun stop() {
+        transportGeneration.incrementAndGet()
         cancelPendingOutput()
         playing = false
         paused = true
-        send(buildJsonObject { put("type", "stop") }.toString())
         audio.pause()
         ring.clear()
-        refresh()
+        scope.launch {
+            send(buildJsonObject { put("type", "stop") }.toString())
+            refresh()
+        }
     }
 
     fun seek(ms: Long) {
-        send(
-            buildJsonObject {
-                put("type", "seek")
-                put("positionMs", ms)
-            }.toString(),
-        )
         // Drop audio rendered for the old position so it is not heard after
         // the seek.
         ring.clear()
-        refresh()
+        scope.launch {
+            send(
+                buildJsonObject {
+                    put("type", "seek")
+                    put("positionMs", ms)
+                }.toString(),
+            )
+            refresh()
+        }
     }
 
     fun next() {
@@ -270,12 +301,12 @@ class PlaybackSession(
         type: String,
         block: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit = {},
     ) {
-        send(
+        val json =
             buildJsonObject {
                 put("type", type)
                 block()
-            }.toString(),
-        )
+            }.toString()
+        scope.launch { send(json) }
         refreshSoon()
     }
 
@@ -289,13 +320,25 @@ class PlaybackSession(
 
     fun resetChannels() = command("resetChannels")
 
+    /**
+     * Waits for the V8 creation task that was queued before any other command.
+     * Only call this from a background thread: at startup the wait covers the
+     * engine.js compile.
+     */
+    private fun awaitEngine(): V8Engine? {
+        runCatching { v8Exec.submit {}.get(20, TimeUnit.SECONDS) }
+        return engine
+    }
+
     private fun send(json: String): Boolean {
-        if (!v8.available) {
+        if (awaitEngine()?.available != true) {
             Log.w(TAG, "engine unavailable, dropped $json")
             return false
         }
         val out =
-            runCatching { v8Exec.submit<String> { v8.command(json) }.get(5, TimeUnit.SECONDS) }
+            runCatching {
+                v8Exec.submit<String> { engine?.command(json) ?: "" }.get(5, TimeUnit.SECONDS)
+            }
                 .onFailure { Log.e(TAG, "command failed: $json", it) }
                 .getOrNull() ?: return false
         if (out.startsWith("{\"error\"")) {
@@ -313,7 +356,7 @@ class PlaybackSession(
         repeat(ring.capacity / FRAMES) {
             if (ring.availableWrite() < FRAMES) return
             val pcm =
-                runCatching { v8Exec.submit<FloatArray> { v8.render(FRAMES) }.get(1, TimeUnit.SECONDS) }
+                runCatching { v8Exec.submit<FloatArray> { engine?.render(FRAMES) ?: FloatArray(0) }.get(1, TimeUnit.SECONDS) }
                     .getOrNull() ?: return
             if (pcm.isEmpty()) return
             ring.write(pcm, pcm.size / 2)
@@ -325,7 +368,10 @@ class PlaybackSession(
             try {
                 if (playing && !paused) {
                     if (ring.availableWrite() >= FRAMES) {
-                        val pcm = v8Exec.submit<FloatArray> { v8.render(FRAMES) }.get(2, TimeUnit.SECONDS)
+                        val pcm =
+                            v8Exec
+                                .submit<FloatArray> { engine?.render(FRAMES) ?: FloatArray(0) }
+                                .get(2, TimeUnit.SECONDS)
                         if (pcm.isEmpty()) {
                             if (advancing.compareAndSet(false, true)) onEnded()
                         } else {
@@ -363,12 +409,12 @@ class PlaybackSession(
 
     @Synchronized
     private fun refresh() {
-        if (!v8.available) return
+        if (engine?.available != true) return
         // Throttle even when the call fails, otherwise a broken snapshot makes
         // the render loop retry (and log) every few milliseconds.
         lastSnapshotAt = System.currentTimeMillis()
         val json =
-            runCatching { v8Exec.submit<String> { v8.snapshot() }.get(2, TimeUnit.SECONDS) }
+            runCatching { v8Exec.submit<String> { engine?.snapshot() ?: "" }.get(2, TimeUnit.SECONDS) }
                 .onFailure { Log.e(TAG, "snapshot call failed: ${it.message}") }
                 .getOrNull() ?: return
         if (json.startsWith("{\"error\"")) {

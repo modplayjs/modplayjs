@@ -16,10 +16,10 @@ object AppGraph {
 
     fun init(context: Context) {
         appContext = context.applicationContext
-        // Building the player costs a V8 dlopen, a 1.4 MB engine.js compile and
-        // an AudioTrack. Do that on a background thread so the first frame is
-        // not blocked by it; later accesses wait for this initialisation
-        // instead of performing it.
+        // The player still opens an AudioTrack and starts its render thread in
+        // the constructor; the V8 dlopen and 1.4 MB engine.js compile are
+        // queued on their own executor, so neither has to happen on the thread
+        // that builds the first frame.
         Thread(
             {
                 runCatching { session.setSettings(settings.load()) }

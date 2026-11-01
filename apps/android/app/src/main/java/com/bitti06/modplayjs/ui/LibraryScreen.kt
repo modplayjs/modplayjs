@@ -393,6 +393,8 @@ private fun RootList(
     onAddFolder: () -> Unit,
     onFolderMenu: (FolderEntity) -> Unit,
 ) {
+    // Counted once for every folder row instead of once per row.
+    val trackCounts = remember(tracks) { tracks.groupingBy { it.folderId }.eachCount() }
     LazyColumn(Modifier.fillMaxSize()) {
         if (folders.isNotEmpty()) {
             item {
@@ -424,7 +426,7 @@ private fun RootList(
         items(folders, key = { it.id }) { folder ->
             FolderRow(
                 name = folder.name,
-                trackCount = tracks.count { it.folderId == folder.id },
+                trackCount = trackCounts[folder.id] ?: 0,
                 onClick = { onOpen(folder.id) },
                 onPlay = null,
                 trailing = {

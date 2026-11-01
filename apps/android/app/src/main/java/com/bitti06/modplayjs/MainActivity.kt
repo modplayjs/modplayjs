@@ -10,7 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import com.bitti06.modplayjs.ui.App
 import com.bitti06.modplayjs.ui.AppViewModel
-import com.bitti06.modplayjs.ui.ModplayTheme
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels { AppViewModel.factory(applicationContext) }
@@ -26,6 +25,8 @@ class MainActivity : ComponentActivity() {
         ) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        setContent { ModplayTheme { App(vm) } }
+        // App applies ModplayTheme itself, so the theme is created once from the
+        // stored setting.
+        setContent { App(vm) }
     }
 }

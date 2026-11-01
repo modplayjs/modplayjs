@@ -51,6 +51,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.bitti06.modplayjs.R
+import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
@@ -73,7 +74,6 @@ fun App(vm: AppViewModel) {
 
 @Composable
 private fun AppRoot(vm: AppViewModel) {
-    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val tracks by vm.tracks.collectAsStateWithLifecycle()
     val libraryTracks by vm.libraryTracks.collectAsStateWithLifecycle()
@@ -84,8 +84,6 @@ private fun AppRoot(vm: AppViewModel) {
     val queue by vm.queue.collectAsStateWithLifecycle()
     val queueIndex by vm.queueIndex.collectAsStateWithLifecycle()
     val filters by vm.filters.collectAsStateWithLifecycle()
-    val loading by vm.loading.collectAsStateWithLifecycle()
-    val error by vm.error.collectAsStateWithLifecycle()
     val awaitingStart by vm.awaitingStart.collectAsStateWithLifecycle()
 
     // A loaded track stays silent until this screen has composed and drawn it
@@ -135,8 +133,8 @@ private fun AppRoot(vm: AppViewModel) {
                 SettingsHub(onOpen = navigate, onBack = back)
             }
             entry<PlaybackSettingsKey> { PlaybackSettingsScreen(vm, settings, back) }
-            entry<AudioSettingsKey> { AudioSettingsScreen(vm, settings, snapshot?.capabilities, back) }
-            entry<MixerSettingsKey> { MixerSettingsScreen(vm, settings, snapshot?.capabilities, back) }
+            entry<AudioSettingsKey> { AudioSettingsEntry(vm, settings, back) }
+            entry<MixerSettingsKey> { MixerSettingsEntry(vm, settings, back) }
             entry<SidSettingsKey> { SidSettingsScreen(vm, settings, back) }
             entry<AppearanceSettingsKey> { AppearanceSettingsScreen(vm, settings, back) }
             entry<LanguageKey> { LanguageSettingsScreen(back) }
@@ -150,7 +148,7 @@ private fun AppRoot(vm: AppViewModel) {
                     onBack = back,
                 )
             }
-            entry<DiagnosticsKey> { DiagnosticsScreen(snapshot = snapshot, vm = vm, onBack = back) }
+            entry<DiagnosticsKey> { DiagnosticsEntry(vm, back) }
             entry<AboutKey> {
                 AboutScreen(
                     sampleRate = vm.sampleRate,
@@ -164,7 +162,7 @@ private fun AppRoot(vm: AppViewModel) {
             entry<LicenseKey> { key ->
                 licenseEntry(key.id)?.let { LicenseTextScreen(it, onBack = back) }
             }
-            entry<DetailsKey> { DetailsScreen(snapshot, vm, back) }
+            entry<DetailsKey> { DetailsEntry(vm, back) }
             entry<QueueKey> {
                 QueueScreen(queue, queueIndex, onPlay = { vm.playQueue(it) }, onBack = back)
             }
@@ -191,15 +189,12 @@ private fun AppRoot(vm: AppViewModel) {
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             bottomBar = {
                 Column {
-                    snapshot?.let { current ->
-                        if (current.track != null && tab != Tab.Playing) {
-                            MiniPlayer(
-                                snap = current,
-                                onOpen = { tabName = Tab.Playing.name },
-                                onToggle = { vm.togglePlay() },
-                            )
-                        }
-                    }
+                    MiniPlayerSlot(
+                        vm = vm,
+                        tab = tab,
+                        onOpen = { tabName = Tab.Playing.name },
+                        onToggle = { vm.togglePlay() },
+                    )
                     NavigationBar(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
                     tonalElevation = 0.dp,
@@ -280,12 +275,9 @@ private fun AppRoot(vm: AppViewModel) {
                         )
 
                     Tab.Playing ->
-                        PlayerScreen(
+                        PlayerTab(
                             vm = vm,
-                            snapshot = snapshot,
                             settings = settings,
-                            loading = loading,
-                            error = error,
                             onOpenDetails = { navigate(DetailsKey) },
                             onOpenQueue = { navigate(QueueKey) },
                             onBrowseLibrary = { tabName = Tab.Library.name },
@@ -380,4 +372,86 @@ private fun MiniPlayer(
             )
         }
     }
+}
+
+/**
+ * Screens that observe the engine snapshot. Keeping the collection inside them
+ * means the snapshot's 4 Hz refresh only invalidates what actually displays it,
+ * not the scaffold, the tab bar or the other tabs.
+ */
+@Composable
+private fun PlayerTab(
+    vm: AppViewModel,
+    settings: AndroidSettings,
+    onOpenDetails: () -> Unit,
+    onOpenQueue: () -> Unit,
+    onBrowseLibrary: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
+    val loading by vm.loading.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
+    PlayerScreen(
+        vm = vm,
+        snapshot = snapshot,
+        settings = settings,
+        loading = loading,
+        error = error,
+        onOpenDetails = onOpenDetails,
+        onOpenQueue = onOpenQueue,
+        onBrowseLibrary = onBrowseLibrary,
+        onOpenSettings = onOpenSettings,
+    )
+}
+
+@Composable
+private fun MiniPlayerSlot(
+    vm: AppViewModel,
+    tab: Tab,
+    onOpen: () -> Unit,
+    onToggle: () -> Unit,
+) {
+    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
+    val current = snapshot ?: return
+    if (current.track != null && tab != Tab.Playing) {
+        MiniPlayer(snap = current, onOpen = onOpen, onToggle = onToggle)
+    }
+}
+
+@Composable
+private fun AudioSettingsEntry(
+    vm: AppViewModel,
+    settings: AndroidSettings,
+    onBack: () -> Unit,
+) {
+    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
+    AudioSettingsScreen(vm, settings, snapshot?.capabilities, onBack)
+}
+
+@Composable
+private fun MixerSettingsEntry(
+    vm: AppViewModel,
+    settings: AndroidSettings,
+    onBack: () -> Unit,
+) {
+    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
+    MixerSettingsScreen(vm, settings, snapshot?.capabilities, onBack)
+}
+
+@Composable
+private fun DiagnosticsEntry(
+    vm: AppViewModel,
+    onBack: () -> Unit,
+) {
+    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
+    DiagnosticsScreen(snapshot = snapshot, vm = vm, onBack = onBack)
+}
+
+@Composable
+private fun DetailsEntry(
+    vm: AppViewModel,
+    onBack: () -> Unit,
+) {
+    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
+    DetailsScreen(snapshot, vm, onBack)
 }

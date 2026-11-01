@@ -1,5 +1,9 @@
 package com.bitti06.modplayjs.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.WindowInsetsController
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
@@ -10,7 +14,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 
 /**
@@ -86,6 +93,28 @@ private val AppShapes =
     )
 
 @Composable
+private fun SyncSystemBars(dark: Boolean) {
+    val view = LocalView.current
+    val context = LocalContext.current
+    if (view.isInEditMode) return
+    SideEffect {
+        val window = context.findActivity()?.window ?: return@SideEffect
+        val controller = window.insetsController ?: return@SideEffect
+        val lightBars =
+            WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+        controller.setSystemBarsAppearance(if (dark) 0 else lightBars, lightBars)
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }
+
+@Composable
 fun ModplayTheme(
     dark: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
@@ -96,6 +125,10 @@ fun ModplayTheme(
         colorScheme = if (dark) Dark else Light,
         shapes = AppShapes,
     ) {
+        // The theme is chosen in-app and can differ from the system's, so the
+        // status and navigation bar icons follow the picked theme rather than
+        // enableEdgeToEdge's system-based default.
+        SyncSystemBars(dark)
         // Nothing at the root provides LocalContentColor, so unstyled Text
         // would fall back to black. Anchor it to the scheme.
         CompositionLocalProvider(
