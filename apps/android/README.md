@@ -105,6 +105,10 @@ debug APK, and verifies 16 KB ELF segment alignment.
   opens the folder list instead.
 - The transport row carries the repeat toggle (off / all / one); the queue,
   which is the list playback started from, is listed from Track details.
+- Playback survives a process restart: the queue (as library ids), the current
+  entry and the position are stored a few seconds apart, and on launch the track
+  is loaded, seeked back and either resumed or left paused, whichever it was.
+  Rows that no longer exist in the library are dropped.
 - The header opens a realtime pattern view: rows x channels of tracker text
   ("C-4 01 40 A0F"), the playing row highlighted and followed, columns scrolling
   sideways. The engine answers it on demand; the snapshot speeds up to 16 Hz

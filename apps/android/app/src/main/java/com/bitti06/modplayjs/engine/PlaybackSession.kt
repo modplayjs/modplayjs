@@ -69,6 +69,9 @@ class PlaybackSession(
 
     @Volatile private var currentItem: QueueItem? = null
     @Volatile private var patternViewActive = false
+    /** Start position and pause flag for the next load, see [restore]. */
+    @Volatile private var pendingStartMs = 0L
+    @Volatile private var pendingPaused = false
 
     @Volatile private var playing = false
 
@@ -177,6 +180,21 @@ class PlaybackSession(
         play(items[index])
     }
 
+    /**
+     * Picks up where the process left off: loads [index] of the current queue,
+     * seeks to [positionMs] before the AudioTrack is armed, and either starts
+     * playing or stays paused on that position.
+     */
+    fun restore(
+        index: Int,
+        positionMs: Long,
+        autoplay: Boolean,
+    ) {
+        pendingStartMs = positionMs.coerceAtLeast(0)
+        pendingPaused = !autoplay
+        playIndex(index)
+    }
+
     fun play(item: QueueItem) =
         scope.launch {
             val generation = playGeneration.incrementAndGet()
@@ -207,13 +225,27 @@ class PlaybackSession(
                         ?: throw IllegalStateException("engine did not report a loaded track")
                 if (playGeneration.get() != generation) return@launch
                 currentItem = item
-                playing = true
-                paused = false
-                // The engine renders into the ring and stalls once it is full;
-                // the AudioTrack stays paused until the UI says it has drawn
-                // this track, so sound and screen start together.
-                outputPending.set(true)
-                awaitingOutput.value += 1
+                // A restored session starts where it stopped: the seek has to
+                // land before anything is primed from position zero.
+                val startAt = pendingStartMs
+                pendingStartMs = 0L
+                if (startAt > 0) {
+                    seek(startAt)
+                    refresh()
+                }
+                val keepPaused = pendingPaused
+                pendingPaused = false
+                playing = !keepPaused
+                paused = keepPaused
+                if (keepPaused) {
+                    Log.i(TAG, "restored ${loaded.name} at $startAt ms, paused")
+                } else {
+                    // The engine renders into the ring and stalls once it is
+                    // full; the AudioTrack stays paused until the UI says it has
+                    // drawn this track, so sound and screen start together.
+                    outputPending.set(true)
+                    awaitingOutput.value += 1
+                }
                 // Media buttons and the notification can start playback while
                 // no activity is composed; never leave it silent forever.
                 scope.launch {

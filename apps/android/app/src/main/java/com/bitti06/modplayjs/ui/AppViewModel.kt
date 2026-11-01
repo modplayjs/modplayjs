@@ -14,6 +14,7 @@ import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.engine.AudioOutputInfo
 import com.bitti06.modplayjs.engine.PlayError
 import com.bitti06.modplayjs.engine.PlaybackSession
+import com.bitti06.modplayjs.engine.PlaybackStore
 import com.bitti06.modplayjs.engine.QueueItem
 import com.bitti06.modplayjs.engine.SettingsStore
 import com.bitti06.modplayjs.library.FolderEntity
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.put
 
 data class Filters(
@@ -50,6 +52,7 @@ class AppViewModel(
     private val repo: LibraryRepository,
     private val session: PlaybackSession,
     private val store: SettingsStore,
+    private val playback: PlaybackStore,
 ) : ViewModel(),
     UiActions {
     private val filtersState = MutableStateFlow(Filters())
@@ -125,6 +128,58 @@ class AppViewModel(
             if (store.engineVersion != version) {
                 store.engineVersion = version
                 runCatching { repo.rescan(null) }
+            }
+        }
+        restorePlayback()
+        rememberPlayback()
+    }
+
+    /**
+     * Picks up the queue and position the process died with, so a rebuild does
+     * not lose the listening session. The queue is stored as ids and resolved
+     * against the library: rows that are gone are dropped.
+     */
+    private fun restorePlayback() {
+        viewModelScope.launch {
+            val saved = playback.load() ?: return@launch
+            val rows = withTimeoutOrNull(10_000) { allTracks.first { it.isNotEmpty() } } ?: return@launch
+            val byId = rows.associateBy { it.id }
+            val items = saved.ids.mapNotNull { byId[it] }
+            if (items.isEmpty()) {
+                playback.clear()
+                return@launch
+            }
+            val currentId = saved.ids.getOrNull(saved.index)
+            val index = items.indexOfFirst { it.id == currentId }.coerceAtLeast(0)
+            session.setQueue(
+                items.map { QueueItem(it.id, it.name, it.documentUri, it.format) },
+                index,
+            )
+            if (saved.playing) PlaybackService.start(context)
+            session.restore(index, saved.positionMs, saved.playing)
+        }
+    }
+
+    /** Queue changes are rare; the position is written every few seconds. */
+    private fun rememberPlayback() {
+        viewModelScope.launch {
+            session.queue
+                .combine(session.queueIndex) { queue, index -> queue to index }
+                .collect { (queue, index) ->
+                    if (queue.isNotEmpty()) playback.saveQueue(queue.map { it.id }, index)
+                }
+        }
+        viewModelScope.launch {
+            var lastSaved = 0L
+            session.snapshot.collect { snap ->
+                val now = System.currentTimeMillis()
+                if (now - lastSaved < POSITION_SAVE_MS) return@collect
+                lastSaved = now
+                if (session.queue.value.isEmpty()) return@collect
+                playback.savePosition(
+                    positionMs = snap?.state?.positionMs?.toLong() ?: 0L,
+                    playing = snap?.state?.playing == true,
+                )
             }
         }
     }
@@ -239,6 +294,9 @@ class AppViewModel(
     }
 
     companion object {
+        /** How often the position is written while playing. */
+        private const val POSITION_SAVE_MS = 5_000L
+
         fun factory(application: Application): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer {
@@ -247,6 +305,7 @@ class AppViewModel(
                         AppGraph.library,
                         AppGraph.session,
                         AppGraph.settings,
+                        AppGraph.playback,
                     )
                 }
             }
