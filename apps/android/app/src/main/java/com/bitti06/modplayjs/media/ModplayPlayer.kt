@@ -69,7 +69,6 @@ class ModplayPlayer(
                             Player.COMMAND_PLAY_PAUSE,
                             Player.COMMAND_PREPARE,
                             Player.COMMAND_STOP,
-                            Player.COMMAND_SEEK_TO,
                             Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
                             Player.COMMAND_SEEK_TO_DEFAULT_POSITION,
                             Player.COMMAND_SEEK_TO_NEXT,
@@ -77,7 +76,10 @@ class ModplayPlayer(
                             Player.COMMAND_RELEASE,
                         ).build(),
                 ).setPlaylist(items)
-                .setPlayWhenReady(snap != null && snap.state.playing && !snap.state.paused)
+                .setPlayWhenReady(
+                    snap != null && snap.state.playing && !snap.state.paused,
+                    Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST,
+                )
                 .setPlaybackState(
                     when {
                         snap == null || snap.track == null -> Player.STATE_IDLE
