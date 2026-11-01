@@ -43,7 +43,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -226,7 +227,10 @@ fun LibraryScreen(
     if (showFilters) {
         ModalBottomSheet(
             onDismissRequest = { showFilters = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState = rememberBottomSheetState(
+                initialValue = SheetValue.Hidden,
+                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            ),
         ) {
             FilterSheet(
                 vm = vm,
@@ -240,7 +244,10 @@ fun LibraryScreen(
     showTrackActions?.let { track ->
         ModalBottomSheet(
             onDismissRequest = { showTrackActions = null },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState = rememberBottomSheetState(
+                initialValue = SheetValue.Hidden,
+                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            ),
         ) {
             TrackActionsSheet(
                 track = track,

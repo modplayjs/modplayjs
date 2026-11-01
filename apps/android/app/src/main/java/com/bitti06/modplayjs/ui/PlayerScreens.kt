@@ -52,11 +52,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -224,9 +226,18 @@ fun PlayerScreen(
         val duration = snap.state.durationMs
         val position = snap.state.positionMs
         var drag by remember(track.id) { mutableStateOf<Float?>(null) }
+        val fraction =
+            drag ?: if (duration > 0) (position / duration).toFloat().coerceIn(0f, 1f) else 0f
+        val sliderState = rememberSliderState(value = fraction, trackRange = 0f..1f)
+        LaunchedEffect(fraction) { sliderState.value = fraction }
         Slider(
-            value = drag ?: if (duration > 0) (position / duration).toFloat().coerceIn(0f, 1f) else 0f,
-            onValueChange = { if (duration > 0) drag = it },
+            state = sliderState,
+            onValueChange = { v ->
+                if (duration > 0) {
+                    drag = v
+                    sliderState.value = v
+                }
+            },
             onValueChangeFinished = {
                 drag?.let { vm.seek((it * duration).toLong()) }
                 drag = null
@@ -240,8 +251,6 @@ fun PlayerScreen(
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { vm.previous() }) { Icon(Icons.Default.SkipPrevious, contentDescription = "Previous") }
-            val fraction =
-                drag ?: if (duration > 0) (position / duration).toFloat().coerceIn(0f, 1f) else 0f
             Box(contentAlignment = Alignment.Center) {
                 CircularWavyProgressIndicator(
                     progress = { fraction },
