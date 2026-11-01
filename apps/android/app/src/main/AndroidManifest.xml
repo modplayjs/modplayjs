@@ -7,6 +7,18 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
+      Package visibility: the system audio-effects panel is provided by the
+      device vendor, and Android 11+ hides other packages from resolveActivity
+      unless the intent is declared here. Without this the availability check
+      always reports "no panel" even on devices that ship one.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL" />
+        </intent>
+    </queries>
+
+    <!--
       Android 16+ runs an AppOps check with an empty attribution tag from the
       platform audio stack while audio is playing, and logs
       "attributionTag  not declared in manifest of <package>" for every call.

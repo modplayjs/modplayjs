@@ -3,8 +3,9 @@ package com.bitti06.modplayjs.ui
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.audiofx.AudioEffect
-import android.widget.Toast
+import android.provider.Settings
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -78,6 +79,7 @@ fun PlayerScreen(
     val context = LocalContext.current
     val track = snapshot?.track
     var channelDialog by remember { mutableStateOf(false) }
+    var showEffectsDialog by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -154,7 +156,7 @@ fun PlayerScreen(
             OutlinedButton(
                 onClick = {
                     if (!openSystemAudioEffects(context, vm.audioSessionId)) {
-                        Toast.makeText(context, "No system audio effects panel on this device", Toast.LENGTH_SHORT).show()
+                        showEffectsDialog = true
                     }
                 },
                 modifier = Modifier.weight(1f),
@@ -183,27 +185,69 @@ fun PlayerScreen(
     if (channelDialog && snapshot != null) {
         ChannelDialog(snapshot, vm) { channelDialog = false }
     }
+    if (showEffectsDialog) {
+        SystemEffectsUnavailableDialog { showEffectsDialog = false }
+    }
 }
+
+private fun systemEffectsIntent(
+    context: Context,
+    sessionId: Int,
+): Intent =
+    Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
+        putExtra(AudioEffect.EXTRA_AUDIO_SESSION, sessionId)
+        putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
+        putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+    }
+
+/** True when the device ships Android's audio-effects panel (many Pixels do not). */
+fun hasSystemAudioEffects(context: Context): Boolean =
+    context.packageManager.resolveActivity(
+        systemEffectsIntent(context, 0),
+        PackageManager.MATCH_DEFAULT_ONLY,
+    ) != null
 
 /** Opens the platform audio-effects panel (system equalizer) for [sessionId]. */
 fun openSystemAudioEffects(
     context: Context,
     sessionId: Int,
 ): Boolean {
-    val intent =
-        Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
-            putExtra(AudioEffect.EXTRA_AUDIO_SESSION, sessionId)
-            putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
-            putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
-        }
+    if (!hasSystemAudioEffects(context)) return false
     return try {
-        context.startActivity(intent)
+        context.startActivity(systemEffectsIntent(context, sessionId))
         true
     } catch (_: ActivityNotFoundException) {
         false
     } catch (_: SecurityException) {
         false
     }
+}
+
+/**
+ * Fallback for devices without an audio-effects panel: say so and offer the
+ * system sound settings instead of leaving the tap without feedback.
+ */
+@Composable
+fun SystemEffectsUnavailableDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("No system effects panel") },
+        text = {
+            Text(
+                "Android only provides the audio-effects panel when the device vendor ships one. " +
+                    "This device does not, so there is no system equalizer to open. " +
+                    "Use your headphones' or speaker's own EQ, or open the system sound settings.",
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onDismiss()
+                runCatching { context.startActivity(Intent(Settings.ACTION_SOUND_SETTINGS)) }
+            }) { Text("Sound settings") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
 }
 
 @Composable

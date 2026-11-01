@@ -1,6 +1,5 @@
 package com.bitti06.modplayjs.ui
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -24,6 +23,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -120,6 +123,8 @@ fun AudioSettingsScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    var showEffectsDialog by remember { mutableStateOf(false) }
+    val effectsAvailable = remember { hasSystemAudioEffects(context) }
     SettingsPage("Audio", onBack) {
         SliderRow("Volume", settings.transport.volume.toFloat(), 0f..100f) { value ->
             vm.updateSettings { it.copy(transport = it.transport.copy(volume = value.toInt())) }
@@ -153,10 +158,20 @@ fun AudioSettingsScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        SettingsRow("System audio effects", "Equalizer, bass boost and other device effects") {
+        SettingsRow(
+            "System audio effects",
+            if (effectsAvailable) {
+                "Equalizer, bass boost and other device effects"
+            } else {
+                "Not provided by this device"
+            },
+        ) {
             if (!openSystemAudioEffects(context, vm.audioSessionId)) {
-                Toast.makeText(context, "No system audio effects panel on this device", Toast.LENGTH_SHORT).show()
+                showEffectsDialog = true
             }
+        }
+        if (showEffectsDialog) {
+            SystemEffectsUnavailableDialog { showEffectsDialog = false }
         }
     }
 }
