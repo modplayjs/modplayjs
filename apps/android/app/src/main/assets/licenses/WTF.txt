@@ -1,0 +1,13 @@
+WTF license (public-domain style)
+
+Copyright (C) 2025-2026 Mihály Horváth (Hermit)
+
+License is still WTF: Do what the frick you want with this code, but the
+original author asks to be mentioned.
+
+The cRSID emulation core, its tables (combined waveforms, filter curves,
+Sinc window, ADSR DAC) and the PSID/RSID loader are ported from libcRSID
+1.58. The original copyright notice and attribution request remain in
+force for that material.
+
+https://csdb.dk/release/?id=261057

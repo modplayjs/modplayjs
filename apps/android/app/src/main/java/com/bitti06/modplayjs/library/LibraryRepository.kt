@@ -137,7 +137,6 @@ class LibraryRepository(
         status: String,
         family: String?,
         format: String?,
-        folderId: String?,
         sort: String,
         descending: Boolean,
     ): List<TrackEntity> {
@@ -148,18 +147,16 @@ class LibraryRepository(
                 .filter { status == "all" || it.availability == status }
                 .filter { family == null || it.family == family }
                 .filter { format == null || it.format == format }
-                .filter { folderId == null || it.folderId == folderId }
                 .filter { q.isEmpty() || it.name.lowercase().contains(q) || it.relativePath.lowercase().contains(q) }
         val comparator: Comparator<TrackEntity> =
             when (sort) {
-                "format" -> compareBy { it.format }
-                "family" -> compareBy { it.family }
+                "format" -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.format }
+                "family" -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.family }
                 "size" -> compareBy { it.size }
                 "modified" -> compareBy { it.lastModified }
-                "missing" -> compareBy { it.availability == "missing" }
-                else -> compareBy { it.name.lowercase() }
+                "added" -> compareBy { it.addedAt }
+                else -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
             }
-        val list = filtered.sortedWith(if (descending) comparator.reversed() else comparator).toList()
-        return if (sort == "added") list.sortedByDescending { it.addedAt } else list
+        return filtered.sortedWith(if (descending) comparator.reversed() else comparator).toList()
     }
 }

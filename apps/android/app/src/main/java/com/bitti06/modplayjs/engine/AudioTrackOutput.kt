@@ -41,6 +41,10 @@ class AudioTrackOutput(
     val underruns: Int
         get() = runCatching { track?.underrunCount ?: 0 }.getOrDefault(0)
 
+    /** Audio session used by the current track, for system audio effects. */
+    val audioSessionId: Int
+        get() = runCatching { track?.audioSessionId ?: 0 }.getOrDefault(0)
+
     fun start(ring: PcmRing) {
         if (running.get()) return
         this.ring = ring

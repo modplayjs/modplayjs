@@ -8,6 +8,16 @@ plugins {
 }
 
 val repoRoot = rootProject.projectDir.parentFile.parentFile
+val gitCommit: String =
+    runCatching {
+        providers
+            .exec {
+                workingDir = repoRoot
+                commandLine("git", "rev-parse", "--short", "HEAD")
+            }.standardOutput.asText
+            .get()
+            .trim()
+    }.getOrDefault("unknown")
 val defaultV8 = File(repoRoot, "build/v8-prebuilt/android-arm64-v8a")
 val v8Dir: String? = (project.findProperty("v8Dir") as String?)
     ?: defaultV8.takeIf { File(it, "lib/libv8_monolith.a").isFile }?.absolutePath
@@ -25,6 +35,7 @@ android {
         versionCode = 1
         versionName = "0.2.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         ndk { abiFilters += listOf("arm64-v8a") }
         externalNativeBuild {
             cmake {

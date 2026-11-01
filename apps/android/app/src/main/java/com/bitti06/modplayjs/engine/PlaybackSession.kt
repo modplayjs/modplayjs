@@ -69,6 +69,7 @@ class PlaybackSession(
     val v8Available: Boolean get() = v8.available
     val v8Error: String? get() = v8.initError
     val underruns: Int get() = audio.underruns
+    val audioSessionId: Int get() = audio.audioSessionId
 
     init {
         audio.start(ring)

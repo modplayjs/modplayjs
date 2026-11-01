@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.put
@@ -28,7 +29,6 @@ data class Filters(
     val status: String = "all",
     val family: String? = null,
     val format: String? = null,
-    val folderId: String? = null,
     val sort: String = "name",
     val descending: Boolean = false,
 )
@@ -54,12 +54,21 @@ class AppViewModel(
     val v8Error: String? get() = session.v8Error
     val underruns: Int get() = session.underruns
     val sampleRate: Int get() = session.sampleRate
+    val audioSessionId: Int get() = session.audioSessionId
 
     private val allTracks = repo.tracks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Unfiltered library, used for counts and filter option lists. */
+    val libraryTracks: StateFlow<List<TrackEntity>> = allTracks
+
     val tracks: StateFlow<List<TrackEntity>> =
         combine(allTracks, filtersState) { all, f ->
-            repo.filter(all, f.search, f.status, f.family, f.format, f.folderId, f.sort, f.descending)
+            repo.filter(all, f.search, f.status, f.family, f.format, f.sort, f.descending)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val recent: StateFlow<List<TrackEntity>> =
+        allTracks
+            .map { list -> list.sortedByDescending { it.addedAt }.take(12) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         session.setSettings(_settings.value)
@@ -67,6 +76,10 @@ class AppViewModel(
 
     fun updateFilters(block: (Filters) -> Filters) {
         filtersState.value = block(filtersState.value)
+    }
+
+    fun resetFilters() {
+        filtersState.value = Filters()
     }
 
     fun updateSettings(block: (AndroidSettings) -> AndroidSettings) {
@@ -89,11 +102,20 @@ class AppViewModel(
     fun play(track: TrackEntity) {
         val list = tracks.value.ifEmpty { listOf(track) }
         val index = list.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-        val items = list.map { QueueItem(it.id, it.name, it.documentUri, it.format) }
-        session.setQueue(items, index)
+        playList(list, index)
+    }
+
+    /** Replaces the queue with [items] and starts at [index]. */
+    fun playList(
+        items: List<TrackEntity>,
+        index: Int,
+    ) {
+        if (items.isEmpty()) return
+        val start = index.coerceIn(0, items.lastIndex)
+        session.setQueue(items.map { QueueItem(it.id, it.name, it.documentUri, it.format) }, start)
         PlaybackService.start(context)
-        session.playIndex(index)
-        viewModelScope.launch { repo.markPlayed(track) }
+        session.playIndex(start)
+        viewModelScope.launch { repo.markPlayed(items[start]) }
     }
 
     fun playQueue(index: Int) {
