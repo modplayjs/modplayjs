@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.SimpleBasePlayer
 import androidx.media3.common.util.UnstableApi
@@ -111,6 +112,10 @@ class ModplayPlayer(
                         else -> Player.REPEAT_MODE_OFF
                     },
                 ).setShuffleModeEnabled(snap?.state?.shuffle == true)
+                // Explicit: the legacy session publishes speed 0 whenever the
+                // player is not "playing", and a dynamic window makes the system
+                // drop the time labels.
+                .setPlaybackParameters(PlaybackParameters.DEFAULT)
                 .setVolume((snap?.settings?.transport?.volume ?: 100) / 100f)
 
         if (items.isNotEmpty()) {
@@ -123,7 +128,8 @@ class ModplayPlayer(
             lastLoggedDuration = durationMs
             Log.i(
                 TAG,
-                "durationMs=${durationMs ?: "unset"} seekable=${snap?.capabilities?.seekable == true}",
+                "durationMs=${durationMs ?: "unset"} seekable=${snap?.capabilities?.seekable == true} " +
+                    "playing=$isPlaying speed=${playbackParameters.speed} state=${state.playbackState}",
             )
         }
         val summary = "queue=${queue.size} index=$currentIndex engine=${engine?.name} item=${queue.getOrNull(currentIndex)?.name}"
@@ -220,6 +226,7 @@ class ModplayPlayer(
                                     }.build(),
                             ).build(),
                     ).setDurationUs(if (current) durationUs else C.TIME_UNSET)
+                    .setIsDynamic(false)
                     .setIsSeekable(seekable)
                     .build()
             }
