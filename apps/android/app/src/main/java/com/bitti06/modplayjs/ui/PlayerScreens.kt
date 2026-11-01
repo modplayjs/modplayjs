@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.audiofx.AudioEffect
 import android.provider.Settings
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -383,8 +382,8 @@ fun PlayerScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    // Queue, details and stop share the transport row; three
-                    // labelled buttons underneath ate a whole row for two
+                    // Repeat, details and stop share the transport row; three
+                    // labeled buttons underneath ate a whole row for two
                     // secondary actions. SpaceEvenly keeps the touch targets
                     // apart on narrow windows instead of overlapping them.
                     Row(
@@ -549,17 +548,17 @@ fun hasSystemAudioEffects(context: Context): Boolean =
 fun openSystemAudioEffects(
     context: Context,
     sessionId: Int,
-): Boolean {
-    if (!hasSystemAudioEffects(context)) return false
-    return try {
-        context.startActivity(systemEffectsIntent(context, sessionId))
-        true
-    } catch (_: ActivityNotFoundException) {
-        false
-    } catch (_: SecurityException) {
-        false
-    }
-}
+): Boolean =
+    // No panel means no attempt: the platform has none to show.
+    hasSystemAudioEffects(context) &&
+        try {
+            context.startActivity(systemEffectsIntent(context, sessionId))
+            true
+        } catch (_: ActivityNotFoundException) {
+            false
+        } catch (_: SecurityException) {
+            false
+        }
 
 /**
  * Fallback for devices without an audio-effects panel: say so and offer the
@@ -638,7 +637,6 @@ private fun InfoBox(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChannelStrip(
     snapshot: AndroidSnapshot,
@@ -674,7 +672,6 @@ private fun ChannelStrip(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChannelDialog(
     snapshot: AndroidSnapshot,
