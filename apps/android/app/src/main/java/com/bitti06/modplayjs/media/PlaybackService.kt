@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.CommandButton
@@ -81,6 +82,15 @@ class PlaybackService : MediaSessionService() {
         // Ongoing while playing: the media card stays until playback stops.
         notificationProvider = StickyMediaNotificationProvider(this)
         setMediaNotificationProvider(notificationProvider)
+        // Android 12+ may refuse a foreground start from the background; Media3
+        // swallows the exception and reports it here instead.
+        setListener(
+            object : MediaSessionService.Listener {
+                override fun onForegroundServiceStartNotAllowedException() {
+                    Log.w(TAG, "foreground start blocked by the system")
+                }
+            },
+        )
         mediaSession = buildSession()
 
         // The app starts the service directly and has no MediaController, so
@@ -351,6 +361,8 @@ class PlaybackService : MediaSessionService() {
     }
 
     companion object {
+        private const val TAG = "PlaybackService"
+
         /** Do not churn session tokens faster than this. */
         private const val SESSION_MIN_GAP_MS = 2_000L
 
