@@ -72,7 +72,9 @@ class ModplayPlayer(
                             Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
                             Player.COMMAND_SEEK_TO_DEFAULT_POSITION,
                             Player.COMMAND_SEEK_TO_NEXT,
+                            Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
                             Player.COMMAND_SEEK_TO_PREVIOUS,
+                            Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
                             Player.COMMAND_RELEASE,
                         ).build(),
                 ).setPlaylist(items)
@@ -122,8 +124,8 @@ class ModplayPlayer(
         seekCommand: Int,
     ): ListenableFuture<*> {
         when (seekCommand) {
-            Player.COMMAND_SEEK_TO_NEXT -> playback.next()
-            Player.COMMAND_SEEK_TO_PREVIOUS -> playback.previous()
+            Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> playback.next()
+            Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> playback.previous()
             else -> {
                 if (mediaItemIndex != C.INDEX_UNSET && mediaItemIndex != playback.queueIndex.value) {
                     playback.playIndex(mediaItemIndex)
