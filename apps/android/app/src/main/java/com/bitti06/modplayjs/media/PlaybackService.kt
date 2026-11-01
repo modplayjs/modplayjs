@@ -117,6 +117,31 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = mediaSession
 
+    /**
+     * The media card replaced Media3's own delete intent with ours, so a swipe
+     * arrives here instead of stopping playback. Hand the notification back.
+     */
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
+        if (intent?.action == StickyMediaNotificationProvider.ACTION_RESTORE &&
+            ::mediaSession.isInitialized
+        ) {
+            notificationProvider.last()?.let { notification ->
+                runCatching {
+                    startForeground(
+                        notification.notificationId,
+                        notification.notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+                    )
+                }
+            }
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
     private val favoriteCommand = SessionCommand(FAVORITE_ACTION, Bundle.EMPTY)
 
     private fun favoriteButton(favorite: Boolean): CommandButton =

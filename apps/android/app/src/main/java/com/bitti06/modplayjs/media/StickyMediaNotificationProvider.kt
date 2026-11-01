@@ -1,7 +1,9 @@
 package com.bitti06.modplayjs.media
 
 import android.app.Notification
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.core.app.NotificationManagerCompat
 import androidx.media3.session.CommandButton
@@ -43,11 +45,14 @@ class StickyMediaNotificationProvider(
             )
         // Ongoing whether playing or paused: a paused session is still a session
         // the user is in the middle of, and a swipe would take the controls.
+        // Android 14+ lets the swipe through anyway, so the dismissal is caught
+        // and the notification handed straight back.
         val sticky =
             Notification.Builder
                 .recoverBuilder(context, built.notification)
                 .setOngoing(true)
                 .setAutoCancel(false)
+                .setDeleteIntent(restoreIntent())
                 .build()
                 .let { MediaNotification(built.notificationId, it) }
         lastBuilt = sticky
@@ -62,6 +67,21 @@ class StickyMediaNotificationProvider(
 
     override fun getNotificationChannelInfo(): MediaNotification.Provider.NotificationChannelInfo =
         delegate.notificationChannelInfo
+
+    companion object {
+        /** Broadcast to the service when the card is dismissed. */
+        const val ACTION_RESTORE = "com.bitti06.modplayjs.RESTORE_NOTIFICATION"
+
+        private const val RESTORE_REQUEST = 1001
+    }
+
+    private fun restoreIntent(): PendingIntent =
+        PendingIntent.getService(
+            context,
+            RESTORE_REQUEST,
+            Intent(context, PlaybackService::class.java).setAction(ACTION_RESTORE),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 
     /** The last notification the system accepted, for [repost] and the service. */
     fun last(): MediaNotification? = lastBuilt
