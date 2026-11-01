@@ -15,7 +15,6 @@
     <string name="common_play_pause">Abspielen oder pausieren</string>
     <string name="common_track_options">Titeloptionen</string>
     <string name="common_close">Schließen</string>
-    <string name="common_unnamed">(unbenannt)</string>
     <string name="common_all">Alle</string>
     <string name="common_header">Kopf</string>
     <string name="common_settings">Einstellungen</string>
@@ -139,6 +138,8 @@
     <string name="info_instruments">Instrumente</string>
     <string name="info_samples">Samples</string>
     <string name="list_numbered">%1$d. %2$s</string>
+    <string name="sample_line_unnamed">%1$d. %2$d</string>
+    <string name="sample_line_unnamed_loop">%1$d. %2$d L</string>
     <string name="sample_line">%1$d. %2$s  %3$d</string>
     <string name="sample_line_loop">%1$d. %2$s  %3$d L</string>
     <string name="cd_previous">Zurück</string>

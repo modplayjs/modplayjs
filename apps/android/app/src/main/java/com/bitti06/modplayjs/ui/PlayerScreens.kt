@@ -254,11 +254,7 @@ fun PlayerScreen(
                             ) {
                                 instruments.forEach { instrument ->
                                     Text(
-                                        stringResource(
-                                            R.string.list_numbered,
-                                            instrument.index + 1,
-                                            instrument.name.ifBlank { stringResource(R.string.common_unnamed) },
-                                        ),
+                                        instrumentLine(instrument.index + 1, instrument.name),
                                         style = MaterialTheme.typography.bodySmall,
                                         fontFamily = FontFamily.Monospace,
                                     )
@@ -273,11 +269,11 @@ fun PlayerScreen(
                             ) {
                                 samples.forEach { sample ->
                                     Text(
-                                        stringResource(
-                                            if (sample.loop) R.string.sample_line_loop else R.string.sample_line,
+                                        sampleLine(
                                             sample.index + 1,
-                                            sample.name.ifBlank { stringResource(R.string.common_unnamed) },
+                                            sample.name,
                                             sample.length,
+                                            sample.loop,
                                         ),
                                         style = MaterialTheme.typography.bodySmall,
                                         fontFamily = FontFamily.Monospace,
@@ -506,6 +502,44 @@ fun SystemEffectsUnavailableDialog(onDismiss: () -> Unit) {
     )
 }
 
+/**
+ * Lists an instrument as the module shows it: unnamed slots keep their number
+ * and print nothing else, instead of repeating "(unnamed)" down the list.
+ */
+@Composable
+private fun instrumentLine(
+    number: Int,
+    name: String,
+): String {
+    val trimmed = name.trim()
+    return if (trimmed.isEmpty()) "$number." else stringResource(R.string.list_numbered, number, trimmed)
+}
+
+/** Same for samples, where the length (and loop flag) still carries meaning. */
+@Composable
+private fun sampleLine(
+    number: Int,
+    name: String,
+    length: Int,
+    loop: Boolean,
+): String {
+    val trimmed = name.trim()
+    return if (trimmed.isEmpty()) {
+        stringResource(
+            if (loop) R.string.sample_line_unnamed_loop else R.string.sample_line_unnamed,
+            number,
+            length,
+        )
+    } else {
+        stringResource(
+            if (loop) R.string.sample_line_loop else R.string.sample_line,
+            number,
+            trimmed,
+            length,
+        )
+    }
+}
+
 /** A titled, independently scrolling box used on the Now Playing screen. */
 @Composable
 private fun InfoBox(
@@ -677,11 +711,7 @@ fun DetailsScreen(
                 item { SectionTitle(stringResource(R.string.details_instruments)) }
                 items(track.instrumentList, key = { "i${it.index}" }) { instrument ->
                     Text(
-                        stringResource(
-                            R.string.list_numbered,
-                            instrument.index + 1,
-                            instrument.name.ifBlank { stringResource(R.string.common_unnamed) },
-                        ),
+                        instrumentLine(instrument.index + 1, instrument.name),
                         fontFamily = FontFamily.Monospace,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -691,11 +721,11 @@ fun DetailsScreen(
                 item { SectionTitle(stringResource(R.string.details_samples)) }
                 items(track.sampleList, key = { "s${it.index}" }) { sample ->
                     Text(
-                        stringResource(
-                            if (sample.loop) R.string.sample_line_loop else R.string.sample_line,
+                        sampleLine(
                             sample.index + 1,
-                            sample.name.ifBlank { stringResource(R.string.common_unnamed) },
+                            sample.name,
                             sample.length,
+                            sample.loop,
                         ),
                         fontFamily = FontFamily.Monospace,
                         style = MaterialTheme.typography.bodySmall,
