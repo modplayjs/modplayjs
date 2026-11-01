@@ -373,6 +373,9 @@ class PlaybackSession(
     @Synchronized
     private fun refresh() {
         if (!v8.available) return
+        // Throttle even when the call fails, otherwise a broken snapshot makes
+        // the render loop retry (and log) every few milliseconds.
+        lastSnapshotAt = System.currentTimeMillis()
         val json =
             runCatching { v8Exec.submit<String> { v8.snapshot() }.get(2, TimeUnit.SECONDS) }
                 .onFailure { Log.e(TAG, "snapshot call failed: ${it.message}") }
@@ -387,7 +390,6 @@ class PlaybackSession(
                 .getOrNull() ?: return
         currentSettings = snap.settings
         _snapshot.value = snap
-        lastSnapshotAt = System.currentTimeMillis()
     }
 
     private fun readBytes(uri: String): ByteArray? =

@@ -38,9 +38,13 @@ v8::Local<v8::Value> get_global(Engine* e) {
 
 v8::Local<v8::Value> get_fn(Engine* e, const char* name) {
     auto ctx = e->context.Get(e->isolate);
-    v8::Local<v8::String> key = v8::String::NewFromUtf8(e->isolate, name).ToLocalChecked();
+    v8::Local<v8::Object> global;
+    if (!get_global(e)->ToObject(ctx).ToLocal(&global)) return {};
+    v8::Local<v8::String> apiKey = v8::String::NewFromUtf8(e->isolate, "__modplay").ToLocalChecked();
     v8::Local<v8::Value> api;
-    if (!get_global(e)->ToObject(ctx).ToLocal(&api)) return {};
+    if (!global->Get(ctx, apiKey).ToLocal(&api)) return {};
+    if (!api->IsObject()) return {};
+    v8::Local<v8::String> key = v8::String::NewFromUtf8(e->isolate, name).ToLocalChecked();
     v8::Local<v8::Value> fn;
     if (!api.As<v8::Object>()->Get(ctx, key).ToLocal(&fn)) return {};
     return fn;
