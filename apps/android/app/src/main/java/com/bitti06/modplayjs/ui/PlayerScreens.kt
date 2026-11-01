@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.media.audiofx.AudioEffect
 import android.provider.Settings
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,10 +29,12 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Equalizer
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
@@ -40,11 +43,14 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -57,6 +63,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -64,8 +71,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
-import com.bitti06.modplayjs.engine.AndroidTrack
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PlayerScreen(
     vm: AppViewModel,
@@ -84,7 +91,18 @@ fun PlayerScreen(
     var channelDialog by remember { mutableStateOf(false) }
     var showEffectsDialog by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    0f to MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                    0.45f to MaterialTheme.colorScheme.background,
+                    1f to MaterialTheme.colorScheme.background,
+                ),
+            ),
+    ) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "Now Playing",
@@ -117,6 +135,13 @@ fun PlayerScreen(
             )
         }
         if (snap == null || track == null) {
+            if (loading != null) {
+                LoadingIndicator(
+                    modifier = Modifier.size(44.dp).align(Alignment.CenterHorizontally),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
             EmptyState(
                 title = when {
                     error != null -> "Playback failed"
@@ -176,14 +201,26 @@ fun PlayerScreen(
             }
         }
         Spacer(Modifier.height(10.dp))
-        Text(
-            track.title.ifBlank { track.name },
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(track.tracker.ifBlank { track.format.uppercase() }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FormatArt(track.format, 62.dp)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    track.title.ifBlank { track.name },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    track.tracker.ifBlank { track.format.uppercase() },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
         val duration = snap.state.durationMs
         val position = snap.state.positionMs
         var drag by remember(track.id) { mutableStateOf<Float?>(null) }
@@ -203,32 +240,51 @@ fun PlayerScreen(
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { vm.previous() }) { Icon(Icons.Default.SkipPrevious, contentDescription = "Previous") }
-            FilledIconButton(onClick = { vm.togglePlay() }, modifier = Modifier.size(64.dp)) {
-                Icon(
-                    if (snap.state.playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = "Play or pause",
-                    modifier = Modifier.size(34.dp),
+            val fraction =
+                drag ?: if (duration > 0) (position / duration).toFloat().coerceIn(0f, 1f) else 0f
+            Box(contentAlignment = Alignment.Center) {
+                CircularWavyProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier.size(96.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 )
+                FilledIconButton(
+                    onClick = { vm.togglePlay() },
+                    modifier = Modifier.size(68.dp),
+                    shape = CircleShape,
+                ) {
+                    Icon(
+                        if (snap.state.playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = "Play or pause",
+                        modifier = Modifier.size(36.dp),
+                    )
+                }
             }
             IconButton(onClick = { vm.next() }) { Icon(Icons.Default.SkipNext, contentDescription = "Next") }
             IconButton(onClick = { vm.stop() }) { Icon(Icons.Default.Stop, contentDescription = "Stop") }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onOpenQueue, modifier = Modifier.weight(1f)) {
-                Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = null)
+            FilledTonalButton(onClick = onOpenQueue, modifier = Modifier.weight(1f), shape = CircleShape) {
+                Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Queue")
             }
-            OutlinedButton(onClick = onOpenDetails, modifier = Modifier.weight(1f)) { Text("Details") }
-            OutlinedButton(
+            FilledTonalButton(onClick = onOpenDetails, modifier = Modifier.weight(1f), shape = CircleShape) {
+                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Details")
+            }
+            FilledTonalButton(
                 onClick = {
                     if (!openSystemAudioEffects(context, vm.audioSessionId)) {
                         showEffectsDialog = true
                     }
                 },
                 modifier = Modifier.weight(1f),
+                shape = CircleShape,
             ) {
-                Icon(Icons.Default.Equalizer, contentDescription = null)
+                Icon(Icons.Default.Equalizer, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Effects")
             }
@@ -249,6 +305,7 @@ fun PlayerScreen(
             ChannelStrip(snap, vm)
         }
         Spacer(Modifier.height(8.dp))
+        }
     }
     if (channelDialog && snap != null) {
         ChannelDialog(snap, vm) { channelDialog = false }
@@ -327,8 +384,8 @@ private fun InfoBox(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Column(Modifier.fillMaxSize()) {
             Text(

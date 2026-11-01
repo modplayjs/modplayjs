@@ -1,6 +1,7 @@
 package com.bitti06.modplayjs.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -38,9 +40,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.library.TrackEntity
 import java.util.Locale
@@ -54,6 +59,37 @@ fun SectionTitle(text: String) {
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(top = 8.dp),
     )
+}
+
+/**
+ * Deterministic cover-art stand-in: tracker files have no artwork, but a
+ * per-format gradient tile gives rows and the player the visual anchor that
+ * album art gives a normal music player.
+ */
+private fun formatHue(format: String): Float =
+    ((format.uppercase().hashCode().toLong() and 0xFFFFFFFFL) % 360L).toFloat()
+
+@Composable
+fun FormatArt(
+    format: String,
+    size: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val base = Color.hsv(formatHue(format), 0.45f, 0.95f)
+    Box(
+        modifier
+            .size(size)
+            .clip(RoundedCornerShape(size / 3f))
+            .background(Brush.linearGradient(listOf(base, base.copy(alpha = 0.55f)))),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            format.uppercase().take(4),
+            style = if (size >= 56.dp) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF0A0A12),
+        )
+    }
 }
 
 /** Top bar used by every modal screen. */
@@ -99,19 +135,21 @@ fun TrackRow(
             base.clickable(onClick = onClick)
         }
     Row(
-        modifier.padding(horizontal = 4.dp, vertical = 7.dp),
+        modifier.padding(horizontal = 4.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            track.format.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.width(46.dp),
-        )
+        FormatArt(track.format, 46.dp)
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(track.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                track.relativePath.substringBeforeLast('/', ""),
+                track.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                track.relativePath.substringBeforeLast('/', track.format.uppercase()),
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -183,13 +221,26 @@ fun FolderRow(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(10.dp))
+        Box(
+            Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Folder,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 "$trackCount ${if (trackCount == 1) "track" else "tracks"}",
                 style = MaterialTheme.typography.labelSmall,
@@ -368,14 +419,27 @@ fun StatCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
+    val colors = MaterialTheme.colorScheme
+    Box(
+        modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        colors.primary.copy(alpha = 0.20f),
+                        colors.secondary.copy(alpha = 0.10f),
+                    ),
+                ),
+            ).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 14.dp),
     ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column {
+            Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
