@@ -63,7 +63,7 @@ class SafScanner(
                 val childPath = if (path.isEmpty()) name else "$path/$name"
                 if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
                     walk(treeUri, id, childPath, out, onProgress)
-                } else {
+                } else if (isSupported(name)) {
                     val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, id)
                     out.add(
                         DocumentEntry(
@@ -87,9 +87,17 @@ class SafScanner(
     fun delete(documentUri: Uri): Boolean = runCatching { DocumentsContract.deleteDocument(resolver, documentUri) }.getOrDefault(false)
 
     companion object {
+        /**
+         * Every extension the Android engine bundle can play: the format
+         * plugins registered in `engine/src/engine-entry.ts` plus the streamed
+         * audio decoder (wav/mp3/ogg). Files with any other extension are not
+         * indexed at all.
+         */
         private val formats =
             mapOf(
                 "mod" to "mod",
+                "flt" to "mod",
+                "hmn" to "mod",
                 "mmd" to "mod",
                 "mmd0" to "mod",
                 "mmd1" to "mod",
@@ -101,7 +109,12 @@ class SafScanner(
                 "it" to "it",
                 "mtm" to "mtm",
                 "stm" to "stm",
+                "st" to "st",
                 "669" to "669",
+                "sfx" to "sfx",
+                "digi" to "digi",
+                "asylum" to "asylum",
+                "ice" to "ice",
                 "med" to "med",
                 "med2" to "med",
                 "med3" to "med",
@@ -113,6 +126,7 @@ class SafScanner(
                 "pow" to "packed",
                 "pp" to "packed",
                 "xpk" to "packed",
+                "pack" to "packed",
                 "p61" to "packed",
                 "utz" to "packed",
                 "wav" to "wav",
@@ -120,17 +134,22 @@ class SafScanner(
                 "ogg" to "ogg",
             )
 
+        fun isSupported(name: String): Boolean = formats.containsKey(extensionOf(name))
+
         fun formatOf(name: String): Pair<String, String> {
-            val ext = name.substringAfterLast('.', "").lowercase()
-            val format = formats[ext] ?: "unknown"
+            val format = formats[extensionOf(name)] ?: "unknown"
             val family =
                 when (format) {
                     "sid" -> "sid"
                     "wav", "mp3", "ogg" -> "audio"
-                    "packed", "unknown" -> "other"
+                    // Packed modules are still tracker modules once unpacked.
+                    "packed" -> "tracker"
+                    "unknown" -> "other"
                     else -> "tracker"
                 }
             return format to family
         }
+
+        private fun extensionOf(name: String): String = name.substringAfterLast('.', "").lowercase()
     }
 }

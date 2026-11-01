@@ -44,7 +44,12 @@ class LibraryRepository(
                         dao.upsertFolder(folder.copy(status = "revoked", error = it.message))
                         return@withContext total
                     }
-                val existing = dao.tracksInFolder(folder.id).associateBy { it.documentId }
+                val allExisting = dao.tracksInFolder(folder.id).associateBy { it.documentId }
+                // Rows for types the app no longer indexes (older builds stored
+                // every file) are removed instead of being kept as "missing".
+                val dropped = allExisting.values.filterNot { SafScanner.isSupported(it.name) }.map { it.id }
+                if (dropped.isNotEmpty()) dao.deleteTracks(dropped)
+                val existing = allExisting.filterValues { SafScanner.isSupported(it.name) }
                 val seen = HashSet<String>(entries.size)
                 val rows = ArrayList<TrackEntity>(entries.size)
                 val now = System.currentTimeMillis()
