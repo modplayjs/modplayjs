@@ -23,6 +23,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 Set-Location $Root
@@ -72,9 +73,10 @@ if (-not $SkipV8) {
             throw "V8 checksum mismatch: expected $Expected, got $Actual"
         }
 
-        tar -xzf $Archive -C $OutDir
         $Extracted = Join-Path $OutDir "android-$Abi"
         if (Test-Path $V8Dir) { Remove-Item -Recurse -Force $V8Dir }
+        if (Test-Path $Extracted) { Remove-Item -Recurse -Force $Extracted }
+        tar -xzf $Archive -C $OutDir
         Move-Item $Extracted $V8Dir
     } else {
         Write-Host "Using existing V8 at $V8Dir"
