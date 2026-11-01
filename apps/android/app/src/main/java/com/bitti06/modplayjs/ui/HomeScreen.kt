@@ -26,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.library.FolderEntity
@@ -67,12 +66,7 @@ fun HomeScreen(
                     ).padding(horizontal = 18.dp, vertical = 18.dp),
             ) {
                 Column {
-                    Text(
-                        "modplayjs",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    AppWordmark(MaterialTheme.typography.headlineMedium)
                     Text(
                         stringResource(R.string.home_tagline),
                         style = MaterialTheme.typography.bodyMedium,

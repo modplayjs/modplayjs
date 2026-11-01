@@ -24,7 +24,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.BuildConfig
 import com.bitti06.modplayjs.R
@@ -52,12 +51,7 @@ fun AboutScreen(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(48.dp),
                     )
-                    Text(
-                        "modplayjs",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    AppWordmark(MaterialTheme.typography.headlineSmall)
                     Text(
                         stringResource(R.string.about_tagline),
                         style = MaterialTheme.typography.bodySmall,
