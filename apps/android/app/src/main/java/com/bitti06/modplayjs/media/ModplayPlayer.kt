@@ -14,7 +14,6 @@ import com.bitti06.modplayjs.engine.AndroidTrack
 import com.bitti06.modplayjs.engine.PlaybackSession
 import com.bitti06.modplayjs.engine.QueueItem
 import com.google.common.util.concurrent.Futures
-import java.util.Locale
 import com.google.common.util.concurrent.ListenableFuture
 
 /**
@@ -45,7 +44,6 @@ class ModplayPlayer(
     private var cachedTitle = ""
     private var cachedArtist = ""
     private var cachedDurationUs = C.TIME_UNSET
-    private var cachedArtistLine = ""
     private var lastLoggedDuration: Long? = null
     private var cachedSeekable = false
     private var cachedItems: List<MediaItemData> = emptyList()
@@ -160,17 +158,6 @@ class ModplayPlayer(
                 C.TIME_UNSET
             }
         val seekable = snap?.capabilities?.seekable == true
-        // The system media card shows no timestamps at rest, so the current
-        // item's subtitle carries them; it changes once a second while playing.
-        val artistLine =
-            if (durationUs != C.TIME_UNSET) {
-                val position = snap?.state?.positionMs?.toLong() ?: 0L
-                listOf(artist.takeIf { it.isNotBlank() }, "${clock(position)} / ${clock(durationUs / 1000)}")
-                    .filterNotNull()
-                    .joinToString(" · ")
-            } else {
-                artist
-            }
         val start =
             (currentIndex - WINDOW / 2)
                 .coerceAtLeast(0)
@@ -183,7 +170,6 @@ class ModplayPlayer(
             cachedTitle == title &&
             cachedArtist == artist &&
             cachedDurationUs == durationUs &&
-            cachedArtistLine == artistLine &&
             cachedSeekable == seekable
         ) {
             windowStart = cachedStart
@@ -211,16 +197,11 @@ class ModplayPlayer(
                                     )
                                     .setArtist(
                                         if (current) {
-                                            artistLine.ifBlank { item.format.uppercase() }
+                                            artist.takeIf { it.isNotBlank() } ?: item.format.uppercase()
                                         } else {
                                             item.format.uppercase()
                                         },
                                     )
-                                    // Surfaces differ in which line they read, so
-                                    // the time goes in both.
-                                    .apply {
-                                        if (current) setSubtitle(artistLine.ifBlank { item.format.uppercase() })
-                                    }
                                     // The system media player reads the length from
                                     // METADATA_KEY_DURATION as well as from the
                                     // player; give it both.
@@ -242,7 +223,6 @@ class ModplayPlayer(
         cachedTitle = title
         cachedArtist = artist
         cachedDurationUs = durationUs
-        cachedArtistLine = artistLine
         cachedSeekable = seekable
         cachedItems = built
         windowStart = start
@@ -281,19 +261,6 @@ class ModplayPlayer(
             }
         }
         return Futures.immediateVoidFuture()
-    }
-
-    /** mm:ss, or h:mm:ss past an hour. */
-    private fun clock(ms: Long): String {
-        val total = (ms / 1000).coerceAtLeast(0)
-        val hours = total / 3600
-        val minutes = (total % 3600) / 60
-        val seconds = total % 60
-        return if (hours > 0) {
-            String.format(Locale.ROOT, "%d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            String.format(Locale.ROOT, "%d:%02d", minutes, seconds)
-        }
     }
 
     private companion object {
