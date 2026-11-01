@@ -38,10 +38,10 @@ V8 is a pinned prebuilt static library from NativeScript/v8-buildscripts
 (V8 14.9.207.39, NDK r29). No depot_tools or Chromium checkout.
 
 ```sh
-./apps/android/scripts/fetch-v8-prebuilt.sh arm64-v8a build/v8-prebuilt
+node apps/android/scripts/fetch-v8.mjs arm64-v8a
 cd apps/android
 ./gradlew :app:assembleDebug \
-  -Pv8Dir="$PWD/../../build/v8-prebuilt/android-arm64-v8a"
+  -Pv8Dir="$(node apps/android/scripts/fetch-v8.mjs arm64-v8a)"
 ```
 
 Or simply:

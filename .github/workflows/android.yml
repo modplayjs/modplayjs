@@ -35,7 +35,7 @@ jobs:
       - name: Build engine bundle
         run: npm run build:engine -w @modplayjs/android
       - name: Fetch prebuilt V8
-        run: ./apps/android/scripts/fetch-v8-prebuilt.sh arm64-v8a build/v8-prebuilt
+        run: node apps/android/scripts/fetch-v8.mjs arm64-v8a
       - uses: gradle/actions/setup-gradle@v6
       - name: Assemble debug
         working-directory: apps/android

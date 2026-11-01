@@ -47,40 +47,10 @@ if (-not $env:ANDROID_HOME -and -not $env:ANDROID_SDK_ROOT) {
 }
 if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = $env:ANDROID_SDK_ROOT }
 
-$V8Version = "14.9.207.39"
-$V8Tag = "v8-$V8Version-7"
-$V8Base = "https://github.com/NativeScript/v8-buildscripts/releases/download/$V8Tag"
-$OutDir = Join-Path $Root "build\v8-prebuilt"
-$V8Dir = Join-Path $OutDir "v8-$Abi"
-
+$V8Dir = ""
 if (-not $SkipV8) {
-    $Lib = Join-Path $V8Dir "lib\libv8_monolith.a"
-    if (-not (Test-Path $Lib)) {
-        New-Item -ItemType Directory -Force $OutDir | Out-Null
-        $Archive = Join-Path $OutDir "v8-$V8Version-android-$Abi.tar.gz"
-        $Sums = Join-Path $OutDir "SHA256SUMS"
-
-        Write-Host "Fetching V8 $V8Version ($Abi)..."
-        Invoke-WebRequest "$V8Base/v8-$V8Version-android-$Abi.tar.gz" -OutFile $Archive
-        Invoke-WebRequest "$V8Base/SHA256SUMS" -OutFile $Sums
-
-        $Line = Select-String -Path $Sums -Pattern "v8-$V8Version-android-$Abi.tar.gz" |
-            Select-Object -First 1
-        if (-not $Line) { throw "V8 checksum entry not found for $Abi" }
-        $Expected = (($Line.Line -split '\s+')[0]).ToLowerInvariant()
-        $Actual = (Get-FileHash $Archive -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ($Actual -ne $Expected) {
-            throw "V8 checksum mismatch: expected $Expected, got $Actual"
-        }
-
-        $Extracted = Join-Path $OutDir "android-$Abi"
-        if (Test-Path $V8Dir) { Remove-Item -Recurse -Force $V8Dir }
-        if (Test-Path $Extracted) { Remove-Item -Recurse -Force $Extracted }
-        tar -xzf $Archive -C $OutDir
-        Move-Item $Extracted $V8Dir
-    } else {
-        Write-Host "Using existing V8 at $V8Dir"
-    }
+    $V8Dir = (node "apps/android/scripts/fetch-v8.mjs" $Abi).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "V8 fetch failed" }
 }
 
 Write-Host "Installing JS dependencies..."
