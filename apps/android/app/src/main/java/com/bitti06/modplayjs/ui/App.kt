@@ -105,8 +105,15 @@ private fun AppRoot(vm: AppViewModel) {
             if (uri != null) vm.addFolder(uri)
         }
 
-    val navigate: (NavKey) -> Unit = { backStack.add(it) }
-    val back: () -> Unit = { backStack.removeLastOrNull() }
+    // Never stack the same destination twice: a double tap on a settings
+    // button would push two identical keys, and NavDisplay resolves scenes by
+    // key, so popping one would leave the same screen on top.
+    val navigate: (NavKey) -> Unit = { key ->
+        if (backStack.lastOrNull() != key) backStack.add(key)
+    }
+    val back: () -> Unit = {
+        if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex)
+    }
     val playTrack: (TrackEntity) -> Unit = {
         vm.play(it)
         tabName = Tab.Playing.name
@@ -289,14 +296,17 @@ private fun AppRoot(vm: AppViewModel) {
             }
         }
         if (backStack.isNotEmpty()) {
+            val backdrop = MaterialTheme.colorScheme.background
             Box(
                 Modifier
                     .fillMaxSize()
+                    // Fully opaque: a translucent top stop let the tab content
+                    // show through the settings screen.
                     .background(
                         Brush.verticalGradient(
-                            0f to MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                            0.40f to MaterialTheme.colorScheme.background,
-                            1f to MaterialTheme.colorScheme.background,
+                            0f to lerp(backdrop, MaterialTheme.colorScheme.primary, 0.20f),
+                            0.40f to backdrop,
+                            1f to backdrop,
                         ),
                     ),
             ) {
@@ -309,6 +319,9 @@ private fun AppRoot(vm: AppViewModel) {
                     )
                 }
             }
+            // Safety net: the arrow and the system gesture share this pop, and
+            // this handler is registered after NavDisplay's own one.
+            BackHandler { back() }
         }
     }
 }
