@@ -45,6 +45,7 @@ class ModplayPlayer(
     private var cachedArtist = ""
     private var cachedDurationUs = C.TIME_UNSET
     private var cachedArtistLine = ""
+    private var lastLoggedDuration: Long? = null
     private var cachedSeekable = false
     private var cachedItems: List<MediaItemData> = emptyList()
 
@@ -83,6 +84,7 @@ class ModplayPlayer(
                             Player.COMMAND_PREPARE,
                             Player.COMMAND_STOP,
                             Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
+                            Player.COMMAND_SEEK_TO_MEDIA_ITEM,
                             Player.COMMAND_SEEK_TO_DEFAULT_POSITION,
                             Player.COMMAND_SEEK_TO_NEXT,
                             Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
@@ -113,6 +115,16 @@ class ModplayPlayer(
 
         if (items.isNotEmpty()) {
             builder.setCurrentMediaItemIndex((currentIndex - windowStart).coerceIn(0, items.lastIndex))
+        }
+        // One line the first time the length changes: what the platform is told,
+        // which is what decides whether it can draw a scrubber and its times.
+        val durationMs = snap?.state?.takeIf { it.durationKnown }?.durationMs?.toLong()
+        if (durationMs != lastLoggedDuration) {
+            lastLoggedDuration = durationMs
+            Log.i(
+                TAG,
+                "durationMs=${durationMs ?: "unset"} seekable=${snap?.capabilities?.seekable == true}",
+            )
         }
         val summary = "queue=${queue.size} index=$currentIndex engine=${engine?.name} item=${queue.getOrNull(currentIndex)?.name}"
         if (summary != lastLoggedState) {
