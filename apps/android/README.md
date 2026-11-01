@@ -88,6 +88,8 @@ debug APK, and verifies 16 KB ELF segment alignment.
 - Plays through the JS core in V8: float32 stereo into an `AudioTrack`, a
   queue with repeat/shuffle/auto-advance, channel mute/solo, per-format accent
   colours and an AudioEffect panel entry.
+- Swiping left on the player opens the folder the playing file lives in, at the
+  directory of that file; picking a track there plays it and returns.
 - Media3 `MediaSessionService` owns the notification, lock-screen and media
   buttons.
 - Diagnostics screen reports the engine, the audio path (buffer frames and

@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -53,6 +54,7 @@ import androidx.navigation3.ui.NavDisplay
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
+import com.bitti06.modplayjs.library.FolderEntity
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
@@ -167,6 +169,25 @@ private fun AppRoot(vm: AppViewModel) {
                 QueueScreen(queue, queueIndex, onPlay = { vm.playQueue(it) }, onBack = back)
             }
             entry<TextKey> { key -> TextEntry(key.kind, vm, settings, back) }
+            entry<FolderKey> { key ->
+                FolderEntry(
+                    key = key,
+                    actions = vm,
+                    tracks = tracks,
+                    libraryTracks = libraryTracks,
+                    folders = folders,
+                    filters = filters,
+                    onPlay = { track ->
+                        back()
+                        playTrack(track)
+                    },
+                    onPlayList = { list, index ->
+                        back()
+                        playList(list, index)
+                    },
+                    onBack = back,
+                )
+            }
             entry<IgnoredKey> { IgnoredScreen(ignored, vm, back) }
         }
 
@@ -282,6 +303,7 @@ private fun AppRoot(vm: AppViewModel) {
                             onOpenDetails = { navigate(DetailsKey) },
                             onOpenQueue = { navigate(QueueKey) },
                             onOpenText = { kind -> navigate(TextKey(kind)) },
+                            onOpenFolder = { track -> navigate(FolderKey(track.folderId, folderPathOf(track))) },
                             onBrowseLibrary = { tabName = Tab.Library.name },
                             onOpenSettings = { navigate(SettingsKey) },
                         )
@@ -388,6 +410,7 @@ private fun PlayerTab(
     onOpenDetails: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenText: (TrackText) -> Unit,
+    onOpenFolder: (TrackEntity) -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -405,8 +428,54 @@ private fun PlayerTab(
         onOpenDetails = onOpenDetails,
         onOpenQueue = onOpenQueue,
         onOpenText = onOpenText,
+        onOpenFolder = onOpenFolder,
         onBrowseLibrary = onBrowseLibrary,
         onOpenSettings = onOpenSettings,
+    )
+}
+
+/** Directory segments of a track inside its folder, as the browser wants them. */
+private fun folderPathOf(track: TrackEntity): List<String> {
+    val directory = track.relativePath.substringBeforeLast('/', "")
+    return if (directory.isEmpty()) emptyList() else directory.split('/')
+}
+
+/**
+ * The folder browser pushed from the player, open at the directory of the
+ * playing file. Picking a track plays it and returns to the player.
+ */
+@Composable
+private fun FolderEntry(
+    key: FolderKey,
+    actions: UiActions,
+    tracks: List<TrackEntity>,
+    libraryTracks: List<TrackEntity>,
+    folders: List<FolderEntity>,
+    filters: Filters,
+    onPlay: (TrackEntity) -> Unit,
+    onPlayList: (List<TrackEntity>, Int) -> Unit,
+    onBack: () -> Unit,
+) {
+    var path by remember(key) { mutableStateOf(key.path) }
+    LibraryScreen(
+        actions = actions,
+        tracks = tracks,
+        libraryTracks = libraryTracks,
+        folders = folders,
+        filters = filters,
+        rootId = key.folderId,
+        path = path,
+        // The browser reports "up" from the root as a null root; here that is
+        // the end of the pushed screen, not a return to the folder list.
+        onNavigate = { root, next ->
+            if (root == null) onBack() else path = next
+        },
+        onPlay = onPlay,
+        onPlayList = onPlayList,
+        onAddFolder = {},
+        onOpenSettings = {},
+        title = folders.firstOrNull { it.id == key.folderId }?.name,
+        onBack = onBack,
     )
 }
 

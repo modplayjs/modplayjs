@@ -10,6 +10,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -58,6 +59,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,6 +94,7 @@ fun PlayerScreen(
     onOpenDetails: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenText: (TrackText) -> Unit,
+    onOpenFolder: (TrackEntity) -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -99,6 +102,9 @@ fun PlayerScreen(
     val snap = snapshot
     val track = snap?.track
     var channelDialog by remember { mutableStateOf(false) }
+    // The track the gesture works on: the library row of what is playing, which
+    // is what knows the folder. Null when the tune has no row in the library.
+    val openable = currentTrack
 
     val accent = track?.let { accentColor(it.format) } ?: MaterialTheme.colorScheme.primary
     Box(
@@ -110,7 +116,25 @@ fun PlayerScreen(
                     0.45f to MaterialTheme.colorScheme.background,
                     1f to lerp(MaterialTheme.colorScheme.background, accent, 0.12f),
                 ),
-            ),
+            )
+            // Swipe left for the folder the playing file lives in. Sliders,
+            // the channel strip and other horizontal children claim the drag
+            // first, so the gesture only fires on the free area.
+            .pointerInput(openable) {
+                val target = openable ?: return@pointerInput
+                var dragged = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { dragged = 0f },
+                    onDragEnd = {
+                        if (dragged < -size.width * 0.18f) onOpenFolder(target)
+                        dragged = 0f
+                    },
+                    onDragCancel = { dragged = 0f },
+                ) { change, amount ->
+                    dragged += amount
+                    change.consume()
+                }
+            },
     ) {
         Column(
             Modifier
@@ -804,6 +828,7 @@ private fun PlayerContentPreview(snapshot: AndroidSnapshot?) {
         onOpenDetails = {},
         onOpenQueue = {},
         onOpenText = {},
+        onOpenFolder = {},
         onBrowseLibrary = {},
         onOpenSettings = {},
     )

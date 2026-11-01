@@ -58,3 +58,13 @@ data class TextKey(
 
 @Serializable
 data object IgnoredKey : NavKey
+
+/**
+ * The folder browser opened from the player: the folder holding the playing
+ * track, already descended to the directory the file sits in.
+ */
+@Serializable
+data class FolderKey(
+    val folderId: String,
+    val path: List<String> = emptyList(),
+) : NavKey

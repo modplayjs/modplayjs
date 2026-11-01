@@ -135,6 +135,9 @@ fun LibraryScreen(
     onPlayList: (List<TrackEntity>, Int) -> Unit,
     onAddFolder: () -> Unit,
     onOpenSettings: () -> Unit,
+    /** Set when pushed from the player; shows a back arrow and the given title. */
+    title: String? = null,
+    onBack: (() -> Unit)? = null,
 ) {
     var showFilters by remember { mutableStateOf(false) }
     var showTrackActions by remember { mutableStateOf<TrackEntity?>(null) }
@@ -171,15 +174,24 @@ fun LibraryScreen(
 
     Column(Modifier.fillMaxSize().safeContentPadding().padding(horizontal = 12.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(AppIcons.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                }
+            }
             Text(
-                stringResource(R.string.library_title),
+                title ?: stringResource(R.string.library_title),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(onClick = onAddFolder) {
-                Icon(AppIcons.CreateNewFolder, contentDescription = stringResource(R.string.common_add_folder))
+            // A pushed folder view is for picking the next track, not for
+            // adding folders or opening settings.
+            if (onBack == null) {
+                IconButton(onClick = onAddFolder) {
+                    Icon(AppIcons.CreateNewFolder, contentDescription = stringResource(R.string.common_add_folder))
+                }
             }
             IconButton(onClick = { showFilters = true }) {
                 Icon(
@@ -193,8 +205,10 @@ fun LibraryScreen(
                         },
                 )
             }
-            IconButton(onClick = onOpenSettings) {
-                Icon(AppIcons.Settings, contentDescription = stringResource(R.string.common_settings))
+            if (onBack == null) {
+                IconButton(onClick = onOpenSettings) {
+                    Icon(AppIcons.Settings, contentDescription = stringResource(R.string.common_settings))
+                }
             }
         }
         OutlinedTextField(
