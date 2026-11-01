@@ -602,6 +602,20 @@ fun DiagnosticsScreen(
 
         // What the samples actually travel through, from the engine's float32
         // ring to the AudioTrack the platform mixes.
+        // Battery optimisation blocks foreground starts from the background, so a
+        // card that will not come back often ends here.
+        val power = context.getSystemService(android.os.PowerManager::class.java)
+        InfoRow(
+            stringResource(R.string.diag_battery),
+            stringResource(
+                if (power?.isIgnoringBatteryOptimizations(context.packageName) == true) {
+                    R.string.diag_battery_unrestricted
+                } else {
+                    R.string.diag_battery_optimized
+                },
+            ),
+        )
+
         SectionTitle(stringResource(R.string.diag_audio))
         InfoRow(stringResource(R.string.diag_output_api), stringResource(R.string.diag_output_api_value))
         InfoRow(

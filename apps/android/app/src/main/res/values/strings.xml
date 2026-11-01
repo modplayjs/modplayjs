@@ -299,6 +299,9 @@
     <string name="output_rate">Output rate</string>
     <string name="audio_session">Audio session</string>
     <string name="underruns">Underruns</string>
+    <string name="diag_battery">Battery use</string>
+    <string name="diag_battery_unrestricted">unrestricted</string>
+    <string name="diag_battery_optimized">optimised</string>
     <string name="diag_audio">Audio output</string>
     <string name="diag_engine_version">Engine formats</string>
     <string name="diag_duration">Track length</string>

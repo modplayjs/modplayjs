@@ -10,8 +10,10 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Bundle
+import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
@@ -43,6 +45,8 @@ class PlaybackService : MediaSessionService() {
     private var resumeOnFocus = false
     private var transientLoss = false
     private var lastFocusAttemptMs = 0L
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val nudgeNotification = Runnable { restoreNotification() }
 
     private val noisyReceiver =
         object : BroadcastReceiver() {
@@ -57,6 +61,21 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         audioManager = getSystemService(AudioManager::class.java)
         player = ModplayPlayer(Looper.getMainLooper(), AppGraph.session)
+        // Media3 updates the notification on its own events; a short delay puts
+        // the re-attach after that, so it shows the new track, not the old one.
+        player.addListener(
+            object : Player.Listener {
+                override fun onMediaItemTransition(
+                    mediaItem: MediaItem?,
+                    reason: Int,
+                ) = nudge()
+
+                override fun onPlayWhenReadyChanged(
+                    playWhenReady: Boolean,
+                    reason: Int,
+                ) = nudge()
+            },
+        )
         // Ongoing while playing: the media card stays until playback stops.
         notificationProvider = StickyMediaNotificationProvider(this)
         setMediaNotificationProvider(notificationProvider)
@@ -124,8 +143,16 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = mediaSession
 
+    /** Re-attaches the card shortly after the player changed, once Media3 rebuilt it. */
+    private fun nudge() {
+        mainHandler.removeCallbacks(nudgeNotification)
+        mainHandler.postDelayed(nudgeNotification, NUDGE_DELAY_MS)
+    }
+
     /** Re-posts the card after it was swiped away. */
     private fun restoreNotification() {
+        if (!::mediaSession.isInitialized) return
+        if (mediaSession.player.currentMediaItem == null) return
         val notification = notificationProvider.last() ?: return
         runCatching {
             startForeground(
@@ -285,6 +312,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(nudgeNotification)
         scope.cancel()
         focusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
         runCatching { unregisterReceiver(noisyReceiver) }
@@ -295,6 +323,9 @@ class PlaybackService : MediaSessionService() {
     }
 
     companion object {
+        /** Wait for Media3 to rebuild the notification before re-attaching it. */
+        private const val NUDGE_DELAY_MS = 200L
+
         /** Custom action of the media card's favourite button. */
         private const val FAVORITE_ACTION = "com.bitti06.modplayjs.FAVORITE"
 
