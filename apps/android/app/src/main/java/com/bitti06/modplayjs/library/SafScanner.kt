@@ -92,6 +92,12 @@ class SafScanner(
          * plugins registered in `engine/src/engine-entry.ts` plus the streamed
          * audio decoder (wav/mp3/ogg). Files with any other extension are not
          * indexed at all.
+         *
+         * `.mo3` is deliberately absent: the Un4seen container is not
+         * registered in the Android bundle until its decoder is finished, so
+         * those files stay out of the library (a rescan drops rows for them)
+         * instead of appearing and failing to play. mp3 streaming is separate
+         * and unaffected: it uses the minimp3 decoder from the same package.
          */
         private val formats =
             mapOf(
@@ -119,7 +125,6 @@ class SafScanner(
                 "med2" to "med",
                 "med3" to "med",
                 "med4" to "med",
-                "mo3" to "mo3",
                 "fc13" to "fc",
                 "fc14" to "fc",
                 "sid" to "sid",

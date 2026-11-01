@@ -21,7 +21,6 @@ import {
   med4Plugin,
 } from '@modplayjs/fmt-med';
 import { plugin as stPlugin } from '@modplayjs/fmt-st';
-import { plugin as mo3Plugin } from '@modplayjs/fmt-mo3';
 import {
   plugin as sidPlugin,
   sidDsp,
@@ -73,7 +72,6 @@ core.registries.registerFormat(med2Plugin);
 core.registries.registerFormat(med3Plugin);
 core.registries.registerFormat(med4Plugin);
 core.registries.registerFormat(stPlugin);
-core.registries.registerFormat(mo3Plugin);
 core.registries.registerFormat(sidPlugin);
 core.registries.registerFormat(fcPlugin);
 core.registries.registerEffect(fcEffect);
