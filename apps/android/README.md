@@ -55,12 +55,47 @@ Or simply:
 `.github/workflows/android.yml` fetches the pinned prebuilt V8, builds the
 debug APK, and verifies 16 KB ELF segment alignment.
 
+## What the app does
+
+- Scans folders through the Storage Access Framework (persisted tree grants),
+  indexing tracker modules, SID tunes and streamed audio into Room, with
+  favourites, ignore list, search and filters.
+- Plays through the JS core in V8: float32 stereo into an `AudioTrack`, a
+  queue with repeat/shuffle/auto-advance, channel mute/solo, per-format accent
+  colours and an AudioEffect panel entry.
+- Media3 `MediaSessionService` owns the notification, lock-screen and media
+  buttons.
+- Diagnostics screen reports the engine, the audio path (buffer frames and
+  time, framework minimum, play state, device burst, effects panel) and the
+  capabilities the engine reports for the loaded track.
+- UI in English and German, chosen in Settings → Language; the same list is
+  declared in `res/xml/locales_config.xml` for Android's per-app language
+  settings.
+
 ## Notes
 
-- `minSdk 35`, `targetSdk 36`, package `com.bitti06.modplayjs`, debug suffix `.debug`.
-- No iOS/desktop support.
-- No WASM, no prerender, no WebView.
-- Pattern view and visualization are hidden in this stage.
+- `minSdk 35` (Android 15), `compileSdk`/`targetSdk` 37 (Android 17), package
+  `com.bitti06.modplayjs`, debug suffix `.debug`.
+- Compose Material 3 Expressive (`MaterialExpressiveTheme`), Navigation 3 for
+  the modal stack, Room 3 (`androidx.room3`) with destructive schema changes.
+- No iOS/desktop support, no WASM, no prerender, no WebView. The UI is native
+  Compose; the JS core runs headless in V8.
+- `ViewSettings` still carries `patternView`, `artwork`, `follow` and
+  `visualizer` flags; the Android UI does not surface them yet.
+- Android 17 hardening: edge-to-edge with system bar icons following the in-app
+  theme, `useLegacyPackaging = false` so `libmodplay_v8.so` is mapped read-only
+  from the APK, and 16 KB page alignment for the native library.
+
+## Source map
+
+| path | contents |
+|---|---|
+| `MainActivity.kt`, `ModplayApp.kt`, `AppGraph.kt` | entry point, warm-up, process-wide singletons |
+| `engine/` | `PlaybackSession` (queue, transport, snapshots), `V8Engine` JNI, `AudioTrackOutput`, `PcmRing`, settings store |
+| `library/` | Room 3 entities/DAO, repository and SAF scanner |
+| `media/` | Media3 session service and `SimpleBasePlayer` facade over the engine |
+| `ui/` | Compose screens, navigation keys, theme, icons, `SupportedLocales` |
+| `src/main/assets/engine/engine.js` | bundled JS core (built by `npm run build:engine`) |
 
 
 ## Windows
