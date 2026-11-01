@@ -85,6 +85,12 @@ class PlaybackService : Service() {
                     },
                 )
                 isActive = true
+                setMediaButtonReceiver(
+                    MediaButtonReceiver.buildMediaButtonPendingIntent(
+                        this@PlaybackService,
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE,
+                    ),
+                )
             }
         registerReceiver(noisyReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), RECEIVER_NOT_EXPORTED)
         collectJob =

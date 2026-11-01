@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -5,7 +7,11 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-val v8Dir: String? = project.findProperty("v8Dir") as String?
+val repoRoot = rootProject.projectDir.parentFile.parentFile
+val defaultV8 = File(repoRoot, "build/v8-prebuilt/android-arm64-v8a")
+val v8Dir: String? = (project.findProperty("v8Dir") as String?)
+    ?: defaultV8.takeIf { File(it, "lib/libv8_monolith.a").isFile }?.absolutePath
+val v8Path = v8Dir?.replace('\\', '/')
 
 android {
     namespace = "com.bitti06.modplayjs"
@@ -20,14 +26,14 @@ android {
         versionName = "0.2.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a") }
-        if (v8Dir != null) {
-            externalNativeBuild {
-                cmake {
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DMODPLAY_V8=${if (v8Path != null) "ON" else "OFF"}")
+                if (v8Path != null) {
                     arguments +=
                         listOf(
-                            "-DMODPLAY_V8=ON",
-                            "-DV8_LIB=$v8Dir/lib/libv8_monolith.a",
-                            "-DV8_INCLUDE=$v8Dir/include",
+                            "-DV8_LIB=$v8Path/lib/libv8_monolith.a",
+                            "-DV8_INCLUDE=$v8Path/include",
                         )
                 }
             }
