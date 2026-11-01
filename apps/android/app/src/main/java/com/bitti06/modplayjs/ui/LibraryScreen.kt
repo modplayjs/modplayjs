@@ -260,8 +260,9 @@ fun LibraryScreen(
             text = {
                 Column {
                     Text("${folder.fileCount} files · ${folder.status}", style = MaterialTheme.typography.bodySmall)
-                    if (folder.error != null) {
-                        Text(folder.error ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    val error = folder.error
+                    if (error != null) {
+                        Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
                 }
             },
