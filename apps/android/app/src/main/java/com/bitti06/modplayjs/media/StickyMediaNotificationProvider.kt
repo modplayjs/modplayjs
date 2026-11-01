@@ -75,11 +75,16 @@ class StickyMediaNotificationProvider(
         private const val RESTORE_REQUEST = 1001
     }
 
+    /**
+     * A broadcast, not a service start: MediaSessionService treats a start it
+     * did not issue as foreign, stops itself and removes the notification, so
+     * the restore has to travel around it.
+     */
     private fun restoreIntent(): PendingIntent =
-        PendingIntent.getService(
+        PendingIntent.getBroadcast(
             context,
             RESTORE_REQUEST,
-            Intent(context, PlaybackService::class.java).setAction(ACTION_RESTORE),
+            Intent(ACTION_RESTORE).setPackage(context.packageName),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
