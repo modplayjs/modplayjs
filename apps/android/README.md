@@ -121,7 +121,8 @@ debug APK, and verifies 16 KB ELF segment alignment.
   whole queue, which can be thousands of items: every playlist change is mapped
   and sent across the session binder on the main thread. The current item
   publishes its length as metadata so the system media card can draw a scrubber;
-  its timestamps are SystemUI's own element, not something the session feeds.
+  its timestamps are SystemUI's own element, not something the session feeds. The
+  card carries one custom button, a heart that favourites the playing track.
 - Diagnostics screen reports the engine, the audio path (buffer frames and
   time, framework minimum, play state, device burst, effects panel) and the
   capabilities the engine reports for the loaded track.

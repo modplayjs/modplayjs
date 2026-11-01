@@ -8,17 +8,27 @@ import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
+import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import com.bitti06.modplayjs.AppGraph
 import com.bitti06.modplayjs.MainActivity
+import com.bitti06.modplayjs.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class PlaybackService : MediaSessionService() {
@@ -47,6 +57,7 @@ class PlaybackService : MediaSessionService() {
         mediaSession =
             MediaSession
                 .Builder(this, player)
+                .setCallback(callback)
                 .setSessionActivity(
                     PendingIntent.getActivity(
                         this,
@@ -71,6 +82,20 @@ class PlaybackService : MediaSessionService() {
             AppGraph.session.queue.collectLatest { player.onQueueChanged() }
         }
 
+        // The card shows one custom button; it mirrors the favourite flag of
+        // whatever is playing, so it toggles like the heart in the player.
+        scope.launch {
+            combine(
+                AppGraph.session.queue,
+                AppGraph.session.queueIndex,
+                AppGraph.library.tracks,
+            ) { queue, index, rows ->
+                val id = queue.getOrNull(index)?.id
+                rows.firstOrNull { it.id == id }?.favoriteAt != null
+            }.distinctUntilChanged()
+                .collect { favorite -> mediaSession.setCustomLayout(listOf(favoriteButton(favorite))) }
+        }
+
         scope.launch {
             AppGraph.session.snapshot.collectLatest { snap ->
                 player.onSnapshot(snap)
@@ -85,6 +110,55 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = mediaSession
+
+    private val favoriteCommand = SessionCommand(FAVORITE_ACTION, Bundle.EMPTY)
+
+    private fun favoriteButton(favorite: Boolean): CommandButton =
+        CommandButton
+            .Builder()
+            .setDisplayName(
+                getString(if (favorite) R.string.cd_remove_favorite else R.string.cd_add_favorite),
+            ).setIconResId(if (favorite) R.drawable.ic_media_favorite else R.drawable.ic_media_favorite_border)
+            .setSessionCommand(favoriteCommand)
+            .build()
+
+    /**
+     * One custom command: favourite the playing track. The session only offers
+     * commands it granted at connect time, so it is added to the accepted set.
+     */
+    private val callback =
+        object : MediaSession.Callback {
+            override fun onConnect(
+                session: MediaSession,
+                controller: MediaSession.ControllerInfo,
+            ): MediaSession.ConnectionResult =
+                MediaSession.ConnectionResult
+                    .AcceptedResultBuilder(session)
+                    .setAvailableSessionCommands(
+                        MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS
+                            .buildUpon()
+                            .add(favoriteCommand)
+                            .build(),
+                    ).build()
+
+            override fun onCustomCommand(
+                session: MediaSession,
+                controller: MediaSession.ControllerInfo,
+                customCommand: SessionCommand,
+                args: Bundle,
+            ): ListenableFuture<SessionResult> {
+                if (customCommand.customAction != FAVORITE_ACTION) {
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
+                }
+                val id = AppGraph.session.queue.value.getOrNull(AppGraph.session.queueIndex.value)?.id
+                    ?: return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_INVALID_STATE))
+                scope.launch {
+                    val favorite = AppGraph.library.tracks.first().firstOrNull { it.id == id }?.favoriteAt != null
+                    AppGraph.library.setFavorite(id, !favorite)
+                }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+        }
 
     private fun requestFocus() {
         if (focusRequest != null) return
@@ -147,6 +221,9 @@ class PlaybackService : MediaSessionService() {
     }
 
     companion object {
+        /** Custom action of the media card's favourite button. */
+        private const val FAVORITE_ACTION = "com.bitti06.modplayjs.FAVORITE"
+
         /** Do not hammer audio focus while Android 17 rejects it. */
         private const val FOCUS_RETRY_MS = 2_000L
 
