@@ -176,6 +176,7 @@
     <string name="details_message">Message</string>
     <string name="details_mute_unavailable">Channel mute is not available for this engine.</string>
     <string name="details_solo">SOLO</string>
+    <string name="text_empty_body">Nothing to show for this module.</string>
     <string name="details_no_message">No module message.</string>
     <string name="details_file">File</string>
     <string name="details_name">Title</string>

@@ -166,7 +166,7 @@ private fun AppRoot(vm: AppViewModel) {
             entry<QueueKey> {
                 QueueScreen(queue, queueIndex, onPlay = { vm.playQueue(it) }, onBack = back)
             }
-            entry<MessageKey> { MessageEntry(vm, back) }
+            entry<TextKey> { key -> TextEntry(key.kind, vm, settings, back) }
             entry<IgnoredKey> { IgnoredScreen(ignored, vm, back) }
         }
 
@@ -281,7 +281,7 @@ private fun AppRoot(vm: AppViewModel) {
                             settings = settings,
                             onOpenDetails = { navigate(DetailsKey) },
                             onOpenQueue = { navigate(QueueKey) },
-                            onOpenMessage = { navigate(MessageKey) },
+                            onOpenText = { kind -> navigate(TextKey(kind)) },
                             onBrowseLibrary = { tabName = Tab.Library.name },
                             onOpenSettings = { navigate(SettingsKey) },
                         )
@@ -387,7 +387,7 @@ private fun PlayerTab(
     settings: AndroidSettings,
     onOpenDetails: () -> Unit,
     onOpenQueue: () -> Unit,
-    onOpenMessage: () -> Unit,
+    onOpenText: (TrackText) -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -402,19 +402,21 @@ private fun PlayerTab(
         error = error,
         onOpenDetails = onOpenDetails,
         onOpenQueue = onOpenQueue,
-        onOpenMessage = onOpenMessage,
+        onOpenText = onOpenText,
         onBrowseLibrary = onBrowseLibrary,
         onOpenSettings = onOpenSettings,
     )
 }
 
 @Composable
-private fun MessageEntry(
+private fun TextEntry(
+    kind: TrackText,
     vm: AppViewModel,
+    settings: AndroidSettings,
     onBack: () -> Unit,
 ) {
     val snapshot by vm.snapshot.collectAsStateWithLifecycle()
-    MessageScreen(snapshot?.track?.message, onBack)
+    TrackTextScreen(kind, snapshot, settings, onBack)
 }
 
 @Composable

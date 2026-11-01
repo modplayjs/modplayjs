@@ -67,16 +67,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.isSpecified
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidSettings
@@ -94,7 +89,7 @@ fun PlayerScreen(
     error: PlayError?,
     onOpenDetails: () -> Unit,
     onOpenQueue: () -> Unit,
-    onOpenMessage: () -> Unit,
+    onOpenText: (TrackText) -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -250,9 +245,9 @@ fun PlayerScreen(
                                 stringResource(R.string.info_message),
                                 Modifier.weight(1f),
                                 MaterialTheme.colorScheme.tertiary,
-                                onExpand = onOpenMessage,
+                                onExpand = { onOpenText(TrackText.Message) },
                             ) {
-                                MessageText(message.replace("\r", ""))
+                                MonospaceText(message.replace("\r", ""))
                             }
                         }
                         if (instruments.isNotEmpty()) {
@@ -260,6 +255,7 @@ fun PlayerScreen(
                                 stringResource(R.string.info_instruments),
                                 Modifier.weight(1f),
                                 MaterialTheme.colorScheme.primary,
+                                onExpand = { onOpenText(TrackText.Instruments) },
                             ) {
                                 instruments.forEach { instrument ->
                                     Text(
@@ -275,6 +271,7 @@ fun PlayerScreen(
                                 stringResource(R.string.info_samples),
                                 Modifier.weight(1f),
                                 MaterialTheme.colorScheme.secondary,
+                                onExpand = { onOpenText(TrackText.Samples) },
                             ) {
                                 samples.forEach { sample ->
                                     // The slot number always stays, so an empty
@@ -527,61 +524,6 @@ fun SystemEffectsUnavailableDialog(onDismiss: () -> Unit) {
     )
 }
 
-/**
- * Lists an instrument as the module shows it: unnamed slots keep their number
- * and print nothing else, instead of repeating "(unnamed)" down the list.
- */
-@Composable
-private fun instrumentLine(
-    number: Int,
-    name: String,
-): String {
-    val trimmed = name.trim()
-    return if (trimmed.isEmpty()) "$number." else stringResource(R.string.list_numbered, number, trimmed)
-}
-
-/** Same for samples, where the length (and loop flag) still carries meaning. */
-@Composable
-private fun sampleLine(
-    number: Int,
-    name: String,
-    length: Int,
-    loop: Boolean,
-    showLength: Boolean,
-    showLoop: Boolean,
-): String {
-    val trimmed = name.trim()
-    val looping = loop && showLoop
-    return when {
-        // An empty slot has neither a name nor audio; the length would only
-        // print a meaningless "0" for every unused sample.
-        trimmed.isEmpty() && length <= 0 -> "$number."
-        trimmed.isEmpty() ->
-            if (showLength) {
-                stringResource(
-                    if (looping) R.string.sample_line_unnamed_loop else R.string.sample_line_unnamed,
-                    number,
-                    length,
-                )
-            } else {
-                "$number."
-            }
-        showLength ->
-            stringResource(
-                if (looping) R.string.sample_line_loop else R.string.sample_line,
-                number,
-                trimmed,
-                length,
-            )
-        else ->
-            stringResource(
-                if (looping) R.string.sample_line_no_length_loop else R.string.sample_line_no_length,
-                number,
-                trimmed,
-            )
-    }
-}
-
 /** A titled, independently scrolling box used on the Now Playing screen. */
 @Composable
 private fun InfoBox(
@@ -725,91 +667,6 @@ private fun ChannelDialog(
     )
 }
 
-/**
- * Fixed-width message text. Module art is up to ~80 columns, which does not fit
- * a phone, so the text is scaled down until its widest line fits the available
- * width; panning sideways is not needed. Lines never wrap, so the columns stay
- * where the creator put them.
- */
-@Composable
-private fun MessageText(
-    text: String,
-    modifier: Modifier = Modifier,
-    scrollable: Boolean = false,
-) {
-    val measurer = rememberTextMeasurer()
-    val base = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-    BoxWithConstraints(modifier) {
-        val style =
-            remember(text, constraints.maxWidth, base) {
-                fittedStyle(measurer, text, base, (constraints.maxWidth - 4).coerceAtLeast(1))
-            }
-        Text(
-            text,
-            style = style,
-            softWrap = false,
-            modifier =
-                (if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-                    .fillMaxWidth(),
-        )
-    }
-}
-
-/**
- * Shrinks [base] until the widest line fits [target] pixels. One pass is not
- * enough: the ratio is taken at the base size, and glyph advances round to
- * whole pixels once the font is smaller, which made the last column spill out.
- */
-private fun fittedStyle(
-    measurer: TextMeasurer,
-    text: String,
-    base: TextStyle,
-    target: Int,
-): TextStyle {
-    fun scaled(scale: Float): TextStyle =
-        if (base.lineHeight.isSpecified) {
-            base.copy(fontSize = base.fontSize * scale, lineHeight = base.lineHeight * scale)
-        } else {
-            base.copy(fontSize = base.fontSize * scale)
-        }
-
-    val first = measurer.measure(AnnotatedString(text), style = base, softWrap = false)
-    if (first.size.width <= target) return base
-    var scale = target.toFloat() / first.size.width
-    var style = scaled(scale)
-    repeat(2) {
-        val measured = measurer.measure(AnnotatedString(text), style = style, softWrap = false)
-        if (measured.size.width <= target) return style
-        scale *= target.toFloat() / measured.size.width
-        style = scaled(scale)
-    }
-    return style
-}
-
-/** The whole module message, scaled to the screen instead of panned sideways. */
-@Composable
-fun MessageScreen(
-    message: String?,
-    onBack: () -> Unit,
-) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-        ModalTopBar(stringResource(R.string.info_message), onBack)
-        val text = message?.replace("\r", "")?.takeIf { it.isNotBlank() }
-        if (text == null) {
-            EmptyState(
-                title = stringResource(R.string.info_message),
-                body = stringResource(R.string.details_no_message),
-            )
-            return
-        }
-        MessageText(
-            text,
-            modifier = Modifier.weight(1f).padding(top = 8.dp, bottom = 24.dp),
-            scrollable = true,
-        )
-    }
-}
-
 @Composable
 fun DetailsScreen(
     snapshot: AndroidSnapshot?,
@@ -914,7 +771,7 @@ fun DetailsScreen(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                 } else {
-                    MessageText(message)
+                    MonospaceText(message)
                 }
             }
             item { Spacer(Modifier.height(24.dp)) }

@@ -164,6 +164,7 @@
     <string name="details_message">Nachricht</string>
     <string name="details_mute_unavailable">Kanäle stummschalten ist für diese Engine nicht verfügbar.</string>
     <string name="details_solo">SOLO</string>
+    <string name="text_empty_body">Für dieses Modul gibt es nichts anzuzeigen.</string>
     <string name="details_no_message">Keine Modul-Nachricht.</string>
     <string name="details_file">Datei</string>
     <string name="details_name">Titel</string>

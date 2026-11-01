@@ -85,6 +85,7 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.android)
@@ -95,4 +96,7 @@ dependencies {
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
+    // Layout previews in Android Studio (the Compose equivalent of the layout
+    // editor); only the debug build carries the tooling UI itself.
+    debugImplementation(libs.androidx.compose.ui.tooling)
 }

@@ -52,7 +52,9 @@ data object DetailsKey : NavKey
 data object QueueKey : NavKey
 
 @Serializable
-data object MessageKey : NavKey
+data class TextKey(
+    val kind: TrackText,
+) : NavKey
 
 @Serializable
 data object IgnoredKey : NavKey
