@@ -1,6 +1,7 @@
 package com.bitti06.modplayjs
 
 import android.content.Context
+import android.util.Log
 import com.bitti06.modplayjs.engine.PlaybackSession
 import com.bitti06.modplayjs.engine.SettingsStore
 import com.bitti06.modplayjs.library.LibraryDb
@@ -15,6 +16,16 @@ object AppGraph {
 
     fun init(context: Context) {
         appContext = context.applicationContext
-        session.setSettings(settings.load())
+        // Building the player costs a V8 dlopen, a 1.4 MB engine.js compile and
+        // an AudioTrack. Do that on a background thread so the first frame is
+        // not blocked by it; later accesses wait for this initialisation
+        // instead of performing it.
+        Thread(
+            {
+                runCatching { session.setSettings(settings.load()) }
+                    .onFailure { Log.e("AppGraph", "player warm-up failed", it) }
+            },
+            "app-warmup",
+        ).start()
     }
 }
