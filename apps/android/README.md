@@ -61,3 +61,27 @@ debug APK, and verifies 16 KB ELF segment alignment.
 - No iOS/desktop support.
 - No WASM, no prerender, no WebView.
 - Pattern view and visualization are hidden in this stage.
+
+
+## Windows
+
+From the repository root:
+
+```bat
+apps\android\scripts\build-windows.cmd
+```
+
+Release build:
+
+```bat
+apps\android\scripts\build-windows.cmd -Task :app:assembleRelease
+```
+
+Stub build without V8:
+
+```bat
+apps\android\scripts\build-windows.cmd -SkipV8
+```
+
+The script verifies the pinned V8 SHA-256, builds the JS packages and engine
+bundle, then runs `gradlew.bat` with `-Pv8Dir`.
