@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 108 108">
+  <!--
+    Play Store icon: the launcher icon (mipmap-anydpi/ic_launcher.xml) on the
+    same #0C0A18 backdrop the app uses. Regenerate with:
+      rsvg-convert -w 512 -h 512 store/icon.svg -o store/icon-512.png
+    This is a placeholder mark; replace the path and re-render when the real
+    logo exists, keeping the same file names.
+  -->
+  <defs>
+    <linearGradient id="backdrop" x1="0" y1="0" x2="0.7" y2="1">
+      <stop offset="0" stop-color="#1A1436" />
+      <stop offset="0.55" stop-color="#0F0C1F" />
+      <stop offset="1" stop-color="#0C0A18" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.55">
+      <stop offset="0" stop-color="#8EA2FF" stop-opacity="0.32" />
+      <stop offset="1" stop-color="#8EA2FF" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="108" height="108" fill="url(#backdrop)" />
+  <rect width="108" height="108" fill="url(#glow)" />
+
+  <!-- Foreground from ic_launcher_foreground.xml, untouched -->
+  <path fill="#8ea2ff" d="M30,72V36h10l14,22 14,-22h10v36h-9V51l-15,23h-1L39,51v21z" />
+</svg>

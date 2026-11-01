@@ -113,16 +113,30 @@ Required under **App content**:
 - **Notifications**: `POST_NOTIFICATIONS` is requested at first start for the
   playback notification.
 
-Store listing assets (not in this repository, they are store data):
+Store listing assets:
 
-- app icon 512 × 512 PNG, 32-bit, no transparency;
-- feature graphic 1024 × 500 PNG;
-- at least two phone screenshots (portrait), German ones optional;
+- **icon**: `store/icon-512.png` — 512 × 512, 32-bit, opaque. Rendered from
+  `store/icon.svg`, which uses the same mark as the launcher icon.
+- **feature graphic**: `store/feature-1024x500.png` — 1024 × 500, mark plus
+  wordmark, no tagline. Rendered from `store/feature.svg`.
+- **screenshots**: still needed — at least two portrait phone screenshots, German
+  ones optional.
 - short description ≤ 80 characters, full description ≤ 4000.
 
-The launcher icon in the app is an adaptive vector
-(`res/mipmap-anydpi/ic_launcher.xml`), so the 512 PNG must be rendered from it
-rather than scaled up from a device screenshot.
+Both images are placeholders built around the `M` mark; replace the paths in the
+SVGs when the real logo exists and re-render, keeping the file names:
+
+```sh
+cd apps/android
+rsvg-convert -w 512  -h 512 store/icon.svg    -o store/icon-512.png
+rsvg-convert -w 1024 -h 500 store/feature.svg -o store/feature-1024x500.png
+```
+
+The launcher icon itself is an adaptive vector
+(`res/mipmap-anydpi/ic_launcher.xml` with `drawable/ic_launcher_foreground.xml`,
+`drawable/ic_launcher_monochrome.xml` and the `ic_launcher_background` colour);
+the store PNG is rendered from the same path rather than scaled up from a
+device screenshot.
 
 ## 6. Notes
 
