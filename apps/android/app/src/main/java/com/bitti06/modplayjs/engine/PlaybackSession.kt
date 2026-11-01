@@ -388,11 +388,16 @@ class PlaybackSession(
                         } else {
                             ring.write(pcm, pcm.size / 2)
                         }
+                    } else {
+                        // The drain thread unparks this one after a read, so a
+                        // full ring costs a park instead of 250 wakeups a second.
+                        ring.awaitWrite(FRAMES, RING_WAIT_MS)
                     }
+                } else {
+                    Thread.sleep(IDLE_SLEEP_MS)
                 }
                 val now = System.currentTimeMillis()
                 if (now - lastSnapshotAt > 250) refresh()
-                Thread.sleep(4)
             } catch (t: Throwable) {
                 Log.e(TAG, "render loop", t)
                 Thread.sleep(20)
@@ -453,5 +458,11 @@ class PlaybackSession(
 
         /** Give the UI time to draw before falling back to an immediate start. */
         private const val UI_START_TIMEOUT_MS = 2_000L
+
+        /** Longest the render thread waits for ring space before rechecking. */
+        private const val RING_WAIT_MS = 20L
+
+        /** Nothing is rendering: only the throttled snapshot refresh matters. */
+        private const val IDLE_SLEEP_MS = 20L
     }
 }

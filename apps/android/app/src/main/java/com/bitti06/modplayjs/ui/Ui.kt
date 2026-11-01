@@ -93,11 +93,14 @@ fun AppWordmark(
 }
 
 @Composable
-fun SectionTitle(text: String) {
+fun SectionTitle(
+    text: String,
+    color: Color = MaterialTheme.colorScheme.primary,
+) {
     Text(
         text.uppercase(),
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
+        color = color,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 0.8.sp,
         modifier = Modifier.padding(top = 8.dp),
@@ -504,6 +507,7 @@ fun FormatBadge(text: String) {
             text,
             style = MaterialTheme.typography.labelSmall,
             fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
         )
     }

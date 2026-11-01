@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -400,7 +401,7 @@ fun PlayerScreen(
                     val muted = snap.channels.count { it.muted }
                     if (snap.capabilities.channelMute && settings.view.showChannelStrip && snap.channels.isNotEmpty()) {
                         Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            SectionTitle(stringResource(R.string.player_channels))
+                            SectionTitle(stringResource(R.string.player_channels), accent)
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 stringResource(R.string.player_channels_count, snap.channels.size, muted),
@@ -434,6 +435,15 @@ fun PlayerScreen(
                                 .fillMaxHeight()
                                 .verticalScroll(rememberScrollState()),
                         )
+                    }
+                } else if (maxHeight < 520.dp) {
+                    // Split screen or a very short window: the transport alone
+                    // can exceed the height, so the pair scrolls instead of the
+                    // info boxes collapsing to nothing.
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        infoBoxes(Modifier.heightIn(max = 240.dp).fillMaxWidth())
+                        Spacer(Modifier.height(10.dp))
+                        transport(Modifier.fillMaxWidth())
                     }
                 } else {
                     Column(Modifier.fillMaxSize()) {
