@@ -247,12 +247,7 @@ private fun ModalHost(
                     onBack = onBack,
                 )
             route == ROUTE_SETTINGS_DIAGNOSTICS ->
-                DiagnosticsScreen(
-                    vm = vm,
-                    onOpenAbout = { onOpen(ROUTE_ABOUT) },
-                    onOpenLicenses = { onOpen(ROUTE_LICENSES) },
-                    onBack = onBack,
-                )
+                DiagnosticsScreen(vm = vm, onBack = onBack)
             route == ROUTE_ABOUT ->
                 AboutScreen(
                     v8Available = vm.v8Available,

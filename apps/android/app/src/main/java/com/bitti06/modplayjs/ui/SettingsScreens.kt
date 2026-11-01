@@ -58,7 +58,6 @@ fun SettingsHub(
     onBack: () -> Unit,
 ) {
     SettingsPage("Settings", onBack) {
-        SectionTitle("Playback")
         SettingsRow(
             "Playback",
             "Repeat ${settings.playback.repeat} · auto-advance ${if (settings.playback.autoAdvance) "on" else "off"}",
@@ -75,7 +74,6 @@ fun SettingsHub(
             "SID",
             "${settings.sid.quality} · ${settings.sid.model}",
         ) { onOpen(ROUTE_SETTINGS_SID) }
-        SectionTitle("App")
         SettingsRow(
             "Appearance",
             "Theme: ${settings.view.theme}",
@@ -322,8 +320,6 @@ fun LibrarySettingsScreen(
 @Composable
 fun DiagnosticsScreen(
     vm: AppViewModel,
-    onOpenAbout: () -> Unit,
-    onOpenLicenses: () -> Unit,
     onBack: () -> Unit,
 ) {
     SettingsPage("Diagnostics", onBack) {
@@ -340,8 +336,6 @@ fun DiagnosticsScreen(
         InfoRow("Version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         InfoRow("Commit", BuildConfig.GIT_COMMIT)
         InfoRow("Variant", BuildConfig.BUILD_TYPE)
-        SettingsRow("About", "Version, commit and links", onOpenAbout)
-        SettingsRow("Licenses", "Open source notices", onOpenLicenses)
     }
 }
 
