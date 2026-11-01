@@ -25,9 +25,9 @@ val v8Dir: String? = (project.findProperty("v8Dir") as String?)
 val v8Path = v8Dir?.replace('\\', '/')
 
 // A release bump can override both without touching this file:
-//   ./gradlew bundleRelease -PversionCode=2 -PversionName=0.3.0
+//   ./gradlew bundleRelease -PversionCode=2 -PversionName=0.0.2
 val appVersionCode: Int = (findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
-val appVersionName: String = (findProperty("versionName") as String?) ?: "0.2.1"
+val appVersionName: String = (findProperty("versionName") as String?) ?: "0.0.1"
 
 // Upload signing. `keystore.properties` is not committed; a CI machine can set
 // the four environment variables instead. RELEASE.md has the keystore command.

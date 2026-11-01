@@ -41,10 +41,10 @@ not escrowed with Play means the listing cannot be updated.
 screen shows. Both can be overridden per build, so no file has to change:
 
 ```sh
-./gradlew :app:bundleRelease -PversionCode=2 -PversionName=0.3.0
+./gradlew :app:bundleRelease -PversionCode=2 -PversionName=0.0.2
 ```
 
-Without the flags the values in `app/build.gradle.kts` (`1`, `0.2.1`) are used.
+Without the flags the values in `app/build.gradle.kts` (`1`, `0.0.1`) are used.
 
 ## 3. Build the bundle
 
