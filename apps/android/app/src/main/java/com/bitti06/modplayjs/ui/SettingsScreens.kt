@@ -796,7 +796,14 @@ private fun SidSettingsPreview() {
 @Preview(name = "Settings appearance", showBackground = true, backgroundColor = 0xFF0C0A18)
 @Composable
 private fun AppearanceSettingsPreview() {
-    PreviewFrame { AppearanceSettingsScreen(PreviewActions, previewSettings(), onBack = {}) }
+    PreviewFrame {
+        AppearanceSettingsScreen(
+            actions = PreviewActions,
+            settings = previewSettings(),
+            onOpenPatternColors = {},
+            onBack = {},
+        )
+    }
 }
 
 @Preview(name = "Settings library", showBackground = true, backgroundColor = 0xFF0C0A18)
