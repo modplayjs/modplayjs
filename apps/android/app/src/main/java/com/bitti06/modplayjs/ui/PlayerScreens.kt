@@ -77,6 +77,7 @@ import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.engine.PlayError
+import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
