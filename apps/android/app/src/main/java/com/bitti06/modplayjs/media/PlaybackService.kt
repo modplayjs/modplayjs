@@ -5,12 +5,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
+import androidx.media3.common.Player
 import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -174,7 +176,23 @@ class PlaybackService : MediaSessionService() {
         startInForegroundRequired: Boolean,
     ) {
         super.onUpdateNotification(session, startInForegroundRequired)
-        if (session.player.isPlaying) notificationProvider.repost()
+        if (session.player.isPlaying) {
+            notificationProvider.repost()
+            return
+        }
+        // Paused: Media3 drops the foreground, and outside it the system lets the
+        // card be swiped away. Stay foreground with the same notification - but
+        // only while a track is loaded and not stopped, or the card would come
+        // back after the user pressed stop.
+        if (session.player.playbackState != Player.STATE_READY) return
+        val notification = notificationProvider.last() ?: return
+        runCatching {
+            startForeground(
+                notification.notificationId,
+                notification.notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+            )
+        }
     }
 
     /**

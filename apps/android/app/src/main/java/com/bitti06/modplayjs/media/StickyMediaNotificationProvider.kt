@@ -41,10 +41,13 @@ class StickyMediaNotificationProvider(
                 actionFactory,
                 onNotificationChangedCallback,
             )
+        // Ongoing whether playing or paused: a paused session is still a session
+        // the user is in the middle of, and a swipe would take the controls.
         val sticky =
             Notification.Builder
                 .recoverBuilder(context, built.notification)
-                .setOngoing(mediaSession.player.isPlaying)
+                .setOngoing(true)
+                .setAutoCancel(false)
                 .build()
                 .let { MediaNotification(built.notificationId, it) }
         lastBuilt = sticky
@@ -59,6 +62,9 @@ class StickyMediaNotificationProvider(
 
     override fun getNotificationChannelInfo(): MediaNotification.Provider.NotificationChannelInfo =
         delegate.notificationChannelInfo
+
+    /** The last notification the system accepted, for [repost] and the service. */
+    fun last(): MediaNotification? = lastBuilt
 
     /**
      * Posts the last notification again. SystemUI keeps its own "dismissed"
