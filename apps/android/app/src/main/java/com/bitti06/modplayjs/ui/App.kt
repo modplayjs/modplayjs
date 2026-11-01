@@ -163,7 +163,15 @@ private fun AppRoot(vm: AppViewModel) {
             entry<AudioSettingsKey> { AudioSettingsEntry(vm, settings, back) }
             entry<MixerSettingsKey> { MixerSettingsEntry(vm, settings, back) }
             entry<SidSettingsKey> { SidSettingsScreen(vm, settings, back) }
-            entry<AppearanceSettingsKey> { AppearanceSettingsScreen(vm, settings, back) }
+            entry<AppearanceSettingsKey> {
+                AppearanceSettingsScreen(
+                    actions = vm,
+                    settings = settings,
+                    onOpenPatternColors = { navigate(PatternColorsKey) },
+                    onBack = back,
+                )
+            }
+            entry<PatternColorsKey> { PatternColorsScreen(vm, settings, back) }
             entry<LanguageKey> { LanguageSettingsScreen(back) }
             entry<LibrarySettingsKey> {
                 LibrarySettingsScreen(
@@ -640,6 +648,7 @@ private fun PatternEntry(
         snapshot = snapshot,
         pattern = pattern,
         follow = settings.view.follow,
+        colors = settings.view.patternColors,
         onBack = onBack,
     )
 }

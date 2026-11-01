@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidPattern
 import com.bitti06.modplayjs.engine.AndroidSnapshot
+import com.bitti06.modplayjs.engine.PatternColors
 
 /**
  * The playing pattern, one row per line and one column per channel, the way a
@@ -61,8 +62,10 @@ fun PatternScreen(
     snapshot: AndroidSnapshot?,
     pattern: AndroidPattern?,
     follow: Boolean,
+    colors: PatternColors,
     onBack: () -> Unit,
 ) {
+    val palette = patternPalette(colors)
     val ord = snapshot?.state?.ord ?: 0
     val activeRow = snapshot?.state?.row ?: 0
     // Landscape is the only way to see many channels at once, so the system
@@ -103,7 +106,7 @@ fun PatternScreen(
             // The header lives outside the list, so it stays put vertically and
             // still travels with the columns.
             Column(Modifier.width(gridWidth).fillMaxHeight()) {
-                ChannelHeader(data.channels)
+                ChannelHeader(data.channels, palette.line)
                 LazyColumn(state = listState, modifier = Modifier.fillMaxHeight()) {
                     items(data.rows) { row ->
                         PatternLine(
@@ -112,6 +115,7 @@ fun PatternScreen(
                             channels = data.channels,
                             active = row == activeRow,
                             accent = MaterialTheme.colorScheme.primary,
+                            palette = palette,
                         )
                     }
                 }
@@ -122,8 +126,7 @@ fun PatternScreen(
 
 /** Channel numbers over their columns, with the same grid lines as the rows. */
 @Composable
-private fun ChannelHeader(channels: Int) {
-    val line = MaterialTheme.colorScheme.outlineVariant
+private fun ChannelHeader(channels: Int, line: Color) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -165,16 +168,16 @@ private fun PatternLine(
     channels: Int,
     active: Boolean,
     accent: Color,
+    palette: PatternPalette,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val dim = scheme.onSurfaceVariant.copy(alpha = 0.40f)
     val style = remember { cellStyle() }
     Row(
         Modifier
             .fillMaxWidth()
             .height(ROW_HEIGHT)
             .background(if (active) accent.copy(alpha = 0.20f) else Color.Transparent)
-            .channelGrid(channels, scheme.outlineVariant.copy(alpha = 0.55f)),
+            .channelGrid(channels, palette.line),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -191,11 +194,11 @@ private fun PatternLine(
             Text(
                 annotatedCell(
                     cell = cell,
-                    note = scheme.onSurface,
-                    ins = scheme.secondary,
-                    vol = scheme.tertiary,
-                    fx = scheme.primary,
-                    dim = dim,
+                    note = palette.note,
+                    ins = palette.instrument,
+                    vol = palette.volume,
+                    fx = palette.effect,
+                    dim = palette.empty,
                 ),
                 style = style,
                 // A cell must never wrap: the grid alignment depends on one line.
@@ -281,6 +284,33 @@ private fun ImmersiveInLandscape(enabled: Boolean) {
     }
 }
 
+/**
+ * The four field colours resolved against the theme: a configured colour wins,
+ * a null follows the scheme, so light and dark stay readable without the user
+ * picking anything.
+ */
+private data class PatternPalette(
+    val note: Color,
+    val instrument: Color,
+    val volume: Color,
+    val effect: Color,
+    val empty: Color,
+    val line: Color,
+)
+
+@Composable
+private fun patternPalette(colors: PatternColors): PatternPalette {
+    val scheme = MaterialTheme.colorScheme
+    return PatternPalette(
+        note = colors.note?.let { Color(it) } ?: scheme.onSurface,
+        instrument = colors.instrument?.let { Color(it) } ?: scheme.secondary,
+        volume = colors.volume?.let { Color(it) } ?: scheme.tertiary,
+        effect = colors.effect?.let { Color(it) } ?: scheme.primary,
+        empty = scheme.onSurfaceVariant.copy(alpha = 0.40f),
+        line = scheme.outlineVariant.copy(alpha = 0.55f),
+    )
+}
+
 private const val CELL_CHARS = 13
 private const val NOTE_EMPTY = "..."
 private const val FIELD_EMPTY = ".."
@@ -306,6 +336,7 @@ private fun PatternScreenPreview() {
             snapshot = previewSnapshot(),
             pattern = previewPattern(),
             follow = true,
+            colors = PatternColors(),
             onBack = {},
         )
     }

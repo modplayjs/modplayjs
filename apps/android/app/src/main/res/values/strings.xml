@@ -95,6 +95,16 @@
     <string name="pattern_empty_title">No pattern</string>
     <string name="pattern_empty_body">Start a tracker module to follow its pattern here.</string>
 
+    <string name="pattern_colors_title">Pattern colours</string>
+    <string name="pattern_colors_body">Each field of a pattern cell can have its own colour. Fields left on the theme colour follow light and dark automatically.</string>
+    <string name="pattern_color_note">Note</string>
+    <string name="pattern_color_instrument">Instrument</string>
+    <string name="pattern_color_volume">Volume</string>
+    <string name="pattern_color_effect">Effect</string>
+    <string name="pattern_color_default">Theme colour</string>
+    <string name="pattern_colors_reset">Reset colours</string>
+    <string name="pattern_colors_reset_summary">Back to the theme colours</string>
+
     <!-- Library -->
     <string name="library_title">Library</string>
     <string name="cd_filters">Filters</string>

@@ -2,19 +2,28 @@ package com.bitti06.modplayjs.ui
 
 import android.app.LocaleManager
 import android.os.LocaleList
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -23,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +40,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -43,6 +55,7 @@ import com.bitti06.modplayjs.engine.AndroidCapabilities
 import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.engine.OutputPlayState
 import com.bitti06.modplayjs.engine.AndroidSettings
+import com.bitti06.modplayjs.engine.PatternColors
 import com.bitti06.modplayjs.library.FolderEntity
 import com.bitti06.modplayjs.library.ScanProgress
 import com.bitti06.modplayjs.ui.icons.AppIcons
@@ -291,6 +304,7 @@ fun SidSettingsScreen(
 fun AppearanceSettingsScreen(
     actions: UiActions,
     settings: AndroidSettings,
+    onOpenPatternColors: () -> Unit,
     onBack: () -> Unit,
 ) {
     SettingsPage(stringResource(R.string.settings_appearance), onBack) {
@@ -319,8 +333,142 @@ fun AppearanceSettingsScreen(
         SwitchRow(stringResource(R.string.loop_marker), settings.view.sampleLoopFlags) { value ->
             actions.updateSettings { it.copy(view = it.view.copy(sampleLoopFlags = value)) }
         }
+        SettingsRow(stringResource(R.string.pattern_colors_title)) { onOpenPatternColors() }
     }
 }
+
+/** Which field of a pattern cell is being coloured. */
+private enum class PatternField(
+    val label: Int,
+) {
+    Note(R.string.pattern_color_note),
+    Instrument(R.string.pattern_color_instrument),
+    Volume(R.string.pattern_color_volume),
+    Effect(R.string.pattern_color_effect),
+}
+
+/**
+ * Colours for the four fields of a pattern cell. A field left alone follows the
+ * theme, which is why "reset" clears the values instead of restoring hex codes:
+ * the grid then adapts to light and dark like everything else.
+ */
+@Composable
+fun PatternColorsScreen(
+    actions: UiActions,
+    settings: AndroidSettings,
+    onBack: () -> Unit,
+) {
+    val colors = settings.view.patternColors
+    var editing by remember { mutableStateOf<PatternField?>(null) }
+    SettingsPage(stringResource(R.string.pattern_colors_title), onBack) {
+        Text(
+            stringResource(R.string.pattern_colors_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        PatternField.entries.forEach { field ->
+            SettingsRow(stringResource(field.label), colorSummary(field.pick(colors))) {
+                editing = field
+            }
+        }
+        SettingsRow(
+            stringResource(R.string.pattern_colors_reset),
+            stringResource(R.string.pattern_colors_reset_summary),
+        ) {
+            actions.updateSettings { it.copy(view = it.view.copy(patternColors = PatternColors())) }
+        }
+    }
+    val field = editing
+    if (field != null) {
+        ColorSwatchDialog(
+            title = stringResource(field.label),
+            selected = field.pick(colors),
+            onPick = { argb ->
+                actions.updateSettings { it.copy(view = it.view.copy(patternColors = field.replace(colors, argb))) }
+                editing = null
+            },
+            onDismiss = { editing = null },
+        )
+    }
+}
+
+private fun PatternField.pick(colors: PatternColors): Int? =
+    when (this) {
+        PatternField.Note -> colors.note
+        PatternField.Instrument -> colors.instrument
+        PatternField.Volume -> colors.volume
+        PatternField.Effect -> colors.effect
+    }
+
+private fun PatternField.replace(
+    colors: PatternColors,
+    argb: Int?,
+): PatternColors =
+    when (this) {
+        PatternField.Note -> colors.copy(note = argb)
+        PatternField.Instrument -> colors.copy(instrument = argb)
+        PatternField.Volume -> colors.copy(volume = argb)
+        PatternField.Effect -> colors.copy(effect = argb)
+    }
+
+@Composable
+private fun colorSummary(argb: Int?): String =
+    if (argb == null) {
+        stringResource(R.string.pattern_color_default)
+    } else {
+        String.format(java.util.Locale.ROOT, "#%06X", argb and 0xFFFFFF)
+    }
+
+/** A palette to pick from; "theme colour" is the first, unset option. */
+@Composable
+private fun ColorSwatchDialog(
+    title: String,
+    selected: Int?,
+    onPick: (Int?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                TextButton(onClick = { onPick(null) }) {
+                    Text(stringResource(R.string.pattern_color_default))
+                }
+                Spacer(Modifier.height(8.dp))
+                LazyVerticalGrid(GridCells.Fixed(6), modifier = Modifier.height(160.dp)) {
+                    gridItems(PATTERN_SWATCHES) { argb ->
+                        Box(
+                            Modifier
+                                .padding(3.dp)
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(argb))
+                                .then(
+                                    if (argb == selected) {
+                                        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                    } else {
+                                        Modifier
+                                    },
+                                ).clickable { onPick(argb) },
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
+        },
+    )
+}
+
+private val PATTERN_SWATCHES: List<Int> =
+    listOf(
+        0xFFFFFFFF, 0xFFF1EDFB, 0xFFB9B0D4, 0xFF9E9E9E,
+        0xFFB49BFF, 0xFF8EA2FF, 0xFF64B5F6, 0xFF4DD0E1,
+        0xFF5FE3C0, 0xFF7BD88F, 0xFFFFD166, 0xFFFFB74D,
+        0xFFFF9BC2, 0xFFE57373, 0xFFBA68C8, 0xFF6B7FA8,
+    ).map { it.toInt() }
 
 @Composable
 fun LibrarySettingsScreen(
@@ -664,6 +812,14 @@ private fun LibrarySettingsPreview() {
             onOpenIgnored = {},
             onBack = {},
         )
+    }
+}
+
+@Preview(name = "Pattern colours", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun PatternColorsPreview() {
+    PreviewFrame {
+        PatternColorsScreen(PreviewActions, previewSettings(), onBack = {})
     }
 }
 

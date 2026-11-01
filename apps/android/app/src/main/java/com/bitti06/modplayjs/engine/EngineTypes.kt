@@ -44,6 +44,19 @@ data class PlaybackSettings(
     val jamMode: Boolean = false,
 )
 
+/**
+ * Per-field colours of the pattern view, ARGB. Null means "use the theme's
+ * colour for that field", so light and dark keep working and a reset is simply
+ * clearing them.
+ */
+@Serializable
+data class PatternColors(
+    val note: Int? = null,
+    val instrument: Int? = null,
+    val volume: Int? = null,
+    val effect: Int? = null,
+)
+
 @Serializable
 data class ViewSettings(
     val theme: String = "dark",
@@ -58,6 +71,7 @@ data class ViewSettings(
     val sampleLengths: Boolean = true,
     /** Show the trailing "L" for looping samples. */
     val sampleLoopFlags: Boolean = true,
+    val patternColors: PatternColors = PatternColors(),
 )
 
 @Serializable

@@ -109,6 +109,9 @@ debug APK, and verifies 16 KB ELF segment alignment.
   ("C-4 01 40 A0F"), the playing row highlighted and followed, columns scrolling
   sideways. The engine answers it on demand; the snapshot speeds up to 16 Hz
   while it is open so the playhead keeps up, and landscape hides the system bars.
+  Each field (note, instrument, volume, effect) can be coloured in Settings ->
+  Appearance -> Pattern colours; a field left on the theme colour follows light
+  and dark, and one row resets all four.
 - Media3 `MediaSessionService` owns the notification, lock-screen and media
   buttons. It is shown a 64-item window around the current track rather than the
   whole queue, which can be thousands of items: every playlist change is mapped

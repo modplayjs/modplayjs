@@ -82,6 +82,16 @@
     <string name="pattern_empty_title">Kein Muster</string>
     <string name="pattern_empty_body">Starte ein Tracker-Modul, um sein Muster hier zu sehen.</string>
 
+    <string name="pattern_colors_title">Musterfarben</string>
+    <string name="pattern_colors_body">Jedes Feld einer Musternote kann eine eigene Farbe haben. Felder in Theme-Farbe passen sich hell und dunkel automatisch an.</string>
+    <string name="pattern_color_note">Note</string>
+    <string name="pattern_color_instrument">Instrument</string>
+    <string name="pattern_color_volume">Lautstärke</string>
+    <string name="pattern_color_effect">Effekt</string>
+    <string name="pattern_color_default">Theme-Farbe</string>
+    <string name="pattern_colors_reset">Farben zurücksetzen</string>
+    <string name="pattern_colors_reset_summary">Zurück zu den Theme-Farben</string>
+
     <!-- Library -->
     <string name="library_title">Bibliothek</string>
     <string name="cd_filters">Filter</string>

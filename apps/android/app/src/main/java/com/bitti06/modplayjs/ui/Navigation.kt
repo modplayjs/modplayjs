@@ -62,3 +62,6 @@ data object IgnoredKey : NavKey
 @Serializable
 data object PatternKey : NavKey
 
+@Serializable
+data object PatternColorsKey : NavKey
+
