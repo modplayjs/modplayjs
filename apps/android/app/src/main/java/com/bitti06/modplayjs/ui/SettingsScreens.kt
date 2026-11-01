@@ -306,7 +306,7 @@ fun LibrarySettingsScreen(
             Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(folder.name)
+                        Text(folder.name, color = MaterialTheme.colorScheme.onSurface)
                         Text(
                             "${folder.fileCount} files · ${folder.status}" +
                                 if (folder.canWrite) " · read/write" else " · read only",

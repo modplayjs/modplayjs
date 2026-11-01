@@ -48,7 +48,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -114,6 +116,7 @@ fun PlayerScreen(
                 Text(
                     track.title.ifBlank { track.name },
                     style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     modifier = Modifier.weight(1f).basicMarquee(initialDelayMillis = 0),
@@ -205,6 +208,7 @@ fun PlayerScreen(
                 Text(
                     track.title.ifBlank { track.name },
                     style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -242,8 +246,14 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatTime(drag?.let { (it * duration).toLong() } ?: position.toLong()))
-            Text(if (duration > 0) formatTime(duration.toLong()) else "∞")
+            Text(
+                formatTime(drag?.let { (it * duration).toLong() } ?: position.toLong()),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                if (duration > 0) formatTime(duration.toLong()) else "∞",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { vm.previous() }) { Icon(AppIcons.SkipPrevious, contentDescription = "Previous") }
@@ -405,8 +415,11 @@ private fun InfoBox(
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
                     .padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 10.dp),
-                content = content,
-            )
+            ) {
+                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+                    content()
+                }
+            }
         }
     }
 }
@@ -476,7 +489,11 @@ private fun ChannelDialog(
                                 ),
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                Text(channel.label, fontWeight = if (channel.muted) FontWeight.Normal else FontWeight.SemiBold)
+                                Text(
+                                    channel.label,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = if (channel.muted) FontWeight.Normal else FontWeight.SemiBold,
+                                )
                             }
                         }
                     }
@@ -526,6 +543,7 @@ fun DetailsScreen(
                     track.orderList.joinToString(" ") { it.toString().padStart(2, '0') },
                     fontFamily = FontFamily.Monospace,
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             if (track.instrumentList.isNotEmpty()) {
@@ -561,12 +579,22 @@ fun DetailsScreen(
             items(snap.channels, key = { "c${it.index}" }) { channel ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = !channel.muted, onCheckedChange = { vm.toggleChannel(channel.index) }, enabled = channel.canMute)
-                    Text(" ${channel.label}", modifier = Modifier.weight(1f))
+                    Text(
+                        " ${channel.label}",
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                     if (channel.solo) Text("SOLO", color = MaterialTheme.colorScheme.primary)
                 }
             }
             item { SectionTitle("Message") }
-            item { Text(track.message ?: "No module message.", style = MaterialTheme.typography.bodySmall) }
+            item {
+                Text(
+                    track.message ?: "No module message.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             item { Spacer(Modifier.height(24.dp)) }
         }
     }

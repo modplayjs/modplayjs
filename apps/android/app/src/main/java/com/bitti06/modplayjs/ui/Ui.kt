@@ -114,6 +114,7 @@ fun ModalTopBar(
         Text(
             title,
             style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -149,6 +150,7 @@ fun TrackRow(
             Text(
                 track.name,
                 style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -188,7 +190,13 @@ fun TrackActionsSheet(
     onDelete: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
-        Text(track.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(
+            track.name,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
         Text(
             track.relativePath,
             style = MaterialTheme.typography.bodySmall,
@@ -246,7 +254,14 @@ fun FolderRow(
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(
                 "$trackCount ${if (trackCount == 1) "track" else "tracks"}",
                 style = MaterialTheme.typography.labelSmall,
@@ -272,7 +287,7 @@ fun SettingsRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title)
+            Text(title, color = MaterialTheme.colorScheme.onSurface)
             if (!summary.isNullOrBlank()) {
                 Text(
                     summary,
@@ -318,7 +333,7 @@ fun SliderRow(
     LaunchedEffect(value) { state.value = value.coerceIn(range) }
     Column(Modifier.padding(vertical = 2.dp)) {
         Row(Modifier.fillMaxWidth()) {
-            Text(label, modifier = Modifier.weight(1f))
+            Text(label, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
             Text(value.toInt().toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Slider(
@@ -363,7 +378,13 @@ fun InfoRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
         )
-        Text(value, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -376,7 +397,12 @@ fun EmptyState(
 ) {
     Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
             Spacer(Modifier.height(6.dp))
             Text(
                 body,

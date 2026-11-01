@@ -71,6 +71,7 @@ fun HomeScreen(
                         Text(
                             "modplayjs",
                             style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(

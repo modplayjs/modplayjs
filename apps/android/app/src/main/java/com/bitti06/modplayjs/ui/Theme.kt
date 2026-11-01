@@ -2,11 +2,13 @@ package com.bitti06.modplayjs.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
@@ -92,6 +94,12 @@ fun ModplayTheme(
     MaterialExpressiveTheme(
         colorScheme = if (dark) Dark else Light,
         shapes = AppShapes,
-        content = content,
-    )
+    ) {
+        // Nothing at the root provides LocalContentColor, so unstyled Text
+        // would fall back to black. Anchor it to the scheme.
+        CompositionLocalProvider(
+            LocalContentColor provides MaterialTheme.colorScheme.onBackground,
+            content = content,
+        )
+    }
 }

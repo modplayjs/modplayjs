@@ -183,6 +183,7 @@ private fun AppRoot(vm: AppViewModel) {
     ) {
         Scaffold(
             containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onBackground,
             bottomBar = {
                 Column {
                     snapshot?.let { current ->
@@ -338,6 +339,7 @@ private fun MiniPlayer(
                     Text(
                         track.title.ifBlank { track.name },
                         style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         fontWeight = FontWeight.SemiBold,

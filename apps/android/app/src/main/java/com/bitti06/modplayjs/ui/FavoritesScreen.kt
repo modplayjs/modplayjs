@@ -72,6 +72,7 @@ fun FavoritesScreen(
                     Text(
                         "Favorites",
                         style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(

@@ -52,7 +52,12 @@ fun AboutScreen(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(48.dp),
                     )
-                    Text("modplayjs", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "modplayjs",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold,
+                    )
                     Text(
                         "Native tracker player · V8",
                         style = MaterialTheme.typography.bodySmall,
@@ -62,6 +67,7 @@ fun AboutScreen(
                     Text(
                         "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                         style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -139,11 +145,19 @@ fun LicenseTextScreen(
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
             Text(entry.license, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             if (entry.copyright != null) {
-                Text(entry.copyright, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    entry.copyright,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (entry.note != null) {
                 Spacer(Modifier.height(4.dp))
-                Text(entry.note, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    entry.note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
             val url = entry.url
             if (url != null) {
@@ -154,12 +168,18 @@ fun LicenseTextScreen(
             Spacer(Modifier.height(8.dp))
             if (text != null) {
                 SelectionContainer {
-                    Text(text, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                    Text(
+                        text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontFamily = FontFamily.Monospace,
+                    )
                 }
             } else {
                 Text(
                     "This component is released into the public domain; no license text is required.",
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
