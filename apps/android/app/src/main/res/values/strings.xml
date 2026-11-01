@@ -277,6 +277,7 @@
     <string name="diag_buffer_value">%1$d frames · %2$d ms</string>
     <string name="diag_buffer_minimum">Framework minimum</string>
     <string name="diag_frames">%1$d frames</string>
+    <string name="diag_written_frames">Written frames</string>
     <string name="diag_play_state">Play state</string>
     <string name="play_state_playing">playing</string>
     <string name="play_state_paused">paused</string>

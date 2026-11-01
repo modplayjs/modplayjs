@@ -430,6 +430,9 @@ fun DiagnosticsScreen(
             stringResource(R.string.diag_buffer_minimum),
             stringResource(R.string.diag_frames, audio.minBufferFrames),
         )
+        audio.writtenFrames?.let { frames ->
+            InfoRow(stringResource(R.string.diag_written_frames), frames.toString())
+        }
         InfoRow(
             stringResource(R.string.diag_play_state),
             stringResource(

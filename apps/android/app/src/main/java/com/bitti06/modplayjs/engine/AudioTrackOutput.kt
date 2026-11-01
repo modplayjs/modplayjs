@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.os.Build
 import android.os.Process
 import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
@@ -88,6 +89,12 @@ class AudioTrackOutput(
                     },
                 deviceFramesPerBuffer = deviceFramesPerBuffer,
                 lowLatencyRequested = true,
+                writtenFrames =
+                    if (Build.VERSION.SDK_INT >= 37) {
+                        runCatching { t?.writtenFramesCount }.getOrNull()
+                    } else {
+                        null
+                    },
             )
         }
 
@@ -212,4 +219,6 @@ data class AudioOutputInfo(
     val playState: OutputPlayState = OutputPlayState.STOPPED,
     val deviceFramesPerBuffer: Int = 0,
     val lowLatencyRequested: Boolean = false,
+    /** AudioTrack.getWrittenFramesCount(), Android 17+ only. */
+    val writtenFrames: Long? = null,
 )
