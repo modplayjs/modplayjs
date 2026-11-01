@@ -9,7 +9,7 @@ import com.bitti06.modplayjs.library.LibraryRepository
 
 object AppGraph {
     private lateinit var appContext: Context
-    val db by lazy { LibraryDb.open(appContext) }
+    private val db by lazy { LibraryDb.open(appContext) }
     val library by lazy { LibraryRepository(appContext, db.dao()) }
     val settings by lazy { SettingsStore(appContext) }
     val session by lazy { PlaybackSession(appContext) }

@@ -25,7 +25,6 @@ class AudioTrackOutput(
             ?.takeIf { it in 8000..192000 } ?: 48000
 
     private var track: AudioTrack? = null
-    private var thread: Thread? = null
     private val running = AtomicBoolean(false)
     private val paused = AtomicBoolean(false)
     private var ring: PcmRing? = null
@@ -83,11 +82,10 @@ class AudioTrackOutput(
         // Stay paused until the engine has audio. Anything else lets the
         // framework count underruns for a track nobody is feeding.
         paused.set(true)
-        thread =
-            Thread({ loop() }, "oboe-drain").apply {
-                priority = Thread.MAX_PRIORITY
-                start()
-            }
+        Thread({ loop() }, "oboe-drain").apply {
+            priority = Thread.MAX_PRIORITY
+            start()
+        }
     }
 
     private fun loop() {
@@ -124,20 +122,6 @@ class AudioTrackOutput(
         runCatching { if (track?.playState == AudioTrack.PLAYSTATE_PAUSED) track?.flush() }
         runCatching { track?.play() }
         paused.set(false)
-    }
-
-    fun stop() {
-        running.set(false)
-        paused.set(false)
-        thread?.join(250)
-        thread = null
-        runCatching {
-            track?.pause()
-            track?.flush()
-            track?.release()
-        }
-        track = null
-        ring = null
     }
 
     private companion object {

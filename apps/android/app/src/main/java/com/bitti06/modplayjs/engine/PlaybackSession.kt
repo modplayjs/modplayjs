@@ -226,19 +226,6 @@ class PlaybackSession(
         refresh()
     }
 
-    fun resume() {
-        if (currentItem == null || _snapshot.value?.track == null) {
-            playIndex(_queueIndex.value)
-            return
-        }
-        cancelPendingOutput()
-        send(buildJsonObject { put("type", "resume") }.toString())
-        primeOutput()
-        paused = false
-        audio.resume()
-        refresh()
-    }
-
     fun stop() {
         cancelPendingOutput()
         playing = false
@@ -276,34 +263,6 @@ class PlaybackSession(
         playIndex(n)
     }
 
-    fun auditionInstrument(
-        index: Int,
-        note: Int = 60,
-    ) {
-        send(
-            buildJsonObject {
-                put("type", "auditionInstrument")
-                put("index", index)
-                put("note", note)
-                put("volume", 64)
-            }.toString(),
-        )
-    }
-
-    fun auditionSample(
-        index: Int,
-        note: Int = 60,
-    ) {
-        send(
-            buildJsonObject {
-                put("type", "auditionSample")
-                put("sampleId", index)
-                put("note", note)
-                put("volume", 64)
-            }.toString(),
-        )
-    }
-
     fun command(
         type: String,
         block: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit = {},
@@ -317,29 +276,15 @@ class PlaybackSession(
         refreshSoon()
     }
 
-    fun setChannelMute(
-        index: Int,
-        muted: Boolean,
-    ) {
-        command("setChannelMute") {
-            put("index", index)
-            put("muted", muted)
-        }
-    }
-
     fun toggleChannelMute(index: Int) = command("toggleChannelMute") { put("index", index) }
 
     fun soloChannel(index: Int) = command("soloChannel") { put("index", index) }
-
-    fun clearSolo() = command("clearSolo")
 
     fun muteAllChannels() = command("muteAllChannels")
 
     fun unmuteAllChannels() = command("unmuteAllChannels")
 
     fun resetChannels() = command("resetChannels")
-
-    fun loadSidSongLengths(text: String) = command("loadSidSongLengths") { put("text", text) }
 
     private fun send(json: String): Boolean {
         if (!v8.available) {
@@ -441,14 +386,6 @@ class PlaybackSession(
         }
             .onFailure { Log.e(TAG, "cannot read $uri", it) }
             .getOrNull()
-
-    fun release() {
-        running.set(false)
-        stop()
-        audio.stop()
-        runCatching { v8Exec.submit { v8.close() }.get(2, TimeUnit.SECONDS) }
-        v8Exec.shutdownNow()
-    }
 
     companion object {
         private const val TAG = "PlaybackSession"

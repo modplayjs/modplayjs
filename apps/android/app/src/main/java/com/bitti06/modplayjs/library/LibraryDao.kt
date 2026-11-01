@@ -1,8 +1,6 @@
 package com.bitti06.modplayjs.library
 
 import androidx.room3.Dao
-import androidx.room3.Insert
-import androidx.room3.OnConflictStrategy
 import androidx.room3.Query
 import androidx.room3.Upsert
 import kotlinx.coroutines.flow.Flow
@@ -31,9 +29,6 @@ interface LibraryDao {
 
     @Query("SELECT * FROM tracks WHERE folderId = :folderId")
     suspend fun tracksInFolder(folderId: String): List<TrackEntity>
-
-    @Query("SELECT * FROM tracks WHERE id = :id")
-    suspend fun track(id: String): TrackEntity?
 
     @Upsert suspend fun upsertTracks(tracks: List<TrackEntity>)
 
@@ -67,23 +62,4 @@ interface LibraryDao {
     @Query("DELETE FROM tracks WHERE folderId = :folderId")
     suspend fun deleteTracksInFolder(folderId: String)
 
-    @Query("DELETE FROM playlist_tracks WHERE trackId IN (:ids)")
-    suspend fun removeFromPlaylists(ids: List<String>)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun addToPlaylist(row: PlaylistTrackEntity)
-
-    @Query("SELECT * FROM playlists ORDER BY name COLLATE NOCASE")
-    fun playlists(): Flow<List<PlaylistEntity>>
-
-    @Insert suspend fun createPlaylist(playlist: PlaylistEntity): Long
-
-    @Query("DELETE FROM playlists WHERE id = :id")
-    suspend fun deletePlaylist(id: Long)
-
-    @Query("DELETE FROM playlist_tracks WHERE playlistId = :id")
-    suspend fun clearPlaylist(id: Long)
-
-    @Query("SELECT t.* FROM tracks t INNER JOIN playlist_tracks p ON p.trackId = t.id WHERE p.playlistId = :id ORDER BY p.position")
-    suspend fun playlistTracks(id: Long): List<TrackEntity>
 }

@@ -42,17 +42,3 @@ data class TrackEntity(
     /** When the track was favorited, or null. Also the newest-first sort key. */
     val favoriteAt: Long? = null,
 )
-
-@Entity(tableName = "playlists")
-data class PlaylistEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val name: String,
-    val createdAt: Long = System.currentTimeMillis(),
-)
-
-@Entity(tableName = "playlist_tracks", primaryKeys = ["playlistId", "trackId"])
-data class PlaylistTrackEntity(
-    val playlistId: Long,
-    val trackId: String,
-    val position: Int,
-)

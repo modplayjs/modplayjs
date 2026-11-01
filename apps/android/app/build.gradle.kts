@@ -34,7 +34,6 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.2.1"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         ndk { abiFilters += listOf("arm64-v8a") }
         externalNativeBuild {
@@ -81,12 +80,9 @@ android {
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.room3.runtime)
@@ -95,5 +91,4 @@ dependencies {
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
-    debugImplementation(libs.androidx.compose.ui.tooling)
 }

@@ -82,8 +82,6 @@ class SafScanner(
         }
     }
 
-    fun readBytes(documentUri: Uri): ByteArray? = runCatching { resolver.openInputStream(documentUri)?.use { it.readBytes() } }.getOrNull()
-
     fun canWrite(uri: Uri): Boolean = resolver.persistedUriPermissions.any { it.uri == uri && it.isWritePermission }
 
     fun delete(documentUri: Uri): Boolean = runCatching { DocumentsContract.deleteDocument(resolver, documentUri) }.getOrDefault(false)

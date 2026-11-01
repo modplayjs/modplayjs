@@ -166,10 +166,6 @@ class AppViewModel(
 
     fun seek(ms: Long) = session.seek(ms)
 
-    fun auditionInstrument(index: Int) = session.auditionInstrument(index)
-
-    fun auditionSample(index: Int) = session.auditionSample(index)
-
     fun toggleChannel(index: Int) = session.toggleChannelMute(index)
 
     fun soloChannel(index: Int) = session.soloChannel(index)

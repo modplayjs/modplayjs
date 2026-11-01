@@ -102,12 +102,9 @@ class LibraryRepository(
             }
         }
 
-    suspend fun read(track: TrackEntity): ByteArray? = withContext(Dispatchers.IO) { scanner.readBytes(Uri.parse(track.documentUri)) }
-
     suspend fun ignore(track: TrackEntity) =
         withContext(Dispatchers.IO) {
             dao.ignore(track.id, System.currentTimeMillis())
-            dao.removeFromPlaylists(listOf(track.id))
         }
 
     suspend fun restore(tracks: List<TrackEntity>) =
@@ -121,7 +118,6 @@ class LibraryRepository(
             if (!scanner.canWrite(Uri.parse(track.documentUri))) return@withContext false
             val deleted = scanner.delete(Uri.parse(track.documentUri))
             if (deleted) {
-                dao.removeFromPlaylists(listOf(track.id))
                 dao.deleteTracks(listOf(track.id))
             }
             deleted

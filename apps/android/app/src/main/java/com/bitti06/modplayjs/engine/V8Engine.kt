@@ -63,13 +63,6 @@ class V8Engine(
 
     fun snapshot(): String = if (handle == 0L) """{"error":"v8-unavailable"}""" else nativeSnapshot(handle)
 
-    fun close() {
-        if (handle != 0L) {
-            nativeDestroy(handle)
-            handle = 0L
-        }
-    }
-
     private external fun nativeCreate(
         script: String,
         cacheDir: String,
@@ -93,7 +86,6 @@ class V8Engine(
 
     private external fun nativeSnapshot(handle: Long): String
 
-    private external fun nativeDestroy(handle: Long)
 
     companion object {
         private const val TAG = "V8Engine"

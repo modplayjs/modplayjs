@@ -8,8 +8,8 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
 import kotlinx.coroutines.Dispatchers
 
 @Database(
-    entities = [FolderEntity::class, TrackEntity::class, PlaylistEntity::class, PlaylistTrackEntity::class],
-    version = 2,
+    entities = [FolderEntity::class, TrackEntity::class],
+    version = 3,
     exportSchema = false,
 )
 abstract class LibraryDb : RoomDatabase() {
