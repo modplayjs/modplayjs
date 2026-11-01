@@ -294,15 +294,19 @@ fun FolderRow(
 @Composable
 fun SettingsRow(
     title: String,
-    summary: String?,
+    summary: String? = null,
     onClick: () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             if (!summary.isNullOrBlank()) {
                 Text(
                     summary,

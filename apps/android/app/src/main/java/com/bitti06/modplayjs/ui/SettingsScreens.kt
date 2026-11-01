@@ -51,41 +51,19 @@ private fun SettingsPage(
 
 @Composable
 fun SettingsHub(
-    vm: AppViewModel,
-    settings: AndroidSettings,
-    folders: List<FolderEntity>,
-    ignoredCount: Int,
     onOpen: (NavKey) -> Unit,
     onBack: () -> Unit,
 ) {
     SettingsPage("Settings", onBack) {
-        SettingsRow(
-            "Playback",
-            "Repeat ${settings.playback.repeat} · auto-advance ${if (settings.playback.autoAdvance) "on" else "off"}",
-        ) { onOpen(PlaybackSettingsKey) }
-        SettingsRow(
-            "Audio",
-            "Volume ${settings.transport.volume}% · ${vm.sampleRate} Hz",
-        ) { onOpen(AudioSettingsKey) }
-        SettingsRow(
-            "Mixer",
-            "${settings.mixer.mode} · ${settings.mixer.layout} · ${settings.mixer.amigaFilter}",
-        ) { onOpen(MixerSettingsKey) }
-        SettingsRow(
-            "SID",
-            "${settings.sid.quality} · ${settings.sid.model}",
-        ) { onOpen(SidSettingsKey) }
-        SettingsRow(
-            "Appearance",
-            "Theme: ${settings.view.theme}",
-        ) { onOpen(AppearanceSettingsKey) }
-        SettingsRow(
-            "Library",
-            "${folders.size} folders · $ignoredCount ignored",
-        ) { onOpen(LibrarySettingsKey) }
-        SettingsRow("Diagnostics", "V8, output, underruns") { onOpen(DiagnosticsKey) }
-        SettingsRow("About", "Version, commit, links") { onOpen(AboutKey) }
-        SettingsRow("Licenses", "Open source notices") { onOpen(LicensesKey) }
+        SettingsRow("Playback") { onOpen(PlaybackSettingsKey) }
+        SettingsRow("Audio") { onOpen(AudioSettingsKey) }
+        SettingsRow("Mixer") { onOpen(MixerSettingsKey) }
+        SettingsRow("SID") { onOpen(SidSettingsKey) }
+        SettingsRow("Appearance") { onOpen(AppearanceSettingsKey) }
+        SettingsRow("Library") { onOpen(LibrarySettingsKey) }
+        SettingsRow("Diagnostics") { onOpen(DiagnosticsKey) }
+        SettingsRow("About") { onOpen(AboutKey) }
+        SettingsRow("Licenses") { onOpen(LicensesKey) }
     }
 }
 

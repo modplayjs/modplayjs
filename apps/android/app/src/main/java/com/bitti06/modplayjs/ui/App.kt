@@ -129,14 +129,7 @@ private fun AppRoot(vm: AppViewModel) {
     val entries =
         entryProvider<NavKey> {
             entry<SettingsKey> {
-                SettingsHub(
-                    vm = vm,
-                    settings = settings,
-                    folders = folders,
-                    ignoredCount = ignored.size,
-                    onOpen = navigate,
-                    onBack = back,
-                )
+                SettingsHub(onOpen = navigate, onBack = back)
             }
             entry<PlaybackSettingsKey> { PlaybackSettingsScreen(vm, settings, back) }
             entry<AudioSettingsKey> { AudioSettingsScreen(vm, settings, snapshot?.capabilities, back) }
