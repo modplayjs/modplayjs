@@ -55,8 +55,8 @@ data class ViewSettings(
     val reducedMotion: Boolean = false,
     val visualizer: String = "off",
     val showChannelStrip: Boolean = true,
-    /** Show the slot number in front of a sample line. */
-    val sampleNumbers: Boolean = true,
+    /** Show the sample length (and with it the loop flag) after the name. */
+    val sampleLengths: Boolean = true,
     /** Show the trailing "L" for looping samples. */
     val sampleLoopFlags: Boolean = true,
 )

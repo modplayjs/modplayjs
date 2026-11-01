@@ -294,8 +294,8 @@ fun AppearanceSettingsScreen(
         SwitchRow(stringResource(R.string.show_channel_strip), settings.view.showChannelStrip) { value ->
             vm.updateSettings { it.copy(view = it.view.copy(showChannelStrip = value)) }
         }
-        SwitchRow(stringResource(R.string.sample_numbers), settings.view.sampleNumbers) { value ->
-            vm.updateSettings { it.copy(view = it.view.copy(sampleNumbers = value)) }
+        SwitchRow(stringResource(R.string.sample_lengths), settings.view.sampleLengths) { value ->
+            vm.updateSettings { it.copy(view = it.view.copy(sampleLengths = value)) }
         }
         SwitchRow(stringResource(R.string.loop_marker), settings.view.sampleLoopFlags) { value ->
             vm.updateSettings { it.copy(view = it.view.copy(sampleLoopFlags = value)) }

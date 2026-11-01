@@ -245,12 +245,10 @@
     <string name="theme">Theme</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
-    <string name="sample_numbers">Sample numbers</string>
+    <string name="sample_lengths">Sample lengths</string>
     <string name="loop_marker">Loop marker</string>
-    <string name="sample_line_bare">%1$s  %2$d</string>
-    <string name="sample_line_bare_loop">%1$s  %2$d L</string>
-    <string name="sample_unnamed_bare">%1$d</string>
-    <string name="sample_unnamed_bare_loop">%1$d L</string>
+    <string name="sample_line_no_length">%1$d. %2$s</string>
+    <string name="sample_line_no_length_loop">%1$d. %2$s L</string>
     <string name="strip_dots">Strip trailing dots</string>
     <string name="reduced_motion">Reduced motion</string>
     <string name="show_channel_strip">Show channel strip</string>

@@ -269,15 +269,15 @@ fun PlayerScreen(
                                 MaterialTheme.colorScheme.secondary,
                             ) {
                                 samples.forEach { sample ->
-                                    // An empty slot keeps its blank line so the
-                                    // list still lines up with the slot numbers.
+                                    // The slot number always stays, so an empty
+                                    // slot never collapses the row.
                                     Text(
                                         sampleLine(
                                             sample.index + 1,
                                             sample.name,
                                             sample.length,
                                             sample.loop,
-                                            settings.view.sampleNumbers,
+                                            settings.view.sampleLengths,
                                             settings.view.sampleLoopFlags,
                                         ),
                                         style = MaterialTheme.typography.bodySmall,
@@ -539,7 +539,7 @@ private fun sampleLine(
     name: String,
     length: Int,
     loop: Boolean,
-    showNumber: Boolean,
+    showLength: Boolean,
     showLoop: Boolean,
 ): String {
     val trimmed = name.trim()
@@ -547,21 +547,18 @@ private fun sampleLine(
     return when {
         // An empty slot has neither a name nor audio; the length would only
         // print a meaningless "0" for every unused sample.
-        trimmed.isEmpty() && length <= 0 -> if (showNumber) "$number." else ""
+        trimmed.isEmpty() && length <= 0 -> "$number."
         trimmed.isEmpty() ->
-            if (showNumber) {
+            if (showLength) {
                 stringResource(
                     if (looping) R.string.sample_line_unnamed_loop else R.string.sample_line_unnamed,
                     number,
                     length,
                 )
             } else {
-                stringResource(
-                    if (looping) R.string.sample_unnamed_bare_loop else R.string.sample_unnamed_bare,
-                    length,
-                )
+                "$number."
             }
-        showNumber ->
+        showLength ->
             stringResource(
                 if (looping) R.string.sample_line_loop else R.string.sample_line,
                 number,
@@ -570,9 +567,9 @@ private fun sampleLine(
             )
         else ->
             stringResource(
-                if (looping) R.string.sample_line_bare_loop else R.string.sample_line_bare,
+                if (looping) R.string.sample_line_no_length_loop else R.string.sample_line_no_length,
+                number,
                 trimmed,
-                length,
             )
     }
 }
@@ -764,7 +761,7 @@ fun DetailsScreen(
                             sample.name,
                             sample.length,
                             sample.loop,
-                            settings.view.sampleNumbers,
+                            settings.view.sampleLengths,
                             settings.view.sampleLoopFlags,
                         ),
                         fontFamily = FontFamily.Monospace,
