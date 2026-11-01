@@ -80,6 +80,13 @@ class AppViewModel(
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /** Favorited tracks, newest favorite first. Ignored tracks are excluded. */
+    val favorites: StateFlow<List<TrackEntity>> =
+        allTracks
+            .map { list -> list.filter { it.favoriteAt != null }.sortedByDescending { it.favoriteAt } }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         session.setSettings(_settings.value)
     }
@@ -166,6 +173,13 @@ class AppViewModel(
     fun resetChannels() = session.resetChannels()
 
     fun ignore(track: TrackEntity) = viewModelScope.launch { repo.ignore(track) }
+
+    /** Flips the favorite flag; the stored track may be a stale snapshot, so the id is what counts. */
+    fun toggleFavorite(track: TrackEntity) =
+        viewModelScope.launch {
+            val current = allTracks.value.firstOrNull { it.id == track.id }
+            repo.setFavorite(track.id, (current ?: track).favoriteAt == null)
+        }
 
     fun restore(tracks: List<TrackEntity>) = viewModelScope.launch { repo.restore(tracks) }
 

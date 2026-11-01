@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -27,8 +28,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -163,12 +162,19 @@ fun LibraryScreen(
         Spacer(Modifier.height(4.dp))
 
         when {
-            filters.search.isNotBlank() -> SearchResults(tracks, onPlay, onMore = { showTrackActions = it })
+            filters.search.isNotBlank() ->
+                SearchResults(
+                    tracks = tracks,
+                    onPlay = onPlay,
+                    onMore = { showTrackActions = it },
+                    onToggleFavorite = { vm.toggleFavorite(it) },
+                )
             rootId == ALL_ROOTS ->
                 AllTracks(
                     tracks = tracks,
                     onPlay = onPlay,
                     onMore = { showTrackActions = it },
+                    onToggleFavorite = { vm.toggleFavorite(it) },
                     onExit = { onNavigate(null, emptyList()) },
                 )
             rootId == null -> RootList(
@@ -189,6 +195,7 @@ fun LibraryScreen(
                 onPlay = onPlay,
                 onPlayList = onPlayList,
                 onMore = { showTrackActions = it },
+                onToggleFavorite = { vm.toggleFavorite(it) },
             )
         }
     }
@@ -218,6 +225,7 @@ fun LibraryScreen(
                     showTrackActions = null
                     onPlay(track)
                 },
+                onToggleFavorite = { vm.toggleFavorite(track) },
                 onIgnore = {
                     vm.ignore(track)
                     showTrackActions = null
@@ -335,6 +343,7 @@ private fun SearchResults(
     tracks: List<TrackEntity>,
     onPlay: (TrackEntity) -> Unit,
     onMore: (TrackEntity) -> Unit,
+    onToggleFavorite: (TrackEntity) -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         Text(
@@ -352,6 +361,7 @@ private fun SearchResults(
                         track,
                         onClick = { onPlay(track) },
                         onLongClick = { onMore(track) },
+                        onToggleFavorite = { onToggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "Track options")
@@ -369,6 +379,7 @@ private fun AllTracks(
     tracks: List<TrackEntity>,
     onPlay: (TrackEntity) -> Unit,
     onMore: (TrackEntity) -> Unit,
+    onToggleFavorite: (TrackEntity) -> Unit,
     onExit: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
@@ -391,6 +402,7 @@ private fun AllTracks(
                         track,
                         onClick = { onPlay(track) },
                         onLongClick = { onMore(track) },
+                        onToggleFavorite = { onToggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "Track options")
@@ -414,11 +426,16 @@ private fun Browser(
     onPlay: (TrackEntity) -> Unit,
     onPlayList: (List<TrackEntity>, Int) -> Unit,
     onMore: (TrackEntity) -> Unit,
+    onToggleFavorite: (TrackEntity) -> Unit,
 ) {
     val base = path.joinToString("/")
     val scope = remember(tracks, rootId, base) { scopeTracks(tracks, rootId, base) }
     val (subfolders, direct) = remember(scope, base) { split(scope, base) }
     val rootName = folders.firstOrNull { it.id == rootId }?.name ?: "Folder"
+    // A fresh list state per folder: opening a folder, entering a subfolder or
+    // stepping up a breadcrumb always starts at the top instead of keeping the
+    // scroll offset of the folder that was open before.
+    val listState = remember(rootId, base) { LazyListState() }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -450,7 +467,7 @@ private fun Browser(
             }
         }
         HorizontalDivider()
-        LazyColumn(Modifier.weight(1f)) {
+        LazyColumn(Modifier.weight(1f), state = listState) {
             if (subfolders.isNotEmpty()) {
                 item { SectionTitle("Folders") }
                 items(subfolders, key = { "f:${it.name}" }) { folder ->
@@ -476,6 +493,7 @@ private fun Browser(
                         track,
                         onClick = { onPlay(track) },
                         onLongClick = { onMore(track) },
+                        onToggleFavorite = { onToggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "Track options")
@@ -532,38 +550,6 @@ private fun FilterSheet(
             TextButton(onClick = { vm.resetFilters() }) { Text("Reset") }
             TextButton(onClick = onDone) { Text("Done") }
         }
-    }
-}
-
-@Composable
-private fun TrackActionsSheet(
-    track: TrackEntity,
-    onPlay: () -> Unit,
-    onIgnore: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
-        Text(track.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(
-            track.relativePath,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FormatBadge(track.format.uppercase())
-            Text(formatSize(track.size), style = MaterialTheme.typography.labelSmall)
-            if (track.availability == "missing") {
-                Text("Missing", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        HorizontalDivider()
-        SettingsRow("Play", null, onPlay)
-        SettingsRow("Remove from library", "Keeps the file, adds it to Ignored files", onIgnore)
-        SettingsRow("Delete permanently", "Deletes the file from storage", onDelete)
     }
 }
 

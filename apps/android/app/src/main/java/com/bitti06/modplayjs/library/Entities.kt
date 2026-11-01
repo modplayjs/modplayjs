@@ -1,8 +1,8 @@
 package com.bitti06.modplayjs.library
 
-import androidx.room.Entity
-import androidx.room.Index
-import androidx.room.PrimaryKey
+import androidx.room3.Entity
+import androidx.room3.Index
+import androidx.room3.PrimaryKey
 
 @Entity(tableName = "folders")
 data class FolderEntity(
@@ -39,6 +39,8 @@ data class TrackEntity(
     val ignoredAt: Long? = null,
     val addedAt: Long = System.currentTimeMillis(),
     val lastPlayed: Long? = null,
+    /** When the track was favorited, or null. Also the newest-first sort key. */
+    val favoriteAt: Long? = null,
 )
 
 @Entity(tableName = "playlists")

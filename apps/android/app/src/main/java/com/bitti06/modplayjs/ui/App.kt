@@ -5,7 +5,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -55,6 +55,7 @@ private enum class Tab(
 ) {
     Home("Home", Icons.Default.Home),
     Library("Library", Icons.Default.LibraryMusic),
+    Favorites("Favorites", Icons.Default.Favorite),
     Playing("Playing", Icons.Default.MusicNote),
 }
 
@@ -71,6 +72,7 @@ private fun AppRoot(vm: AppViewModel) {
     val tracks by vm.tracks.collectAsStateWithLifecycle()
     val libraryTracks by vm.libraryTracks.collectAsStateWithLifecycle()
     val recent by vm.recent.collectAsStateWithLifecycle()
+    val favorites by vm.favorites.collectAsStateWithLifecycle()
     val folders by vm.folders.collectAsStateWithLifecycle()
     val ignored by vm.ignored.collectAsStateWithLifecycle()
     val queue by vm.queue.collectAsStateWithLifecycle()
@@ -138,17 +140,19 @@ private fun AppRoot(vm: AppViewModel) {
                             tracks = libraryTracks,
                             recent = recent,
                             folders = folders,
-                            ignoredCount = ignored.size,
+                            favoritesCount = favorites.size,
                             onAddFolder = { folderPicker.launch(null) },
                             onRescan = { vm.rescan() },
                             onOpenSettings = { open(ROUTE_SETTINGS) },
                             onOpenLibrary = { tabName = Tab.Library.name },
+                            onOpenFavorites = { tabName = Tab.Favorites.name },
                             onOpenFolder = { id ->
                                 libraryRoot = id
                                 libraryPath = arrayListOf()
                                 tabName = Tab.Library.name
                             },
                             onPlay = playTrack,
+                            onToggleFavorite = { vm.toggleFavorite(it) },
                         )
 
                     Tab.Library ->
@@ -168,6 +172,15 @@ private fun AppRoot(vm: AppViewModel) {
                             onPlayList = playList,
                             onAddFolder = { folderPicker.launch(null) },
                             onOpenSettings = { open(ROUTE_SETTINGS) },
+                        )
+
+                    Tab.Favorites ->
+                        FavoritesScreen(
+                            vm = vm,
+                            favorites = favorites,
+                            onPlay = playTrack,
+                            onPlayList = playList,
+                            onBrowseLibrary = { tabName = Tab.Library.name },
                         )
 
                     Tab.Playing ->

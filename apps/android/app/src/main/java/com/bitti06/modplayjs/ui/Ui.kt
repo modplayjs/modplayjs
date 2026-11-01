@@ -19,10 +19,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -85,6 +88,7 @@ fun TrackRow(
     track: TrackEntity,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
+    onToggleFavorite: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val base = Modifier.fillMaxWidth()
@@ -117,7 +121,56 @@ fun TrackRow(
         if (track.availability == "missing") {
             Icon(Icons.Default.Warning, contentDescription = "Missing", tint = MaterialTheme.colorScheme.error)
         }
+        if (onToggleFavorite != null) {
+            val favorite = track.favoriteAt != null
+            IconButton(onClick = onToggleFavorite) {
+                Icon(
+                    if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = if (favorite) "Remove from favorites" else "Add to favorites",
+                    tint = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         trailing?.invoke()
+    }
+}
+
+/** Actions for one track, shared by the library and the favorites list. */
+@Composable
+fun TrackActionsSheet(
+    track: TrackEntity,
+    onPlay: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onIgnore: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+        Text(track.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(
+            track.relativePath,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FormatBadge(track.format.uppercase())
+            Text(formatSize(track.size), style = MaterialTheme.typography.labelSmall)
+            if (track.availability == "missing") {
+                Text("Missing", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        HorizontalDivider()
+        SettingsRow("Play", null, onPlay)
+        SettingsRow(
+            if (track.favoriteAt == null) "Add to favorites" else "Remove from favorites",
+            null,
+            onToggleFavorite,
+        )
+        SettingsRow("Remove from library", "Keeps the file, adds it to Ignored files", onIgnore)
+        SettingsRow("Delete permanently", "Deletes the file from storage", onDelete)
     }
 }
 

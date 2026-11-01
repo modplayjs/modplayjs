@@ -1,0 +1,143 @@
+package com.bitti06.modplayjs.ui
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.bitti06.modplayjs.library.TrackEntity
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FavoritesScreen(
+    vm: AppViewModel,
+    favorites: List<TrackEntity>,
+    onPlay: (TrackEntity) -> Unit,
+    onPlayList: (List<TrackEntity>, Int) -> Unit,
+    onBrowseLibrary: () -> Unit,
+) {
+    var showTrackActions by remember { mutableStateOf<TrackEntity?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf<TrackEntity?>(null) }
+
+    Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Favorites",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "${favorites.size}",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = { onPlayList(favorites, 0) }, enabled = favorites.isNotEmpty()) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Spacer(Modifier.width(4.dp))
+                Text("Play all")
+            }
+        }
+        Text(
+            "Tap the heart on a track to keep it here. Newest favorite first.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 6.dp),
+        )
+        HorizontalDivider()
+        if (favorites.isEmpty()) {
+            EmptyState(
+                title = "No favorites yet",
+                body = "Favorite modules, SID tunes or audio files from the library and they show up here.",
+                actionLabel = "Browse library",
+                onAction = onBrowseLibrary,
+            )
+        } else {
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(favorites, key = { it.id }) { track ->
+                    TrackRow(
+                        track,
+                        onClick = { onPlay(track) },
+                        onLongClick = { showTrackActions = track },
+                        onToggleFavorite = { vm.toggleFavorite(track) },
+                        trailing = {
+                            IconButton(onClick = { showTrackActions = track }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "Track options")
+                            }
+                        },
+                    )
+                }
+                item { Spacer(Modifier.height(24.dp)) }
+            }
+        }
+    }
+
+    showTrackActions?.let { track ->
+        ModalBottomSheet(
+            onDismissRequest = { showTrackActions = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            TrackActionsSheet(
+                track = track,
+                onPlay = {
+                    showTrackActions = null
+                    onPlay(track)
+                },
+                onToggleFavorite = {
+                    vm.toggleFavorite(track)
+                    showTrackActions = null
+                },
+                onIgnore = {
+                    vm.ignore(track)
+                    showTrackActions = null
+                },
+                onDelete = {
+                    showTrackActions = null
+                    showDeleteConfirm = track
+                },
+            )
+        }
+    }
+
+    showDeleteConfirm?.let { track ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = null },
+            title = { Text("Delete permanently?") },
+            text = { Text("\"${track.name}\" will be deleted from storage. This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.deletePermanently(track)
+                    showDeleteConfirm = null
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = null }) { Text("Cancel") } },
+        )
+    }
+}

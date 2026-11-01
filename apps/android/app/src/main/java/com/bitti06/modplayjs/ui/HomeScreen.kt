@@ -35,13 +35,15 @@ fun HomeScreen(
     tracks: List<TrackEntity>,
     recent: List<TrackEntity>,
     folders: List<FolderEntity>,
-    ignoredCount: Int,
+    favoritesCount: Int,
     onAddFolder: () -> Unit,
     onRescan: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenLibrary: () -> Unit,
+    onOpenFavorites: () -> Unit,
     onOpenFolder: (String) -> Unit,
     onPlay: (TrackEntity) -> Unit,
+    onToggleFavorite: (TrackEntity) -> Unit,
 ) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -74,7 +76,7 @@ fun HomeScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatCard(tracks.size.toString(), "tracks", Modifier.weight(1f), onClick = onOpenLibrary)
                 StatCard(folders.size.toString(), "folders", Modifier.weight(1f), onClick = onOpenLibrary)
-                StatCard(ignoredCount.toString(), "ignored", Modifier.weight(1f))
+                StatCard(favoritesCount.toString(), "favorites", Modifier.weight(1f), onClick = onOpenFavorites)
             }
         }
         if (folders.isEmpty()) {
@@ -92,7 +94,11 @@ fun HomeScreen(
                 item { Text("Nothing yet", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             } else {
                 items(recent, key = { "recent:${it.id}" }) { track ->
-                    TrackRow(track, onClick = { onPlay(track) })
+                    TrackRow(
+                        track,
+                        onClick = { onPlay(track) },
+                        onToggleFavorite = { onToggleFavorite(track) },
+                    )
                 }
             }
             item {

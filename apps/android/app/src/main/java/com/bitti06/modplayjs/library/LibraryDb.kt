@@ -1,14 +1,16 @@
 package com.bitti06.modplayjs.library
 
 import android.content.Context
-import androidx.room.Database
-import androidx.room.Room
-import androidx.room.RoomDatabase
+import androidx.room3.Database
+import androidx.room3.Room
+import androidx.room3.RoomDatabase
+import androidx.sqlite.driver.AndroidSQLiteDriver
+import kotlinx.coroutines.Dispatchers
 
 @Database(
     entities = [FolderEntity::class, TrackEntity::class, PlaylistEntity::class, PlaylistTrackEntity::class],
-    version = 1,
-    exportSchema = true,
+    version = 2,
+    exportSchema = false,
 )
 abstract class LibraryDb : RoomDatabase() {
     abstract fun dao(): LibraryDao
@@ -16,7 +18,11 @@ abstract class LibraryDb : RoomDatabase() {
     companion object {
         fun open(context: Context): LibraryDb =
             Room
-                .databaseBuilder(context, LibraryDb::class.java, "modplayjs.db")
+                .databaseBuilder<LibraryDb>(context, "modplayjs.db")
+                .setDriver(AndroidSQLiteDriver())
+                .setQueryCoroutineContext(Dispatchers.IO)
+                // No migrations while this is unreleased: a schema change bumps
+                // the version and the old library is dropped and rescanned.
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
     }

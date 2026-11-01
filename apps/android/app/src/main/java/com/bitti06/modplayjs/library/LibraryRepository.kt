@@ -69,6 +69,7 @@ class LibraryRepository(
                             ignoredAt = old?.ignoredAt,
                             addedAt = old?.addedAt ?: now,
                             lastPlayed = old?.lastPlayed,
+                            favoriteAt = old?.favoriteAt,
                         ),
                     )
                 }
@@ -129,6 +130,14 @@ class LibraryRepository(
     suspend fun markPlayed(track: TrackEntity) =
         withContext(Dispatchers.IO) {
             dao.markPlayed(track.id, System.currentTimeMillis())
+        }
+
+    suspend fun setFavorite(
+        id: String,
+        favorite: Boolean,
+    ) =
+        withContext(Dispatchers.IO) {
+            dao.setFavorite(id, if (favorite) System.currentTimeMillis() else null)
         }
 
     fun filter(
