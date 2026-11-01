@@ -445,7 +445,7 @@ fun InfoRow(
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Text(
             label,
-            modifier = Modifier.width(104.dp),
+            modifier = Modifier.width(136.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
         )

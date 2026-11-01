@@ -274,9 +274,9 @@
     <string name="diag_channels">Channels</string>
     <string name="diag_channels_stereo">Stereo (2)</string>
     <string name="diag_buffer">Buffer</string>
-    <string name="diag_buffer_value">%1$d frames · capacity %2$d</string>
-    <string name="diag_buffer_time">Buffer time</string>
-    <string name="diag_ms_value">%1$d ms</string>
+    <string name="diag_buffer_value">%1$d frames · %2$d ms</string>
+    <string name="diag_buffer_minimum">Framework minimum</string>
+    <string name="diag_frames">%1$d frames</string>
     <string name="diag_play_state">Play state</string>
     <string name="play_state_playing">playing</string>
     <string name="play_state_paused">paused</string>

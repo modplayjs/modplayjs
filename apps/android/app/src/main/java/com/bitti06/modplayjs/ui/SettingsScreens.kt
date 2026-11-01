@@ -424,11 +424,12 @@ fun DiagnosticsScreen(
         InfoRow(stringResource(R.string.diag_channels), stringResource(R.string.diag_channels_stereo))
         InfoRow(
             stringResource(R.string.diag_buffer),
-            stringResource(R.string.diag_buffer_value, audio.bufferFrames, audio.capacityFrames),
+            stringResource(R.string.diag_buffer_value, audio.bufferFrames, bufferMs),
         )
-        if (bufferMs > 0) {
-            InfoRow(stringResource(R.string.diag_buffer_time), stringResource(R.string.diag_ms_value, bufferMs))
-        }
+        InfoRow(
+            stringResource(R.string.diag_buffer_minimum),
+            stringResource(R.string.diag_frames, audio.minBufferFrames),
+        )
         InfoRow(
             stringResource(R.string.diag_play_state),
             stringResource(

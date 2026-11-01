@@ -52,6 +52,24 @@ class AudioTrackOutput(
             ?: 0
 
     /**
+     * What the platform insists a stream buffer must hold. On most devices this
+     * is already several hardware bursts; asking for less makes AudioTrack
+     * fall back to a deep buffer, which is why it is only a floor here.
+     */
+    private val minBufferBytes: Int =
+        runCatching {
+            AudioTrack.getMinBufferSize(
+                sampleRate,
+                AudioFormat.CHANNEL_OUT_STEREO,
+                AudioFormat.ENCODING_PCM_FLOAT,
+            )
+        }.getOrDefault(0)
+            .takeIf { it > 0 }
+            ?: DEFAULT_BURST_FRAMES * LOW_LATENCY_BURSTS * BYTES_PER_FRAME
+
+    val minBufferFrames: Int get() = minBufferBytes / BYTES_PER_FRAME
+
+    /**
      * Everything the diagnostics screen reports about the open AudioTrack.
      * Read on demand; the values change only when the track is rebuilt.
      */
@@ -61,7 +79,7 @@ class AudioTrackOutput(
             return AudioOutputInfo(
                 sampleRate = sampleRate,
                 bufferFrames = runCatching { t?.bufferSizeInFrames ?: 0 }.getOrDefault(0),
-                capacityFrames = runCatching { t?.bufferCapacityInFrames ?: 0 }.getOrDefault(0),
+                minBufferFrames = minBufferFrames,
                 playState =
                     when (runCatching { t?.playState }.getOrNull()) {
                         AudioTrack.PLAYSTATE_PLAYING -> OutputPlayState.PLAYING
@@ -76,17 +94,35 @@ class AudioTrackOutput(
     fun start(ring: PcmRing) {
         if (running.get()) return
         this.ring = ring
-        val minBytes =
-            AudioTrack
-                .getMinBufferSize(
-                    sampleRate,
-                    AudioFormat.CHANNEL_OUT_STEREO,
-                    AudioFormat.ENCODING_PCM_FLOAT,
-                ).coerceAtLeast(4096)
-        val burstFrames = maxOf(256, minBytes / (2 * 4))
-        val bufferBytes = minBytes.coerceAtLeast(burstFrames * 2 * 4 * 2)
-        scratch = FloatArray(burstFrames * 2)
-        val t =
+        val burst = deviceFramesPerBuffer.takeIf { it in 16..16_384 } ?: DEFAULT_BURST_FRAMES
+        // One write covers two hardware bursts, so the drain thread wakes twice
+        // per buffer instead of once per burst.
+        val blockFrames = (burst * 2).coerceAtLeast(256)
+        scratch = FloatArray(blockFrames * 2)
+        // getMinBufferSize already carries the framework's safety margin, and
+        // it is the smallest buffer the platform documents as safe. The old
+        // code asked for twice that, which is where the 120 ms came from; the
+        // device minimum is only a floor here, so honour it rather than guess.
+        val t = buildTrack(minBufferBytes) ?: return
+        Log.i(
+            TAG,
+            "AudioTrack buffer ${t.bufferSizeInFrames} frames " +
+                "(${t.bufferSizeInFrames * 1000 / sampleRate} ms, requested $minBufferFrames, " +
+                "${t.bufferCapacityInFrames} capacity)",
+        )
+        track = t
+        running.set(true)
+        // Stay paused until the engine has audio. Anything else lets the
+        // framework count underruns for a track nobody is feeding.
+        paused.set(true)
+        Thread({ loop() }, "oboe-drain").apply {
+            priority = Thread.MAX_PRIORITY
+            start()
+        }
+    }
+
+    private fun buildTrack(bufferBytes: Int): AudioTrack? =
+        runCatching {
             AudioTrack
                 .Builder()
                 .setAudioAttributes(
@@ -106,16 +142,8 @@ class AudioTrackOutput(
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
                 .build()
-        track = t
-        running.set(true)
-        // Stay paused until the engine has audio. Anything else lets the
-        // framework count underruns for a track nobody is feeding.
-        paused.set(true)
-        Thread({ loop() }, "oboe-drain").apply {
-            priority = Thread.MAX_PRIORITY
-            start()
-        }
-    }
+        }.onFailure { Log.w(TAG, "cannot build an AudioTrack with $bufferBytes bytes", it) }
+            .getOrNull()
 
     private fun loop() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
@@ -155,6 +183,15 @@ class AudioTrackOutput(
 
     private companion object {
         const val TAG = "AudioTrackOutput"
+
+        /** Stereo, 32-bit float: the format the engine renders. */
+        const val BYTES_PER_FRAME = 2 * 4
+
+        /** Typical hardware burst when the device reports none. */
+        const val DEFAULT_BURST_FRAMES = 240
+
+        /** Buffer size in hardware bursts requested on the low-latency path. */
+        const val LOW_LATENCY_BURSTS = 4
     }
 }
 
@@ -171,7 +208,7 @@ enum class OutputPlayState {
 data class AudioOutputInfo(
     val sampleRate: Int = 0,
     val bufferFrames: Int = 0,
-    val capacityFrames: Int = 0,
+    val minBufferFrames: Int = 0,
     val playState: OutputPlayState = OutputPlayState.STOPPED,
     val deviceFramesPerBuffer: Int = 0,
     val lowLatencyRequested: Boolean = false,
