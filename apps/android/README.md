@@ -94,11 +94,15 @@ debug APK, and verifies 16 KB ELF segment alignment.
 - Plays through the JS core in V8: float32 stereo into an `AudioTrack`, a
   queue with repeat/shuffle/auto-advance, channel mute/solo, per-format accent
   colours and an AudioEffect panel entry.
-- Swiping left on the player slides in a panel over it with the folder the
-  playing file lives in, at that file's directory. It is not a navigation
-  destination: the player keeps running underneath, and it closes by swiping it
-  back out, tapping the scrim, or Back. Picking a track plays it and closes the
-  panel; with no library row for the tune it opens the folder list instead.
+- Swiping on the player slides in a panel over it: left for the folder the
+  playing file lives in, at that file's directory; right for the audio controls
+  (volume, pan, interpolation, voices, tempo and the mixer). Neither is a
+  navigation destination — the player keeps running underneath, and a panel
+  closes by swiping it back out, tapping the scrim, or Back. Picking a track
+  plays it and closes the folder panel; with no library row for the tune it
+  opens the folder list instead.
+- The transport row carries the repeat toggle (off / all / one); the queue,
+  which is the list playback started from, is listed from Track details.
 - Media3 `MediaSessionService` owns the notification, lock-screen and media
   buttons.
 - Diagnostics screen reports the engine, the audio path (buffer frames and

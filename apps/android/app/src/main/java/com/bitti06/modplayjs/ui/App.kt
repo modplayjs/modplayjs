@@ -13,11 +13,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.IconButton
@@ -52,6 +55,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.bitti06.modplayjs.R
+import com.bitti06.modplayjs.engine.AndroidCapabilities
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.library.FolderEntity
@@ -107,6 +111,7 @@ private fun AppRoot(vm: AppViewModel) {
     // while it slides out.
     var folderSheet by remember { mutableStateOf<FolderView?>(null) }
     var folderSheetOpen by remember { mutableStateOf(false) }
+    var audioSheetOpen by remember { mutableStateOf(false) }
 
     val folderPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -133,11 +138,14 @@ private fun AppRoot(vm: AppViewModel) {
 
     // Back closes the drawer before it leaves the player: the panel is not a
     // navigation destination, so NavDisplay does not know about it.
+    BackHandler(enabled = backStack.isEmpty() && tab == Tab.Playing && audioSheetOpen) {
+        audioSheetOpen = false
+    }
     BackHandler(enabled = backStack.isEmpty() && tab == Tab.Playing && folderSheetOpen) {
         folderSheetOpen = false
     }
     // NavDisplay registers its own back handler while the stack is not empty.
-    BackHandler(enabled = backStack.isEmpty() && tab == Tab.Playing && !folderSheetOpen) {
+    BackHandler(enabled = backStack.isEmpty() && tab == Tab.Playing && !folderSheetOpen && !audioSheetOpen) {
         tabName = Tab.Library.name
     }
 
@@ -176,7 +184,14 @@ private fun AppRoot(vm: AppViewModel) {
             entry<LicenseKey> { key ->
                 licenseEntry(key.id)?.let { LicenseTextScreen(it, onBack = back) }
             }
-            entry<DetailsKey> { DetailsEntry(vm, settings, back) }
+            entry<DetailsKey> {
+                DetailsEntry(
+                    vm = vm,
+                    settings = settings,
+                    onOpenQueue = { navigate(QueueKey) },
+                    onBack = back,
+                )
+            }
             entry<QueueKey> {
                 QueueScreen(queue, queueIndex, onPlay = { vm.playQueue(it) }, onBack = back)
             }
@@ -294,8 +309,8 @@ private fun AppRoot(vm: AppViewModel) {
                             vm = vm,
                             settings = settings,
                             onOpenDetails = { navigate(DetailsKey) },
-                            onOpenQueue = { navigate(QueueKey) },
                             onOpenText = { kind -> navigate(TextKey(kind)) },
+                            onOpenAudio = { audioSheetOpen = true },
                             onOpenFolder = { track ->
                                 folderSheet = track?.let { FolderView(it.folderId, folderPathOf(it)) }
                                 folderSheetOpen = true
@@ -310,6 +325,14 @@ private fun AppRoot(vm: AppViewModel) {
         // The player's folder drawer. A panel over the tabs rather than a
         // destination: playback and the player underneath keep running, and
         // closing returns to the same screen.
+        SideDrawer(
+            visible = audioSheetOpen,
+            side = DrawerSide.Start,
+            onDismiss = { audioSheetOpen = false },
+            onHidden = {},
+        ) {
+            AudioEntry(vm = vm, settings = settings, onClose = { audioSheetOpen = false })
+        }
         SideDrawer(
             visible = folderSheetOpen,
             onDismiss = { folderSheetOpen = false },
@@ -431,9 +454,9 @@ private fun PlayerTab(
     vm: AppViewModel,
     settings: AndroidSettings,
     onOpenDetails: () -> Unit,
-    onOpenQueue: () -> Unit,
     onOpenText: (TrackText) -> Unit,
     onOpenFolder: (TrackEntity?) -> Unit,
+    onOpenAudio: () -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -449,9 +472,9 @@ private fun PlayerTab(
         loading = loading,
         error = error,
         onOpenDetails = onOpenDetails,
-        onOpenQueue = onOpenQueue,
         onOpenText = onOpenText,
         onOpenFolder = onOpenFolder,
+        onOpenAudio = onOpenAudio,
         onBrowseLibrary = onBrowseLibrary,
         onOpenSettings = onOpenSettings,
     )
@@ -461,6 +484,58 @@ private fun PlayerTab(
 private fun folderPathOf(track: TrackEntity): List<String> {
     val directory = track.relativePath.substringBeforeLast('/', "")
     return if (directory.isEmpty()) emptyList() else directory.split('/')
+}
+
+/**
+ * The audio drawer. It collects the snapshot itself: capabilities drive the
+ * enabled state of a few rows, and the 4 Hz snapshot must not reach the tab
+ * scaffold above.
+ */
+@Composable
+private fun AudioEntry(
+    vm: AppViewModel,
+    settings: AndroidSettings,
+    onClose: () -> Unit,
+) {
+    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
+    AudioSheet(vm, settings, snapshot?.capabilities, onClose)
+}
+
+/** Volume, pan, interpolation, voices, tempo and the mixer, next to the player. */
+@Composable
+private fun AudioSheet(
+    actions: UiActions,
+    settings: AndroidSettings,
+    capabilities: AndroidCapabilities?,
+    onClose: () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .safeContentPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.settings_audio),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onClose) {
+                Icon(AppIcons.Close, contentDescription = stringResource(R.string.common_close))
+            }
+        }
+        AudioSettingsContent(actions, settings, capabilities)
+        SectionTitle(stringResource(R.string.settings_mixer))
+        MixerSettingsContent(actions, settings, capabilities)
+        Spacer(Modifier.height(24.dp))
+    }
 }
 
 /** What the player's drawer should show: a folder, or the folder list. */
@@ -579,8 +654,10 @@ private fun DiagnosticsEntry(
 private fun DetailsEntry(
     vm: AppViewModel,
     settings: AndroidSettings,
+    onOpenQueue: () -> Unit,
     onBack: () -> Unit,
 ) {
     val snapshot by vm.snapshot.collectAsStateWithLifecycle()
-    DetailsScreen(snapshot, vm, settings, onBack)
+    val queue by vm.queue.collectAsStateWithLifecycle()
+    DetailsScreen(snapshot, vm, settings, queue.size, onOpenQueue, onBack)
 }

@@ -27,8 +27,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
+/** Which edge a [SideDrawer] is anchored to. */
+enum class DrawerSide { Start, End }
+
 /**
- * A panel anchored to the trailing edge that slides over the screen instead of
+ * A panel anchored to one edge that slides over the screen instead of
  * being a navigation destination: the tab underneath keeps playing and stays
  * composed, and closing returns to exactly where the user was.
  *
@@ -38,11 +41,14 @@ import kotlinx.coroutines.launch
  *
  * [onHidden] fires once the panel is off screen, which is when the caller may
  * drop the data it is showing; dropping it on dismiss would empty the panel
- * while it is still sliding out.
+ * while it is still sliding out. [side] is the edge it is anchored to: `End`
+ * slides in from the right, `Start` from the left, and the drag that closes it
+ * always runs towards that edge.
  */
 @Composable
 fun SideDrawer(
     visible: Boolean,
+    side: DrawerSide = DrawerSide.End,
     onDismiss: () -> Unit,
     onHidden: () -> Unit,
     content: @Composable () -> Unit,
@@ -54,6 +60,16 @@ fun SideDrawer(
         val widthPx = with(LocalDensity.current) { panelWidth.toPx() }
         val progress = remember { Animatable(1f) }
         val scope = rememberCoroutineScope()
+        // +1 when the panel lives on the right, -1 when on the left: closing
+        // always moves towards its own edge.
+        val toward = if (side == DrawerSide.Start) -1f else 1f
+        val anchor = if (side == DrawerSide.Start) Alignment.CenterStart else Alignment.CenterEnd
+        val panelShape =
+            if (side == DrawerSide.Start) {
+                RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp)
+            } else {
+                RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
+            }
 
         LaunchedEffect(visible, widthPx) {
             if (visible) {
@@ -77,13 +93,13 @@ fun SideDrawer(
             )
             Box(
                 Modifier
-                    .align(Alignment.CenterEnd)
+                    .align(anchor)
                     .width(panelWidth)
                     .fillMaxHeight()
                     .graphicsLayer {
-                        translationX = progress.value * widthPx
+                        translationX = toward * progress.value * widthPx
                         shadowElevation = 24.dp.toPx()
-                        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
+                        this.shape = panelShape
                         clip = true
                     }
                     .background(MaterialTheme.colorScheme.background)
@@ -109,7 +125,7 @@ fun SideDrawer(
                                 }
                             },
                         ) { _, delta ->
-                            dragged = (dragged + delta).coerceAtLeast(0f)
+                            dragged = (dragged + delta * toward).coerceAtLeast(0f)
                             scope.launch {
                                 progress.snapTo((dragged / widthPx).coerceIn(0f, 1f))
                             }

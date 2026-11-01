@@ -157,7 +157,6 @@
     <string name="cd_previous">Previous</string>
     <string name="cd_next">Next</string>
     <string name="cd_stop">Stop</string>
-    <string name="player_queue">Queue</string>
     <string name="player_details">Details</string>
     <string name="player_channels">Channels</string>
     <string name="player_channels_count">%1$d · %2$d muted</string>

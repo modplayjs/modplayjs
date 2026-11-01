@@ -566,45 +566,6 @@ object AppIcons {
 
     private var _playArrow: ImageVector? = null
 
-    val PlaylistPlay: ImageVector
-        get() {
-            if (_playlistPlay != null) {
-                return _playlistPlay!!
-            }
-            _playlistPlay = materialIcon(name = "AutoMirrored.Filled.PlaylistPlay", autoMirror = true) {
-                materialPath {
-                    moveTo(3.0f, 10.0f)
-                    horizontalLineToRelative(11.0f)
-                    verticalLineToRelative(2.0f)
-                    horizontalLineToRelative(-11.0f)
-                    close()
-                }
-                materialPath {
-                    moveTo(3.0f, 6.0f)
-                    horizontalLineToRelative(11.0f)
-                    verticalLineToRelative(2.0f)
-                    horizontalLineToRelative(-11.0f)
-                    close()
-                }
-                materialPath {
-                    moveTo(3.0f, 14.0f)
-                    horizontalLineToRelative(7.0f)
-                    verticalLineToRelative(2.0f)
-                    horizontalLineToRelative(-7.0f)
-                    close()
-                }
-                materialPath {
-                    moveTo(16.0f, 13.0f)
-                    lineToRelative(0.0f, 8.0f)
-                    lineToRelative(6.0f, -4.0f)
-                    close()
-                }
-            }
-            return _playlistPlay!!
-        }
-
-    private var _playlistPlay: ImageVector? = null
-
     val Refresh: ImageVector
         get() {
             if (_refresh != null) {
@@ -633,6 +594,87 @@ object AppIcons {
         }
 
     private var _refresh: ImageVector? = null
+
+    val Repeat: ImageVector
+        get() {
+            if (_repeat != null) {
+                return _repeat!!
+            }
+            _repeat = materialIcon(name = "Filled.Repeat") {
+                materialPath {
+                    moveTo(7.0f, 7.0f)
+                    horizontalLineToRelative(10.0f)
+                    verticalLineToRelative(3.0f)
+                    lineToRelative(4.0f, -4.0f)
+                    lineToRelative(-4.0f, -4.0f)
+                    verticalLineToRelative(3.0f)
+                    horizontalLineTo(5.0f)
+                    verticalLineToRelative(6.0f)
+                    horizontalLineToRelative(2.0f)
+                    verticalLineTo(7.0f)
+                    close()
+                    moveTo(17.0f, 17.0f)
+                    horizontalLineTo(7.0f)
+                    verticalLineToRelative(-3.0f)
+                    lineToRelative(-4.0f, 4.0f)
+                    lineToRelative(4.0f, 4.0f)
+                    verticalLineToRelative(-3.0f)
+                    horizontalLineToRelative(12.0f)
+                    verticalLineToRelative(-6.0f)
+                    horizontalLineToRelative(-2.0f)
+                    verticalLineToRelative(4.0f)
+                    close()
+                }
+            }
+            return _repeat!!
+        }
+
+    private var _repeat: ImageVector? = null
+
+    val RepeatOne: ImageVector
+        get() {
+            if (_repeatOne != null) {
+                return _repeatOne!!
+            }
+            _repeatOne = materialIcon(name = "Filled.RepeatOne") {
+                materialPath {
+                    moveTo(7.0f, 7.0f)
+                    horizontalLineToRelative(10.0f)
+                    verticalLineToRelative(3.0f)
+                    lineToRelative(4.0f, -4.0f)
+                    lineToRelative(-4.0f, -4.0f)
+                    verticalLineToRelative(3.0f)
+                    horizontalLineTo(5.0f)
+                    verticalLineToRelative(6.0f)
+                    horizontalLineToRelative(2.0f)
+                    verticalLineTo(7.0f)
+                    close()
+                    moveTo(17.0f, 17.0f)
+                    horizontalLineTo(7.0f)
+                    verticalLineToRelative(-3.0f)
+                    lineToRelative(-4.0f, 4.0f)
+                    lineToRelative(4.0f, 4.0f)
+                    verticalLineToRelative(-3.0f)
+                    horizontalLineToRelative(12.0f)
+                    verticalLineToRelative(-6.0f)
+                    horizontalLineToRelative(-2.0f)
+                    verticalLineToRelative(4.0f)
+                    close()
+                    moveTo(13.0f, 15.0f)
+                    verticalLineTo(9.0f)
+                    horizontalLineToRelative(-1.0f)
+                    lineToRelative(-2.0f, 1.0f)
+                    verticalLineToRelative(1.0f)
+                    horizontalLineToRelative(1.5f)
+                    verticalLineToRelative(4.0f)
+                    horizontalLineTo(13.0f)
+                    close()
+                }
+            }
+            return _repeatOne!!
+        }
+
+    private var _repeatOne: ImageVector? = null
 
     val Search: ImageVector
         get() {

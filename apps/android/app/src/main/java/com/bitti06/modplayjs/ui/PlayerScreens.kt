@@ -92,9 +92,9 @@ fun PlayerScreen(
     loading: String?,
     error: PlayError?,
     onOpenDetails: () -> Unit,
-    onOpenQueue: () -> Unit,
     onOpenText: (TrackText) -> Unit,
     onOpenFolder: (TrackEntity?) -> Unit,
+    onOpenAudio: () -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -117,16 +117,19 @@ fun PlayerScreen(
                     1f to lerp(MaterialTheme.colorScheme.background, accent, 0.12f),
                 ),
             )
-            // Swipe left for the folder the playing file lives in. Sliders,
-            // the channel strip and other horizontal children claim the drag
-            // first, so the gesture only fires on the free area.
+            // Swipe left for the folder the playing file lives in, right for
+            // the audio panel. Sliders, the channel strip and other horizontal
+            // children claim the drag first, so these only fire on free area.
             .pointerInput(openable, currentTrack) {
                 if (!openable) return@pointerInput
                 var dragged = 0f
                 detectHorizontalDragGestures(
                     onDragStart = { dragged = 0f },
                     onDragEnd = {
-                        if (dragged < -size.width * 0.18f) onOpenFolder(currentTrack)
+                        when {
+                            dragged < -size.width * 0.18f -> onOpenFolder(currentTrack)
+                            dragged > size.width * 0.18f -> onOpenAudio()
+                        }
                         dragged = 0f
                     },
                     onDragCancel = { dragged = 0f },
@@ -388,10 +391,39 @@ fun PlayerScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = onOpenQueue) {
+                        // Repeat cycles off -> all -> one. It lives here rather
+                        // than only in Settings because it is the one playback
+                        // option changed mid-track.
+                        val repeat = settings.playback.repeat
+                        IconButton(
+                            onClick = {
+                                val next =
+                                    when (repeat) {
+                                        "off" -> "all"
+                                        "all" -> "one"
+                                        else -> "off"
+                                    }
+                                actions.updateSettings {
+                                    it.copy(playback = it.playback.copy(repeat = next))
+                                }
+                            },
+                        ) {
                             Icon(
-                                AppIcons.PlaylistPlay,
-                                contentDescription = stringResource(R.string.player_queue),
+                                if (repeat == "one") AppIcons.RepeatOne else AppIcons.Repeat,
+                                contentDescription =
+                                    stringResource(
+                                        when (repeat) {
+                                            "all" -> R.string.repeat_all
+                                            "one" -> R.string.repeat_one
+                                            else -> R.string.repeat_off
+                                        },
+                                    ),
+                                tint =
+                                    if (repeat == "off") {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    } else {
+                                        accent
+                                    },
                             )
                         }
                         IconButton(onClick = { actions.previous() }) {
@@ -697,6 +729,8 @@ fun DetailsScreen(
     snapshot: AndroidSnapshot?,
     actions: UiActions,
     settings: AndroidSettings,
+    queueSize: Int,
+    onOpenQueue: () -> Unit,
     onBack: () -> Unit,
 ) {
     val snap = snapshot
@@ -711,6 +745,14 @@ fun DetailsScreen(
             return
         }
         LazyColumn(Modifier.fillMaxSize()) {
+            // The queue lost its transport slot to the repeat toggle; it stays
+            // reachable here, with the count of what will play next.
+            item {
+                SettingsRow(
+                    stringResource(R.string.queue_title),
+                    pluralStringResource(R.plurals.track_count, queueSize, queueSize),
+                ) { onOpenQueue() }
+            }
             item { SectionTitle(stringResource(R.string.details_info)) }
             listOf(
                 R.string.details_file to track.name,
@@ -826,9 +868,9 @@ private fun PlayerContentPreview(snapshot: AndroidSnapshot?) {
         loading = null,
         error = null,
         onOpenDetails = {},
-        onOpenQueue = {},
         onOpenText = {},
         onOpenFolder = {},
+        onOpenAudio = {},
         onBrowseLibrary = {},
         onOpenSettings = {},
     )
@@ -842,6 +884,8 @@ private fun DetailsScreenPreview() {
             snapshot = previewSnapshot(),
             actions = PreviewActions,
             settings = previewSettings(),
+            queueSize = previewQueue().size,
+            onOpenQueue = {},
             onBack = {},
         )
     }

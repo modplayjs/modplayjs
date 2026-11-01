@@ -115,59 +115,69 @@ fun AudioSettingsScreen(
     capabilities: AndroidCapabilities?,
     onBack: () -> Unit,
 ) {
+    SettingsPage(stringResource(R.string.settings_audio), onBack) {
+        AudioSettingsContent(actions, settings, capabilities)
+    }
+}
+
+/** The audio controls, shared by the Settings page and the player's audio panel. */
+@Composable
+fun AudioSettingsContent(
+    actions: UiActions,
+    settings: AndroidSettings,
+    capabilities: AndroidCapabilities?,
+) {
     val context = LocalContext.current
     var showEffectsDialog by remember { mutableStateOf(false) }
     val effectsAvailable = remember { hasSystemAudioEffects(context) }
-    SettingsPage(stringResource(R.string.settings_audio), onBack) {
-        SliderRow(stringResource(R.string.volume), settings.transport.volume.toFloat(), 0f..100f) { value ->
-            actions.updateSettings { it.copy(transport = it.transport.copy(volume = value.toInt())) }
+    SliderRow(stringResource(R.string.volume), settings.transport.volume.toFloat(), 0f..100f) { value ->
+        actions.updateSettings { it.copy(transport = it.transport.copy(volume = value.toInt())) }
+    }
+    SliderRow(
+        stringResource(R.string.pan_separation),
+        settings.transport.panSeparation.toFloat(),
+        0f..100f,
+        enabled = capabilities?.panSeparation != false,
+    ) { value ->
+        actions.updateSettings { it.copy(transport = it.transport.copy(panSeparation = value.toInt())) }
+    }
+    ChoiceRow(
+        stringResource(R.string.interpolation),
+        listOf(
+            "0" to stringResource(R.string.interpolation_nearest),
+            "1" to stringResource(R.string.interpolation_linear),
+            "2" to stringResource(R.string.interpolation_spline),
+        ),
+        settings.transport.interpolation.toString(),
+    ) { value ->
+        actions.updateSettings { it.copy(transport = it.transport.copy(interpolation = value.toInt())) }
+    }
+    SliderRow(stringResource(R.string.voices), settings.transport.numVoices.toFloat(), 4f..64f) { value ->
+        actions.updateSettings { it.copy(transport = it.transport.copy(numVoices = value.toInt())) }
+    }
+    SliderRow(stringResource(R.string.tempo_factor), settings.transport.tempoFactor.toFloat(), 0.25f..4f) { value ->
+        actions.updateSettings { it.copy(transport = it.transport.copy(tempoFactor = value.toDouble())) }
+    }
+    SectionTitle(stringResource(R.string.output))
+    InfoRow(stringResource(R.string.rate), stringResource(R.string.rate_value, actions.sampleRate))
+    InfoRow(stringResource(R.string.session), actions.audioSessionId.toString())
+    Text(
+        stringResource(R.string.audio_output_note),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    SettingsRow(
+        stringResource(R.string.audio_effects),
+        stringResource(
+            if (effectsAvailable) R.string.audio_effects_summary else R.string.audio_effects_unavailable,
+        ),
+    ) {
+        if (!openSystemAudioEffects(context, actions.audioSessionId)) {
+            showEffectsDialog = true
         }
-        SliderRow(
-            stringResource(R.string.pan_separation),
-            settings.transport.panSeparation.toFloat(),
-            0f..100f,
-            enabled = capabilities?.panSeparation != false,
-        ) { value ->
-            actions.updateSettings { it.copy(transport = it.transport.copy(panSeparation = value.toInt())) }
-        }
-        ChoiceRow(
-            stringResource(R.string.interpolation),
-            listOf(
-                "0" to stringResource(R.string.interpolation_nearest),
-                "1" to stringResource(R.string.interpolation_linear),
-                "2" to stringResource(R.string.interpolation_spline),
-            ),
-            settings.transport.interpolation.toString(),
-        ) { value ->
-            actions.updateSettings { it.copy(transport = it.transport.copy(interpolation = value.toInt())) }
-        }
-        SliderRow(stringResource(R.string.voices), settings.transport.numVoices.toFloat(), 4f..64f) { value ->
-            actions.updateSettings { it.copy(transport = it.transport.copy(numVoices = value.toInt())) }
-        }
-        SliderRow(stringResource(R.string.tempo_factor), settings.transport.tempoFactor.toFloat(), 0.25f..4f) { value ->
-            actions.updateSettings { it.copy(transport = it.transport.copy(tempoFactor = value.toDouble())) }
-        }
-        SectionTitle(stringResource(R.string.output))
-        InfoRow(stringResource(R.string.rate), stringResource(R.string.rate_value, actions.sampleRate))
-        InfoRow(stringResource(R.string.session), actions.audioSessionId.toString())
-        Text(
-            stringResource(R.string.audio_output_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SettingsRow(
-            stringResource(R.string.audio_effects),
-            stringResource(
-                if (effectsAvailable) R.string.audio_effects_summary else R.string.audio_effects_unavailable,
-            ),
-        ) {
-            if (!openSystemAudioEffects(context, actions.audioSessionId)) {
-                showEffectsDialog = true
-            }
-        }
-        if (showEffectsDialog) {
-            SystemEffectsUnavailableDialog { showEffectsDialog = false }
-        }
+    }
+    if (showEffectsDialog) {
+        SystemEffectsUnavailableDialog { showEffectsDialog = false }
     }
 }
 
@@ -179,39 +189,49 @@ fun MixerSettingsScreen(
     onBack: () -> Unit,
 ) {
     SettingsPage(stringResource(R.string.settings_mixer), onBack) {
-        Text(
-            stringResource(R.string.mixer_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        ChoiceRow(
-            stringResource(R.string.mixer_mode),
-            listOf("libxmp" to "libxmp", "paula" to "Paula"),
-            settings.mixer.mode,
-            enabled = capabilities?.mixerMode != false,
-        ) { value -> actions.updateSettings { it.copy(mixer = it.mixer.copy(mode = value)) } }
-        ChoiceRow(
-            stringResource(R.string.mixer_layout),
-            listOf(
-                "panned" to stringResource(R.string.layout_module_pan),
-                "lrlr" to "L R L R",
-                "lrrl" to "L R R L",
-            ),
-            settings.mixer.layout,
-            enabled = capabilities?.mixer != false,
-        ) { value -> actions.updateSettings { it.copy(mixer = it.mixer.copy(layout = value)) } }
-        ChoiceRow(
-            stringResource(R.string.a500_filter),
-            listOf(
-                "a500" to stringResource(R.string.a500_off),
-                "a500led" to stringResource(R.string.a500_on),
-            ),
-            settings.mixer.amigaFilter,
-            enabled = capabilities?.amigaFilter != false,
-        ) { value -> actions.updateSettings { it.copy(mixer = it.mixer.copy(amigaFilter = value)) } }
-        SliderRow(stringResource(R.string.amplify), settings.mixer.amplify.toFloat(), 1f..32f) { value ->
-            actions.updateSettings { it.copy(mixer = it.mixer.copy(amplify = value.toInt())) }
-        }
+        MixerSettingsContent(actions, settings, capabilities)
+    }
+}
+
+/** The mixer controls, shared by the Settings page and the player's audio panel. */
+@Composable
+fun MixerSettingsContent(
+    actions: UiActions,
+    settings: AndroidSettings,
+    capabilities: AndroidCapabilities?,
+) {
+    Text(
+        stringResource(R.string.mixer_note),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    ChoiceRow(
+        stringResource(R.string.mixer_mode),
+        listOf("libxmp" to "libxmp", "paula" to "Paula"),
+        settings.mixer.mode,
+        enabled = capabilities?.mixerMode != false,
+    ) { value -> actions.updateSettings { it.copy(mixer = it.mixer.copy(mode = value)) } }
+    ChoiceRow(
+        stringResource(R.string.mixer_layout),
+        listOf(
+            "panned" to stringResource(R.string.layout_module_pan),
+            "lrlr" to "L R L R",
+            "lrrl" to "L R R L",
+        ),
+        settings.mixer.layout,
+        enabled = capabilities?.mixer != false,
+    ) { value -> actions.updateSettings { it.copy(mixer = it.mixer.copy(layout = value)) } }
+    ChoiceRow(
+        stringResource(R.string.a500_filter),
+        listOf(
+            "a500" to stringResource(R.string.a500_off),
+            "a500led" to stringResource(R.string.a500_on),
+        ),
+        settings.mixer.amigaFilter,
+        enabled = capabilities?.amigaFilter != false,
+    ) { value -> actions.updateSettings { it.copy(mixer = it.mixer.copy(amigaFilter = value)) } }
+    SliderRow(stringResource(R.string.amplify), settings.mixer.amplify.toFloat(), 1f..32f) { value ->
+        actions.updateSettings { it.copy(mixer = it.mixer.copy(amplify = value.toInt())) }
     }
 }
 
