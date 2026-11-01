@@ -54,6 +54,8 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         audioManager = getSystemService(AudioManager::class.java)
         player = ModplayPlayer(Looper.getMainLooper(), AppGraph.session)
+        // Ongoing while playing: the media card stays until playback stops.
+        setMediaNotificationProvider(StickyMediaNotificationProvider(this))
         mediaSession =
             MediaSession
                 .Builder(this, player)
