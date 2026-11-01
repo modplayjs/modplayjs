@@ -34,6 +34,7 @@ import kotlinx.coroutines.launch
 class PlaybackService : MediaSessionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var mediaSession: MediaSession
+    private lateinit var notificationProvider: StickyMediaNotificationProvider
     private lateinit var player: ModplayPlayer
     private lateinit var audioManager: AudioManager
     private var focusRequest: AudioFocusRequest? = null
@@ -55,7 +56,8 @@ class PlaybackService : MediaSessionService() {
         audioManager = getSystemService(AudioManager::class.java)
         player = ModplayPlayer(Looper.getMainLooper(), AppGraph.session)
         // Ongoing while playing: the media card stays until playback stops.
-        setMediaNotificationProvider(StickyMediaNotificationProvider(this))
+        notificationProvider = StickyMediaNotificationProvider(this)
+        setMediaNotificationProvider(notificationProvider)
         mediaSession =
             MediaSession
                 .Builder(this, player)
@@ -161,6 +163,19 @@ class PlaybackService : MediaSessionService() {
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
         }
+
+    /**
+     * Media3 posts the notification through the provider; this override adds one
+     * thing on top of that: while playing, the last notification is posted again
+     * even if the system had dropped it, which is what brings a swiped card back.
+     */
+    override fun onUpdateNotification(
+        session: MediaSession,
+        startInForegroundRequired: Boolean,
+    ) {
+        super.onUpdateNotification(session, startInForegroundRequired)
+        if (session.player.isPlaying) notificationProvider.repost()
+    }
 
     /**
      * Swiping the app out of recents stops playback. Media3 keeps playing by

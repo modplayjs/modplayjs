@@ -3,6 +3,7 @@ package com.bitti06.modplayjs.media
 import android.app.Notification
 import android.content.Context
 import android.os.Bundle
+import androidx.core.app.NotificationManagerCompat
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaNotification
@@ -24,6 +25,9 @@ class StickyMediaNotificationProvider(
     private val context = context.applicationContext
     private val delegate = DefaultMediaNotificationProvider(context)
 
+    /** The last notification the system accepted, for [repost]. */
+    @Volatile private var lastBuilt: MediaNotification? = null
+
     override fun createNotification(
         mediaSession: MediaSession,
         mediaButtonPreferences: ImmutableList<CommandButton>,
@@ -42,7 +46,9 @@ class StickyMediaNotificationProvider(
                 .recoverBuilder(context, built.notification)
                 .setOngoing(mediaSession.player.isPlaying)
                 .build()
-        return MediaNotification(built.notificationId, sticky)
+                .let { MediaNotification(built.notificationId, it) }
+        lastBuilt = sticky
+        return sticky
     }
 
     override fun handleCustomCommand(
@@ -53,4 +59,16 @@ class StickyMediaNotificationProvider(
 
     override fun getNotificationChannelInfo(): MediaNotification.Provider.NotificationChannelInfo =
         delegate.notificationChannelInfo
+
+    /**
+     * Posts the last notification again. SystemUI keeps its own "dismissed"
+     * memory per session, and Media3 stops posting while the player is idle, so
+     * the app has to hand the notification back itself.
+     */
+    fun repost() {
+        val notification = lastBuilt ?: return
+        runCatching {
+            NotificationManagerCompat.from(context).notify(notification.notificationId, notification.notification)
+        }
+    }
 }
