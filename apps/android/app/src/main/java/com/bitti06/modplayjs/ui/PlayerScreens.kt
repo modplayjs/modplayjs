@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.media.audiofx.AudioEffect
 import android.provider.Settings
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -85,7 +86,26 @@ fun PlayerScreen(
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Now Playing", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(
+                "Now Playing",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            if (track != null) {
+                Spacer(Modifier.width(12.dp))
+                // Scrolls sideways when the name does not fit, like a player's
+                // top bar does.
+                Text(
+                    track.title.ifBlank { track.name },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f).basicMarquee(),
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
             IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
         }
         if (error != null) {
