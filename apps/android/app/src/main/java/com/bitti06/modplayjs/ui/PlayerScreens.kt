@@ -244,15 +244,14 @@ fun PlayerScreen(
                                 Modifier.weight(1f),
                                 MaterialTheme.colorScheme.tertiary,
                             ) {
-                                // Module messages are fixed-width ASCII: the
-                                // web player renders them in a monospaced,
-                                // centred <pre> and the creator's columns only
-                                // line up the same way here.
+                                // Module messages are fixed-width ASCII. Each
+                                // line starts at the same column, so centring
+                                // them individually (as the web's text-center
+                                // does) would shift the art line by line.
                                 Text(
                                     message.replace("\r", ""),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontFamily = FontFamily.Monospace,
-                                    textAlign = TextAlign.Center,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }
