@@ -52,4 +52,7 @@ data object DetailsKey : NavKey
 data object QueueKey : NavKey
 
 @Serializable
+data object MessageKey : NavKey
+
+@Serializable
 data object IgnoredKey : NavKey

@@ -8,6 +8,7 @@ import android.media.audiofx.AudioEffect
 import android.provider.Settings
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -89,6 +90,7 @@ fun PlayerScreen(
     error: PlayError?,
     onOpenDetails: () -> Unit,
     onOpenQueue: () -> Unit,
+    onOpenMessage: () -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -244,6 +246,7 @@ fun PlayerScreen(
                                 stringResource(R.string.info_message),
                                 Modifier.weight(1f),
                                 MaterialTheme.colorScheme.tertiary,
+                                onExpand = onOpenMessage,
                             ) {
                                 // Module messages are fixed-width ASCII, up to
                                 // 79 columns here. Wrapping would move every
@@ -591,20 +594,39 @@ private fun InfoBox(
     title: String,
     modifier: Modifier = Modifier,
     accent: Color = MaterialTheme.colorScheme.primary,
+    onExpand: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .then(if (onExpand != null) Modifier.clickable(onClick = onExpand) else Modifier),
         shape = MaterialTheme.shapes.medium,
         color = lerp(MaterialTheme.colorScheme.surfaceContainer, accent, 0.18f),
     ) {
         Column(Modifier.fillMaxSize()) {
-            Text(
-                title.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = accent,
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 2.dp),
-            )
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    title.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = accent,
+                    modifier = Modifier.weight(1f),
+                )
+                if (onExpand != null) {
+                    Icon(
+                        AppIcons.ChevronRight,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
             Column(
                 Modifier
                     .weight(1f)
@@ -707,6 +729,40 @@ private fun ChannelDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
         },
     )
+}
+
+/** The whole module message, unwrapped and pannable in both directions. */
+@Composable
+fun MessageScreen(
+    message: String?,
+    onBack: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+        ModalTopBar(stringResource(R.string.info_message), onBack)
+        val text = message?.replace("\r", "")?.takeIf { it.isNotBlank() }
+        if (text == null) {
+            EmptyState(
+                title = stringResource(R.string.info_message),
+                body = stringResource(R.string.details_no_message),
+            )
+            return
+        }
+        // Two scroll axes on one node: fixed-width lines keep their columns and
+        // can still be panned sideways on a phone.
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            softWrap = false,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .horizontalScroll(rememberScrollState())
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = 8.dp, bottom = 24.dp),
+        )
+    }
 }
 
 @Composable

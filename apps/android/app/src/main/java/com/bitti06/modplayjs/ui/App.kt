@@ -166,6 +166,7 @@ private fun AppRoot(vm: AppViewModel) {
             entry<QueueKey> {
                 QueueScreen(queue, queueIndex, onPlay = { vm.playQueue(it) }, onBack = back)
             }
+            entry<MessageKey> { MessageEntry(vm, back) }
             entry<IgnoredKey> { IgnoredScreen(ignored, vm, back) }
         }
 
@@ -280,6 +281,7 @@ private fun AppRoot(vm: AppViewModel) {
                             settings = settings,
                             onOpenDetails = { navigate(DetailsKey) },
                             onOpenQueue = { navigate(QueueKey) },
+                            onOpenMessage = { navigate(MessageKey) },
                             onBrowseLibrary = { tabName = Tab.Library.name },
                             onOpenSettings = { navigate(SettingsKey) },
                         )
@@ -385,6 +387,7 @@ private fun PlayerTab(
     settings: AndroidSettings,
     onOpenDetails: () -> Unit,
     onOpenQueue: () -> Unit,
+    onOpenMessage: () -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -399,9 +402,19 @@ private fun PlayerTab(
         error = error,
         onOpenDetails = onOpenDetails,
         onOpenQueue = onOpenQueue,
+        onOpenMessage = onOpenMessage,
         onBrowseLibrary = onBrowseLibrary,
         onOpenSettings = onOpenSettings,
     )
+}
+
+@Composable
+private fun MessageEntry(
+    vm: AppViewModel,
+    onBack: () -> Unit,
+) {
+    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
+    MessageScreen(snapshot?.track?.message, onBack)
 }
 
 @Composable
