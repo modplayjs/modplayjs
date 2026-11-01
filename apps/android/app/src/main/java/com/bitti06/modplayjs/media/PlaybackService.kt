@@ -160,6 +160,18 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
+    /**
+     * Swiping the app out of recents stops playback. Media3 keeps playing by
+     * default, which leaves sound coming from a window the user just dismissed.
+     * The position is kept (paused) so reopening offers the same place.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val position = AppGraph.session.snapshot.value?.state?.positionMs?.toLong() ?: 0L
+        AppGraph.playback.savePosition(position, playing = false)
+        AppGraph.session.stop()
+        super.onTaskRemoved(rootIntent)
+    }
+
     private fun requestFocus() {
         if (focusRequest != null) return
         // Android 17 returns AUDIOFOCUS_REQUEST_FAILED when the request arrives
