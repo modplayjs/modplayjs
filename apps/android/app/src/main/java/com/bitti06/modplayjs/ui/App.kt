@@ -17,13 +17,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.IconButton
@@ -54,15 +47,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.engine.QueueItem
 import com.bitti06.modplayjs.library.TrackEntity
+import com.bitti06.modplayjs.ui.icons.AppIcons
 
 private enum class Tab(
     val label: String,
     val icon: ImageVector,
 ) {
-    Home("Home", Icons.Default.Home),
-    Library("Library", Icons.Default.LibraryMusic),
-    Favorites("Favorites", Icons.Default.Favorite),
-    Playing("Playing", Icons.Default.MusicNote),
+    Home("Home", AppIcons.Home),
+    Library("Library", AppIcons.LibraryMusic),
+    Favorites("Favorites", AppIcons.Favorite),
+    Playing("Playing", AppIcons.MusicNote),
 }
 
 @Composable
@@ -375,7 +369,7 @@ private fun MiniPlayer(
                 }
                 IconButton(onClick = onToggle) {
                     Icon(
-                        if (snap.state.playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        if (snap.state.playing) AppIcons.Pause else AppIcons.PlayArrow,
                         contentDescription = "Play or pause",
                         tint = MaterialTheme.colorScheme.primary,
                     )

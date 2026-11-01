@@ -1,5 +1,7 @@
 package com.bitti06.modplayjs.ui
 
+import android.text.format.DateUtils
+import android.text.format.Formatter
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,14 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -44,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,7 +46,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bitti06.modplayjs.library.TrackEntity
-import java.util.Locale
+import com.bitti06.modplayjs.ui.icons.AppIcons
 
 @Composable
 fun SectionTitle(text: String) {
@@ -114,7 +109,7 @@ fun ModalTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            Icon(AppIcons.ArrowBack, contentDescription = "Back")
         }
         Text(
             title,
@@ -167,13 +162,13 @@ fun TrackRow(
             )
         }
         if (track.availability == "missing") {
-            Icon(Icons.Default.Warning, contentDescription = "Missing", tint = MaterialTheme.colorScheme.error)
+            Icon(AppIcons.Warning, contentDescription = "Missing", tint = MaterialTheme.colorScheme.error)
         }
         if (onToggleFavorite != null) {
             val favorite = track.favoriteAt != null
             IconButton(onClick = onToggleFavorite) {
                 Icon(
-                    if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    if (favorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
                     contentDescription = if (favorite) "Remove from favorites" else "Add to favorites",
                     tint = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -243,7 +238,7 @@ fun FolderRow(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Default.Folder,
+                AppIcons.Folder,
                 contentDescription = null,
                 tint = accent,
                 modifier = Modifier.size(22.dp),
@@ -259,10 +254,10 @@ fun FolderRow(
             )
         }
         if (onPlay != null) {
-            IconButton(onClick = onPlay) { Icon(Icons.Default.PlayArrow, contentDescription = "Play folder") }
+            IconButton(onClick = onPlay) { Icon(AppIcons.PlayArrow, contentDescription = "Play folder") }
         }
         trailing?.invoke()
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(AppIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -288,7 +283,7 @@ fun SettingsRow(
                 )
             }
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(AppIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -412,22 +407,10 @@ fun FormatBadge(text: String) {
     }
 }
 
-fun formatTime(ms: Long): String {
-    val s = (ms / 1000).coerceAtLeast(0)
-    return "%d:%02d".format(s / 60, s % 60)
-}
+fun formatTime(ms: Long): String = DateUtils.formatElapsedTime((ms / 1000).coerceAtLeast(0))
 
-fun formatSize(bytes: Long): String {
-    if (bytes <= 0) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    var value = bytes.toDouble()
-    var unit = 0
-    while (value >= 1024 && unit < units.lastIndex) {
-        value /= 1024
-        unit++
-    }
-    return if (unit == 0) "${bytes} B" else String.format(Locale.US, "%.1f %s", value, units[unit])
-}
+@Composable
+fun formatSize(bytes: Long): String = Formatter.formatShortFileSize(LocalContext.current, bytes)
 
 /** Small clickable card used on the home screen. */
 @Composable

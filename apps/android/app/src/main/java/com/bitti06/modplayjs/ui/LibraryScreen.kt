@@ -19,17 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CreateNewFolder
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -57,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.library.FolderEntity
 import com.bitti06.modplayjs.library.TrackEntity
+import com.bitti06.modplayjs.ui.icons.AppIcons
 
 const val ALL_ROOTS = "*"
 
@@ -136,11 +126,11 @@ fun LibraryScreen(
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Library", style = MaterialTheme.typography.headlineMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, modifier = Modifier.weight(1f))
-            IconButton(onClick = onAddFolder) { Icon(Icons.Default.CreateNewFolder, contentDescription = "Add folder") }
+            IconButton(onClick = onAddFolder) { Icon(AppIcons.CreateNewFolder, contentDescription = "Add folder") }
             IconButton(onClick = { showFilters = true }) {
-                Icon(Icons.Default.FilterList, contentDescription = "Filters", tint = if (filtersActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(AppIcons.FilterList, contentDescription = "Filters", tint = if (filtersActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
+            IconButton(onClick = onOpenSettings) { Icon(AppIcons.Settings, contentDescription = "Settings") }
         }
         OutlinedTextField(
             value = filters.search,
@@ -148,12 +138,12 @@ fun LibraryScreen(
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Search modules, paths") },
             leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(AppIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             },
             trailingIcon = {
                 if (filters.search.isNotEmpty()) {
                     IconButton(onClick = { vm.updateFilters { it.copy(search = "") } }) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear search")
+                        Icon(AppIcons.Close, contentDescription = "Clear search")
                     }
                 }
             },
@@ -358,7 +348,7 @@ private fun RootList(
                 onPlay = null,
                 trailing = {
                     IconButton(onClick = { onFolderMenu(folder) }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Folder options")
+                        Icon(AppIcons.MoreVert, contentDescription = "Folder options")
                     }
                 },
             )
@@ -403,7 +393,7 @@ private fun SearchResults(
                         onToggleFavorite = { onToggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Track options")
+                                Icon(AppIcons.MoreVert, contentDescription = "Track options")
                             }
                         },
                     )
@@ -423,7 +413,7 @@ private fun AllTracks(
 ) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onExit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Folders") }
+            IconButton(onClick = onExit) { Icon(AppIcons.ArrowBack, contentDescription = "Folders") }
             Text(
                 "All folders · ${tracks.size} ${if (tracks.size == 1) "track" else "tracks"}",
                 style = MaterialTheme.typography.labelSmall,
@@ -444,7 +434,7 @@ private fun AllTracks(
                         onToggleFavorite = { onToggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Track options")
+                                Icon(AppIcons.MoreVert, contentDescription = "Track options")
                             }
                         },
                     )
@@ -481,7 +471,7 @@ private fun Browser(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onExit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Folders") }
+            IconButton(onClick = onExit) { Icon(AppIcons.ArrowBack, contentDescription = "Folders") }
             TextButton(onClick = { onNavigate(emptyList()) }) {
                 Text(rootName, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -504,7 +494,7 @@ private fun Browser(
                 enabled = scope.isNotEmpty(),
                 shape = CircleShape,
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(AppIcons.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Play all")
             }
@@ -539,7 +529,7 @@ private fun Browser(
                         onToggleFavorite = { onToggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Track options")
+                                Icon(AppIcons.MoreVert, contentDescription = "Track options")
                             }
                         },
                     )
@@ -656,10 +646,10 @@ fun IgnoredScreen(
                             )
                         }
                         IconButton(onClick = { vm.restore(listOf(track)) }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Restore")
+                            Icon(AppIcons.Refresh, contentDescription = "Restore")
                         }
                         IconButton(onClick = { confirm = track }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                            Icon(AppIcons.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 }

@@ -17,9 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -41,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.library.TrackEntity
+import com.bitti06.modplayjs.ui.icons.AppIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,7 +85,7 @@ fun FavoritesScreen(
                     enabled = favorites.isNotEmpty(),
                     shape = CircleShape,
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(AppIcons.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Play all")
                 }
@@ -111,7 +109,7 @@ fun FavoritesScreen(
                         onToggleFavorite = { vm.toggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { showTrackActions = track }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Track options")
+                                Icon(AppIcons.MoreVert, contentDescription = "Track options")
                             }
                         },
                     )

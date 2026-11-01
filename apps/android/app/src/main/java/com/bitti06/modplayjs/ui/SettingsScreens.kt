@@ -11,10 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -35,6 +31,7 @@ import com.bitti06.modplayjs.BuildConfig
 import com.bitti06.modplayjs.engine.AndroidCapabilities
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.library.FolderEntity
+import com.bitti06.modplayjs.ui.icons.AppIcons
 
 @Composable
 private fun SettingsPage(
@@ -289,12 +286,12 @@ fun LibrarySettingsScreen(
     SettingsPage("Library", onBack) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onAddFolder, modifier = Modifier.weight(1f)) {
-                Icon(Icons.Default.Add, contentDescription = null)
+                Icon(AppIcons.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
                 Text("Add folder")
             }
             OutlinedButton(onClick = { vm.rescan() }) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
+                Icon(AppIcons.Refresh, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
                 Text("Rescan")
             }
@@ -320,10 +317,10 @@ fun LibrarySettingsScreen(
                         }
                     }
                     IconButton(onClick = { vm.rescan(folder.id) }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Rescan ${folder.name}")
+                        Icon(AppIcons.Refresh, contentDescription = "Rescan ${folder.name}")
                     }
                     IconButton(onClick = { vm.removeFolder(folder) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Remove ${folder.name}", tint = MaterialTheme.colorScheme.error)
+                        Icon(AppIcons.Delete, contentDescription = "Remove ${folder.name}", tint = MaterialTheme.colorScheme.error)
                     }
                 }
                 HorizontalDivider()

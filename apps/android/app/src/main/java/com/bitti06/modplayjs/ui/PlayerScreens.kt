@@ -32,16 +32,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Equalizer
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -76,6 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
+import com.bitti06.modplayjs.ui.icons.AppIcons
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -130,7 +121,7 @@ fun PlayerScreen(
             } else {
                 Spacer(Modifier.weight(1f))
             }
-            IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
+            IconButton(onClick = onOpenSettings) { Icon(AppIcons.Settings, contentDescription = "Settings") }
         }
         if (error != null) {
             Text(
@@ -255,7 +246,7 @@ fun PlayerScreen(
             Text(if (duration > 0) formatTime(duration.toLong()) else "∞")
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { vm.previous() }) { Icon(Icons.Default.SkipPrevious, contentDescription = "Previous") }
+            IconButton(onClick = { vm.previous() }) { Icon(AppIcons.SkipPrevious, contentDescription = "Previous") }
             Box(contentAlignment = Alignment.Center) {
                 CircularWavyProgressIndicator(
                     progress = { fraction },
@@ -269,23 +260,23 @@ fun PlayerScreen(
                     shape = CircleShape,
                 ) {
                     Icon(
-                        if (snap.state.playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        if (snap.state.playing) AppIcons.Pause else AppIcons.PlayArrow,
                         contentDescription = "Play or pause",
                         modifier = Modifier.size(36.dp),
                     )
                 }
             }
-            IconButton(onClick = { vm.next() }) { Icon(Icons.Default.SkipNext, contentDescription = "Next") }
-            IconButton(onClick = { vm.stop() }) { Icon(Icons.Default.Stop, contentDescription = "Stop") }
+            IconButton(onClick = { vm.next() }) { Icon(AppIcons.SkipNext, contentDescription = "Next") }
+            IconButton(onClick = { vm.stop() }) { Icon(AppIcons.Stop, contentDescription = "Stop") }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledTonalButton(onClick = onOpenQueue, modifier = Modifier.weight(1f), shape = CircleShape) {
-                Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(AppIcons.PlaylistPlay, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Queue")
             }
             FilledTonalButton(onClick = onOpenDetails, modifier = Modifier.weight(1f), shape = CircleShape) {
-                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(AppIcons.Info, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Details")
             }
@@ -298,7 +289,7 @@ fun PlayerScreen(
                 modifier = Modifier.weight(1f),
                 shape = CircleShape,
             ) {
-                Icon(Icons.Default.Equalizer, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(AppIcons.Equalizer, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Effects")
             }

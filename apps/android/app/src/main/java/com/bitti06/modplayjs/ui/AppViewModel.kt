@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.viewModelScope
 import com.bitti06.modplayjs.AppGraph
 import com.bitti06.modplayjs.engine.AndroidSettings
@@ -193,10 +195,15 @@ class AppViewModel(
 
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    AppViewModel(context.applicationContext, AppGraph.library, AppGraph.session, AppGraph.settings) as T
+            viewModelFactory {
+                initializer {
+                    AppViewModel(
+                        context.applicationContext,
+                        AppGraph.library,
+                        AppGraph.session,
+                        AppGraph.settings,
+                    )
+                }
             }
     }
 }

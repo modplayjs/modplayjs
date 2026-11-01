@@ -81,6 +81,15 @@ val LICENSE_ENTRIES: List<LicenseEntry> =
             note = "Layer-III decoder used for MP3-compressed samples.",
         ),
         LicenseEntry(
+            id = "materialicons",
+            name = "Material Icons",
+            license = "Apache-2.0",
+            copyright = "Copyright The Android Open Source Project",
+            asset = "licenses/Apache-2.0.txt",
+            url = "https://fonts.google.com/icons",
+            note = "Icon path data copied from material-icons-core/-extended 1.7.8; only the icons the app draws are included.",
+        ),
+        LicenseEntry(
             id = "androidx",
             name = "AndroidX, Jetpack Compose, Media3, Room",
             license = "Apache-2.0",

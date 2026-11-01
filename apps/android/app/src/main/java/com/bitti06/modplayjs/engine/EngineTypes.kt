@@ -1,6 +1,5 @@
 package com.bitti06.modplayjs.engine
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
