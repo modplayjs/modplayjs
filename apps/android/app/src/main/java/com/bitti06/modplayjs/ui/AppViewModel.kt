@@ -15,10 +15,12 @@ import com.bitti06.modplayjs.library.FolderEntity
 import com.bitti06.modplayjs.library.LibraryRepository
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.media.PlaybackService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -61,13 +63,21 @@ class AppViewModel(
     /** Unfiltered library, used for counts and filter option lists. */
     val libraryTracks: StateFlow<List<TrackEntity>> = allTracks
 
+    /**
+     * stateIn collects on [viewModelScope], its upstream included, which is the
+     * main dispatcher. Filtering and sorting the whole library is O(n log n)
+     * and Room re-emits on every scan write, so without flowOn the work ran on
+     * the main thread.
+     */
     val tracks: StateFlow<List<TrackEntity>> =
         combine(allTracks, filtersState) { all, f ->
             repo.filter(all, f.search, f.status, f.family, f.format, f.sort, f.descending)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }.flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val recent: StateFlow<List<TrackEntity>> =
         allTracks
             .map { list -> list.sortedByDescending { it.addedAt }.take(12) }
+            .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
