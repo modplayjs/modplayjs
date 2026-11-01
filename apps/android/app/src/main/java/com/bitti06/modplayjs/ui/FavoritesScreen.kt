@@ -52,7 +52,7 @@ fun FavoritesScreen(
     var showTrackActions by remember { mutableStateOf<TrackEntity?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<TrackEntity?>(null) }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+    Column(Modifier.fillMaxSize().safeContentPadding().padding(horizontal = 12.dp)) {
         Box(
             Modifier
                 .fillMaxWidth()

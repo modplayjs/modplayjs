@@ -191,6 +191,9 @@ private fun AppRoot(vm: AppViewModel) {
         Scaffold(
             containerColor = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onBackground,
+            // Tab screens paint edge to edge and pad their own content, so the
+            // player gradient reaches the status bar.
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             bottomBar = {
                 Column {
                     snapshot?.let { current ->

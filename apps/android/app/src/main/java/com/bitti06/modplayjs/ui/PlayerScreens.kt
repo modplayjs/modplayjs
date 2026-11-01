@@ -8,7 +8,6 @@ import android.media.audiofx.AudioEffect
 import android.provider.Settings
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -97,35 +96,26 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    0f to accent.copy(alpha = 0.34f),
-                    0.42f to MaterialTheme.colorScheme.background,
-                    1f to MaterialTheme.colorScheme.background,
+                    0f to lerp(MaterialTheme.colorScheme.background, accent, 0.36f),
+                    0.45f to MaterialTheme.colorScheme.background,
+                    1f to lerp(MaterialTheme.colorScheme.background, accent, 0.12f),
                 ),
             ),
     ) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .safeContentPadding()
+                .padding(horizontal = 16.dp),
+        ) {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "Now Playing",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
                     maxLines = 1,
                 )
-                if (track != null) {
-                    Spacer(Modifier.width(12.dp))
-                    // Scrolls sideways when the name does not fit, like a player's
-                    // top bar does.
-                    Text(
-                        track.title.ifBlank { track.name },
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f).basicMarquee(initialDelayMillis = 0),
-                    )
-                } else {
-                    Spacer(Modifier.weight(1f))
-                }
                 IconButton(onClick = onOpenSettings) { Icon(AppIcons.Settings, contentDescription = "Settings") }
             }
             if (error != null) {
