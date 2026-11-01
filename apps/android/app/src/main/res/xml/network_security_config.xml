@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app never talks to the network; Android 17 plans to deprecate the
+     usesCleartextTraffic manifest flag in favour of this file. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

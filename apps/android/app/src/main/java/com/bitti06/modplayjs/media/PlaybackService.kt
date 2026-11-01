@@ -9,6 +9,7 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Looper
+import android.os.SystemClock
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.bitti06.modplayjs.AppGraph
@@ -28,6 +29,7 @@ class PlaybackService : MediaSessionService() {
     private var focusRequest: AudioFocusRequest? = null
     private var resumeOnFocus = false
     private var transientLoss = false
+    private var lastFocusAttemptMs = 0L
 
     private val noisyReceiver =
         object : BroadcastReceiver() {
@@ -86,6 +88,12 @@ class PlaybackService : MediaSessionService() {
 
     private fun requestFocus() {
         if (focusRequest != null) return
+        // Android 17 returns AUDIOFOCUS_REQUEST_FAILED when the request arrives
+        // outside a valid lifecycle (no visible activity, no while-in-use FGS).
+        // Do not record a failed request as held; retry on a later snapshot.
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastFocusAttemptMs < FOCUS_RETRY_MS) return
+        lastFocusAttemptMs = now
         val attrs =
             AudioAttributes
                 .Builder()
@@ -118,11 +126,12 @@ class PlaybackService : MediaSessionService() {
                         }
                     }
                 }.build()
-        focusRequest = request
-        audioManager.requestAudioFocus(request)
+        val granted = audioManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        if (granted) focusRequest = request
     }
 
     private fun abandonFocus() {
+        lastFocusAttemptMs = 0L
         val request = focusRequest ?: return
         audioManager.abandonAudioFocusRequest(request)
         focusRequest = null
@@ -138,6 +147,9 @@ class PlaybackService : MediaSessionService() {
     }
 
     companion object {
+        /** Do not hammer audio focus while Android 17 rejects it. */
+        private const val FOCUS_RETRY_MS = 2_000L
+
         fun start(context: Context) {
             context.startService(Intent(context, PlaybackService::class.java))
         }
