@@ -31,7 +31,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,11 +67,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidSettings
@@ -248,17 +250,7 @@ fun PlayerScreen(
                                 MaterialTheme.colorScheme.tertiary,
                                 onExpand = onOpenMessage,
                             ) {
-                                // Module messages are fixed-width ASCII, up to
-                                // 79 columns here. Wrapping would move every
-                                // following column, so the text keeps its own
-                                // lines and pans sideways instead.
-                                Text(
-                                    message.replace("\r", ""),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    softWrap = false,
-                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                )
+                                MessageText(message.replace("\r", ""))
                             }
                         }
                         if (instruments.isNotEmpty()) {
@@ -731,7 +723,54 @@ private fun ChannelDialog(
     )
 }
 
-/** The whole module message, unwrapped and pannable in both directions. */
+/**
+ * Fixed-width message text. Module art is up to ~80 columns, which does not fit
+ * a phone, so the text is scaled down until its widest line fits the available
+ * width; panning sideways is not needed. Lines never wrap, so the columns stay
+ * where the creator put them.
+ */
+@Composable
+private fun MessageText(
+    text: String,
+    modifier: Modifier = Modifier,
+    scrollable: Boolean = false,
+) {
+    val measurer = rememberTextMeasurer()
+    val base = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+    BoxWithConstraints(modifier) {
+        val available = constraints.maxWidth
+        val measured =
+            remember(text, available, base) {
+                measurer.measure(AnnotatedString(text), style = base, softWrap = false)
+            }
+        val scale =
+            if (measured.size.width > available && measured.size.width > 0) {
+                available.toFloat() / measured.size.width
+            } else {
+                1f
+            }
+        val style =
+            if (scale != 1f) {
+                if (base.lineHeight.isSpecified) {
+                    base.copy(fontSize = base.fontSize * scale, lineHeight = base.lineHeight * scale)
+                } else {
+                    base.copy(fontSize = base.fontSize * scale)
+                }
+            } else {
+                base
+            }
+        Text(
+            text,
+            style = style,
+            softWrap = false,
+            modifier =
+                (if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                    .fillMaxWidth(),
+        )
+    }
+}
+
+/** The whole module message, scaled to the screen instead of panned sideways. */
 @Composable
 fun MessageScreen(
     message: String?,
@@ -747,20 +786,10 @@ fun MessageScreen(
             )
             return
         }
-        // Two scroll axes on one node: fixed-width lines keep their columns and
-        // can still be panned sideways on a phone.
-        Text(
+        MessageText(
             text,
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            softWrap = false,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .horizontalScroll(rememberScrollState())
-                    .verticalScroll(rememberScrollState())
-                    .padding(top = 8.dp, bottom = 24.dp),
+            modifier = Modifier.weight(1f).padding(top = 8.dp, bottom = 24.dp),
+            scrollable = true,
         )
     }
 }
@@ -861,14 +890,16 @@ fun DetailsScreen(
             }
             item { SectionTitle(stringResource(R.string.details_message)) }
             item {
-                Text(
-                    track.message?.replace("\r", "") ?: stringResource(R.string.details_no_message),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    softWrap = false,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                )
+                val message = track.message?.replace("\r", "")
+                if (message.isNullOrBlank()) {
+                    Text(
+                        stringResource(R.string.details_no_message),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                } else {
+                    MessageText(message)
+                }
             }
             item { Spacer(Modifier.height(24.dp)) }
         }
