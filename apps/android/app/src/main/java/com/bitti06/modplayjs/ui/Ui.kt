@@ -2,7 +2,6 @@ package com.bitti06.modplayjs.ui
 
 import android.text.format.DateUtils
 import android.text.format.Formatter
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -176,7 +175,6 @@ fun ModalTopBar(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackRow(
     track: TrackEntity,
@@ -184,6 +182,7 @@ fun TrackRow(
     onLongClick: (() -> Unit)? = null,
     onToggleFavorite: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    playing: Boolean = false,
 ) {
     val base = Modifier.fillMaxWidth()
     val modifier =
@@ -193,7 +192,12 @@ fun TrackRow(
             base.clickable(onClick = onClick)
         }
     Row(
-        modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+        modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (playing) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent,
+            )
+            .padding(horizontal = 4.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         FormatArt(track.format, 46.dp)
@@ -202,8 +206,8 @@ fun TrackRow(
             Text(
                 track.name,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
+                color = if (playing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (playing) FontWeight.SemiBold else FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

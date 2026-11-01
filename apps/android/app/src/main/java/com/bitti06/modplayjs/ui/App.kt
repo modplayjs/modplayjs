@@ -94,6 +94,7 @@ private fun AppRoot(vm: AppViewModel) {
     val queueIndex by vm.queueIndex.collectAsStateWithLifecycle()
     val filters by vm.filters.collectAsStateWithLifecycle()
     val scanProgress by vm.scanProgress.collectAsStateWithLifecycle()
+    val nowPlayingTrack by vm.nowPlaying.collectAsStateWithLifecycle()
     val awaitingStart by vm.awaitingStart.collectAsStateWithLifecycle()
 
     // A loaded track stays silent until this screen has composed and drawn it
@@ -284,6 +285,7 @@ private fun AppRoot(vm: AppViewModel) {
                             folders = folders,
                             filters = filters,
                             scanProgress = scanProgress,
+                            playingTrackId = nowPlayingTrack?.id,
                             // A removed folder or an empty library drops back to
                             // the folder list instead of an empty browser.
                             rootId =
@@ -354,6 +356,7 @@ private fun AppRoot(vm: AppViewModel) {
                 folders = folders,
                 filters = filters,
                 scanProgress = scanProgress,
+                playingTrackId = nowPlayingTrack?.id,
                 onPlay = { track ->
                     folderSheetOpen = false
                     playTrack(track)
@@ -569,6 +572,7 @@ private fun FolderSheet(
     folders: List<FolderEntity>,
     filters: Filters,
     scanProgress: ScanProgress?,
+    playingTrackId: String?,
     onPlay: (TrackEntity) -> Unit,
     onPlayList: (List<TrackEntity>, Int) -> Unit,
     onClose: () -> Unit,
@@ -594,6 +598,7 @@ private fun FolderSheet(
         folders = folders,
         filters = filters,
         scanProgress = scanProgress,
+        playingTrackId = playingTrackId,
         rootId = rootId,
         path = path,
         onNavigate = { root, next ->

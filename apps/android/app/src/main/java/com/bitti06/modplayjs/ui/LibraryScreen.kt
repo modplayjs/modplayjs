@@ -138,6 +138,8 @@ fun LibraryScreen(
     onOpenSettings: () -> Unit,
     /** Live rescan state; the banner sits under the search field. */
     scanProgress: ScanProgress? = null,
+    /** The row to highlight as the playing track, if it is in the list. */
+    playingTrackId: String? = null,
     /** Set when pushed from the player; shows a back arrow and the given title. */
     title: String? = null,
     onBack: (() -> Unit)? = null,
@@ -273,6 +275,7 @@ fun LibraryScreen(
             filters.search.isNotBlank() ->
                 SearchResults(
                     tracks = tracks,
+                    playingId = playingTrackId,
                     onPlay = onPlay,
                     onMore = { showTrackActions = it },
                     onToggleFavorite = { actions.toggleFavorite(it) },
@@ -280,6 +283,7 @@ fun LibraryScreen(
             rootId == ALL_ROOTS ->
                 AllTracks(
                     tracks = tracks,
+                    playingId = playingTrackId,
                     onPlay = onPlay,
                     onMore = { showTrackActions = it },
                     onToggleFavorite = { actions.toggleFavorite(it) },
@@ -296,6 +300,7 @@ fun LibraryScreen(
             else -> Browser(
                 folders = folders,
                 tracks = tracks,
+                playingId = playingTrackId,
                 rootId = rootId,
                 path = path,
                 onNavigate = { newPath -> onNavigate(rootId, newPath) },
@@ -480,6 +485,7 @@ private fun RootList(
 @Composable
 private fun SearchResults(
     tracks: List<TrackEntity>,
+    playingId: String?,
     onPlay: (TrackEntity) -> Unit,
     onMore: (TrackEntity) -> Unit,
     onToggleFavorite: (TrackEntity) -> Unit,
@@ -504,6 +510,7 @@ private fun SearchResults(
                         onClick = { onPlay(track) },
                         onLongClick = { onMore(track) },
                         onToggleFavorite = { onToggleFavorite(track) },
+                        playing = track.id == playingId,
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
                                 Icon(
@@ -522,6 +529,7 @@ private fun SearchResults(
 @Composable
 private fun AllTracks(
     tracks: List<TrackEntity>,
+    playingId: String?,
     onPlay: (TrackEntity) -> Unit,
     onMore: (TrackEntity) -> Unit,
     onToggleFavorite: (TrackEntity) -> Unit,
@@ -546,13 +554,20 @@ private fun AllTracks(
                 stringResource(R.string.library_nothing_here_body),
             )
         } else {
-            LazyColumn(Modifier.weight(1f)) {
+            val listState = remember { LazyListState() }
+            // Opened with a playing track, the list starts at its row.
+            LaunchedEffect(playingId, tracks) {
+                val index = tracks.indexOfFirst { it.id == playingId }
+                if (index >= 0) listState.scrollToItem(index)
+            }
+            LazyColumn(Modifier.weight(1f), state = listState) {
                 items(tracks, key = { it.id }) { track ->
                     TrackRow(
                         track,
                         onClick = { onPlay(track) },
                         onLongClick = { onMore(track) },
                         onToggleFavorite = { onToggleFavorite(track) },
+                        playing = track.id == playingId,
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
                                 Icon(
@@ -572,6 +587,7 @@ private fun AllTracks(
 private fun Browser(
     folders: List<FolderEntity>,
     tracks: List<TrackEntity>,
+    playingId: String?,
     rootId: String,
     path: List<String>,
     onNavigate: (List<String>) -> Unit,
@@ -589,6 +605,14 @@ private fun Browser(
     // stepping up a breadcrumb always starts at the top instead of keeping the
     // scroll offset of the folder that was open before.
     val listState = remember(rootId, base) { LazyListState() }
+    // Opening the folder from the player lands on the playing file: the
+    // subfolder rows and the "tracks" heading sit above it.
+    LaunchedEffect(playingId, rootId, base, direct) {
+        val index = direct.indexOfFirst { it.id == playingId }
+        if (index < 0) return@LaunchedEffect
+        val headers = (if (subfolders.isEmpty()) 0 else 1 + subfolders.size) + 1
+        listState.scrollToItem(headers + index)
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -659,6 +683,7 @@ private fun Browser(
                         onClick = { onPlay(track) },
                         onLongClick = { onMore(track) },
                         onToggleFavorite = { onToggleFavorite(track) },
+                        playing = track.id == playingId,
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
                                 Icon(
@@ -891,6 +916,7 @@ private fun LibraryContentPreview(rootId: String?) {
         libraryTracks = previewTracks(),
         folders = previewFolders(),
         filters = Filters(),
+        playingTrackId = "2",
         rootId = rootId,
         path = emptyList(),
         onNavigate = { _, _ -> },
