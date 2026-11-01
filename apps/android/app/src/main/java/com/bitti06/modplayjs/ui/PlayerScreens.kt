@@ -124,9 +124,11 @@ fun PlayerScreen(
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                 )
-                val favorite = current?.favoriteAt != null
-                if (current != null) {
-                    IconButton(onClick = { vm.toggleFavorite(current) }) {
+                // A delegated property cannot be smart cast; read it once.
+                val favoriteTrack = current
+                if (favoriteTrack != null) {
+                    val favorite = favoriteTrack.favoriteAt != null
+                    IconButton(onClick = { vm.toggleFavorite(favoriteTrack) }) {
                         Icon(
                             if (favorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
                             contentDescription =
