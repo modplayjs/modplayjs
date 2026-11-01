@@ -60,11 +60,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.engine.AndroidSettings
@@ -127,23 +129,65 @@ fun PlayerScreen(
                 )
             }
             if (snap == null || track == null) {
-                if (loading != null) {
-                    LoadingIndicator(
-                        modifier = Modifier.size(44.dp).align(Alignment.CenterHorizontally),
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.height(8.dp))
+                // Centred in the whole free area rather than stuck under the
+                // header, with a large format-tinted tile as the anchor.
+                Box(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            Modifier
+                                .size(108.dp)
+                                .clip(RoundedCornerShape(36.dp))
+                                .background(lerp(MaterialTheme.colorScheme.surface, accent, 0.28f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                AppIcons.MusicNote,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(48.dp),
+                            )
+                        }
+                        Spacer(Modifier.height(20.dp))
+                        if (loading != null) {
+                            LoadingIndicator(
+                                modifier = Modifier.size(44.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                        }
+                        Text(
+                            text = when {
+                                error != null -> "Playback failed"
+                                loading != null -> "Loading $loading"
+                                else -> "No track loaded"
+                            },
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = if (error != null) {
+                                "Open the library and pick another file."
+                            } else {
+                                "Choose a module, SID tune or audio file to start."
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(0.85f),
+                        )
+                        Spacer(Modifier.height(22.dp))
+                        FilledTonalButton(onClick = onBrowseLibrary, shape = CircleShape) {
+                            Icon(AppIcons.LibraryMusic, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Browse library")
+                        }
+                    }
                 }
-                EmptyState(
-                    title = when {
-                        error != null -> "Playback failed"
-                        loading != null -> "Loading $loading"
-                        else -> "No track loaded"
-                    },
-                    body = if (error != null) "Open the library and pick another file." else "Choose a module, SID tune or audio file to start.",
-                    actionLabel = "Browse library",
-                    onAction = onBrowseLibrary,
-                )
                 return
             }
 
