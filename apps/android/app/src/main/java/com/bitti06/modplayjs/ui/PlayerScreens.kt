@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -244,15 +245,16 @@ fun PlayerScreen(
                                 Modifier.weight(1f),
                                 MaterialTheme.colorScheme.tertiary,
                             ) {
-                                // Module messages are fixed-width ASCII. Each
-                                // line starts at the same column, so centring
-                                // them individually (as the web's text-center
-                                // does) would shift the art line by line.
+                                // Module messages are fixed-width ASCII, up to
+                                // 79 columns here. Wrapping would move every
+                                // following column, so the text keeps its own
+                                // lines and pans sideways instead.
                                 Text(
                                     message.replace("\r", ""),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.fillMaxWidth(),
+                                    softWrap = false,
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
                                 )
                             }
                         }
@@ -807,7 +809,9 @@ fun DetailsScreen(
                     track.message?.replace("\r", "") ?: stringResource(R.string.details_no_message),
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
+                    softWrap = false,
                     color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
                 )
             }
             item { Spacer(Modifier.height(24.dp)) }
