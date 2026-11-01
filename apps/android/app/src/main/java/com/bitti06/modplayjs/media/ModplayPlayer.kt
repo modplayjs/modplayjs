@@ -197,7 +197,15 @@ class ModplayPlayer(
                                         } else {
                                             item.format.uppercase()
                                         },
-                                    ).build(),
+                                    )
+                                    // The system media player reads the length from
+                                    // METADATA_KEY_DURATION as well as from the
+                                    // player; give it both.
+                                    .apply {
+                                        if (current && durationUs != C.TIME_UNSET) {
+                                            setDurationMs(durationUs / 1000)
+                                        }
+                                    }.build(),
                             ).build(),
                     ).setDurationUs(if (current) durationUs else C.TIME_UNSET)
                     .setIsSeekable(seekable)
