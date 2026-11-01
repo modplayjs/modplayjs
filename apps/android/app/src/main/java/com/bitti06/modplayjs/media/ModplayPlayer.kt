@@ -1,6 +1,7 @@
 package com.bitti06.modplayjs.media
 
 import android.os.Looper
+import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -23,18 +24,32 @@ class ModplayPlayer(
     private val playback: PlaybackSession,
 ) : SimpleBasePlayer(looper) {
     @Volatile private var snapshot: AndroidSnapshot? = null
+    private var lastLoggedState: String? = null
 
     fun onSnapshot(value: AndroidSnapshot?) {
         snapshot = value
         invalidateState()
     }
 
+    /** The queue or its index changed without a snapshot; rebuild the state. */
+    fun onQueueChanged() {
+        invalidateState()
+    }
+
     override fun getState(): State {
         val snap = snapshot
+        val engine = snap?.track
         val queue = playback.queue.value
-        val currentIndex = playback.queueIndex.value
+        // The engine is the source of truth for what is audible: the queue
+        // index can lag a load, and the notification would then name another
+        // track than the player screen.
+        val byName =
+            engine?.name?.let { name -> queue.indexOfFirst { it.name == name } } ?: -1
+        val currentIndex =
+            if (byName >= 0) byName else playback.queueIndex.value.coerceIn(0, maxOf(0, queue.lastIndex))
         val items =
             queue.mapIndexed { index, item ->
+                val current = index == currentIndex
                 MediaItemData
                     .Builder(item.id)
                     .setMediaItem(
@@ -44,9 +59,20 @@ class ModplayPlayer(
                             .setMediaMetadata(
                                 MediaMetadata
                                     .Builder()
-                                    .setTitle(item.name)
-                                    .setArtist(item.format.uppercase())
-                                    .build(),
+                                    .setTitle(
+                                        if (current) {
+                                            engine?.title?.takeIf { it.isNotBlank() } ?: item.name
+                                        } else {
+                                            item.name
+                                        },
+                                    )
+                                    .setArtist(
+                                        if (current) {
+                                            engine?.tracker?.takeIf { it.isNotBlank() } ?: item.format.uppercase()
+                                        } else {
+                                            item.format.uppercase()
+                                        },
+                                    ).build(),
                             ).build(),
                     ).setDurationUs(
                         if (snap != null && index == currentIndex && snap.state.durationKnown) {
@@ -101,6 +127,11 @@ class ModplayPlayer(
         if (items.isNotEmpty()) {
             builder.setCurrentMediaItemIndex(currentIndex.coerceIn(0, items.lastIndex))
         }
+        val summary = "queue=${queue.size} index=$currentIndex engine=${engine?.name} item=${queue.getOrNull(currentIndex)?.name}"
+        if (summary != lastLoggedState) {
+            lastLoggedState = summary
+            Log.i(TAG, summary)
+        }
         return builder.build()
     }
 
@@ -134,5 +165,9 @@ class ModplayPlayer(
             }
         }
         return Futures.immediateVoidFuture()
+    }
+
+    private companion object {
+        const val TAG = "ModplayPlayer"
     }
 }

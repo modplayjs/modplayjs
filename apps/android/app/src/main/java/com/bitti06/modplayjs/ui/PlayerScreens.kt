@@ -101,7 +101,7 @@ fun PlayerScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
-                    modifier = Modifier.weight(1f).basicMarquee(),
+                    modifier = Modifier.weight(1f).basicMarquee(initialDelayMillis = 0),
                 )
             } else {
                 Spacer(Modifier.weight(1f))

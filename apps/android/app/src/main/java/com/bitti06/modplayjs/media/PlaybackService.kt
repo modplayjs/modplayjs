@@ -66,6 +66,10 @@ class PlaybackService : MediaSessionService() {
         )
 
         scope.launch {
+            AppGraph.session.queue.collectLatest { player.onQueueChanged() }
+        }
+
+        scope.launch {
             AppGraph.session.snapshot.collectLatest { snap ->
                 player.onSnapshot(snap)
                 if (snap?.state?.playing == true) {
