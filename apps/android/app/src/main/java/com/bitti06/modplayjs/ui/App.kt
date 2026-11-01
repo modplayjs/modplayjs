@@ -3,6 +3,7 @@ package com.bitti06.modplayjs.ui
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,6 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -117,9 +122,20 @@ private fun AppRoot(vm: AppViewModel) {
     BackHandler(enabled = modals.isNotEmpty()) { close() }
     BackHandler(enabled = modals.isEmpty() && tab == Tab.Playing) { tabName = Tab.Library.name }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    0f to MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                    0.30f to MaterialTheme.colorScheme.background,
+                    0.72f to MaterialTheme.colorScheme.background,
+                    1f to MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f),
+                ),
+            ),
+    ) {
         Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
+            containerColor = Color.Transparent,
             bottomBar = {
                 Column {
                     snapshot?.let { current ->
@@ -131,13 +147,22 @@ private fun AppRoot(vm: AppViewModel) {
                             )
                         }
                     }
-                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                    NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                    tonalElevation = 0.dp,
+                ) {
                         Tab.entries.forEach { item ->
                             NavigationBarItem(
                                 selected = tab == item,
                                 onClick = { tabName = item.name },
                                 icon = { Icon(item.icon, contentDescription = item.label) },
                                 label = { Text(item.label) },
+                                colors =
+                                    NavigationBarItemDefaults.colors(
+                                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    ),
                             )
                         }
                     }
@@ -248,7 +273,17 @@ private fun ModalHost(
     onOpen: (String) -> Unit,
     onBack: () -> Unit,
 ) {
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    0f to MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                    0.40f to MaterialTheme.colorScheme.background,
+                    1f to MaterialTheme.colorScheme.background,
+                ),
+            ),
+    ) {
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             when {
                 route == ROUTE_SETTINGS ->
@@ -309,8 +344,9 @@ private fun MiniPlayer(
     val track = snap.track ?: return
     val duration = snap.state.durationMs
     val progress = if (duration > 0) (snap.state.positionMs / duration).toFloat().coerceIn(0f, 1f) else 0f
+    val accent = accentColor(track.format)
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = lerp(MaterialTheme.colorScheme.surfaceContainerHigh, accent, 0.20f),
         shape = RoundedCornerShape(22.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -348,7 +384,7 @@ private fun MiniPlayer(
             LinearWavyProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
-                color = MaterialTheme.colorScheme.primary,
+                color = accent,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
         }

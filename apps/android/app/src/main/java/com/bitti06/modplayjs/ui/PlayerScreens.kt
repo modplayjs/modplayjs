@@ -52,6 +52,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.rememberSliderState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -66,6 +67,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -93,13 +96,14 @@ fun PlayerScreen(
     var channelDialog by remember { mutableStateOf(false) }
     var showEffectsDialog by remember { mutableStateOf(false) }
 
+    val accent = track?.let { accentColor(it.format) } ?: MaterialTheme.colorScheme.primary
     Box(
         Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    0f to MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                    0.45f to MaterialTheme.colorScheme.background,
+                    0f to accent.copy(alpha = 0.34f),
+                    0.42f to MaterialTheme.colorScheme.background,
                     1f to MaterialTheme.colorScheme.background,
                 ),
             ),
@@ -165,7 +169,7 @@ fun PlayerScreen(
         // below stays pinned just above the bottom bar.
         Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (message == null && instruments.isEmpty() && samples.isEmpty()) {
-                InfoBox("Track", Modifier.weight(1f)) {
+                InfoBox("Track", Modifier.weight(1f), accent) {
                     Text(
                         "${track.format.uppercase()} · ${track.channels} channels · ${track.tracker}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -174,12 +178,12 @@ fun PlayerScreen(
                 }
             } else {
                 if (message != null) {
-                    InfoBox("Message", Modifier.weight(1f)) {
+                    InfoBox("Message", Modifier.weight(1f), MaterialTheme.colorScheme.tertiary) {
                         Text(message.replace("\r", ""), style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 if (instruments.isNotEmpty()) {
-                    InfoBox("Instruments", Modifier.weight(1f)) {
+                    InfoBox("Instruments", Modifier.weight(1f), MaterialTheme.colorScheme.primary) {
                         instruments.forEach { instrument ->
                             Text(
                                 "${instrument.index + 1}. ${instrument.name.ifBlank { "(unnamed)" }}",
@@ -190,7 +194,7 @@ fun PlayerScreen(
                     }
                 }
                 if (samples.isNotEmpty()) {
-                    InfoBox("Samples", Modifier.weight(1f)) {
+                    InfoBox("Samples", Modifier.weight(1f), MaterialTheme.colorScheme.secondary) {
                         samples.forEach { sample ->
                             Text(
                                 "${sample.index + 1}. ${sample.name.ifBlank { "(unnamed)" }}  ${sample.length}${if (sample.loop) " L" else ""}",
@@ -243,6 +247,7 @@ fun PlayerScreen(
                 drag = null
             },
             enabled = snap.capabilities.seekable,
+            colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent),
             modifier = Modifier.fillMaxWidth(),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -255,7 +260,7 @@ fun PlayerScreen(
                 CircularWavyProgressIndicator(
                     progress = { fraction },
                     modifier = Modifier.size(96.dp),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = accent,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 )
                 FilledIconButton(
@@ -389,18 +394,19 @@ fun SystemEffectsUnavailableDialog(onDismiss: () -> Unit) {
 private fun InfoBox(
     title: String,
     modifier: Modifier = Modifier,
+    accent: Color = MaterialTheme.colorScheme.primary,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = lerp(MaterialTheme.colorScheme.surfaceContainer, accent, 0.18f),
     ) {
         Column(Modifier.fillMaxSize()) {
             Text(
                 title.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = accent,
                 modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 2.dp),
             )
             Column(

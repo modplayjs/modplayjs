@@ -1,5 +1,7 @@
 package com.bitti06.modplayjs.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -7,23 +9,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.SheetValue
@@ -52,43 +55,45 @@ fun FavoritesScreen(
     var showDeleteConfirm by remember { mutableStateOf<TrackEntity?>(null) }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-        Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Favorites",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-            )
-            Surface(
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                shape = CircleShape,
-            ) {
-                Text(
-                    "${favorites.size}",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            FilledTonalButton(
-                onClick = { onPlayList(favorites, 0) },
-                enabled = favorites.isNotEmpty(),
-                shape = CircleShape,
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Play all")
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.42f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.24f),
+                        ),
+                    ),
+                ).padding(horizontal = 16.dp, vertical = 16.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Favorites",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "${favorites.size} ${if (favorites.size == 1) "track" else "tracks"} · tap the heart to add one",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                FilledTonalButton(
+                    onClick = { onPlayList(favorites, 0) },
+                    enabled = favorites.isNotEmpty(),
+                    shape = CircleShape,
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Play all")
+                }
             }
         }
-        Text(
-            "Tap the heart on a track to keep it here. Newest favorite first.",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp),
-        )
-        HorizontalDivider()
+        Spacer(Modifier.height(10.dp))
         if (favorites.isEmpty()) {
             EmptyState(
                 title = "No favorites yet",

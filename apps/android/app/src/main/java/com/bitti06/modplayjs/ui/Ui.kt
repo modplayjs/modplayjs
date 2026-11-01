@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.bitti06.modplayjs.library.TrackEntity
 import java.util.Locale
 
@@ -57,8 +58,9 @@ fun SectionTitle(text: String) {
     Text(
         text.uppercase(),
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.8.sp,
         modifier = Modifier.padding(top = 8.dp),
     )
 }
@@ -68,8 +70,14 @@ fun SectionTitle(text: String) {
  * per-format gradient tile gives rows and the player the visual anchor that
  * album art gives a normal music player.
  */
-private fun formatHue(format: String): Float =
-    ((format.uppercase().hashCode().toLong() and 0xFFFFFFFFL) % 360L).toFloat()
+fun accentColor(
+    seed: String,
+    saturation: Float = 0.55f,
+    value: Float = 0.98f,
+): Color {
+    val hue = ((seed.uppercase().hashCode().toLong() and 0xFFFFFFFFL) % 360L).toFloat()
+    return Color.hsv(hue, saturation, value)
+}
 
 @Composable
 fun FormatArt(
@@ -77,7 +85,7 @@ fun FormatArt(
     size: Dp,
     modifier: Modifier = Modifier,
 ) {
-    val base = Color.hsv(formatHue(format), 0.45f, 0.95f)
+    val base = accentColor(format, saturation = 0.6f)
     Box(
         modifier
             .size(size)
@@ -226,17 +234,18 @@ fun FolderRow(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val accent = accentColor(name)
         Box(
             Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                .background(accent.copy(alpha = 0.20f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 Icons.Default.Folder,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = accent,
                 modifier = Modifier.size(22.dp),
             )
         }
@@ -427,23 +436,25 @@ fun StatCard(
     label: String,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    accent: Color = MaterialTheme.colorScheme.primary,
 ) {
-    val colors = MaterialTheme.colorScheme
     Box(
         modifier
             .clip(RoundedCornerShape(20.dp))
             .background(
                 Brush.linearGradient(
-                    listOf(
-                        colors.primary.copy(alpha = 0.20f),
-                        colors.secondary.copy(alpha = 0.10f),
-                    ),
+                    listOf(accent.copy(alpha = 0.34f), accent.copy(alpha = 0.12f)),
                 ),
             ).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 14.dp, vertical = 14.dp),
     ) {
         Column {
-            Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(
+                value,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = accent,
+            )
             Text(
                 label,
                 style = MaterialTheme.typography.labelMedium,

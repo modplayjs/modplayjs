@@ -147,7 +147,9 @@ fun LibraryScreen(
             onValueChange = { vm.updateFilters { f -> f.copy(search = it) } },
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Search modules, paths") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            leadingIcon = {
+                Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            },
             trailingIcon = {
                 if (filters.search.isNotEmpty()) {
                     IconButton(onClick = { vm.updateFilters { it.copy(search = "") } }) {
@@ -158,8 +160,8 @@ fun LibraryScreen(
             singleLine = true,
             shape = RoundedCornerShape(18.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = Color.Transparent,
             ),
