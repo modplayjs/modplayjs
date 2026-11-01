@@ -216,6 +216,11 @@ class ModplayPlayer(
                                             item.format.uppercase()
                                         },
                                     )
+                                    // Surfaces differ in which line they read, so
+                                    // the time goes in both.
+                                    .apply {
+                                        if (current) setSubtitle(artistLine.ifBlank { item.format.uppercase() })
+                                    }
                                     // The system media player reads the length from
                                     // METADATA_KEY_DURATION as well as from the
                                     // player; give it both.
