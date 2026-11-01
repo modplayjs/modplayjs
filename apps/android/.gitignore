@@ -7,3 +7,7 @@ local.properties
 .externalNativeBuild/
 .scratch/
 
+# Upload signing for release builds (see RELEASE.md). Never commit these.
+keystore.properties
+*.jks
+*.keystore

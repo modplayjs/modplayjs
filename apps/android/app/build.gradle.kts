@@ -1,4 +1,5 @@
 import java.io.File
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -23,6 +24,29 @@ val v8Dir: String? = (project.findProperty("v8Dir") as String?)
     ?: defaultV8.takeIf { File(it, "lib/libv8_monolith.a").isFile }?.absolutePath
 val v8Path = v8Dir?.replace('\\', '/')
 
+// A release bump can override both without touching this file:
+//   ./gradlew bundleRelease -PversionCode=2 -PversionName=0.3.0
+val appVersionCode: Int = (findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
+val appVersionName: String = (findProperty("versionName") as String?) ?: "0.2.1"
+
+// Upload signing. `keystore.properties` is not committed; a CI machine can set
+// the four environment variables instead. RELEASE.md has the keystore command.
+val keystoreProperties =
+    Properties().apply {
+        val file = rootProject.file("keystore.properties")
+        if (file.isFile) file.inputStream().use { load(it) }
+    }
+
+fun signingValue(property: String, environment: String): String? =
+    keystoreProperties.getProperty(property) ?: System.getenv(environment)
+
+val storeFilePath = signingValue("storeFile", "MODPLAY_KEYSTORE_PATH")
+val storePasswordValue = signingValue("storePassword", "MODPLAY_KEYSTORE_PASSWORD")
+val keyAliasValue = signingValue("keyAlias", "MODPLAY_KEY_ALIAS")
+val keyPasswordValue = signingValue("keyPassword", "MODPLAY_KEY_PASSWORD")
+val uploadSigningReady =
+    listOf(storeFilePath, storePasswordValue, keyAliasValue, keyPasswordValue).all { it != null }
+
 android {
     namespace = "com.bitti06.modplayjs"
     compileSdk = 37
@@ -32,8 +56,8 @@ android {
         applicationId = "com.bitti06.modplayjs"
         minSdk = 35
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.2.1"
+        versionCode = appVersionCode
+        versionName = appVersionName
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         ndk { abiFilters += listOf("arm64-v8a") }
         externalNativeBuild {
@@ -50,11 +74,29 @@ android {
         }
     }
 
+    // Only declared when a keystore is configured, so a missing file is one
+    // clear error from the release task instead of an unsigned artifact.
+    signingConfigs {
+        if (uploadSigningReady) {
+            create("upload") {
+                storeFile = rootProject.file(storeFilePath!!)
+                storePassword = storePasswordValue
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
+            }
+        }
+    }
+
     buildTypes {
         debug { applicationIdSuffix = ".debug" }
         release {
             isMinifyEnabled = true
+            // R8 shrinks resources too; AGP 9 runs it inside R8.
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("upload")?.let { signingConfig = it }
+            // Native crash reports on Play need the symbols of the JNI library.
+            ndk { debugSymbolLevel = "SYMBOL_TABLE" }
         }
     }
 
@@ -99,4 +141,23 @@ dependencies {
     // Layout previews in Android Studio (the Compose equivalent of the layout
     // editor); only the debug build carries the tooling UI itself.
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+// A release build must carry the real engine and a signature: the stub JNI
+// plays nothing, and Play rejects an unsigned bundle. Failing here beats
+// discovering either after upload.
+val releaseTaskNames =
+    setOf("packageRelease", "packageReleaseBundle", "assembleRelease", "bundleRelease")
+tasks.matching { it.name in releaseTaskNames }.configureEach {
+    doFirst {
+        check(v8Path != null) {
+            "Release builds need the V8 prebuilt. Run `node apps/android/scripts/fetch-v8.mjs " +
+                "arm64-v8a` or pass -Pv8Dir=<dir>; without it the stub JNI is built."
+        }
+        check(uploadSigningReady) {
+            "Release builds need an upload keystore: create apps/android/keystore.properties " +
+                "or set MODPLAY_KEYSTORE_PATH, MODPLAY_KEYSTORE_PASSWORD, MODPLAY_KEY_ALIAS and " +
+                "MODPLAY_KEY_PASSWORD. See apps/android/RELEASE.md."
+        }
+    }
 }

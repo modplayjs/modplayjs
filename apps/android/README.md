@@ -75,6 +75,12 @@ Or simply:
 ./apps/android/scripts/build-local.sh
 ```
 
+## Release
+
+`RELEASE.md` is the runbook: upload keystore, version bump, `bundleRelease`,
+artifact checks (16 KB alignment, signature, manifest) and the Play Console
+checklist. `PRIVACY.md` is the privacy policy text for the store listing.
+
 ## CI
 
 `.github/workflows/android.yml` fetches the pinned prebuilt V8, builds the
@@ -133,10 +139,10 @@ From the repository root:
 apps\android\scripts\build-windows.cmd
 ```
 
-Release build:
+Release bundle for Play (needs the upload keystore, see `RELEASE.md`):
 
 ```bat
-apps\android\scripts\build-windows.cmd -Task :app:assembleRelease
+apps\android\scripts\build-windows.cmd -Task :app:bundleRelease
 ```
 
 Stub build without V8:

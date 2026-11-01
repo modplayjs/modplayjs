@@ -5,7 +5,7 @@
 
   Usage:
     .\scripts\build-windows.ps1
-    .\scripts\build-windows.ps1 -Task :app:assembleRelease
+    .\scripts\build-windows.ps1 -Task :app:bundleRelease   # Play upload
     .\scripts\build-windows.ps1 -SkipV8        # stub JNI build
 
   Prerequisites:
@@ -76,4 +76,4 @@ Write-Host "Running .\gradlew.bat $($GradleArgs -join ' ')"
 & .\gradlew.bat @GradleArgs
 if ($LASTEXITCODE -ne 0) { throw "Gradle build failed" }
 
-Write-Host "Done. APK is under apps\android\app\build\outputs\apk\."
+Write-Host "Done. See apps\android\app\build\outputs\ for the APK or the AAB."
