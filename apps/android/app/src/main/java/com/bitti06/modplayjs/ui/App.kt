@@ -153,8 +153,6 @@ private fun AppRoot(vm: AppViewModel) {
             entry<DiagnosticsKey> { DiagnosticsScreen(vm = vm, onBack = back) }
             entry<AboutKey> {
                 AboutScreen(
-                    v8Available = vm.v8Available,
-                    v8Error = vm.v8Error,
                     sampleRate = vm.sampleRate,
                     onOpenLicenses = { navigate(LicensesKey) },
                     onBack = back,
@@ -236,7 +234,6 @@ private fun AppRoot(vm: AppViewModel) {
                             favoritesCount = favorites.size,
                             onAddFolder = { folderPicker.launch(null) },
                             onRescan = { vm.rescan() },
-                            onOpenSettings = { navigate(SettingsKey) },
                             onOpenLibrary = { tabName = Tab.Library.name },
                             onOpenFavorites = { tabName = Tab.Favorites.name },
                             onOpenFolder = { id ->

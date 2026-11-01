@@ -41,7 +41,7 @@
     <string name="tab_playing">Wiedergabe</string>
 
     <!-- Home -->
-    <string name="home_tagline">Tracker-Player · V8</string>
+    <string name="home_tagline">Tracker-Player</string>
     <string name="stat_tracks">Titel</string>
     <string name="stat_folders">Ordner</string>
     <string name="stat_favorites">Favoriten</string>
@@ -262,10 +262,10 @@
     <string name="language_system_summary">Sprache aus den Android-Einstellungen verwenden</string>
 
     <!-- About -->
-    <string name="about_tagline">Nativer Tracker-Player · V8</string>
+    <string name="about_tagline">Nativer Tracker-Player</string>
     <string name="package_label">Paket</string>
     <string name="core_label">Kern</string>
-    <string name="core">modplayjs-JS-Engine (V8, kein WebView, kein WASM)</string>
+    <string name="core">modplayjs-JavaScript-Engine</string>
     <string name="links">Links</string>
     <string name="source_code">Quellcode</string>
     <string name="source_code_summary">github.com/modplayjs/modplayjs</string>

@@ -32,8 +32,6 @@ import com.bitti06.modplayjs.ui.icons.AppIcons
 
 @Composable
 fun AboutScreen(
-    v8Available: Boolean,
-    v8Error: String?,
     sampleRate: Int,
     onOpenLicenses: () -> Unit,
     onBack: () -> Unit,
@@ -82,13 +80,6 @@ fun AboutScreen(
             InfoRow(stringResource(R.string.variant), BuildConfig.BUILD_TYPE)
             InfoRow(stringResource(R.string.package_label), BuildConfig.APPLICATION_ID)
             SectionTitle(stringResource(R.string.engine))
-            InfoRow(
-                "V8",
-                stringResource(if (v8Available) R.string.v8_available else R.string.v8_stub),
-            )
-            if (!v8Available && v8Error != null) {
-                Text(v8Error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-            }
             InfoRow(stringResource(R.string.output_rate), "$sampleRate Hz")
             InfoRow(stringResource(R.string.core_label), stringResource(R.string.core))
             SectionTitle(stringResource(R.string.links))
