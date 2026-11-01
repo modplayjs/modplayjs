@@ -32,7 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -77,7 +77,8 @@ fun PlayerScreen(
     onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
-    val track = snapshot?.track
+    val snap = snapshot
+    val track = snap?.track
     var channelDialog by remember { mutableStateOf(false) }
     var showEffectsDialog by remember { mutableStateOf(false) }
 
@@ -94,7 +95,7 @@ fun PlayerScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
             )
         }
-        if (track == null || snapshot == null) {
+        if (snap == null || track == null) {
             EmptyState(
                 title = when {
                     error != null -> "Playback failed"
@@ -117,8 +118,8 @@ fun PlayerScreen(
             overflow = TextOverflow.Ellipsis,
         )
         Text(track.tracker.ifBlank { track.format.uppercase() }, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val duration = snapshot.state.durationMs
-        val position = snapshot.state.positionMs
+        val duration = snap.state.durationMs
+        val position = snap.state.positionMs
         var drag by remember(track.id) { mutableStateOf<Float?>(null) }
         Slider(
             value = drag ?: if (duration > 0) (position / duration).toFloat().coerceIn(0f, 1f) else 0f,
@@ -127,7 +128,7 @@ fun PlayerScreen(
                 drag?.let { vm.seek((it * duration).toLong()) }
                 drag = null
             },
-            enabled = snapshot.capabilities.seekable,
+            enabled = snap.capabilities.seekable,
             modifier = Modifier.fillMaxWidth(),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -138,7 +139,7 @@ fun PlayerScreen(
             IconButton(onClick = { vm.previous() }) { Icon(Icons.Default.SkipPrevious, contentDescription = "Previous") }
             FilledIconButton(onClick = { vm.togglePlay() }, modifier = Modifier.size(64.dp)) {
                 Icon(
-                    if (snapshot.state.playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    if (snap.state.playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = "Play or pause",
                     modifier = Modifier.size(34.dp),
                 )
@@ -148,7 +149,7 @@ fun PlayerScreen(
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onOpenQueue, modifier = Modifier.weight(1f)) {
-                Icon(Icons.Default.PlaylistPlay, contentDescription = null)
+                Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
                 Text("Queue")
             }
@@ -166,24 +167,24 @@ fun PlayerScreen(
                 Text("Effects")
             }
         }
-        val muted = snapshot.channels.count { it.muted }
-        if (snapshot.capabilities.channelMute && settings.view.showChannelStrip && snapshot.channels.isNotEmpty()) {
+        val muted = snap.channels.count { it.muted }
+        if (snap.capabilities.channelMute && settings.view.showChannelStrip && snap.channels.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 SectionTitle("Channels")
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "${snapshot.channels.size} · $muted muted",
+                    "${snap.channels.size} · $muted muted",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { channelDialog = true }) { Text("Expand") }
             }
-            ChannelStrip(snapshot, vm)
+            ChannelStrip(snap, vm)
         }
     }
-    if (channelDialog && snapshot != null) {
-        ChannelDialog(snapshot, vm) { channelDialog = false }
+    if (channelDialog && snap != null) {
+        ChannelDialog(snap, vm) { channelDialog = false }
     }
     if (showEffectsDialog) {
         SystemEffectsUnavailableDialog { showEffectsDialog = false }
@@ -262,7 +263,7 @@ private fun InfoPanel(
         ) {
             if (!track.message.isNullOrBlank()) {
                 Text("MESSAGE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                Text(track.message?.replace("\r", "") ?: "", style = MaterialTheme.typography.bodySmall)
+                Text(track.message.replace("\r", ""), style = MaterialTheme.typography.bodySmall)
             }
             if (track.instrumentList.isNotEmpty()) {
                 Text("INSTRUMENTS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
@@ -381,10 +382,11 @@ fun DetailsScreen(
     vm: AppViewModel,
     onBack: () -> Unit,
 ) {
-    val track = snapshot?.track
+    val snap = snapshot
+    val track = snap?.track
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
         ModalTopBar("Track details", onBack)
-        if (track == null || snapshot == null) {
+        if (snap == null || track == null) {
             EmptyState("No track loaded", "Play a module to inspect its orders, instruments and samples.")
             return
         }
@@ -440,8 +442,8 @@ fun DetailsScreen(
                     }
                 }
             }
-            item { SectionTitle("Channels (${snapshot.channels.size})") }
-            if (snapshot.channels.none { it.canMute }) {
+            item { SectionTitle("Channels (${snap.channels.size})") }
+            if (snap.channels.none { it.canMute }) {
                 item {
                     Text(
                         "Channel mute is not available for this engine.",
@@ -450,7 +452,7 @@ fun DetailsScreen(
                     )
                 }
             }
-            items(snapshot.channels, key = { "c${it.index}" }) { channel ->
+            items(snap.channels, key = { "c${it.index}" }) { channel ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = !channel.muted, onCheckedChange = { vm.toggleChannel(channel.index) }, enabled = channel.canMute)
                     Text(" ${channel.label}", modifier = Modifier.weight(1f))
