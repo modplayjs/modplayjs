@@ -47,6 +47,8 @@ class PlaybackService : MediaSessionService() {
     private var lastFocusAttemptMs = 0L
     private val mainHandler = Handler(Looper.getMainLooper())
     private val nudgeNotification = Runnable { restoreNotification() }
+    private var lastFavorite = false
+    private var lastSessionAt = 0L
 
     private val noisyReceiver =
         object : BroadcastReceiver() {
@@ -68,7 +70,7 @@ class PlaybackService : MediaSessionService() {
                 override fun onMediaItemTransition(
                     mediaItem: MediaItem?,
                     reason: Int,
-                ) = nudge()
+                ) = refreshSession()
 
                 override fun onPlayWhenReadyChanged(
                     playWhenReady: Boolean,
@@ -79,18 +81,7 @@ class PlaybackService : MediaSessionService() {
         // Ongoing while playing: the media card stays until playback stops.
         notificationProvider = StickyMediaNotificationProvider(this)
         setMediaNotificationProvider(notificationProvider)
-        mediaSession =
-            MediaSession
-                .Builder(this, player)
-                .setCallback(callback)
-                .setSessionActivity(
-                    PendingIntent.getActivity(
-                        this,
-                        0,
-                        Intent(this, MainActivity::class.java),
-                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-                    ),
-                ).build()
+        mediaSession = buildSession()
 
         // The app starts the service directly and has no MediaController, so
         // onGetSession() is never called. Register the session here so Media3
@@ -125,7 +116,12 @@ class PlaybackService : MediaSessionService() {
                 val id = queue.getOrNull(index)?.id
                 rows.firstOrNull { it.id == id }?.favoriteAt != null
             }.distinctUntilChanged()
-                .collect { favorite -> mediaSession.setCustomLayout(listOf(favoriteButton(favorite))) }
+                .collect { favorite ->
+                    lastFavorite = favorite
+                    if (::mediaSession.isInitialized) {
+                        mediaSession.setCustomLayout(listOf(favoriteButton(favorite)))
+                    }
+                }
         }
 
         scope.launch {
@@ -142,6 +138,38 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = mediaSession
+
+    private fun buildSession(): MediaSession =
+        MediaSession
+            .Builder(this, player)
+            .setCallback(callback)
+            .setSessionActivity(
+                PendingIntent.getActivity(
+                    this,
+                    0,
+                    Intent(this, MainActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            ).setCustomLayout(listOf(favoriteButton(lastFavorite)))
+            .build()
+
+    /**
+     * A new session per track. SystemUI remembers a dismissed media card by
+     * session token, so updating the old one never brings it back; a fresh token
+     * is a fresh card, which is the only way a track change can re-appear.
+     */
+    private fun refreshSession() {
+        if (!::mediaSession.isInitialized) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastSessionAt < SESSION_MIN_GAP_MS) return
+        lastSessionAt = now
+        val old = mediaSession
+        val fresh = buildSession()
+        addSession(fresh)
+        removeSession(old)
+        runCatching { old.release() }
+        mediaSession = fresh
+    }
 
     /** Re-attaches the card shortly after the player changed, once Media3 rebuilt it. */
     private fun nudge() {
@@ -323,6 +351,9 @@ class PlaybackService : MediaSessionService() {
     }
 
     companion object {
+        /** Do not churn session tokens faster than this. */
+        private const val SESSION_MIN_GAP_MS = 2_000L
+
         /** Wait for Media3 to rebuild the notification before re-attaching it. */
         private const val NUDGE_DELAY_MS = 200L
 
