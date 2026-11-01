@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -80,13 +82,18 @@ fun SideDrawer(
             }
         }
 
-        // Stays in the tree while it slides out, so the exit is not a blank box.
-        if (visible || progress.value < 1f) {
-            val open = 1f - progress.value
+        // Only the state transition, not every animation frame: reading
+        // progress.value in composition here would recompose the whole panel
+        // (a full library browser) 60 times a second while it slides.
+        val onScreen by remember(visible) { derivedStateOf { visible || progress.value < 1f } }
+        if (onScreen) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.55f * open))
+                    // Alpha follows the animation in the layer, which does not
+                    // recompose anything.
+                    .graphicsLayer { alpha = 0.55f * (1f - progress.value) }
+                    .background(Color.Black)
                     .pointerInput(visible) {
                         if (visible) detectTapGestures { onDismiss() }
                     },

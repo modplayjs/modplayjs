@@ -28,10 +28,17 @@ class ModplayPlayer(
     @Volatile private var snapshot: AndroidSnapshot? = null
     private var lastLoggedState: String? = null
 
-    // The playlist is rebuilt only when something in it changed. Media3 asks
-    // for the state on every snapshot (4x/s) and a queue can hold the whole
-    // library, so mapping it each time allocated thousands of MediaItems.
+    // Media3 gets a window around the current track, not the whole queue: a
+    // library can hold thousands of items, and every playlist change is both
+    // mapped here and sent across the session binder. The engine keeps the real
+    // queue; this only feeds the notification and the media controls.
+    private var windowStart = 0
+
+    // Rebuilt only when something in the window changed. Media3 asks for the
+    // state on every snapshot (4x/s).
     private var cachedQueue: List<QueueItem>? = null
+    private var cachedStart = -1
+    private var cachedEnd = -1
     private var cachedIndex = -1
     private var cachedTitle = ""
     private var cachedArtist = ""
@@ -103,7 +110,7 @@ class ModplayPlayer(
                 .setVolume((snap?.settings?.transport?.volume ?: 100) / 100f)
 
         if (items.isNotEmpty()) {
-            builder.setCurrentMediaItemIndex(currentIndex.coerceIn(0, items.lastIndex))
+            builder.setCurrentMediaItemIndex((currentIndex - windowStart).coerceIn(0, items.lastIndex))
         }
         val summary = "queue=${queue.size} index=$currentIndex engine=${engine?.name} item=${queue.getOrNull(currentIndex)?.name}"
         if (summary != lastLoggedState) {
@@ -113,7 +120,11 @@ class ModplayPlayer(
         return builder.build()
     }
 
-    /** Cached so the 4 Hz state refresh does not rebuild every queue item. */
+    /**
+     * The window of the queue that Media3 sees, centred on [currentIndex] so
+     * the notification always has a track either side. Cached, so the 4 Hz
+     * state refresh does not remap it.
+     */
     private fun playlistFor(
         queue: List<QueueItem>,
         currentIndex: Int,
@@ -129,17 +140,26 @@ class ModplayPlayer(
                 C.TIME_UNSET
             }
         val seekable = snap?.capabilities?.seekable == true
+        val start =
+            (currentIndex - WINDOW / 2)
+                .coerceAtLeast(0)
+                .coerceAtMost((queue.size - WINDOW).coerceAtLeast(0))
+        val end = (start + WINDOW).coerceAtMost(queue.size)
         if (cachedQueue === queue &&
+            cachedStart == start &&
+            cachedEnd == end &&
             cachedIndex == currentIndex &&
             cachedTitle == title &&
             cachedArtist == artist &&
             cachedDurationUs == durationUs &&
             cachedSeekable == seekable
         ) {
+            windowStart = cachedStart
             return cachedItems
         }
         val built =
-            queue.mapIndexed { index, item ->
+            queue.subList(start, end).mapIndexed { offset, item ->
+                val index = start + offset
                 val current = index == currentIndex
                 MediaItemData
                     .Builder(item.id)
@@ -170,12 +190,15 @@ class ModplayPlayer(
                     .build()
             }
         cachedQueue = queue
+        cachedStart = start
+        cachedEnd = end
         cachedIndex = currentIndex
         cachedTitle = title
         cachedArtist = artist
         cachedDurationUs = durationUs
         cachedSeekable = seekable
         cachedItems = built
+        windowStart = start
         return built
     }
 
@@ -202,8 +225,10 @@ class ModplayPlayer(
             Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> playback.next()
             Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> playback.previous()
             else -> {
-                if (mediaItemIndex != C.INDEX_UNSET && mediaItemIndex != playback.queueIndex.value) {
-                    playback.playIndex(mediaItemIndex)
+                // Playlist indices are window-relative; the engine's are not.
+                if (mediaItemIndex != C.INDEX_UNSET) {
+                    val target = mediaItemIndex + windowStart
+                    if (target != playback.queueIndex.value) playback.playIndex(target)
                 }
                 if (positionMs != C.TIME_UNSET) playback.seek(positionMs)
             }
@@ -213,5 +238,8 @@ class ModplayPlayer(
 
     private companion object {
         const val TAG = "ModplayPlayer"
+
+        /** How many queue items Media3 is told about at a time. */
+        const val WINDOW = 64
     }
 }

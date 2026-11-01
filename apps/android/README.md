@@ -104,7 +104,9 @@ debug APK, and verifies 16 KB ELF segment alignment.
 - The transport row carries the repeat toggle (off / all / one); the queue,
   which is the list playback started from, is listed from Track details.
 - Media3 `MediaSessionService` owns the notification, lock-screen and media
-  buttons.
+  buttons. It is shown a 64-item window around the current track rather than the
+  whole queue, which can be thousands of items: every playlist change is mapped
+  and sent across the session binder on the main thread.
 - Diagnostics screen reports the engine, the audio path (buffer frames and
   time, framework minimum, play state, device burst, effects panel) and the
   capabilities the engine reports for the loaded track.

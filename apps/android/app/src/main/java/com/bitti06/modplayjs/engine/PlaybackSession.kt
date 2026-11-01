@@ -131,8 +131,11 @@ class PlaybackSession(
         items: List<QueueItem>,
         index: Int = 0,
     ) {
-        _queue.value = items
-        _queueIndex.value = index.coerceIn(0, maxOf(0, items.lastIndex))
+        // Replaying a track from the list already in the queue must not replace
+        // it: Media3 maps the queue whenever the list instance changes, and a
+        // library list is thousands of items.
+        if (_queue.value != items) _queue.value = items
+        _queueIndex.value = index.coerceIn(0, maxOf(0, _queue.value.lastIndex))
     }
 
     fun playIndex(index: Int) {
