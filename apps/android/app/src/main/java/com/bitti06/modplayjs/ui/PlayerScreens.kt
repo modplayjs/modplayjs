@@ -12,10 +12,12 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -102,224 +104,257 @@ fun PlayerScreen(
             ),
     ) {
         Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Now Playing",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-            if (track != null) {
-                Spacer(Modifier.width(12.dp))
-                // Scrolls sideways when the name does not fit, like a player's
-                // top bar does.
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    track.title.ifBlank { track.name },
+                    "Now Playing",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    modifier = Modifier.weight(1f).basicMarquee(initialDelayMillis = 0),
                 )
-            } else {
-                Spacer(Modifier.weight(1f))
-            }
-            IconButton(onClick = onOpenSettings) { Icon(AppIcons.Settings, contentDescription = "Settings") }
-        }
-        if (error != null) {
-            Text(
-                error,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-            )
-        }
-        if (snap == null || track == null) {
-            if (loading != null) {
-                LoadingIndicator(
-                    modifier = Modifier.size(44.dp).align(Alignment.CenterHorizontally),
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-            EmptyState(
-                title = when {
-                    error != null -> "Playback failed"
-                    loading != null -> "Loading $loading"
-                    else -> "No track loaded"
-                },
-                body = if (error != null) "Open the library and pick another file." else "Choose a module, SID tune or audio file to start.",
-                actionLabel = "Browse library",
-                onAction = onBrowseLibrary,
-            )
-            return
-        }
-        val message = track.message?.takeIf { it.isNotBlank() }
-        val instruments = track.instrumentList
-        val samples = track.sampleList
-
-        // The three info boxes take the space between the header and the
-        // transport controls, each scrolling on its own; the transport block
-        // below stays pinned just above the bottom bar.
-        Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (message == null && instruments.isEmpty() && samples.isEmpty()) {
-                InfoBox("Track", Modifier.weight(1f), accent) {
+                if (track != null) {
+                    Spacer(Modifier.width(12.dp))
+                    // Scrolls sideways when the name does not fit, like a player's
+                    // top bar does.
                     Text(
-                        "${track.format.uppercase()} · ${track.channels} channels · ${track.tracker}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
+                        track.title.ifBlank { track.name },
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f).basicMarquee(initialDelayMillis = 0),
                     )
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
-            } else {
-                if (message != null) {
-                    InfoBox("Message", Modifier.weight(1f), MaterialTheme.colorScheme.tertiary) {
-                        Text(message.replace("\r", ""), style = MaterialTheme.typography.bodySmall)
-                    }
+                IconButton(onClick = onOpenSettings) { Icon(AppIcons.Settings, contentDescription = "Settings") }
+            }
+            if (error != null) {
+                Text(
+                    error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                )
+            }
+            if (snap == null || track == null) {
+                if (loading != null) {
+                    LoadingIndicator(
+                        modifier = Modifier.size(44.dp).align(Alignment.CenterHorizontally),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.height(8.dp))
                 }
-                if (instruments.isNotEmpty()) {
-                    InfoBox("Instruments", Modifier.weight(1f), MaterialTheme.colorScheme.primary) {
-                        instruments.forEach { instrument ->
+                EmptyState(
+                    title = when {
+                        error != null -> "Playback failed"
+                        loading != null -> "Loading $loading"
+                        else -> "No track loaded"
+                    },
+                    body = if (error != null) "Open the library and pick another file." else "Choose a module, SID tune or audio file to start.",
+                    actionLabel = "Browse library",
+                    onAction = onBrowseLibrary,
+                )
+                return
+            }
+
+            val message = track.message?.takeIf { it.isNotBlank() }
+            val instruments = track.instrumentList
+            val samples = track.sampleList
+
+            // Message/instruments/samples each scroll on their own.
+            val infoBoxes: @Composable (Modifier) -> Unit = { modifier ->
+                Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (message == null && instruments.isEmpty() && samples.isEmpty()) {
+                        InfoBox("Track", Modifier.weight(1f), accent) {
                             Text(
-                                "${instrument.index + 1}. ${instrument.name.ifBlank { "(unnamed)" }}",
+                                "${track.format.uppercase()} · ${track.channels} channels · ${track.tracker}",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
                             )
+                        }
+                    } else {
+                        if (message != null) {
+                            InfoBox("Message", Modifier.weight(1f), MaterialTheme.colorScheme.tertiary) {
+                                Text(message.replace("\r", ""), style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        if (instruments.isNotEmpty()) {
+                            InfoBox("Instruments", Modifier.weight(1f), MaterialTheme.colorScheme.primary) {
+                                instruments.forEach { instrument ->
+                                    Text(
+                                        "${instrument.index + 1}. ${instrument.name.ifBlank { "(unnamed)" }}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                    )
+                                }
+                            }
+                        }
+                        if (samples.isNotEmpty()) {
+                            InfoBox("Samples", Modifier.weight(1f), MaterialTheme.colorScheme.secondary) {
+                                samples.forEach { sample ->
+                                    Text(
+                                        "${sample.index + 1}. ${sample.name.ifBlank { "(unnamed)" }}  ${sample.length}${if (sample.loop) " L" else ""}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-                if (samples.isNotEmpty()) {
-                    InfoBox("Samples", Modifier.weight(1f), MaterialTheme.colorScheme.secondary) {
-                        samples.forEach { sample ->
+            }
+
+            val transport: @Composable (Modifier) -> Unit = { modifier ->
+                Column(modifier) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FormatArt(track.format, 62.dp)
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
                             Text(
-                                "${sample.index + 1}. ${sample.name.ifBlank { "(unnamed)" }}  ${sample.length}${if (sample.loop) " L" else ""}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
+                                track.title.ifBlank { track.name },
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                track.tracker.ifBlank { track.format.uppercase() },
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
-                }
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            FormatArt(track.format, 62.dp)
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    track.title.ifBlank { track.name },
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    track.tracker.ifBlank { track.format.uppercase() },
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        val duration = snap.state.durationMs
-        val position = snap.state.positionMs
-        var drag by remember(track.id) { mutableStateOf<Float?>(null) }
-        val fraction =
-            drag ?: if (duration > 0) (position / duration).toFloat().coerceIn(0f, 1f) else 0f
-        val sliderState = rememberSliderState(value = fraction, trackRange = 0f..1f)
-        LaunchedEffect(fraction) { sliderState.value = fraction }
-        Slider(
-            state = sliderState,
-            onValueChange = { v ->
-                if (duration > 0) {
-                    drag = v
-                    sliderState.value = v
-                }
-            },
-            onValueChangeFinished = {
-                drag?.let { vm.seek((it * duration).toLong()) }
-                drag = null
-            },
-            enabled = snap.capabilities.seekable,
-            colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                formatTime(drag?.let { (it * duration).toLong() } ?: position.toLong()),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                if (duration > 0) formatTime(duration.toLong()) else "∞",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { vm.previous() }) { Icon(AppIcons.SkipPrevious, contentDescription = "Previous") }
-            Box(contentAlignment = Alignment.Center) {
-                CircularWavyProgressIndicator(
-                    progress = { fraction },
-                    modifier = Modifier.size(96.dp),
-                    color = accent,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                )
-                FilledIconButton(
-                    onClick = { vm.togglePlay() },
-                    modifier = Modifier.size(68.dp),
-                    shape = CircleShape,
-                ) {
-                    Icon(
-                        if (snap.state.playing) AppIcons.Pause else AppIcons.PlayArrow,
-                        contentDescription = "Play or pause",
-                        modifier = Modifier.size(36.dp),
+                    val duration = snap.state.durationMs
+                    val position = snap.state.positionMs
+                    var drag by remember(track.id) { mutableStateOf<Float?>(null) }
+                    val fraction =
+                        drag ?: if (duration > 0) (position / duration).toFloat().coerceIn(0f, 1f) else 0f
+                    val sliderState = rememberSliderState(value = fraction, trackRange = 0f..1f)
+                    LaunchedEffect(fraction) { sliderState.value = fraction }
+                    Slider(
+                        state = sliderState,
+                        onValueChange = { v ->
+                            if (duration > 0) {
+                                drag = v
+                                sliderState.value = v
+                            }
+                        },
+                        onValueChangeFinished = {
+                            drag?.let { vm.seek((it * duration).toLong()) }
+                            drag = null
+                        },
+                        enabled = snap.capabilities.seekable,
+                        colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent),
+                        modifier = Modifier.fillMaxWidth(),
                     )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            formatTime(drag?.let { (it * duration).toLong() } ?: position.toLong()),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            if (duration > 0) formatTime(duration.toLong()) else "∞",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(onClick = { vm.previous() }) { Icon(AppIcons.SkipPrevious, contentDescription = "Previous") }
+                        Box(contentAlignment = Alignment.Center) {
+                            CircularWavyProgressIndicator(
+                                progress = { fraction },
+                                modifier = Modifier.size(96.dp),
+                                color = accent,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            FilledIconButton(
+                                onClick = { vm.togglePlay() },
+                                modifier = Modifier.size(68.dp),
+                                shape = CircleShape,
+                            ) {
+                                Icon(
+                                    if (snap.state.playing) AppIcons.Pause else AppIcons.PlayArrow,
+                                    contentDescription = "Play or pause",
+                                    modifier = Modifier.size(36.dp),
+                                )
+                            }
+                        }
+                        IconButton(onClick = { vm.next() }) { Icon(AppIcons.SkipNext, contentDescription = "Next") }
+                        IconButton(onClick = { vm.stop() }) { Icon(AppIcons.Stop, contentDescription = "Stop") }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(onClick = onOpenQueue, modifier = Modifier.weight(1f), shape = CircleShape) {
+                            Icon(AppIcons.PlaylistPlay, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Queue")
+                        }
+                        FilledTonalButton(onClick = onOpenDetails, modifier = Modifier.weight(1f), shape = CircleShape) {
+                            Icon(AppIcons.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Details")
+                        }
+                        FilledTonalButton(
+                            onClick = {
+                                if (!openSystemAudioEffects(context, vm.audioSessionId)) {
+                                    showEffectsDialog = true
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = CircleShape,
+                        ) {
+                            Icon(AppIcons.Equalizer, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Effects")
+                        }
+                    }
+                    val muted = snap.channels.count { it.muted }
+                    if (snap.capabilities.channelMute && settings.view.showChannelStrip && snap.channels.isNotEmpty()) {
+                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            SectionTitle("Channels")
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "${snap.channels.size} · $muted muted",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.weight(1f))
+                            TextButton(onClick = { channelDialog = true }) { Text("Expand") }
+                        }
+                        ChannelStrip(snap, vm)
+                    }
                 }
             }
-            IconButton(onClick = { vm.next() }) { Icon(AppIcons.SkipNext, contentDescription = "Next") }
-            IconButton(onClick = { vm.stop() }) { Icon(AppIcons.Stop, contentDescription = "Stop") }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalButton(onClick = onOpenQueue, modifier = Modifier.weight(1f), shape = CircleShape) {
-                Icon(AppIcons.PlaylistPlay, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Queue")
-            }
-            FilledTonalButton(onClick = onOpenDetails, modifier = Modifier.weight(1f), shape = CircleShape) {
-                Icon(AppIcons.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Details")
-            }
-            FilledTonalButton(
-                onClick = {
-                    if (!openSystemAudioEffects(context, vm.audioSessionId)) {
-                        showEffectsDialog = true
+
+            // Portrait pins the transport above the tab bar; landscape puts the
+            // info boxes beside it, since Android 17 ignores orientation locks
+            // and this window can be short and wide.
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                val wide = maxWidth > maxHeight && maxWidth >= 480.dp
+                if (wide) {
+                    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        infoBoxes(Modifier.weight(1f).fillMaxHeight())
+                        transport(
+                            Modifier
+                                .width(380.dp)
+                                .fillMaxHeight()
+                                .verticalScroll(rememberScrollState()),
+                        )
                     }
-                },
-                modifier = Modifier.weight(1f),
-                shape = CircleShape,
-            ) {
-                Icon(AppIcons.Equalizer, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Effects")
+                } else {
+                    Column(Modifier.fillMaxSize()) {
+                        infoBoxes(Modifier.weight(1f).fillMaxWidth())
+                        Spacer(Modifier.height(10.dp))
+                        transport(Modifier.fillMaxWidth())
+                    }
+                }
             }
-        }
-        val muted = snap.channels.count { it.muted }
-        if (snap.capabilities.channelMute && settings.view.showChannelStrip && snap.channels.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                SectionTitle("Channels")
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "${snap.channels.size} · $muted muted",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = { channelDialog = true }) { Text("Expand") }
-            }
-            ChannelStrip(snap, vm)
-        }
-        Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
         }
     }
     if (channelDialog && snap != null) {

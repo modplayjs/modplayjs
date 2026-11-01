@@ -35,13 +35,20 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.library.FolderEntity
@@ -112,6 +119,18 @@ fun LibraryScreen(
     var showTrackActions by remember { mutableStateOf<TrackEntity?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<TrackEntity?>(null) }
     var folderMenu by remember { mutableStateOf<FolderEntity?>(null) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val searchFocus = remember { FocusRequester() }
+    var searchWasFocused by rememberSaveable { mutableStateOf(false) }
+    // Android 17 does not restore IME visibility when the activity is
+    // recreated by a configuration change, so re-focus and re-show it here.
+    LaunchedEffect(Unit) {
+        if (searchWasFocused) {
+            searchFocus.requestFocus()
+            withFrameNanos { }
+            keyboard?.show()
+        }
+    }
     val filtersActive =
         filters.status != "all" || filters.family != null || filters.format != null || filters.sort != "name" || filters.descending
 
@@ -141,7 +160,11 @@ fun LibraryScreen(
         OutlinedTextField(
             value = filters.search,
             onValueChange = { vm.updateFilters { f -> f.copy(search = it) } },
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .focusRequester(searchFocus)
+                    .onFocusChanged { searchWasFocused = it.isFocused },
             placeholder = { Text("Search modules, paths") },
             leadingIcon = {
                 Icon(AppIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
