@@ -288,6 +288,8 @@
     <string name="underruns">Underruns</string>
     <string name="diag_audio">Audioausgabe</string>
     <string name="diag_engine_version">Engine-Formate</string>
+    <string name="diag_duration">Titel-Länge</string>
+    <string name="diag_unknown">unbekannt</string>
     <string name="diag_output_api">API</string>
     <string name="diag_output_api_value">AudioTrack · PCM float · Stream</string>
     <string name="diag_performance">Leistungsmodus</string>

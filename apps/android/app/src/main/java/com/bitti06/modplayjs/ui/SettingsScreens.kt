@@ -580,6 +580,18 @@ fun DiagnosticsScreen(
             stringResource(R.string.diag_engine_version),
             snapshot?.engineVersion?.takeIf { it.isNotBlank() } ?: "—",
         )
+        // What the media session tells the system: no length means no scrubber,
+        // and a length that is here but invisible in the card is the platform's
+        // layout, not the player's.
+        val loaded = snapshot?.state
+        InfoRow(
+            stringResource(R.string.diag_duration),
+            when {
+                loaded == null -> stringResource(R.string.diag_unknown)
+                loaded.durationKnown -> formatTime(loaded.durationMs.toLong())
+                else -> stringResource(R.string.diag_unknown)
+            },
+        )
         val v8Error = actions.v8Error
         if (!actions.v8Available && v8Error != null) {
             Text(v8Error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)

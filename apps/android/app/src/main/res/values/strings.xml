@@ -301,6 +301,8 @@
     <string name="underruns">Underruns</string>
     <string name="diag_audio">Audio output</string>
     <string name="diag_engine_version">Engine formats</string>
+    <string name="diag_duration">Track length</string>
+    <string name="diag_unknown">unknown</string>
     <string name="diag_output_api">API</string>
     <string name="diag_output_api_value">AudioTrack · PCM float · stream</string>
     <string name="diag_performance">Performance mode</string>
