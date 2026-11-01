@@ -70,6 +70,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -738,29 +740,9 @@ private fun MessageText(
     val measurer = rememberTextMeasurer()
     val base = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
     BoxWithConstraints(modifier) {
-        val available = constraints.maxWidth
-        val measured =
-            remember(text, available, base) {
-                measurer.measure(AnnotatedString(text), style = base, softWrap = false)
-            }
-        // Glyph advances round to whole pixels, so fitting exactly clipped the
-        // last column of the widest line; leave a few pixels of headroom.
-        val target = (available - 4).coerceAtLeast(1)
-        val scale =
-            if (measured.size.width > target && measured.size.width > 0) {
-                target.toFloat() / measured.size.width
-            } else {
-                1f
-            }
         val style =
-            if (scale != 1f) {
-                if (base.lineHeight.isSpecified) {
-                    base.copy(fontSize = base.fontSize * scale, lineHeight = base.lineHeight * scale)
-                } else {
-                    base.copy(fontSize = base.fontSize * scale)
-                }
-            } else {
-                base
+            remember(text, constraints.maxWidth, base) {
+                fittedStyle(measurer, text, base, (constraints.maxWidth - 4).coerceAtLeast(1))
             }
         Text(
             text,
@@ -771,6 +753,37 @@ private fun MessageText(
                     .fillMaxWidth(),
         )
     }
+}
+
+/**
+ * Shrinks [base] until the widest line fits [target] pixels. One pass is not
+ * enough: the ratio is taken at the base size, and glyph advances round to
+ * whole pixels once the font is smaller, which made the last column spill out.
+ */
+private fun fittedStyle(
+    measurer: TextMeasurer,
+    text: String,
+    base: TextStyle,
+    target: Int,
+): TextStyle {
+    fun scaled(scale: Float): TextStyle =
+        if (base.lineHeight.isSpecified) {
+            base.copy(fontSize = base.fontSize * scale, lineHeight = base.lineHeight * scale)
+        } else {
+            base.copy(fontSize = base.fontSize * scale)
+        }
+
+    val first = measurer.measure(AnnotatedString(text), style = base, softWrap = false)
+    if (first.size.width <= target) return base
+    var scale = target.toFloat() / first.size.width
+    var style = scaled(scale)
+    repeat(2) {
+        val measured = measurer.measure(AnnotatedString(text), style = style, softWrap = false)
+        if (measured.size.width <= target) return style
+        scale *= target.toFloat() / measured.size.width
+        style = scaled(scale)
+    }
+    return style
 }
 
 /** The whole module message, scaled to the screen instead of panned sideways. */
