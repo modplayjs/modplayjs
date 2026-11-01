@@ -308,6 +308,9 @@ fun PlayerScreen(
                             )
                         }
                     }
+                    // The slider thumb stands taller than its track, so it needs
+                    // its own gap instead of hugging the tile above it.
+                    Spacer(Modifier.height(8.dp))
                     val duration = snap.state.durationMs
                     val position = snap.state.positionMs
                     var drag by remember(track.id) { mutableStateOf<Float?>(null) }
