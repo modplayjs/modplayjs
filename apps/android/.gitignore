@@ -2,7 +2,6 @@ build/
 .gradle/
 local.properties
 .cxx/
-app/src/main/assets/engine/engine.js
 *.iml
 .kotlin/
 .externalNativeBuild/

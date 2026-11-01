@@ -46,9 +46,12 @@ class AppViewModel(
     val snapshot: StateFlow<AndroidSnapshot?> = session.snapshot
     val queue: StateFlow<List<QueueItem>> = session.queue
     val queueIndex: StateFlow<Int> = session.queueIndex
+    val loading: StateFlow<String?> = session.loading
+    val error: StateFlow<String?> = session.error
     val folders: StateFlow<List<FolderEntity>> = repo.folders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val ignored: StateFlow<List<TrackEntity>> = repo.ignored.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val v8Available: Boolean get() = session.v8Available
+    val v8Error: String? get() = session.v8Error
     val underruns: Int get() = session.underruns
     val sampleRate: Int get() = session.sampleRate
 

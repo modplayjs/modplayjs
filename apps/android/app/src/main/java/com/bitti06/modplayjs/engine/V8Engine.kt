@@ -14,6 +14,10 @@ class V8Engine(
     private var handle: Long = 0L
     val available: Boolean get() = handle != 0L
 
+    /** Why the isolate or engine.js failed to start, if it did. */
+    @Volatile var initError: String? = null
+        private set
+
     init {
         handle =
             try {
@@ -25,9 +29,14 @@ class V8Engine(
                         .use { it.readText() }
                 nativeCreate(script, context.cacheDir.absolutePath)
             } catch (t: Throwable) {
-                Log.e(TAG, "V8 unavailable: ${t.message}")
+                initError = "${t.javaClass.simpleName}: ${t.message}"
+                Log.e(TAG, "V8 unavailable: $initError")
                 0L
             }
+        if (handle == 0L && initError == null) {
+            initError = "engine.js failed to compile or run (see modplay-v8 log)"
+            Log.e(TAG, "V8 unavailable: $initError")
+        }
     }
 
     fun load(
@@ -39,6 +48,16 @@ class V8Engine(
     }
 
     fun command(json: String): String = if (handle == 0L) """{"error":"v8-unavailable"}""" else nativeCommand(handle, json)
+
+    /**
+     * Tell the engine which rate the AudioTrack was actually created at. The
+     * JS default is 48000; on a 44100 Hz device that mismatch would render
+     * audio at the wrong pitch/speed.
+     */
+    fun setSampleRate(hz: Int) {
+        if (handle == 0L || hz <= 0) return
+        nativeCommand(handle, """{"type":"setSampleRate","value":$hz}""")
+    }
 
     fun render(frames: Int): FloatArray = if (handle == 0L) FloatArray(0) else nativeRender(handle, frames)
 

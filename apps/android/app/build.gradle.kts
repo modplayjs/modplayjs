@@ -84,6 +84,6 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-    implementation(libs.androidx.media)
+    implementation(libs.androidx.media3.session)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

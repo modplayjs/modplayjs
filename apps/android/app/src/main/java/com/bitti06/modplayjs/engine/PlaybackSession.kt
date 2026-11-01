@@ -18,6 +18,7 @@ import kotlinx.serialization.json.put
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Owns the player: V8 render thread, PCM ring, AudioTrack drain, queue and
@@ -43,6 +44,14 @@ class PlaybackSession(
     private val _queueIndex = MutableStateFlow(0)
     val queueIndex: StateFlow<Int> = _queueIndex.asStateFlow()
 
+    /** Name of the track currently being decoded, or null. */
+    private val _loading = MutableStateFlow<String?>(null)
+    val loading: StateFlow<String?> = _loading.asStateFlow()
+
+    /** Last load/playback failure, shown by the player instead of silence. */
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
     @Volatile private var currentSettings = AndroidSettings()
 
     @Volatile private var currentItem: QueueItem? = null
@@ -55,18 +64,27 @@ class PlaybackSession(
 
     @Volatile private var lastSnapshotAt = 0L
     private val running = AtomicBoolean(true)
+    private val playGeneration = AtomicInteger(0)
 
     val v8Available: Boolean get() = v8.available
+    val v8Error: String? get() = v8.initError
     val underruns: Int get() = audio.underruns
 
     init {
         audio.start(ring)
         audio.pause()
+        applyDeviceSampleRate()
         Thread({ renderLoop() }, "render-loop").apply {
             priority = Thread.MAX_PRIORITY
             start()
         }
         refresh()
+    }
+
+    private fun applyDeviceSampleRate() {
+        if (!v8.available) return
+        runCatching { v8Exec.submit { v8.setSampleRate(audio.sampleRate) }.get(2, TimeUnit.SECONDS) }
+            .onFailure { Log.e(TAG, "setSampleRate failed", it) }
     }
 
     fun setSettings(settings: AndroidSettings) {
@@ -77,6 +95,9 @@ class PlaybackSession(
                 put("settings", EngineJson.encodeToJsonElement(AndroidSettings.serializer(), settings))
             }.toString(),
         )
+        // The settings screen may carry a sample rate, but output is fixed to
+        // the AudioTrack rate; keep the engine rendering at that rate.
+        applyDeviceSampleRate()
     }
 
     fun setQueue(
@@ -96,29 +117,60 @@ class PlaybackSession(
 
     fun play(item: QueueItem) =
         scope.launch {
-            val bytes =
-                readBytes(item.uri) ?: run {
-                    Log.e(TAG, "cannot read ${item.uri}")
-                    return@launch
-                }
-            runCatching {
+            val generation = playGeneration.incrementAndGet()
+            _error.value = null
+            _loading.value = item.name
+            // Stop the old track before decoding: the render thread must not
+            // feed the old module into the ring while a new one loads, and an
+            // unpaused-but-starved AudioTrack counts underruns.
+            playing = false
+            paused = true
+            audio.pause()
+            ring.clear()
+            try {
+                val bytes =
+                    readBytes(item.uri)
+                        ?: throw IllegalStateException("cannot open ${item.uri}")
                 v8Exec.submit { v8.load(bytes, item.name) }.get(20, TimeUnit.SECONDS)
-                currentItem = item
+                if (playGeneration.get() != generation) return@launch
                 ring.clear()
-                send(buildJsonObject { put("type", "play") }.toString())
+                check(send(buildJsonObject { put("type", "play") }.toString())) {
+                    "engine is not available"
+                }
+                refresh()
+                val loaded =
+                    _snapshot.value
+                        ?.takeIf { it.capabilities.loaded }
+                        ?.track
+                        ?: throw IllegalStateException("engine did not report a loaded track")
+                if (playGeneration.get() != generation) return@launch
+                currentItem = item
+                primeOutput()
                 playing = true
                 paused = false
                 audio.resume()
-                refresh()
-            }.onFailure { Log.e(TAG, "play failed", it) }
+                Log.i(TAG, "playing ${loaded.name} (${loaded.format})")
+            } catch (t: Throwable) {
+                if (playGeneration.get() == generation) {
+                    playing = false
+                    paused = true
+                    audio.pause()
+                    val reason = t.cause?.message?.ifBlank { null } ?: t.message ?: t.javaClass.simpleName
+                    _error.value = "Cannot play ${item.name}: $reason"
+                }
+                Log.e(TAG, "play failed: ${item.name}", t)
+            } finally {
+                if (playGeneration.get() == generation) _loading.value = null
+            }
         }
 
     fun play() {
-        if (currentItem == null) {
+        if (currentItem == null || _snapshot.value?.track == null) {
             playIndex(_queueIndex.value)
             return
         }
         send(buildJsonObject { put("type", "play") }.toString())
+        if (paused || !playing) primeOutput()
         paused = false
         playing = true
         audio.resume()
@@ -128,11 +180,18 @@ class PlaybackSession(
         paused = true
         send(buildJsonObject { put("type", "pause") }.toString())
         audio.pause()
+        // Frames already rendered are ahead of the pause point; drop them.
+        ring.clear()
         refresh()
     }
 
     fun resume() {
+        if (currentItem == null || _snapshot.value?.track == null) {
+            playIndex(_queueIndex.value)
+            return
+        }
         send(buildJsonObject { put("type", "resume") }.toString())
+        primeOutput()
         paused = false
         audio.resume()
         refresh()
@@ -140,7 +199,7 @@ class PlaybackSession(
 
     fun stop() {
         playing = false
-        paused = false
+        paused = true
         send(buildJsonObject { put("type", "stop") }.toString())
         audio.pause()
         ring.clear()
@@ -154,6 +213,9 @@ class PlaybackSession(
                 put("positionMs", ms)
             }.toString(),
         )
+        // Drop audio rendered for the old position so it is not heard after
+        // the seek.
+        ring.clear()
         refresh()
     }
 
@@ -236,10 +298,35 @@ class PlaybackSession(
 
     fun loadSidSongLengths(text: String) = command("loadSidSongLengths") { put("text", text) }
 
-    private fun send(json: String) {
-        if (!v8.available) return
-        runCatching { v8Exec.submit { v8.command(json) }.get(5, TimeUnit.SECONDS) }
-            .onFailure { Log.e(TAG, "command failed: $json", it) }
+    private fun send(json: String): Boolean {
+        if (!v8.available) {
+            Log.w(TAG, "engine unavailable, dropped $json")
+            return false
+        }
+        val out =
+            runCatching { v8Exec.submit<String> { v8.command(json) }.get(5, TimeUnit.SECONDS) }
+                .onFailure { Log.e(TAG, "command failed: $json", it) }
+                .getOrNull() ?: return false
+        if (out.startsWith("{\"error\"")) {
+            Log.e(TAG, "engine rejected $json: $out")
+            return false
+        }
+        return true
+    }
+
+    /**
+     * Fill the ring before starting AudioTrack so output does not begin with
+     * an empty buffer (which the framework reports as an underrun).
+     */
+    private fun primeOutput() {
+        repeat(ring.capacity / FRAMES) {
+            if (ring.availableWrite() < FRAMES) return
+            val pcm =
+                runCatching { v8Exec.submit<FloatArray> { v8.render(FRAMES) }.get(1, TimeUnit.SECONDS) }
+                    .getOrNull() ?: return
+            if (pcm.isEmpty()) return
+            ring.write(pcm, pcm.size / 2)
+        }
     }
 
     private fun renderLoop() {
@@ -267,7 +354,12 @@ class PlaybackSession(
 
     private fun onEnded() {
         playing = false
+        audio.pause()
         advancing.set(false)
+        if (_snapshot.value?.track == null) {
+            stop()
+            return
+        }
         val items = _queue.value
         when {
             currentSettings.playback.repeat == "one" && currentItem != null -> play(currentItem!!)
@@ -281,8 +373,18 @@ class PlaybackSession(
     @Synchronized
     private fun refresh() {
         if (!v8.available) return
-        val json = runCatching { v8Exec.submit<String> { v8.snapshot() }.get(2, TimeUnit.SECONDS) }.getOrNull() ?: return
-        val snap = runCatching { EngineJson.decodeFromString<AndroidSnapshot>(json) }.getOrNull() ?: return
+        val json =
+            runCatching { v8Exec.submit<String> { v8.snapshot() }.get(2, TimeUnit.SECONDS) }
+                .onFailure { Log.e(TAG, "snapshot call failed: ${it.message}") }
+                .getOrNull() ?: return
+        if (json.startsWith("{\"error\"")) {
+            Log.e(TAG, "snapshot error: $json")
+            return
+        }
+        val snap =
+            runCatching { EngineJson.decodeFromString<AndroidSnapshot>(json) }
+                .onFailure { Log.e(TAG, "snapshot decode failed: ${it.message}") }
+                .getOrNull() ?: return
         currentSettings = snap.settings
         _snapshot.value = snap
         lastSnapshotAt = System.currentTimeMillis()
@@ -291,7 +393,9 @@ class PlaybackSession(
     private fun readBytes(uri: String): ByteArray? =
         runCatching {
             context.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() }
-        }.getOrNull()
+        }
+            .onFailure { Log.e(TAG, "cannot read $uri", it) }
+            .getOrNull()
 
     fun release() {
         running.set(false)

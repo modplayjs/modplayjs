@@ -6,6 +6,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.os.Process
+import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -30,8 +31,15 @@ class AudioTrackOutput(
     private var ring: PcmRing? = null
     private var scratch = FloatArray(0)
 
-    @Volatile var underruns: Int = 0
-        private set
+    /**
+     * Underruns reported by the audio framework for the current track. This is
+     * the platform counter (AudioTrack.getUnderrunCount); it only moves while
+     * the track is actually playing and the framework had no data to consume.
+     * The old hand-rolled counter incremented once per drain-thread poll, so an
+     * idle-but-unpaused track (nothing loaded yet) inflated it by ~500/s.
+     */
+    val underruns: Int
+        get() = runCatching { track?.underrunCount ?: 0 }.getOrDefault(0)
 
     fun start(ring: PcmRing) {
         if (running.get()) return
@@ -68,8 +76,9 @@ class AudioTrackOutput(
                 .build()
         track = t
         running.set(true)
-        paused.set(false)
-        t.play()
+        // Stay paused until the engine has audio. Anything else lets the
+        // framework count underruns for a track nobody is feeding.
+        paused.set(true)
         thread =
             Thread({ loop() }, "oboe-drain").apply {
                 priority = Thread.MAX_PRIORITY
@@ -88,14 +97,13 @@ class AudioTrackOutput(
             val r = ring ?: break
             val n = r.read(scratch, scratch.size / 2)
             if (n == 0) {
-                underruns++
                 Thread.sleep(2)
                 continue
             }
             try {
                 t.write(scratch, 0, n * 2, AudioTrack.WRITE_BLOCKING)
             } catch (t2: Throwable) {
-                if (running.get()) underruns++
+                if (running.get()) Log.e(TAG, "write failed", t2)
                 Thread.sleep(5)
             }
         }
@@ -107,6 +115,9 @@ class AudioTrackOutput(
     }
 
     fun resume() {
+        // Drop audio buffered before a pause so playback resumes at the
+        // current engine position instead of replaying stale frames.
+        runCatching { if (track?.playState == AudioTrack.PLAYSTATE_PAUSED) track?.flush() }
         runCatching { track?.play() }
         paused.set(false)
     }
@@ -123,5 +134,9 @@ class AudioTrackOutput(
         }
         track = null
         ring = null
+    }
+
+    private companion object {
+        const val TAG = "AudioTrackOutput"
     }
 }

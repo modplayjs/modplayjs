@@ -112,9 +112,21 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeLoad(JNIEnv* env, jobject, jlon
     if (!fnv.IsEmpty() && fnv->IsFunction()) {
         v8::Local<v8::Function> fn = fnv.As<v8::Function>();
         v8::Local<v8::Value> args[2] = { u8, nameStr };
-        fn->Call(ctx, fn, 2, args).ToLocalChecked();
+        v8::Local<v8::Value> result;
+        if (!fn->Call(ctx, fn, 2, args).ToLocal(&result)) {
+            // load() throws for unsupported/corrupt modules. Never
+            // ToLocalChecked() here: that aborts the whole process.
+            std::string message = try_catch.HasCaught()
+                ? to_string(e, try_catch.Exception())
+                : "module load failed";
+            LOGE("load: %s", message.c_str());
+            jclass ex = env->FindClass("java/lang/IllegalStateException");
+            if (ex) env->ThrowNew(ex, message.c_str());
+        }
+    } else {
+        jclass ex = env->FindClass("java/lang/IllegalStateException");
+        if (ex) env->ThrowNew(ex, "engine load() missing");
     }
-    if (try_catch.HasCaught()) LOGE("load: %s", to_string(e, try_catch.Exception()).c_str());
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -135,7 +147,10 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeCommand(JNIEnv* env, jobject, j
         if (fnv.As<v8::Function>()->Call(ctx, fnv, 1, args).ToLocal(&res)) out = to_string(e, res);
     }
     env->ReleaseStringUTFChars(json, c);
-    if (try_catch.HasCaught()) out = "{\"error\":\"command\"}";
+    if (try_catch.HasCaught()) {
+        LOGE("command: %s", to_string(e, try_catch.Exception()).c_str());
+        out = "{\"error\":\"command\"}";
+    }
     return env->NewStringUTF(out.c_str());
 }
 
@@ -152,8 +167,14 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeRender(JNIEnv* env, jobject, jl
     if (fnv.IsEmpty() || !fnv->IsFunction()) return env->NewFloatArray(0);
     v8::Local<v8::Value> args[1] = { v8::Integer::New(e->isolate, frames) };
     v8::Local<v8::Value> res;
-    if (!fnv.As<v8::Function>()->Call(ctx, fnv, 1, args).ToLocal(&res)) return env->NewFloatArray(0);
-    if (!res->IsFloat32Array()) return env->NewFloatArray(0);
+    if (!fnv.As<v8::Function>()->Call(ctx, fnv, 1, args).ToLocal(&res)) {
+        if (try_catch.HasCaught()) LOGE("render: %s", to_string(e, try_catch.Exception()).c_str());
+        return env->NewFloatArray(0);
+    }
+    if (!res->IsFloat32Array()) {
+        LOGE("render returned non-Float32Array");
+        return env->NewFloatArray(0);
+    }
     v8::Local<v8::Float32Array> arr = res.As<v8::Float32Array>();
     size_t len = arr->Length();
     auto store = arr->Buffer()->GetBackingStore();

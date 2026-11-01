@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -40,7 +41,13 @@ import com.bitti06.modplayjs.library.TrackEntity
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
-private val screens = listOf("home" to "Home", "search" to "Search", "library" to "Library")
+private val screens =
+    listOf(
+        "home" to "Home",
+        "search" to "Search",
+        "library" to "Library",
+        "player" to "Playing",
+    )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,7 +97,8 @@ private fun AppBody(
                                     when (key) {
                                         "home" -> Icons.Default.Home
                                         "search" -> Icons.Default.Search
-                                        else -> Icons.Default.LibraryMusic
+                                        "library" -> Icons.Default.LibraryMusic
+                                        else -> Icons.Default.MusicNote
                                     },
                                     contentDescription = label,
                                 )
@@ -495,6 +503,8 @@ private fun PlayerScreen(
     onBack: () -> Unit,
 ) {
     val track = snapshot?.track
+    val loading by vm.loading.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
     var channelDialog by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -502,8 +512,28 @@ private fun PlayerScreen(
             Text("Now Playing", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "settings") }
         }
+        if (error != null) {
+            Text(
+                error!!,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+            )
+        }
         if (track == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No track loaded") }
+            Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                val message =
+                    when {
+                        error != null -> error!!
+                        loading != null -> "Loading $loading…"
+                        else -> "No track loaded"
+                    }
+                Text(
+                    message,
+                    textAlign = TextAlign.Center,
+                    color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                )
+            }
             return
         }
         InfoPanel(track, Modifier.fillMaxWidth().height(300.dp))
@@ -951,6 +981,9 @@ private fun SettingsScreen(
 
         item { SectionTitle("Diagnostics") }
         item { Text("V8: ${if (vm.v8Available) "available" else "stub — build with -Pv8Lib"}") }
+        if (!vm.v8Available && vm.v8Error != null) {
+            item { Text(vm.v8Error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        }
         item { Text("Sample rate: ${vm.sampleRate} Hz · underruns: ${vm.underruns}") }
         item { Text("Build: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") }
         item { Text("modplayjs · BSD-3-Clause · V8 BSD-3-Clause", style = MaterialTheme.typography.labelSmall) }
