@@ -1,0 +1,2 @@
+-keep class com.bitti06.modplayjs.engine.V8Engine { *; }
+-keepclasseswithmembernames class * { native <methods>; }

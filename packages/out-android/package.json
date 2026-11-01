@@ -1,0 +1,15 @@
+{
+  "name": "@modplayjs/out-android",
+  "version": "0.2.1",
+  "description": "Headless Android/Tauri player session: settings, transport, capabilities, commands.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "license": "BSD-3-Clause"
+}

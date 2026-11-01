@@ -9,3 +9,6 @@ testfiles/
 out/
 testfiles2/
 main.zip
+
+# Android prebuilt V8
+/build/
