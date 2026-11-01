@@ -91,6 +91,7 @@
         <item quantity="one">%1$d channel</item>
         <item quantity="other">%1$d channels</item>
     </plurals>
+    <string name="pattern_row_label" translatable="false">#</string>
     <string name="pattern_empty_title">No pattern</string>
     <string name="pattern_empty_body">Start a tracker module to follow its pattern here.</string>
 
