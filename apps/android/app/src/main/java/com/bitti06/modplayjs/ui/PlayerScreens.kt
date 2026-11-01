@@ -288,8 +288,8 @@ fun PlayerScreen(
             val transport: @Composable (Modifier) -> Unit = { modifier ->
                 Column(modifier) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        FormatArt(track.format, 62.dp)
-                        Spacer(Modifier.width(14.dp))
+                        FormatArt(track.format, 52.dp)
+                        Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
                                 track.title.ifBlank { track.name },

@@ -134,7 +134,9 @@ fun FormatArt(
     ) {
         Text(
             format.uppercase().take(4),
-            style = if (size >= 56.dp) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelSmall,
+            // List rows (46 dp) keep the compact label; the player tile (52 dp)
+            // needs the larger one or the format code turns into a speck.
+            style = if (size >= 48.dp) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF0A0A12),
         )
