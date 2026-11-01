@@ -70,6 +70,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
@@ -90,6 +91,7 @@ fun PlayerScreen(
     onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
+    val current by vm.nowPlaying.collectAsStateWithLifecycle()
     val errorText = error?.let { stringResource(R.string.player_error, it.track, it.reason) }
     val snap = snapshot
     val track = snap?.track
@@ -122,6 +124,24 @@ fun PlayerScreen(
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                 )
+                val favorite = current?.favoriteAt != null
+                if (current != null) {
+                    IconButton(onClick = { vm.toggleFavorite(current) }) {
+                        Icon(
+                            if (favorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                            contentDescription =
+                                stringResource(
+                                    if (favorite) R.string.cd_remove_favorite else R.string.cd_add_favorite,
+                                ),
+                            tint =
+                                if (favorite) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                        )
+                    }
+                }
                 IconButton(onClick = onOpenSettings) {
                     Icon(AppIcons.Settings, contentDescription = stringResource(R.string.common_settings))
                 }
@@ -653,7 +673,10 @@ fun DetailsScreen(
             item { SectionTitle(stringResource(R.string.details_orders)) }
             item {
                 Text(
-                    track.orderList.joinToString(" ") { it.toString().padStart(2, '0') },
+                    // "position:pattern", the same pairing the web player lists.
+                    track.orderList.withIndex().joinToString(" ") { (index, pattern) ->
+                        index.toString().padStart(2, '0') + ":" + pattern.toString().padStart(2, '0')
+                    },
                     fontFamily = FontFamily.Monospace,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,

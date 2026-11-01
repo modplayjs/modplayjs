@@ -88,6 +88,15 @@ class AppViewModel(
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /**
+     * The library row for whatever the queue says is current, so screens can
+     * show its favorite state without guessing by file name.
+     */
+    val nowPlaying: StateFlow<TrackEntity?> =
+        combine(allTracks, queue, queueIndex) { all, items, index ->
+            items.getOrNull(index)?.id?.let { id -> all.firstOrNull { it.id == id } }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     /** Favorited tracks, newest favorite first. Ignored tracks are excluded. */
     val favorites: StateFlow<List<TrackEntity>> =
         allTracks
