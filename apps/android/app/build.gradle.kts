@@ -74,6 +74,10 @@ android {
             }
         }
     }
+    // Uncompressed, page-aligned libs straight from the APK: nothing is
+    // extracted into writable storage (Android 17 native DCL) and the 16 KB
+    // alignment survives. AGP writes android:extractNativeLibs="false" from
+    // this flag, which is why the attribute must not be in the manifest.
     packaging { jniLibs { useLegacyPackaging = false } }
 }
 

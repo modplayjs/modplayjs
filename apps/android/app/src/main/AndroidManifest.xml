@@ -33,7 +33,6 @@
     <application
         android:name=".ModplayApp"
         android:allowBackup="true"
-        android:extractNativeLibs="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
