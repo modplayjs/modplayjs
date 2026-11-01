@@ -57,6 +57,7 @@ import com.bitti06.modplayjs.ui.icons.AppIcons
  * Keeps screen content clear of the status bar and cutouts while letting the
  * screen's own background paint behind them.
  */
+@Composable
 fun Modifier.safeContentPadding(): Modifier =
     windowInsetsPadding(
         WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
