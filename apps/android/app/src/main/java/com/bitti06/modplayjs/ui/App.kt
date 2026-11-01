@@ -454,12 +454,29 @@ private fun MiniPlayer(
                     )
                 }
             }
-            LinearWavyProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
-                color = accent,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            )
+            // The system media card leaves the timestamps out until the thumb
+            // is dragged, so the app's own surfaces show them.
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    formatTime(snap.state.positionMs.toLong()),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LinearWavyProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    color = accent,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
+                Text(
+                    if (duration > 0) formatTime(duration.toLong()) else "∞",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
