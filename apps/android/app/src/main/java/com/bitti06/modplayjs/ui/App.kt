@@ -181,6 +181,7 @@ private fun AppRoot(vm: AppViewModel) {
                         )
                 }
             }
+        }
         if (modals.isNotEmpty()) {
             BackHandler { close() }
             ModalHost(

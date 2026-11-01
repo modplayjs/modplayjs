@@ -180,7 +180,7 @@ fun PlayerScreen(
             ChannelStrip(snapshot, vm)
         }
     }
-    if (channelDialog) {
+    if (channelDialog && snapshot != null) {
         ChannelDialog(snapshot, vm) { channelDialog = false }
     }
 }

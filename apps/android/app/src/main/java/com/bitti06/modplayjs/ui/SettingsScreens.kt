@@ -329,8 +329,9 @@ fun DiagnosticsScreen(
     SettingsPage("Diagnostics", onBack) {
         SectionTitle("Engine")
         InfoRow("V8", if (vm.v8Available) "available" else "stub")
-        if (!vm.v8Available && vm.v8Error != null) {
-            Text(vm.v8Error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        val v8Error = vm.v8Error
+        if (!vm.v8Available && v8Error != null) {
+            Text(v8Error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
         InfoRow("Output rate", "${vm.sampleRate} Hz")
         InfoRow("Audio session", vm.audioSessionId.toString())
