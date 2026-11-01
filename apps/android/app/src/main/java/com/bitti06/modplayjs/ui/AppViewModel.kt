@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.bitti06.modplayjs.AppGraph
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
+import com.bitti06.modplayjs.engine.AudioOutputInfo
 import com.bitti06.modplayjs.engine.PlayError
 import com.bitti06.modplayjs.engine.PlaybackSession
 import com.bitti06.modplayjs.engine.QueueItem
@@ -63,6 +64,7 @@ class AppViewModel(
     val underruns: Int get() = session.underruns
     val sampleRate: Int get() = session.sampleRate
     val audioSessionId: Int get() = session.audioSessionId
+    val audioInfo: AudioOutputInfo get() = session.audioInfo
 
     private val allTracks = repo.tracks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

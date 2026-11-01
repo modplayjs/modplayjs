@@ -44,6 +44,35 @@ class AudioTrackOutput(
     val audioSessionId: Int
         get() = runCatching { track?.audioSessionId ?: 0 }.getOrDefault(0)
 
+    /** Frames per buffer the device asks apps to use, from AudioManager. */
+    val deviceFramesPerBuffer: Int =
+        audioManager
+            ?.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
+            ?.toIntOrNull()
+            ?: 0
+
+    /**
+     * Everything the diagnostics screen reports about the open AudioTrack.
+     * Read on demand; the values change only when the track is rebuilt.
+     */
+    val info: AudioOutputInfo
+        get() {
+            val t = track
+            return AudioOutputInfo(
+                sampleRate = sampleRate,
+                bufferFrames = runCatching { t?.bufferSizeInFrames ?: 0 }.getOrDefault(0),
+                capacityFrames = runCatching { t?.bufferCapacityInFrames ?: 0 }.getOrDefault(0),
+                playState =
+                    when (runCatching { t?.playState }.getOrNull()) {
+                        AudioTrack.PLAYSTATE_PLAYING -> OutputPlayState.PLAYING
+                        AudioTrack.PLAYSTATE_PAUSED -> OutputPlayState.PAUSED
+                        else -> OutputPlayState.STOPPED
+                    },
+                deviceFramesPerBuffer = deviceFramesPerBuffer,
+                lowLatencyRequested = true,
+            )
+        }
+
     fun start(ring: PcmRing) {
         if (running.get()) return
         this.ring = ring
@@ -128,3 +157,22 @@ class AudioTrackOutput(
         const val TAG = "AudioTrackOutput"
     }
 }
+
+enum class OutputPlayState {
+    STOPPED,
+    PAUSED,
+    PLAYING,
+}
+
+/**
+ * Diagnostics for the audio path: the AudioTrack that plays the engine's
+ * float32 stereo output, and what the device reports about it.
+ */
+data class AudioOutputInfo(
+    val sampleRate: Int = 0,
+    val bufferFrames: Int = 0,
+    val capacityFrames: Int = 0,
+    val playState: OutputPlayState = OutputPlayState.STOPPED,
+    val deviceFramesPerBuffer: Int = 0,
+    val lowLatencyRequested: Boolean = false,
+)

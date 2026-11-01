@@ -150,7 +150,7 @@ private fun AppRoot(vm: AppViewModel) {
                     onBack = back,
                 )
             }
-            entry<DiagnosticsKey> { DiagnosticsScreen(vm = vm, onBack = back) }
+            entry<DiagnosticsKey> { DiagnosticsScreen(snapshot = snapshot, vm = vm, onBack = back) }
             entry<AboutKey> {
                 AboutScreen(
                     sampleRate = vm.sampleRate,

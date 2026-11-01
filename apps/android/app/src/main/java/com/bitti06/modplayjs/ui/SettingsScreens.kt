@@ -35,9 +35,12 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
+import kotlin.math.roundToInt
 import com.bitti06.modplayjs.BuildConfig
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidCapabilities
+import com.bitti06.modplayjs.engine.AndroidSnapshot
+import com.bitti06.modplayjs.engine.OutputPlayState
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.library.FolderEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
@@ -377,9 +380,19 @@ fun LibrarySettingsScreen(
 
 @Composable
 fun DiagnosticsScreen(
+    snapshot: AndroidSnapshot?,
     vm: AppViewModel,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val effectsPanel = remember { hasSystemAudioEffects(context) }
+    val audio = vm.audioInfo
+    val bufferMs =
+        if (audio.sampleRate > 0 && audio.bufferFrames > 0) {
+            (audio.bufferFrames * 1000.0 / audio.sampleRate).roundToInt()
+        } else {
+            0
+        }
     SettingsPage(stringResource(R.string.settings_diagnostics), onBack) {
         SectionTitle(stringResource(R.string.engine))
         InfoRow(
@@ -393,6 +406,65 @@ fun DiagnosticsScreen(
         InfoRow(stringResource(R.string.output_rate), "${vm.sampleRate} Hz")
         InfoRow(stringResource(R.string.audio_session), vm.audioSessionId.toString())
         InfoRow(stringResource(R.string.underruns), vm.underruns.toString())
+
+        // What the samples actually travel through, from the engine's float32
+        // ring to the AudioTrack the platform mixes.
+        SectionTitle(stringResource(R.string.diag_audio))
+        InfoRow(stringResource(R.string.diag_output_api), stringResource(R.string.diag_output_api_value))
+        InfoRow(
+            stringResource(R.string.diag_performance),
+            stringResource(
+                if (audio.lowLatencyRequested) {
+                    R.string.diag_performance_low_latency
+                } else {
+                    R.string.diag_performance_default
+                },
+            ),
+        )
+        InfoRow(stringResource(R.string.diag_channels), stringResource(R.string.diag_channels_stereo))
+        InfoRow(
+            stringResource(R.string.diag_buffer),
+            stringResource(R.string.diag_buffer_value, audio.bufferFrames, audio.capacityFrames),
+        )
+        if (bufferMs > 0) {
+            InfoRow(stringResource(R.string.diag_buffer_time), stringResource(R.string.diag_ms_value, bufferMs))
+        }
+        InfoRow(
+            stringResource(R.string.diag_play_state),
+            stringResource(
+                when (audio.playState) {
+                    OutputPlayState.PLAYING -> R.string.play_state_playing
+                    OutputPlayState.PAUSED -> R.string.play_state_paused
+                    OutputPlayState.STOPPED -> R.string.play_state_stopped
+                },
+            ),
+        )
+
+        SectionTitle(stringResource(R.string.diag_device))
+        InfoRow(stringResource(R.string.diag_frames_per_buffer), audio.deviceFramesPerBuffer.toString())
+        InfoRow(
+            stringResource(R.string.diag_effects_panel),
+            stringResource(
+                if (effectsPanel) R.string.diag_effects_yes else R.string.diag_effects_no,
+            ),
+        )
+
+        SectionTitle(stringResource(R.string.diag_capabilities))
+        val capabilities = snapshot?.capabilities
+        if (capabilities == null) {
+            Text(
+                stringResource(R.string.diag_caps_none),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Text(
+                capabilitySummary(capabilities),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+
         SectionTitle(stringResource(R.string.build))
         InfoRow(
             stringResource(R.string.version),
@@ -400,6 +472,33 @@ fun DiagnosticsScreen(
         )
         InfoRow(stringResource(R.string.commit), BuildConfig.GIT_COMMIT)
         InfoRow(stringResource(R.string.variant), BuildConfig.BUILD_TYPE)
+    }
+}
+
+/** Capabilities the engine reports for the loaded track, as a readable list. */
+@Composable
+private fun capabilitySummary(capabilities: AndroidCapabilities): String {
+    val flags =
+        listOf(
+            capabilities.seekable to R.string.cap_seekable,
+            capabilities.channelMute to R.string.cap_channel_mute,
+            capabilities.mixer to R.string.cap_mixer,
+            capabilities.mixerMode to R.string.cap_mixer_mode,
+            capabilities.amigaFilter to R.string.cap_amiga_filter,
+            capabilities.panSeparation to R.string.cap_pan_separation,
+            capabilities.sid to R.string.cap_sid,
+            capabilities.sidPanel to R.string.cap_sid_panel,
+            capabilities.sidStereo to R.string.cap_sid_stereo,
+            capabilities.patternView to R.string.cap_pattern_view,
+            capabilities.endless to R.string.cap_endless,
+            capabilities.streamed to R.string.cap_streamed,
+            capabilities.audition to R.string.cap_audition,
+        )
+    val enabled = flags.filter { it.first }.map { stringResource(it.second) }
+    return if (enabled.isEmpty()) {
+        stringResource(R.string.diag_caps_empty)
+    } else {
+        enabled.joinToString(" · ")
     }
 }
 

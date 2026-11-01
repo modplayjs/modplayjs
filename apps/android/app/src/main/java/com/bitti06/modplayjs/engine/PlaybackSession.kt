@@ -80,6 +80,9 @@ class PlaybackSession(
     val underruns: Int get() = audio.underruns
     val audioSessionId: Int get() = audio.audioSessionId
 
+    /** Audio stack details for the diagnostics screen. */
+    val audioInfo: AudioOutputInfo get() = audio.info
+
     init {
         audio.start(ring)
         audio.pause()
