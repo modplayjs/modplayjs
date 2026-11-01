@@ -33,10 +33,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,6 +82,16 @@ private fun AppRoot(vm: AppViewModel) {
     val filters by vm.filters.collectAsStateWithLifecycle()
     val loading by vm.loading.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
+    val awaitingStart by vm.awaitingStart.collectAsStateWithLifecycle()
+
+    // A loaded track stays silent until this screen has composed and drawn it
+    // once, so the player is never behind the sound.
+    LaunchedEffect(awaitingStart) {
+        if (awaitingStart == 0) return@LaunchedEffect
+        withFrameNanos { }
+        withFrameNanos { }
+        vm.startOutputAfterUi()
+    }
 
     var tabName by rememberSaveable { mutableStateOf(Tab.Library.name) }
     val tab = Tab.entries.firstOrNull { it.name == tabName } ?: Tab.Library

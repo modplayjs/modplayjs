@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,6 +66,15 @@ class PlaybackSession(
     @Volatile private var lastSnapshotAt = 0L
     private val running = AtomicBoolean(true)
     private val playGeneration = AtomicInteger(0)
+
+    /**
+     * A freshly loaded track waits here until the now-playing screen has drawn
+     * it, so the UI is not a second behind the sound. Incremented every time a
+     * track is loaded and waiting, which the UI observes to release it.
+     */
+    private val awaitingOutput = MutableStateFlow(0)
+    val awaitingStart: StateFlow<Int> = awaitingOutput.asStateFlow()
+    private val outputPending = AtomicBoolean(false)
 
     val v8Available: Boolean get() = v8.available
     val v8Error: String? get() = v8.initError
@@ -146,13 +156,23 @@ class PlaybackSession(
                         ?: throw IllegalStateException("engine did not report a loaded track")
                 if (playGeneration.get() != generation) return@launch
                 currentItem = item
-                primeOutput()
                 playing = true
                 paused = false
-                audio.resume()
-                Log.i(TAG, "playing ${loaded.name} (${loaded.format})")
+                // The engine renders into the ring and stalls once it is full;
+                // the AudioTrack stays paused until the UI says it has drawn
+                // this track, so sound and screen start together.
+                outputPending.set(true)
+                awaitingOutput.value += 1
+                // Media buttons and the notification can start playback while
+                // no activity is composed; never leave it silent forever.
+                scope.launch {
+                    delay(UI_START_TIMEOUT_MS)
+                    startOutputAfterUi()
+                }
+                Log.i(TAG, "loaded ${loaded.name} (${loaded.format}), waiting for the ui")
             } catch (t: Throwable) {
                 if (playGeneration.get() == generation) {
+                    cancelPendingOutput()
                     playing = false
                     paused = true
                     audio.pause()
@@ -165,11 +185,31 @@ class PlaybackSession(
             }
         }
 
+    /**
+     * Starts the pending AudioTrack once the player screen has drawn the
+     * loaded track. Safe to call when nothing is pending.
+     */
+    fun startOutputAfterUi() {
+        if (!outputPending.compareAndSet(true, false)) return
+        scope.launch {
+            if (!playing || paused) return@launch
+            primeOutput()
+            if (!playing || paused) return@launch
+            audio.resume()
+            Log.i(TAG, "output started")
+        }
+    }
+
+    private fun cancelPendingOutput() {
+        outputPending.set(false)
+    }
+
     fun play() {
         if (currentItem == null || _snapshot.value?.track == null) {
             playIndex(_queueIndex.value)
             return
         }
+        cancelPendingOutput()
         send(buildJsonObject { put("type", "play") }.toString())
         if (paused || !playing) primeOutput()
         paused = false
@@ -178,6 +218,7 @@ class PlaybackSession(
     }
 
     fun pause() {
+        cancelPendingOutput()
         paused = true
         send(buildJsonObject { put("type", "pause") }.toString())
         audio.pause()
@@ -191,6 +232,7 @@ class PlaybackSession(
             playIndex(_queueIndex.value)
             return
         }
+        cancelPendingOutput()
         send(buildJsonObject { put("type", "resume") }.toString())
         primeOutput()
         paused = false
@@ -199,6 +241,7 @@ class PlaybackSession(
     }
 
     fun stop() {
+        cancelPendingOutput()
         playing = false
         paused = true
         send(buildJsonObject { put("type", "stop") }.toString())
@@ -411,5 +454,8 @@ class PlaybackSession(
     companion object {
         private const val TAG = "PlaybackSession"
         private const val FRAMES = 1024
+
+        /** Give the UI time to draw before falling back to an immediate start. */
+        private const val UI_START_TIMEOUT_MS = 2_000L
     }
 }

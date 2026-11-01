@@ -50,6 +50,9 @@ class AppViewModel(
     val queueIndex: StateFlow<Int> = session.queueIndex
     val loading: StateFlow<String?> = session.loading
     val error: StateFlow<String?> = session.error
+
+    /** Bumped when a loaded track is waiting for the player screen to draw. */
+    val awaitingStart: StateFlow<Int> = session.awaitingStart
     val folders: StateFlow<List<FolderEntity>> = repo.folders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val ignored: StateFlow<List<TrackEntity>> = repo.ignored.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val v8Available: Boolean get() = session.v8Available
@@ -134,6 +137,9 @@ class AppViewModel(
         session.playIndex(start)
         viewModelScope.launch { repo.markPlayed(items[start]) }
     }
+
+    /** Releases the audio output once the now-playing screen has been drawn. */
+    fun startOutputAfterUi() = session.startOutputAfterUi()
 
     fun playQueue(index: Int) {
         PlaybackService.start(context)
