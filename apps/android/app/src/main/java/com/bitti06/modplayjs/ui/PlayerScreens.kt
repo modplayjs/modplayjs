@@ -244,7 +244,17 @@ fun PlayerScreen(
                                 Modifier.weight(1f),
                                 MaterialTheme.colorScheme.tertiary,
                             ) {
-                                Text(message.replace("\r", ""), style = MaterialTheme.typography.bodySmall)
+                                // Module messages are fixed-width ASCII: the
+                                // web player renders them in a monospaced,
+                                // centred <pre> and the creator's columns only
+                                // line up the same way here.
+                                Text(
+                                    message.replace("\r", ""),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
                             }
                         }
                         if (instruments.isNotEmpty()) {
@@ -795,8 +805,9 @@ fun DetailsScreen(
             item { SectionTitle(stringResource(R.string.details_message)) }
             item {
                 Text(
-                    track.message ?: stringResource(R.string.details_no_message),
+                    track.message?.replace("\r", "") ?: stringResource(R.string.details_no_message),
                     style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
