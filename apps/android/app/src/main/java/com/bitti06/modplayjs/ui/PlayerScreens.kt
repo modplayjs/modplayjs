@@ -525,11 +525,17 @@ private fun sampleLine(
 ): String {
     val trimmed = name.trim()
     return if (trimmed.isEmpty()) {
-        stringResource(
-            if (loop) R.string.sample_line_unnamed_loop else R.string.sample_line_unnamed,
-            number,
-            length,
-        )
+        // An empty slot has neither a name nor audio; the length would only
+        // print a meaningless "0" for every unused sample.
+        if (length <= 0) {
+            "$number."
+        } else {
+            stringResource(
+                if (loop) R.string.sample_line_unnamed_loop else R.string.sample_line_unnamed,
+                number,
+                length,
+            )
+        }
     } else {
         stringResource(
             if (loop) R.string.sample_line_loop else R.string.sample_line,
