@@ -230,9 +230,6 @@ fun MixerSettingsContent(
         settings.mixer.amigaFilter,
         enabled = capabilities?.amigaFilter != false,
     ) { value -> actions.updateSettings { it.copy(mixer = it.mixer.copy(amigaFilter = value)) } }
-    SliderRow(stringResource(R.string.amplify), settings.mixer.amplify.toFloat(), 1f..32f) { value ->
-        actions.updateSettings { it.copy(mixer = it.mixer.copy(amplify = value.toInt())) }
-    }
 }
 
 @Composable

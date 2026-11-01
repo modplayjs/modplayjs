@@ -215,7 +215,6 @@
     <string name="a500_filter">A500-Filter</string>
     <string name="a500_off">LED aus</string>
     <string name="a500_on">LED an</string>
-    <string name="amplify">Verstärkung</string>
     <string name="sid_note">Einstellungen für SID-Tunes; sie beeinflussen Tracker-Module und gestreamtes Audio nicht.</string>
     <string name="sid_chip">Chip</string>
     <string name="sid_video">Video</string>

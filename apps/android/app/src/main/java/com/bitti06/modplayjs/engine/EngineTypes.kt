@@ -25,7 +25,6 @@ data class MixerSettings(
     val mode: String = "libxmp",
     val layout: String = "panned",
     val amigaFilter: String = "a500",
-    val amplify: Int = 1,
 )
 
 @Serializable
