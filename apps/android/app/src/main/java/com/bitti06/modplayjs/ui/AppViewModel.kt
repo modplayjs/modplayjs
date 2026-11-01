@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.viewModelScope
 import com.bitti06.modplayjs.AppGraph
+import com.bitti06.modplayjs.engine.AndroidPattern
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.engine.AudioOutputInfo
@@ -175,6 +176,11 @@ class AppViewModel(
         session.playIndex(start)
         viewModelScope.launch { repo.markPlayed(items[start]) }
     }
+
+    /** Pattern cells for an order position, for the pattern screen. */
+    suspend fun pattern(orderIndex: Int): AndroidPattern? = session.pattern(orderIndex)
+
+    fun patternViewActive(active: Boolean) = session.setPatternViewActive(active)
 
     /** Releases the audio output once the now-playing screen has been drawn. */
     fun startOutputAfterUi() = session.startOutputAfterUi()

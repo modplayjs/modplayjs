@@ -387,6 +387,56 @@ object AppIcons {
             return _home!!
         }
 
+    val Grid: ImageVector
+        get() {
+            if (_grid != null) {
+                return _grid!!
+            }
+            _grid = materialIcon(name = "Filled.ViewModule") {
+                materialPath {
+                    moveTo(4.0f, 11.0f)
+                    horizontalLineToRelative(5.0f)
+                    verticalLineTo(5.0f)
+                    horizontalLineTo(4.0f)
+                    verticalLineToRelative(6.0f)
+                    close()
+                    moveTo(4.0f, 18.0f)
+                    horizontalLineToRelative(5.0f)
+                    verticalLineToRelative(-6.0f)
+                    horizontalLineTo(4.0f)
+                    verticalLineToRelative(6.0f)
+                    close()
+                    moveTo(10.0f, 18.0f)
+                    horizontalLineToRelative(5.0f)
+                    verticalLineToRelative(-6.0f)
+                    horizontalLineToRelative(-5.0f)
+                    verticalLineToRelative(6.0f)
+                    close()
+                    moveTo(16.0f, 18.0f)
+                    horizontalLineToRelative(5.0f)
+                    verticalLineToRelative(-6.0f)
+                    horizontalLineToRelative(-5.0f)
+                    verticalLineToRelative(6.0f)
+                    close()
+                    moveTo(10.0f, 11.0f)
+                    horizontalLineToRelative(5.0f)
+                    verticalLineTo(5.0f)
+                    horizontalLineToRelative(-5.0f)
+                    verticalLineToRelative(6.0f)
+                    close()
+                    moveTo(16.0f, 5.0f)
+                    verticalLineToRelative(6.0f)
+                    horizontalLineToRelative(5.0f)
+                    verticalLineTo(5.0f)
+                    horizontalLineToRelative(-5.0f)
+                    close()
+                }
+            }
+            return _grid!!
+        }
+
+    private var _grid: ImageVector? = null
+
     private var _home: ImageVector? = null
 
     val Info: ImageVector

@@ -95,6 +95,7 @@ fun PlayerScreen(
     onOpenText: (TrackText) -> Unit,
     onOpenFolder: (TrackEntity?) -> Unit,
     onOpenAudio: () -> Unit,
+    onOpenPattern: () -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -153,6 +154,9 @@ fun PlayerScreen(
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                 )
+                IconButton(onClick = onOpenPattern) {
+                    Icon(AppIcons.Grid, contentDescription = stringResource(R.string.cd_pattern))
+                }
                 // A delegated property cannot be smart cast; read it once.
                 val favoriteTrack = currentTrack
                 if (favoriteTrack != null) {
@@ -869,6 +873,7 @@ private fun PlayerContentPreview(snapshot: AndroidSnapshot?) {
         onOpenText = {},
         onOpenFolder = {},
         onOpenAudio = {},
+        onOpenPattern = {},
         onBrowseLibrary = {},
         onOpenSettings = {},
     )

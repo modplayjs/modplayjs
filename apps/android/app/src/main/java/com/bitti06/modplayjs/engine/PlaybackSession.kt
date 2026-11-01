@@ -6,6 +6,7 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,6 +68,7 @@ class PlaybackSession(
     @Volatile private var currentSettings = AndroidSettings()
 
     @Volatile private var currentItem: QueueItem? = null
+    @Volatile private var patternViewActive = false
 
     @Volatile private var playing = false
 
@@ -125,6 +127,36 @@ class PlaybackSession(
             }.toString(),
         )
         applyDeviceSampleRate()
+    }
+
+    /**
+     * Fetches the pattern at [orderIndex]. Called from a coroutine, never from
+     * the UI thread: the V8 call queues behind the render tasks and waits.
+     */
+    suspend fun pattern(orderIndex: Int): AndroidPattern? =
+        withContext(Dispatchers.IO) {
+            if (engine?.available != true) return@withContext null
+            val json =
+                runCatching {
+                    v8Exec
+                        .submit<String> {
+                            engine?.command(
+                                buildJsonObject {
+                                    put("type", "getPattern")
+                                    put("pattern", orderIndex)
+                                }.toString(),
+                            )
+                        }.get(5, TimeUnit.SECONDS)
+                }.getOrNull() ?: return@withContext null
+            runCatching { EngineJson.decodeFromString<AndroidPattern>(json) }.getOrNull()
+        }
+
+    /**
+     * The pattern screen follows the playhead, so the snapshot has to arrive
+     * faster than four times a second while it is open.
+     */
+    fun setPatternViewActive(active: Boolean) {
+        patternViewActive = active
     }
 
     fun setQueue(
@@ -425,10 +457,11 @@ class PlaybackSession(
         }
     }
 
-    /** Snapshot for the UI, at most four times a second, off the render thread. */
+    /** Snapshot for the UI, throttled, off the render thread. */
     private fun refreshThrottled() {
         val now = System.currentTimeMillis()
-        if (now - lastSnapshotAt <= 250) return
+        val interval = if (patternViewActive) FAST_REFRESH_MS else SNAPSHOT_MS
+        if (now - lastSnapshotAt <= interval) return
         lastSnapshotAt = now
         scope.launch { refresh() }
     }
@@ -473,6 +506,10 @@ class PlaybackSession(
 
         /** Longest the render thread waits for ring space before rechecking. */
         private const val RING_WAIT_MS = 20L
+
+        /** Snapshot interval, and the shorter one used while the pattern view is open. */
+        private const val SNAPSHOT_MS = 250L
+        private const val FAST_REFRESH_MS = 60L
 
         /** Nothing is rendering: only the throttled snapshot refresh matters. */
         private const val IDLE_SLEEP_MS = 20L

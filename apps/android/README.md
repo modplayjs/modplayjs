@@ -105,6 +105,10 @@ debug APK, and verifies 16 KB ELF segment alignment.
   opens the folder list instead.
 - The transport row carries the repeat toggle (off / all / one); the queue,
   which is the list playback started from, is listed from Track details.
+- The header opens a realtime pattern view: rows x channels of tracker text
+  ("C-4 01 40 A0F"), the playing row highlighted and followed, columns scrolling
+  sideways. The engine answers it on demand; the snapshot speeds up to 16 Hz
+  while it is open so the playhead keeps up, and landscape hides the system bars.
 - Media3 `MediaSessionService` owns the notification, lock-screen and media
   buttons. It is shown a 64-item window around the current track rather than the
   whole queue, which can be thousands of items: every playlist change is mapped
@@ -124,8 +128,9 @@ debug APK, and verifies 16 KB ELF segment alignment.
   the modal stack, Room 3 (`androidx.room3`) with destructive schema changes.
 - No iOS/desktop support, no WASM, no prerender, no WebView. The UI is native
   Compose; the JS core runs headless in V8.
-- `ViewSettings` still carries `patternView`, `artwork`, `follow` and
-  `visualizer` flags; the Android UI does not surface them yet.
+- `ViewSettings` still carries `patternView`, `artwork` and `visualizer` flags;
+  the Android UI does not surface them yet. `follow` drives the pattern view's
+  auto-scroll.
 - Android 17 hardening: edge-to-edge with system bar icons following the in-app
   theme, `useLegacyPackaging = false` so `libmodplay_v8.so` is mapped read-only
   from the APK, and 16 KB page alignment for the native library.

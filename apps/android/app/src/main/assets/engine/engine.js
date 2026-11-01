@@ -67717,6 +67717,42 @@
       }
     }
   }
+  var NOTE_NAMES = ["C-", "C#", "D-", "D#", "E-", "F-", "F#", "G-", "G#", "A-", "A#", "B-"];
+  var FX_LETTERS = "0123456789ABCDEFHIJKLMNOPQRSTUVWXWZ";
+  function noteText(note) {
+    if (note <= 0 || note > 120) return "...";
+    const n = note - 1;
+    return NOTE_NAMES[n % 12] + String(Math.floor(n / 12));
+  }
+  function fxText(fxt, fxp) {
+    if (!fxt && !fxp) return "...";
+    const letter = fxt >= 0 && fxt < FX_LETTERS.length ? FX_LETTERS[fxt] : "?";
+    return letter + (fxp & 255).toString(16).toUpperCase().padStart(2, "0");
+  }
+  function cellText(event) {
+    const note = event && event.note ? noteText(event.note) : "...";
+    const ins = event && event.ins ? String(event.ins).padStart(2, " ") : "..";
+    const vol = event && event.vol ? String(Math.min(event.vol, 99)).padStart(2, " ") : "..";
+    const fx2 = event && (event.fxt || event.fxp) ? fxText(event.fxt, event.fxp) : "...";
+    return `${note} ${ins} ${vol} ${fx2}`;
+  }
+  function patternObject(order) {
+    const mod = core.module;
+    const empty = { pattern: order, rows: 0, channels: 0, cells: [] };
+    if (!mod) return empty;
+    const orderIndex = order >= 0 ? order : core.playState.ord;
+    const patIndex = mod.xxo[orderIndex] ?? orderIndex;
+    const pat = mod.patterns[patIndex];
+    if (!pat) return empty;
+    const channels = mod.chn;
+    const cells = new Array(pat.rows * channels);
+    for (let row = 0; row < pat.rows; row++) {
+      for (let ch = 0; ch < channels; ch++) {
+        cells[row * channels + ch] = cellText(pat.tracks[ch]?.event?.[row]);
+      }
+    }
+    return { pattern: orderIndex, rows: pat.rows, channels, cells };
+  }
   function command(json) {
     let c;
     try {
@@ -67727,6 +67763,8 @@
     const n = (v) => typeof v === "number" ? v : 0;
     const s = (v) => typeof v === "string" ? v : "";
     switch (c.type) {
+      case "getPattern":
+        return JSON.stringify(patternObject(typeof c.pattern === "number" ? c.pattern : -1));
       case "play":
         play();
         break;

@@ -155,6 +155,19 @@ data class AndroidTrack(
     val artwork: ArtworkInfo? = null,
 )
 
+/**
+ * One pattern as preformatted tracker cells ("C-4 01 40 A0F"), fetched on
+ * demand: rows x channels strings is far more than the snapshot carries.
+ */
+@Serializable
+data class AndroidPattern(
+    val pattern: Int = 0,
+    val rows: Int = 0,
+    val channels: Int = 0,
+    /** Row-major: index = row * channels + channel. */
+    val cells: List<String> = emptyList(),
+)
+
 @Serializable
 data class AndroidState(
     val playing: Boolean = false,

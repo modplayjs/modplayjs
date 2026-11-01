@@ -46,6 +46,7 @@ import {
   type AndroidCapabilities,
   type AndroidChannel,
   type AndroidCommand,
+  type AndroidPattern,
   type AndroidSettings,
   type AndroidSnapshot,
   type AndroidState,
@@ -496,6 +497,54 @@ function auditionSample(sampleId: number, note = 60, volume = 64): void {
   }
 }
 
+const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+const FX_LETTERS = '0123456789ABCDEFHIJKLMNOPQRSTUVWXWZ';
+
+function noteText(note: number): string {
+  if (note <= 0 || note > 120) return '...';
+  const n = note - 1;
+  return NOTE_NAMES[n % 12] + String(Math.floor(n / 12));
+}
+
+function fxText(fxt: number, fxp: number): string {
+  if (!fxt && !fxp) return '...';
+  const letter = fxt >= 0 && fxt < FX_LETTERS.length ? FX_LETTERS[fxt] : '?';
+  return letter + (fxp & 0xff).toString(16).toUpperCase().padStart(2, '0');
+}
+
+/** One cell as fixed-width tracker text: note, instrument, volume, effect. */
+function cellText(
+  event: { note: number; ins: number; vol: number; fxt: number; fxp: number } | undefined,
+): string {
+  const note = event && event.note ? noteText(event.note) : '...';
+  const ins = event && event.ins ? String(event.ins).padStart(2, ' ') : '..';
+  const vol = event && event.vol ? String(Math.min(event.vol, 99)).padStart(2, ' ') : '..';
+  const fx = event && (event.fxt || event.fxp) ? fxText(event.fxt, event.fxp) : '...';
+  return `${note} ${ins} ${vol} ${fx}`;
+}
+
+/**
+ * The pattern at an order position, as preformatted cells. Fetched on demand:
+ * rows x channels strings is far too much for the 4 Hz snapshot.
+ */
+function patternObject(order: number): AndroidPattern {
+  const mod = core.module;
+  const empty: AndroidPattern = { pattern: order, rows: 0, channels: 0, cells: [] };
+  if (!mod) return empty;
+  const orderIndex = order >= 0 ? order : core.playState.ord;
+  const patIndex = mod.xxo[orderIndex] ?? orderIndex;
+  const pat = mod.patterns[patIndex];
+  if (!pat) return empty;
+  const channels = mod.chn;
+  const cells: string[] = new Array(pat.rows * channels);
+  for (let row = 0; row < pat.rows; row++) {
+    for (let ch = 0; ch < channels; ch++) {
+      cells[row * channels + ch] = cellText(pat.tracks[ch]?.event?.[row]);
+    }
+  }
+  return { pattern: orderIndex, rows: pat.rows, channels, cells };
+}
+
 function command(json: string): string {
   let c: AndroidCommand;
   try {
@@ -506,6 +555,8 @@ function command(json: string): string {
   const n = (v: unknown): number => (typeof v === 'number' ? v : 0);
   const s = (v: unknown): string => (typeof v === 'string' ? v : '');
   switch (c.type) {
+    case 'getPattern':
+      return JSON.stringify(patternObject(typeof c.pattern === 'number' ? c.pattern : -1));
     case 'play':
       play();
       break;

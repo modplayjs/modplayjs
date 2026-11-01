@@ -59,3 +59,6 @@ data class TextKey(
 @Serializable
 data object IgnoredKey : NavKey
 
+@Serializable
+data object PatternKey : NavKey
+

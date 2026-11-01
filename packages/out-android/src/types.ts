@@ -128,6 +128,19 @@ export interface AndroidSnapshot {
   soloChannel: number | null;
 }
 
+/**
+ * One pattern, fetched on demand rather than with every snapshot: rows times
+ * channels cells of preformatted tracker text ("C-4 01 40 A0F").
+ */
+export interface AndroidPattern {
+  /** Order position the view asked for. */
+  pattern: number;
+  rows: number;
+  channels: number;
+  /** Row-major: index = row * channels + channel. */
+  cells: string[];
+}
+
 export interface AndroidCommand {
   type:
     | 'play'
@@ -176,6 +189,7 @@ export interface AndroidCommand {
     | 'setVisualizer'
     | 'setShowChannelStrip'
     | 'loadSidSongLengths'
+    | 'getPattern'
     | 'setSettings';
   [key: string]: unknown;
 }

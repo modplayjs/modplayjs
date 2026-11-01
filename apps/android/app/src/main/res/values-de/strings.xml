@@ -69,6 +69,19 @@
     <string name="scan_scanning">Scanne %1$s</string>
     <string name="scan_percent">%1$d %%</string>
 
+    <string name="pattern_title">Muster %1$d</string>
+    <string name="cd_pattern">Musteransicht</string>
+    <plurals name="pattern_rows">
+        <item quantity="one">%1$d Zeile</item>
+        <item quantity="other">%1$d Zeilen</item>
+    </plurals>
+    <plurals name="pattern_channels">
+        <item quantity="one">%1$d Kanal</item>
+        <item quantity="other">%1$d Kanäle</item>
+    </plurals>
+    <string name="pattern_empty_title">Kein Muster</string>
+    <string name="pattern_empty_body">Starte ein Tracker-Modul, um sein Muster hier zu sehen.</string>
+
     <!-- Library -->
     <string name="library_title">Bibliothek</string>
     <string name="cd_filters">Filter</string>

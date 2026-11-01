@@ -32,6 +32,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +57,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidCapabilities
+import com.bitti06.modplayjs.engine.AndroidPattern
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.library.FolderEntity
@@ -199,6 +201,7 @@ private fun AppRoot(vm: AppViewModel) {
                 QueueScreen(queue, queueIndex, onPlay = { vm.playQueue(it) }, onBack = back)
             }
             entry<TextKey> { key -> TextEntry(key.kind, vm, settings, back) }
+            entry<PatternKey> { PatternEntry(vm, settings, back) }
             entry<IgnoredKey> { IgnoredScreen(ignored, vm, back) }
         }
 
@@ -315,6 +318,7 @@ private fun AppRoot(vm: AppViewModel) {
                             onOpenDetails = { navigate(DetailsKey) },
                             onOpenText = { kind -> navigate(TextKey(kind)) },
                             onOpenAudio = { audioSheetOpen = true },
+                            onOpenPattern = { navigate(PatternKey) },
                             onOpenFolder = { track ->
                                 folderSheet = track?.let { FolderView(it.folderId, folderPathOf(it)) }
                                 folderSheetOpen = true
@@ -462,6 +466,7 @@ private fun PlayerTab(
     onOpenText: (TrackText) -> Unit,
     onOpenFolder: (TrackEntity?) -> Unit,
     onOpenAudio: () -> Unit,
+    onOpenPattern: () -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -480,6 +485,7 @@ private fun PlayerTab(
         onOpenText = onOpenText,
         onOpenFolder = onOpenFolder,
         onOpenAudio = onOpenAudio,
+        onOpenPattern = onOpenPattern,
         onBrowseLibrary = onBrowseLibrary,
         onOpenSettings = onOpenSettings,
     )
@@ -600,6 +606,36 @@ private fun FolderSheet(
         onOpenSettings = {},
         title = rootId?.let { id -> folders.firstOrNull { it.id == id }?.name },
         onBack = up,
+    )
+}
+
+/**
+ * The pattern view. It owns the fetch: a pattern is rows x channels cells, so
+ * it is requested once per order position rather than per snapshot, and the
+ * screen asks for faster snapshots while it is open so the playhead keeps up.
+ */
+@Composable
+private fun PatternEntry(
+    vm: AppViewModel,
+    settings: AndroidSettings,
+    onBack: () -> Unit,
+) {
+    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
+    val trackId = snapshot?.track?.id
+    val ord = snapshot?.state?.ord ?: 0
+    var pattern by remember { mutableStateOf<AndroidPattern?>(null) }
+    LaunchedEffect(trackId, ord) {
+        pattern = vm.pattern(ord)
+    }
+    DisposableEffect(Unit) {
+        vm.patternViewActive(true)
+        onDispose { vm.patternViewActive(false) }
+    }
+    PatternScreen(
+        snapshot = snapshot,
+        pattern = pattern,
+        follow = settings.view.follow,
+        onBack = onBack,
     )
 }
 
