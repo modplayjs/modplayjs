@@ -17,7 +17,7 @@ abstract class LibraryDb : RoomDatabase() {
         fun open(context: Context): LibraryDb =
             Room
                 .databaseBuilder(context, LibraryDb::class.java, "modplayjs.db")
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
     }
 }
