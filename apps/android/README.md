@@ -10,11 +10,25 @@ Native Android 15+ player around the existing JS core.
 - Gradle 9.8.2 (wrapper included)
 
 
+## Open in Android Studio
+
+Open the **`apps/android`** folder directly: `File → Open → apps/android`.
+Android Studio uses the Gradle wrapper (9.8.2) and the version catalog in
+`gradle/libs.versions.toml`.
+
+Included run configurations:
+
+- **assembleDebug**
+- **assembleRelease**
+
+For a full V8 build, fetch the pinned prebuilt first. Without `v8Dir` the app
+builds the stub JNI so the UI/library work can be developed.
+
 ## Build
 
 ```sh
 npm ci
-npm run build --workspaces --if-present
+npm run build
 npm run build:engine -w @modplayjs/android
 cd apps/android
 ./gradlew :app:assembleDebug
