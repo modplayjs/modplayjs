@@ -44,8 +44,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.ui.NavDisplay
 import com.bitti06.modplayjs.engine.AndroidSnapshot
-import com.bitti06.modplayjs.engine.QueueItem
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
@@ -93,7 +96,7 @@ private fun AppRoot(vm: AppViewModel) {
 
     var tabName by rememberSaveable { mutableStateOf(Tab.Library.name) }
     val tab = Tab.entries.firstOrNull { it.name == tabName } ?: Tab.Library
-    var modals by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+    val backStack = rememberNavBackStack()
     var libraryRoot by rememberSaveable { mutableStateOf<String?>(null) }
     var libraryPath by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
 
@@ -102,8 +105,8 @@ private fun AppRoot(vm: AppViewModel) {
             if (uri != null) vm.addFolder(uri)
         }
 
-    val open: (String) -> Unit = { route -> modals = ArrayList(modals).apply { add(route) } }
-    val close: () -> Unit = { modals = ArrayList(modals).apply { if (isNotEmpty()) removeAt(lastIndex) } }
+    val navigate: (NavKey) -> Unit = { backStack.add(it) }
+    val back: () -> Unit = { backStack.removeLastOrNull() }
     val playTrack: (TrackEntity) -> Unit = {
         vm.play(it)
         tabName = Tab.Playing.name
@@ -113,8 +116,58 @@ private fun AppRoot(vm: AppViewModel) {
         tabName = Tab.Playing.name
     }
 
-    BackHandler(enabled = modals.isNotEmpty()) { close() }
-    BackHandler(enabled = modals.isEmpty() && tab == Tab.Playing) { tabName = Tab.Library.name }
+    // NavDisplay registers its own back handler while the stack is not empty.
+    BackHandler(enabled = backStack.isEmpty() && tab == Tab.Playing) { tabName = Tab.Library.name }
+
+    val entries =
+        entryProvider<NavKey> {
+            entry<SettingsKey> {
+                SettingsHub(
+                    vm = vm,
+                    settings = settings,
+                    folders = folders,
+                    ignoredCount = ignored.size,
+                    onOpen = navigate,
+                    onBack = back,
+                )
+            }
+            entry<PlaybackSettingsKey> { PlaybackSettingsScreen(vm, settings, back) }
+            entry<AudioSettingsKey> { AudioSettingsScreen(vm, settings, snapshot?.capabilities, back) }
+            entry<MixerSettingsKey> { MixerSettingsScreen(vm, settings, snapshot?.capabilities, back) }
+            entry<SidSettingsKey> { SidSettingsScreen(vm, settings, back) }
+            entry<AppearanceSettingsKey> { AppearanceSettingsScreen(vm, settings, back) }
+            entry<LibrarySettingsKey> {
+                LibrarySettingsScreen(
+                    vm = vm,
+                    folders = folders,
+                    ignoredCount = ignored.size,
+                    onAddFolder = { folderPicker.launch(null) },
+                    onOpenIgnored = { navigate(IgnoredKey) },
+                    onBack = back,
+                )
+            }
+            entry<DiagnosticsKey> { DiagnosticsScreen(vm = vm, onBack = back) }
+            entry<AboutKey> {
+                AboutScreen(
+                    v8Available = vm.v8Available,
+                    v8Error = vm.v8Error,
+                    sampleRate = vm.sampleRate,
+                    onOpenLicenses = { navigate(LicensesKey) },
+                    onBack = back,
+                )
+            }
+            entry<LicensesKey> {
+                LicensesScreen(onOpen = { navigate(LicenseKey(it)) }, onBack = back)
+            }
+            entry<LicenseKey> { key ->
+                licenseEntry(key.id)?.let { LicenseTextScreen(it, onBack = back) }
+            }
+            entry<DetailsKey> { DetailsScreen(snapshot, vm, back) }
+            entry<QueueKey> {
+                QueueScreen(queue, queueIndex, onPlay = { vm.playQueue(it) }, onBack = back)
+            }
+            entry<IgnoredKey> { IgnoredScreen(ignored, vm, back) }
+        }
 
     Box(
         Modifier
@@ -173,7 +226,7 @@ private fun AppRoot(vm: AppViewModel) {
                             favoritesCount = favorites.size,
                             onAddFolder = { folderPicker.launch(null) },
                             onRescan = { vm.rescan() },
-                            onOpenSettings = { open(ROUTE_SETTINGS) },
+                            onOpenSettings = { navigate(SettingsKey) },
                             onOpenLibrary = { tabName = Tab.Library.name },
                             onOpenFavorites = { tabName = Tab.Favorites.name },
                             onOpenFolder = { id ->
@@ -207,7 +260,7 @@ private fun AppRoot(vm: AppViewModel) {
                             onPlay = playTrack,
                             onPlayList = playList,
                             onAddFolder = { folderPicker.launch(null) },
-                            onOpenSettings = { open(ROUTE_SETTINGS) },
+                            onOpenSettings = { navigate(SettingsKey) },
                         )
 
                     Tab.Favorites ->
@@ -226,104 +279,34 @@ private fun AppRoot(vm: AppViewModel) {
                             settings = settings,
                             loading = loading,
                             error = error,
-                            onOpenDetails = { open(ROUTE_DETAILS) },
-                            onOpenQueue = { open(ROUTE_QUEUE) },
+                            onOpenDetails = { navigate(DetailsKey) },
+                            onOpenQueue = { navigate(QueueKey) },
                             onBrowseLibrary = { tabName = Tab.Library.name },
-                            onOpenSettings = { open(ROUTE_SETTINGS) },
+                            onOpenSettings = { navigate(SettingsKey) },
                         )
                 }
             }
         }
-        if (modals.isNotEmpty()) {
-            BackHandler { close() }
-            ModalHost(
-                route = modals.last(),
-                vm = vm,
-                snapshot = snapshot,
-                settings = settings,
-                folders = folders,
-                ignored = ignored,
-                queue = queue,
-                queueIndex = queueIndex,
-                onAddFolder = { folderPicker.launch(null) },
-                onOpen = open,
-                onBack = close,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ModalHost(
-    route: String,
-    vm: AppViewModel,
-    snapshot: AndroidSnapshot?,
-    settings: com.bitti06.modplayjs.engine.AndroidSettings,
-    folders: List<com.bitti06.modplayjs.library.FolderEntity>,
-    ignored: List<TrackEntity>,
-    queue: List<QueueItem>,
-    queueIndex: Int,
-    onAddFolder: () -> Unit,
-    onOpen: (String) -> Unit,
-    onBack: () -> Unit,
-) {
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    0f to MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                    0.40f to MaterialTheme.colorScheme.background,
-                    1f to MaterialTheme.colorScheme.background,
-                ),
-            ),
-    ) {
-        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            when {
-                route == ROUTE_SETTINGS ->
-                SettingsHub(
-                    vm = vm,
-                    settings = settings,
-                    folders = folders,
-                    ignoredCount = ignored.size,
-                    onOpen = onOpen,
-                    onBack = onBack,
-                )
-            route == ROUTE_SETTINGS_PLAYBACK -> PlaybackSettingsScreen(vm, settings, onBack)
-            route == ROUTE_SETTINGS_AUDIO ->
-                AudioSettingsScreen(vm, settings, snapshot?.capabilities, onBack)
-            route == ROUTE_SETTINGS_MIXER ->
-                MixerSettingsScreen(vm, settings, snapshot?.capabilities, onBack)
-            route == ROUTE_SETTINGS_SID -> SidSettingsScreen(vm, settings, onBack)
-            route == ROUTE_SETTINGS_APPEARANCE -> AppearanceSettingsScreen(vm, settings, onBack)
-            route == ROUTE_SETTINGS_LIBRARY ->
-                LibrarySettingsScreen(
-                    vm = vm,
-                    folders = folders,
-                    ignoredCount = ignored.size,
-                    onAddFolder = onAddFolder,
-                    onOpenIgnored = { onOpen(ROUTE_IGNORED) },
-                    onBack = onBack,
-                )
-            route == ROUTE_SETTINGS_DIAGNOSTICS ->
-                DiagnosticsScreen(vm = vm, onBack = onBack)
-            route == ROUTE_ABOUT ->
-                AboutScreen(
-                    v8Available = vm.v8Available,
-                    v8Error = vm.v8Error,
-                    sampleRate = vm.sampleRate,
-                    onOpenLicenses = { onOpen(ROUTE_LICENSES) },
-                    onBack = onBack,
-                )
-            route == ROUTE_LICENSES -> LicensesScreen(onOpen = { onOpen(ROUTE_LICENSE_PREFIX + it) }, onBack = onBack)
-            route.startsWith(ROUTE_LICENSE_PREFIX) -> {
-                val entry = licenseEntry(route.removePrefix(ROUTE_LICENSE_PREFIX))
-                if (entry != null) LicenseTextScreen(entry, onBack)
-            }
-            route == ROUTE_DETAILS -> DetailsScreen(snapshot, vm, onBack)
-            route == ROUTE_QUEUE -> QueueScreen(queue, queueIndex, onPlay = { vm.playQueue(it) }, onBack = onBack)
-            route == ROUTE_IGNORED -> IgnoredScreen(ignored, vm, onBack)
-            else -> EmptyState("Unknown screen", route, "Back", onBack)
+        if (backStack.isNotEmpty()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                            0.40f to MaterialTheme.colorScheme.background,
+                            1f to MaterialTheme.colorScheme.background,
+                        ),
+                    ),
+            ) {
+                Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+                    NavDisplay(
+                        backStack = backStack,
+                        modifier = Modifier.fillMaxSize(),
+                        onBack = back,
+                        entryProvider = entries,
+                    )
+                }
             }
         }
     }

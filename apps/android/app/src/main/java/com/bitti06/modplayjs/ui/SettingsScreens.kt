@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.navigation3.runtime.NavKey
 import com.bitti06.modplayjs.BuildConfig
 import com.bitti06.modplayjs.engine.AndroidCapabilities
 import com.bitti06.modplayjs.engine.AndroidSettings
@@ -54,37 +55,37 @@ fun SettingsHub(
     settings: AndroidSettings,
     folders: List<FolderEntity>,
     ignoredCount: Int,
-    onOpen: (String) -> Unit,
+    onOpen: (NavKey) -> Unit,
     onBack: () -> Unit,
 ) {
     SettingsPage("Settings", onBack) {
         SettingsRow(
             "Playback",
             "Repeat ${settings.playback.repeat} · auto-advance ${if (settings.playback.autoAdvance) "on" else "off"}",
-        ) { onOpen(ROUTE_SETTINGS_PLAYBACK) }
+        ) { onOpen(PlaybackSettingsKey) }
         SettingsRow(
             "Audio",
             "Volume ${settings.transport.volume}% · ${vm.sampleRate} Hz",
-        ) { onOpen(ROUTE_SETTINGS_AUDIO) }
+        ) { onOpen(AudioSettingsKey) }
         SettingsRow(
             "Mixer",
             "${settings.mixer.mode} · ${settings.mixer.layout} · ${settings.mixer.amigaFilter}",
-        ) { onOpen(ROUTE_SETTINGS_MIXER) }
+        ) { onOpen(MixerSettingsKey) }
         SettingsRow(
             "SID",
             "${settings.sid.quality} · ${settings.sid.model}",
-        ) { onOpen(ROUTE_SETTINGS_SID) }
+        ) { onOpen(SidSettingsKey) }
         SettingsRow(
             "Appearance",
             "Theme: ${settings.view.theme}",
-        ) { onOpen(ROUTE_SETTINGS_APPEARANCE) }
+        ) { onOpen(AppearanceSettingsKey) }
         SettingsRow(
             "Library",
             "${folders.size} folders · $ignoredCount ignored",
-        ) { onOpen(ROUTE_SETTINGS_LIBRARY) }
-        SettingsRow("Diagnostics", "V8, output, underruns") { onOpen(ROUTE_SETTINGS_DIAGNOSTICS) }
-        SettingsRow("About", "Version, commit, links") { onOpen(ROUTE_ABOUT) }
-        SettingsRow("Licenses", "Open source notices") { onOpen(ROUTE_LICENSES) }
+        ) { onOpen(LibrarySettingsKey) }
+        SettingsRow("Diagnostics", "V8, output, underruns") { onOpen(DiagnosticsKey) }
+        SettingsRow("About", "Version, commit, links") { onOpen(AboutKey) }
+        SettingsRow("Licenses", "Open source notices") { onOpen(LicensesKey) }
     }
 }
 
@@ -350,18 +351,3 @@ fun DiagnosticsScreen(
         InfoRow("Variant", BuildConfig.BUILD_TYPE)
     }
 }
-
-const val ROUTE_SETTINGS = "settings"
-const val ROUTE_SETTINGS_PLAYBACK = "settings/playback"
-const val ROUTE_SETTINGS_AUDIO = "settings/audio"
-const val ROUTE_SETTINGS_MIXER = "settings/mixer"
-const val ROUTE_SETTINGS_SID = "settings/sid"
-const val ROUTE_SETTINGS_APPEARANCE = "settings/appearance"
-const val ROUTE_SETTINGS_LIBRARY = "settings/library"
-const val ROUTE_SETTINGS_DIAGNOSTICS = "settings/diagnostics"
-const val ROUTE_ABOUT = "about"
-const val ROUTE_LICENSES = "licenses"
-const val ROUTE_LICENSE_PREFIX = "license/"
-const val ROUTE_DETAILS = "details"
-const val ROUTE_QUEUE = "queue"
-const val ROUTE_IGNORED = "ignored"

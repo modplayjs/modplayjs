@@ -93,5 +93,7 @@ dependencies {
     implementation(libs.androidx.sqlite.framework)
     ksp(libs.androidx.room3.compiler)
     implementation(libs.androidx.media3.session)
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

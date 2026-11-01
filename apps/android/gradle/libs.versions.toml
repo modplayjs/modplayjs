@@ -12,6 +12,7 @@ serialization = "1.12.0"
 room3 = "3.0.3"
 sqlite = "2.7.1"
 media3 = "1.11.1"
+navigation3 = "1.2.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
@@ -27,6 +28,8 @@ androidx-room3-runtime = { module = "androidx.room3:room3-runtime", version.ref 
 androidx-room3-compiler = { module = "androidx.room3:room3-compiler", version.ref = "room3" }
 androidx-sqlite-framework = { module = "androidx.sqlite:sqlite-framework", version.ref = "sqlite" }
 androidx-media3-session = { module = "androidx.media3:media3-session", version.ref = "media3" }
+androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
+androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 
