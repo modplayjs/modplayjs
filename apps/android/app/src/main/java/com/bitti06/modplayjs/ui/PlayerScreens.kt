@@ -269,16 +269,22 @@ fun PlayerScreen(
                                 MaterialTheme.colorScheme.secondary,
                             ) {
                                 samples.forEach { sample ->
-                                    Text(
+                                    val line =
                                         sampleLine(
                                             sample.index + 1,
                                             sample.name,
                                             sample.length,
                                             sample.loop,
-                                        ),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = FontFamily.Monospace,
-                                    )
+                                            settings.view.sampleNumbers,
+                                            settings.view.sampleLoopFlags,
+                                        )
+                                    if (line.isNotEmpty()) {
+                                        Text(
+                                            line,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontFamily = FontFamily.Monospace,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -535,27 +541,41 @@ private fun sampleLine(
     name: String,
     length: Int,
     loop: Boolean,
+    showNumber: Boolean,
+    showLoop: Boolean,
 ): String {
     val trimmed = name.trim()
-    return if (trimmed.isEmpty()) {
+    val looping = loop && showLoop
+    return when {
         // An empty slot has neither a name nor audio; the length would only
         // print a meaningless "0" for every unused sample.
-        if (length <= 0) {
-            "$number."
-        } else {
+        trimmed.isEmpty() && length <= 0 -> if (showNumber) "$number." else ""
+        trimmed.isEmpty() ->
+            if (showNumber) {
+                stringResource(
+                    if (looping) R.string.sample_line_unnamed_loop else R.string.sample_line_unnamed,
+                    number,
+                    length,
+                )
+            } else {
+                stringResource(
+                    if (looping) R.string.sample_unnamed_bare_loop else R.string.sample_unnamed_bare,
+                    length,
+                )
+            }
+        showNumber ->
             stringResource(
-                if (loop) R.string.sample_line_unnamed_loop else R.string.sample_line_unnamed,
+                if (looping) R.string.sample_line_loop else R.string.sample_line,
                 number,
+                trimmed,
                 length,
             )
-        }
-    } else {
-        stringResource(
-            if (loop) R.string.sample_line_loop else R.string.sample_line,
-            number,
-            trimmed,
-            length,
-        )
+        else ->
+            stringResource(
+                if (looping) R.string.sample_line_bare_loop else R.string.sample_line_bare,
+                trimmed,
+                length,
+            )
     }
 }
 
@@ -687,6 +707,7 @@ private fun ChannelDialog(
 fun DetailsScreen(
     snapshot: AndroidSnapshot?,
     vm: AppViewModel,
+    settings: AndroidSettings,
     onBack: () -> Unit,
 ) {
     val snap = snapshot
@@ -739,16 +760,22 @@ fun DetailsScreen(
             if (track.sampleList.isNotEmpty()) {
                 item { SectionTitle(stringResource(R.string.details_samples)) }
                 items(track.sampleList, key = { "s${it.index}" }) { sample ->
-                    Text(
+                    val line =
                         sampleLine(
                             sample.index + 1,
                             sample.name,
                             sample.length,
                             sample.loop,
-                        ),
-                        fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                            settings.view.sampleNumbers,
+                            settings.view.sampleLoopFlags,
+                        )
+                    if (line.isNotEmpty()) {
+                        Text(
+                            line,
+                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
             }
             item { SectionTitle(stringResource(R.string.details_channels, snap.channels.size)) }

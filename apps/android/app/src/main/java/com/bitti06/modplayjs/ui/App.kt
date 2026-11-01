@@ -162,7 +162,7 @@ private fun AppRoot(vm: AppViewModel) {
             entry<LicenseKey> { key ->
                 licenseEntry(key.id)?.let { LicenseTextScreen(it, onBack = back) }
             }
-            entry<DetailsKey> { DetailsEntry(vm, back) }
+            entry<DetailsKey> { DetailsEntry(vm, settings, back) }
             entry<QueueKey> {
                 QueueScreen(queue, queueIndex, onPlay = { vm.playQueue(it) }, onBack = back)
             }
@@ -450,8 +450,9 @@ private fun DiagnosticsEntry(
 @Composable
 private fun DetailsEntry(
     vm: AppViewModel,
+    settings: AndroidSettings,
     onBack: () -> Unit,
 ) {
     val snapshot by vm.snapshot.collectAsStateWithLifecycle()
-    DetailsScreen(snapshot, vm, onBack)
+    DetailsScreen(snapshot, vm, settings, onBack)
 }
