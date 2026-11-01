@@ -743,9 +743,12 @@ private fun MessageText(
             remember(text, available, base) {
                 measurer.measure(AnnotatedString(text), style = base, softWrap = false)
             }
+        // Glyph advances round to whole pixels, so fitting exactly clipped the
+        // last column of the widest line; leave a few pixels of headroom.
+        val target = (available - 4).coerceAtLeast(1)
         val scale =
-            if (measured.size.width > available && measured.size.width > 0) {
-                available.toFloat() / measured.size.width
+            if (measured.size.width > target && measured.size.width > 0) {
+                target.toFloat() / measured.size.width
             } else {
                 1f
             }
