@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
 import kotlin.math.roundToInt
@@ -81,7 +82,7 @@ fun SettingsHub(
 
 @Composable
 fun PlaybackSettingsScreen(
-    vm: AppViewModel,
+    actions: UiActions,
     settings: AndroidSettings,
     onBack: () -> Unit,
 ) {
@@ -94,22 +95,22 @@ fun PlaybackSettingsScreen(
                 "one" to stringResource(R.string.repeat_one),
             ),
             settings.playback.repeat,
-        ) { value -> vm.updateSettings { it.copy(playback = it.playback.copy(repeat = value)) } }
+        ) { value -> actions.updateSettings { it.copy(playback = it.playback.copy(repeat = value)) } }
         SwitchRow(stringResource(R.string.shuffle), settings.playback.shuffle) { value ->
-            vm.updateSettings { it.copy(playback = it.playback.copy(shuffle = value)) }
+            actions.updateSettings { it.copy(playback = it.playback.copy(shuffle = value)) }
         }
         SwitchRow(stringResource(R.string.auto_advance), settings.playback.autoAdvance) { value ->
-            vm.updateSettings { it.copy(playback = it.playback.copy(autoAdvance = value)) }
+            actions.updateSettings { it.copy(playback = it.playback.copy(autoAdvance = value)) }
         }
         SwitchRow(stringResource(R.string.jam_mode), settings.playback.jamMode) { value ->
-            vm.updateSettings { it.copy(playback = it.playback.copy(jamMode = value)) }
+            actions.updateSettings { it.copy(playback = it.playback.copy(jamMode = value)) }
         }
     }
 }
 
 @Composable
 fun AudioSettingsScreen(
-    vm: AppViewModel,
+    actions: UiActions,
     settings: AndroidSettings,
     capabilities: AndroidCapabilities?,
     onBack: () -> Unit,
@@ -119,7 +120,7 @@ fun AudioSettingsScreen(
     val effectsAvailable = remember { hasSystemAudioEffects(context) }
     SettingsPage(stringResource(R.string.settings_audio), onBack) {
         SliderRow(stringResource(R.string.volume), settings.transport.volume.toFloat(), 0f..100f) { value ->
-            vm.updateSettings { it.copy(transport = it.transport.copy(volume = value.toInt())) }
+            actions.updateSettings { it.copy(transport = it.transport.copy(volume = value.toInt())) }
         }
         SliderRow(
             stringResource(R.string.pan_separation),
@@ -127,7 +128,7 @@ fun AudioSettingsScreen(
             0f..100f,
             enabled = capabilities?.panSeparation != false,
         ) { value ->
-            vm.updateSettings { it.copy(transport = it.transport.copy(panSeparation = value.toInt())) }
+            actions.updateSettings { it.copy(transport = it.transport.copy(panSeparation = value.toInt())) }
         }
         ChoiceRow(
             stringResource(R.string.interpolation),
@@ -138,17 +139,17 @@ fun AudioSettingsScreen(
             ),
             settings.transport.interpolation.toString(),
         ) { value ->
-            vm.updateSettings { it.copy(transport = it.transport.copy(interpolation = value.toInt())) }
+            actions.updateSettings { it.copy(transport = it.transport.copy(interpolation = value.toInt())) }
         }
         SliderRow(stringResource(R.string.voices), settings.transport.numVoices.toFloat(), 4f..64f) { value ->
-            vm.updateSettings { it.copy(transport = it.transport.copy(numVoices = value.toInt())) }
+            actions.updateSettings { it.copy(transport = it.transport.copy(numVoices = value.toInt())) }
         }
         SliderRow(stringResource(R.string.tempo_factor), settings.transport.tempoFactor.toFloat(), 0.25f..4f) { value ->
-            vm.updateSettings { it.copy(transport = it.transport.copy(tempoFactor = value.toDouble())) }
+            actions.updateSettings { it.copy(transport = it.transport.copy(tempoFactor = value.toDouble())) }
         }
         SectionTitle(stringResource(R.string.output))
-        InfoRow(stringResource(R.string.rate), stringResource(R.string.rate_value, vm.sampleRate))
-        InfoRow(stringResource(R.string.session), vm.audioSessionId.toString())
+        InfoRow(stringResource(R.string.rate), stringResource(R.string.rate_value, actions.sampleRate))
+        InfoRow(stringResource(R.string.session), actions.audioSessionId.toString())
         Text(
             stringResource(R.string.audio_output_note),
             style = MaterialTheme.typography.bodySmall,
@@ -160,7 +161,7 @@ fun AudioSettingsScreen(
                 if (effectsAvailable) R.string.audio_effects_summary else R.string.audio_effects_unavailable,
             ),
         ) {
-            if (!openSystemAudioEffects(context, vm.audioSessionId)) {
+            if (!openSystemAudioEffects(context, actions.audioSessionId)) {
                 showEffectsDialog = true
             }
         }
@@ -172,7 +173,7 @@ fun AudioSettingsScreen(
 
 @Composable
 fun MixerSettingsScreen(
-    vm: AppViewModel,
+    actions: UiActions,
     settings: AndroidSettings,
     capabilities: AndroidCapabilities?,
     onBack: () -> Unit,
@@ -188,7 +189,7 @@ fun MixerSettingsScreen(
             listOf("libxmp" to "libxmp", "paula" to "Paula"),
             settings.mixer.mode,
             enabled = capabilities?.mixerMode != false,
-        ) { value -> vm.updateSettings { it.copy(mixer = it.mixer.copy(mode = value)) } }
+        ) { value -> actions.updateSettings { it.copy(mixer = it.mixer.copy(mode = value)) } }
         ChoiceRow(
             stringResource(R.string.mixer_layout),
             listOf(
@@ -198,7 +199,7 @@ fun MixerSettingsScreen(
             ),
             settings.mixer.layout,
             enabled = capabilities?.mixer != false,
-        ) { value -> vm.updateSettings { it.copy(mixer = it.mixer.copy(layout = value)) } }
+        ) { value -> actions.updateSettings { it.copy(mixer = it.mixer.copy(layout = value)) } }
         ChoiceRow(
             stringResource(R.string.a500_filter),
             listOf(
@@ -207,16 +208,16 @@ fun MixerSettingsScreen(
             ),
             settings.mixer.amigaFilter,
             enabled = capabilities?.amigaFilter != false,
-        ) { value -> vm.updateSettings { it.copy(mixer = it.mixer.copy(amigaFilter = value)) } }
+        ) { value -> actions.updateSettings { it.copy(mixer = it.mixer.copy(amigaFilter = value)) } }
         SliderRow(stringResource(R.string.amplify), settings.mixer.amplify.toFloat(), 1f..32f) { value ->
-            vm.updateSettings { it.copy(mixer = it.mixer.copy(amplify = value.toInt())) }
+            actions.updateSettings { it.copy(mixer = it.mixer.copy(amplify = value.toInt())) }
         }
     }
 }
 
 @Composable
 fun SidSettingsScreen(
-    vm: AppViewModel,
+    actions: UiActions,
     settings: AndroidSettings,
     onBack: () -> Unit,
 ) {
@@ -230,7 +231,7 @@ fun SidSettingsScreen(
             stringResource(R.string.sid_chip),
             listOf("0" to stringResource(R.string.common_header), "6581" to "6581", "8580" to "8580"),
             settings.sid.model.toString(),
-        ) { value -> vm.updateSettings { it.copy(sid = it.sid.copy(model = value.toInt())) } }
+        ) { value -> actions.updateSettings { it.copy(sid = it.sid.copy(model = value.toInt())) } }
         ChoiceRow(
             stringResource(R.string.sid_video),
             listOf(
@@ -240,7 +241,7 @@ fun SidSettingsScreen(
             ),
             settings.sid.videoStandard?.toString() ?: "null",
         ) { value ->
-            vm.updateSettings {
+            actions.updateSettings {
                 it.copy(sid = it.sid.copy(videoStandard = if (value == "null") null else value.toInt()))
             }
         }
@@ -252,7 +253,7 @@ fun SidSettingsScreen(
                 "sinc" to stringResource(R.string.quality_sinc),
             ),
             settings.sid.quality,
-        ) { value -> vm.updateSettings { it.copy(sid = it.sid.copy(quality = value)) } }
+        ) { value -> actions.updateSettings { it.copy(sid = it.sid.copy(quality = value)) } }
         ChoiceRow(
             stringResource(R.string.sid_channels),
             listOf(
@@ -261,16 +262,16 @@ fun SidSettingsScreen(
                 "3" to stringResource(R.string.sid_narrow),
             ),
             settings.sid.stereo.toString(),
-        ) { value -> vm.updateSettings { it.copy(sid = it.sid.copy(stereo = value.toInt())) } }
+        ) { value -> actions.updateSettings { it.copy(sid = it.sid.copy(stereo = value.toInt())) } }
         SliderRow(stringResource(R.string.sid_engine_volume), settings.sid.volume.toFloat(), 0f..255f) { value ->
-            vm.updateSettings { it.copy(sid = it.sid.copy(volume = value.toInt())) }
+            actions.updateSettings { it.copy(sid = it.sid.copy(volume = value.toInt())) }
         }
     }
 }
 
 @Composable
 fun AppearanceSettingsScreen(
-    vm: AppViewModel,
+    actions: UiActions,
     settings: AndroidSettings,
     onBack: () -> Unit,
 ) {
@@ -283,29 +284,29 @@ fun AppearanceSettingsScreen(
             ),
             settings.view.theme,
         ) { value ->
-            vm.updateSettings { it.copy(view = it.view.copy(theme = value)) }
+            actions.updateSettings { it.copy(view = it.view.copy(theme = value)) }
         }
         SwitchRow(stringResource(R.string.strip_dots), settings.view.stripDots) { value ->
-            vm.updateSettings { it.copy(view = it.view.copy(stripDots = value)) }
+            actions.updateSettings { it.copy(view = it.view.copy(stripDots = value)) }
         }
         SwitchRow(stringResource(R.string.reduced_motion), settings.view.reducedMotion) { value ->
-            vm.updateSettings { it.copy(view = it.view.copy(reducedMotion = value)) }
+            actions.updateSettings { it.copy(view = it.view.copy(reducedMotion = value)) }
         }
         SwitchRow(stringResource(R.string.show_channel_strip), settings.view.showChannelStrip) { value ->
-            vm.updateSettings { it.copy(view = it.view.copy(showChannelStrip = value)) }
+            actions.updateSettings { it.copy(view = it.view.copy(showChannelStrip = value)) }
         }
         SwitchRow(stringResource(R.string.sample_lengths), settings.view.sampleLengths) { value ->
-            vm.updateSettings { it.copy(view = it.view.copy(sampleLengths = value)) }
+            actions.updateSettings { it.copy(view = it.view.copy(sampleLengths = value)) }
         }
         SwitchRow(stringResource(R.string.loop_marker), settings.view.sampleLoopFlags) { value ->
-            vm.updateSettings { it.copy(view = it.view.copy(sampleLoopFlags = value)) }
+            actions.updateSettings { it.copy(view = it.view.copy(sampleLoopFlags = value)) }
         }
     }
 }
 
 @Composable
 fun LibrarySettingsScreen(
-    vm: AppViewModel,
+    actions: UiActions,
     folders: List<FolderEntity>,
     ignoredCount: Int,
     onAddFolder: () -> Unit,
@@ -319,7 +320,7 @@ fun LibrarySettingsScreen(
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.common_add_folder))
             }
-            OutlinedButton(onClick = { vm.rescan() }) {
+            OutlinedButton(onClick = { actions.rescan() }) {
                 Icon(AppIcons.Refresh, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.common_rescan))
@@ -364,13 +365,13 @@ fun LibrarySettingsScreen(
                             Text(folder.error, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                         }
                     }
-                    IconButton(onClick = { vm.rescan(folder.id) }) {
+                    IconButton(onClick = { actions.rescan(folder.id) }) {
                         Icon(
                             AppIcons.Refresh,
                             contentDescription = stringResource(R.string.cd_rescan_folder, folder.name),
                         )
                     }
-                    IconButton(onClick = { vm.removeFolder(folder) }) {
+                    IconButton(onClick = { actions.removeFolder(folder) }) {
                         Icon(
                             AppIcons.Delete,
                             contentDescription = stringResource(R.string.cd_remove_folder, folder.name),
@@ -387,12 +388,12 @@ fun LibrarySettingsScreen(
 @Composable
 fun DiagnosticsScreen(
     snapshot: AndroidSnapshot?,
-    vm: AppViewModel,
+    actions: UiActions,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     val effectsPanel = remember { hasSystemAudioEffects(context) }
-    val audio = vm.audioInfo
+    val audio = actions.audioInfo
     val bufferMs =
         if (audio.sampleRate > 0 && audio.bufferFrames > 0) {
             (audio.bufferFrames * 1000.0 / audio.sampleRate).roundToInt()
@@ -403,15 +404,15 @@ fun DiagnosticsScreen(
         SectionTitle(stringResource(R.string.engine))
         InfoRow(
             "V8",
-            stringResource(if (vm.v8Available) R.string.v8_available else R.string.v8_stub),
+            stringResource(if (actions.v8Available) R.string.v8_available else R.string.v8_stub),
         )
-        val v8Error = vm.v8Error
-        if (!vm.v8Available && v8Error != null) {
+        val v8Error = actions.v8Error
+        if (!actions.v8Available && v8Error != null) {
             Text(v8Error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
-        InfoRow(stringResource(R.string.output_rate), "${vm.sampleRate} Hz")
-        InfoRow(stringResource(R.string.audio_session), vm.audioSessionId.toString())
-        InfoRow(stringResource(R.string.underruns), vm.underruns.toString())
+        InfoRow(stringResource(R.string.output_rate), "${actions.sampleRate} Hz")
+        InfoRow(stringResource(R.string.audio_session), actions.audioSessionId.toString())
+        InfoRow(stringResource(R.string.underruns), actions.underruns.toString())
 
         // What the samples actually travel through, from the engine's float32
         // ring to the AudioTrack the platform mixes.
@@ -516,7 +517,7 @@ private fun capabilitySummary(capabilities: AndroidCapabilities): String {
 fun LanguageSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val manager = remember { context.getSystemService(LocaleManager::class.java) }
-    var selected by remember { mutableStateOf(manager.applicationLocales.toLanguageTags()) }
+    var selected by remember { mutableStateOf(manager?.applicationLocales?.toLanguageTags().orEmpty()) }
     SettingsPage(stringResource(R.string.language_title), onBack) {
         Text(
             stringResource(R.string.language_body),
@@ -574,11 +575,79 @@ private fun setAppLocale(
     context: android.content.Context,
     tag: String,
 ) {
-    val manager = context.getSystemService(LocaleManager::class.java)
+    // Null in the preview host, which has no locale manager.
+    val manager = context.getSystemService(LocaleManager::class.java) ?: return
     manager.applicationLocales =
         if (tag.isEmpty()) {
             LocaleList.getEmptyLocaleList()
         } else {
             LocaleList.forLanguageTags(tag)
         }
+}
+
+@Preview(name = "Settings", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun SettingsHubPreview() {
+    PreviewFrame { SettingsHub(onOpen = {}, onBack = {}) }
+}
+
+@Preview(name = "Settings playback", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun PlaybackSettingsPreview() {
+    PreviewFrame { PlaybackSettingsScreen(PreviewActions, previewSettings(), onBack = {}) }
+}
+
+@Preview(name = "Settings audio", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun AudioSettingsPreview() {
+    PreviewFrame {
+        AudioSettingsScreen(PreviewActions, previewSettings(), previewSnapshot().capabilities, onBack = {})
+    }
+}
+
+@Preview(name = "Settings mixer", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun MixerSettingsPreview() {
+    PreviewFrame {
+        MixerSettingsScreen(PreviewActions, previewSettings(), previewSnapshot().capabilities, onBack = {})
+    }
+}
+
+@Preview(name = "Settings sid", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun SidSettingsPreview() {
+    PreviewFrame { SidSettingsScreen(PreviewActions, previewSettings(), onBack = {}) }
+}
+
+@Preview(name = "Settings appearance", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun AppearanceSettingsPreview() {
+    PreviewFrame { AppearanceSettingsScreen(PreviewActions, previewSettings(), onBack = {}) }
+}
+
+@Preview(name = "Settings library", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun LibrarySettingsPreview() {
+    PreviewFrame {
+        LibrarySettingsScreen(
+            actions = PreviewActions,
+            folders = previewFolders(),
+            ignoredCount = 2,
+            onAddFolder = {},
+            onOpenIgnored = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview(name = "Settings language", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun LanguageSettingsPreview() {
+    PreviewFrame { LanguageSettingsScreen(onBack = {}) }
+}
+
+@Preview(name = "Diagnostics", showBackground = true, backgroundColor = 0xFF0C0A18, heightDp = 1400)
+@Composable
+private fun DiagnosticsPreview() {
+    PreviewFrame { DiagnosticsScreen(previewSnapshot(), PreviewActions, onBack = {}) }
 }

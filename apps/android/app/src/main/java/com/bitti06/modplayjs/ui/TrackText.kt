@@ -18,6 +18,7 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import com.bitti06.modplayjs.R
@@ -205,4 +206,22 @@ private fun fittedStyle(
         style = scaled(scale)
     }
     return style
+}
+
+@Preview(name = "Message reader", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun MessageReaderPreview() {
+    PreviewFrame { TrackTextScreen(TrackText.Message, previewSnapshot(), previewSettings(), onBack = {}) }
+}
+
+@Preview(name = "Instruments reader", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun InstrumentsReaderPreview() {
+    PreviewFrame { TrackTextScreen(TrackText.Instruments, previewSnapshot(), previewSettings(), onBack = {}) }
+}
+
+@Preview(name = "Samples reader", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun SamplesReaderPreview() {
+    PreviewFrame { TrackTextScreen(TrackText.Samples, previewSnapshot(), previewSettings(), onBack = {}) }
 }

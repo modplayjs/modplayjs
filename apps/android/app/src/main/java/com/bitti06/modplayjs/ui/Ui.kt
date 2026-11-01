@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -549,6 +550,29 @@ fun StatCard(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Preview(name = "Track row", showBackground = true, backgroundColor = 0xFF0C0A18, heightDp = 260)
+@Composable
+private fun TrackRowPreview() {
+    PreviewFrame {
+        Column(Modifier.padding(horizontal = 12.dp)) {
+            previewTracks().take(3).forEach {
+                TrackRow(track = it, onClick = {}, onToggleFavorite = {})
+            }
+        }
+    }
+}
+
+@Preview(name = "Stat card", showBackground = true, backgroundColor = 0xFF0C0A18, heightDp = 140)
+@Composable
+private fun StatCardPreview() {
+    PreviewFrame {
+        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatCard("24", "Tracks", Modifier.weight(1f))
+            StatCard("3", "Favorites", Modifier.weight(1f))
         }
     }
 }

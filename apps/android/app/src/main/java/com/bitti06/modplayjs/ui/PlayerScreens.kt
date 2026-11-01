@@ -71,8 +71,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
@@ -82,8 +82,9 @@ import com.bitti06.modplayjs.ui.icons.AppIcons
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PlayerScreen(
-    vm: AppViewModel,
+    actions: UiActions,
     snapshot: AndroidSnapshot?,
+    currentTrack: TrackEntity?,
     settings: AndroidSettings,
     loading: String?,
     error: PlayError?,
@@ -93,7 +94,6 @@ fun PlayerScreen(
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    val current by vm.nowPlaying.collectAsStateWithLifecycle()
     val errorText = error?.let { stringResource(R.string.player_error, it.track, it.reason) }
     val snap = snapshot
     val track = snap?.track
@@ -126,10 +126,10 @@ fun PlayerScreen(
                     maxLines = 1,
                 )
                 // A delegated property cannot be smart cast; read it once.
-                val favoriteTrack = current
+                val favoriteTrack = currentTrack
                 if (favoriteTrack != null) {
                     val favorite = favoriteTrack.favoriteAt != null
-                    IconButton(onClick = { vm.toggleFavorite(favoriteTrack) }) {
+                    IconButton(onClick = { actions.toggleFavorite(favoriteTrack) }) {
                         Icon(
                             if (favorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
                             contentDescription =
@@ -337,7 +337,7 @@ fun PlayerScreen(
                             }
                         },
                         onValueChangeFinished = {
-                            drag?.let { vm.seek((it * duration).toLong()) }
+                            drag?.let { actions.seek((it * duration).toLong()) }
                             drag = null
                         },
                         enabled = snap.capabilities.seekable,
@@ -369,7 +369,7 @@ fun PlayerScreen(
                                 contentDescription = stringResource(R.string.player_queue),
                             )
                         }
-                        IconButton(onClick = { vm.previous() }) {
+                        IconButton(onClick = { actions.previous() }) {
                             Icon(
                                 AppIcons.SkipPrevious,
                                 contentDescription = stringResource(R.string.cd_previous),
@@ -383,7 +383,7 @@ fun PlayerScreen(
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
                             )
                             FilledIconButton(
-                                onClick = { vm.togglePlay() },
+                                onClick = { actions.togglePlay() },
                                 modifier = Modifier.size(68.dp),
                                 shape = CircleShape,
                             ) {
@@ -394,10 +394,10 @@ fun PlayerScreen(
                                 )
                             }
                         }
-                        IconButton(onClick = { vm.next() }) {
+                        IconButton(onClick = { actions.next() }) {
                             Icon(AppIcons.SkipNext, contentDescription = stringResource(R.string.cd_next))
                         }
-                        IconButton(onClick = { vm.stop() }) {
+                        IconButton(onClick = { actions.stop() }) {
                             Icon(AppIcons.Stop, contentDescription = stringResource(R.string.cd_stop))
                         }
                         IconButton(onClick = onOpenDetails) {
@@ -422,7 +422,7 @@ fun PlayerScreen(
                                 Text(stringResource(R.string.player_expand))
                             }
                         }
-                        ChannelStrip(snap, vm)
+                        ChannelStrip(snap, actions)
                     }
                 }
             }
@@ -466,7 +466,7 @@ fun PlayerScreen(
         }
     }
     if (channelDialog && snap != null) {
-        ChannelDialog(snap, vm) { channelDialog = false }
+        ChannelDialog(snap, actions) { channelDialog = false }
     }
 }
 
@@ -584,7 +584,7 @@ private fun InfoBox(
 @Composable
 private fun ChannelStrip(
     snapshot: AndroidSnapshot,
-    vm: AppViewModel,
+    actions: UiActions,
 ) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -601,8 +601,8 @@ private fun ChannelStrip(
                     },
                 modifier =
                     Modifier.combinedClickable(
-                        onClick = { vm.toggleChannel(channel.index) },
-                        onLongClick = { vm.soloChannel(channel.index) },
+                        onClick = { actions.toggleChannel(channel.index) },
+                        onLongClick = { actions.soloChannel(channel.index) },
                     ),
             ) {
                 Text(
@@ -620,7 +620,7 @@ private fun ChannelStrip(
 @Composable
 private fun ChannelDialog(
     snapshot: AndroidSnapshot,
-    vm: AppViewModel,
+    actions: UiActions,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -640,8 +640,8 @@ private fun ChannelDialog(
                             color = if (channel.muted) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
                             modifier =
                                 Modifier.height(44.dp).combinedClickable(
-                                    onClick = { vm.toggleChannel(channel.index) },
-                                    onLongClick = { vm.soloChannel(channel.index) },
+                                    onClick = { actions.toggleChannel(channel.index) },
+                                    onLongClick = { actions.soloChannel(channel.index) },
                                 ),
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -655,9 +655,9 @@ private fun ChannelDialog(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    TextButton(onClick = { vm.muteAll() }) { Text(stringResource(R.string.action_mute_all)) }
-                    TextButton(onClick = { vm.unmuteAll() }) { Text(stringResource(R.string.action_unmute)) }
-                    TextButton(onClick = { vm.resetChannels() }) { Text(stringResource(R.string.common_reset)) }
+                    TextButton(onClick = { actions.muteAll() }) { Text(stringResource(R.string.action_mute_all)) }
+                    TextButton(onClick = { actions.unmuteAll() }) { Text(stringResource(R.string.action_unmute)) }
+                    TextButton(onClick = { actions.resetChannels() }) { Text(stringResource(R.string.common_reset)) }
                 }
             }
         },
@@ -670,7 +670,7 @@ private fun ChannelDialog(
 @Composable
 fun DetailsScreen(
     snapshot: AndroidSnapshot?,
-    vm: AppViewModel,
+    actions: UiActions,
     settings: AndroidSettings,
     onBack: () -> Unit,
 ) {
@@ -750,7 +750,7 @@ fun DetailsScreen(
             }
             items(snap.channels, key = { "c${it.index}" }) { channel ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = !channel.muted, onCheckedChange = { vm.toggleChannel(channel.index) }, enabled = channel.canMute)
+                    Switch(checked = !channel.muted, onCheckedChange = { actions.toggleChannel(channel.index) }, enabled = channel.canMute)
                     Text(
                         " ${channel.label}",
                         modifier = Modifier.weight(1f),
@@ -776,5 +776,47 @@ fun DetailsScreen(
             }
             item { Spacer(Modifier.height(24.dp)) }
         }
+    }
+}
+
+@Preview(name = "Player", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun PlayerScreenPreview() {
+    PreviewFrame { PlayerContentPreview(previewSnapshot()) }
+}
+
+@Preview(name = "Player empty", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun PlayerEmptyPreview() {
+    PreviewFrame { PlayerContentPreview(null) }
+}
+
+@Composable
+private fun PlayerContentPreview(snapshot: AndroidSnapshot?) {
+    PlayerScreen(
+        actions = PreviewActions,
+        snapshot = snapshot,
+        currentTrack = previewTracks().first(),
+        settings = previewSettings(),
+        loading = null,
+        error = null,
+        onOpenDetails = {},
+        onOpenQueue = {},
+        onOpenText = {},
+        onBrowseLibrary = {},
+        onOpenSettings = {},
+    )
+}
+
+@Preview(name = "Details", showBackground = true, backgroundColor = 0xFF0C0A18, heightDp = 900)
+@Composable
+private fun DetailsScreenPreview() {
+    PreviewFrame {
+        DetailsScreen(
+            snapshot = previewSnapshot(),
+            actions = PreviewActions,
+            settings = previewSettings(),
+            onBack = {},
+        )
     }
 }

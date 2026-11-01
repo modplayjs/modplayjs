@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.library.TrackEntity
@@ -46,7 +47,7 @@ import com.bitti06.modplayjs.ui.icons.AppIcons
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritesScreen(
-    vm: AppViewModel,
+    actions: UiActions,
     favorites: List<TrackEntity>,
     onPlay: (TrackEntity) -> Unit,
     onPlayList: (List<TrackEntity>, Int) -> Unit,
@@ -110,7 +111,7 @@ fun FavoritesScreen(
                         track,
                         onClick = { onPlay(track) },
                         onLongClick = { showTrackActions = track },
-                        onToggleFavorite = { vm.toggleFavorite(track) },
+                        onToggleFavorite = { actions.toggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { showTrackActions = track }) {
                                 Icon(
@@ -141,11 +142,11 @@ fun FavoritesScreen(
                     onPlay(track)
                 },
                 onToggleFavorite = {
-                    vm.toggleFavorite(track)
+                    actions.toggleFavorite(track)
                     showTrackActions = null
                 },
                 onIgnore = {
-                    vm.ignore(track)
+                    actions.ignore(track)
                     showTrackActions = null
                 },
                 onDelete = {
@@ -163,7 +164,7 @@ fun FavoritesScreen(
             text = { Text(stringResource(R.string.delete_body, track.name)) },
             confirmButton = {
                 TextButton(onClick = {
-                    vm.deletePermanently(track)
+                    actions.deletePermanently(track)
                     showDeleteConfirm = null
                 }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
@@ -172,6 +173,20 @@ fun FavoritesScreen(
                     Text(stringResource(R.string.common_cancel))
                 }
             },
+        )
+    }
+}
+
+@Preview(name = "Favorites", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun FavoritesScreenPreview() {
+    PreviewFrame {
+        FavoritesScreen(
+            actions = PreviewActions,
+            favorites = previewTracks().filter { it.favoriteAt != null },
+            onPlay = {},
+            onPlayList = { _, _ -> },
+            onBrowseLibrary = {},
         )
     }
 }

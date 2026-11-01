@@ -48,10 +48,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.library.FolderEntity
@@ -121,7 +123,7 @@ private fun split(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
-    vm: AppViewModel,
+    actions: UiActions,
     tracks: List<TrackEntity>,
     libraryTracks: List<TrackEntity>,
     folders: List<FolderEntity>,
@@ -155,11 +157,15 @@ fun LibraryScreen(
     val filtersActive =
         filters.status != "all" || filters.family != null || filters.format != null || filters.sort != "name" || filters.descending
 
-    BackHandler(enabled = rootId != null || filters.search.isNotBlank()) {
-        when {
-            filters.search.isNotBlank() -> vm.updateFilters { it.copy(search = "") }
-            path.isNotEmpty() -> onNavigate(rootId, path.dropLast(1))
-            else -> onNavigate(null, emptyList())
+    // The preview host has no OnBackPressedDispatcherOwner, and the back
+    // handler has nothing to do in the preview anyway.
+    if (!LocalInspectionMode.current) {
+        BackHandler(enabled = rootId != null || filters.search.isNotBlank()) {
+            when {
+                filters.search.isNotBlank() -> actions.updateFilters { it.copy(search = "") }
+                path.isNotEmpty() -> onNavigate(rootId, path.dropLast(1))
+                else -> onNavigate(null, emptyList())
+            }
         }
     }
 
@@ -193,7 +199,7 @@ fun LibraryScreen(
         }
         OutlinedTextField(
             value = filters.search,
-            onValueChange = { vm.updateFilters { f -> f.copy(search = it) } },
+            onValueChange = { actions.updateFilters { f -> f.copy(search = it) } },
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -205,7 +211,7 @@ fun LibraryScreen(
             },
             trailingIcon = {
                 if (filters.search.isNotEmpty()) {
-                    IconButton(onClick = { vm.updateFilters { it.copy(search = "") } }) {
+                    IconButton(onClick = { actions.updateFilters { it.copy(search = "") } }) {
                         Icon(AppIcons.Close, contentDescription = stringResource(R.string.cd_clear_search))
                     }
                 }
@@ -230,7 +236,7 @@ fun LibraryScreen(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = { vm.resetFilters() }) { Text(stringResource(R.string.common_reset)) }
+                TextButton(onClick = { actions.resetFilters() }) { Text(stringResource(R.string.common_reset)) }
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -251,14 +257,14 @@ fun LibraryScreen(
                     tracks = tracks,
                     onPlay = onPlay,
                     onMore = { showTrackActions = it },
-                    onToggleFavorite = { vm.toggleFavorite(it) },
+                    onToggleFavorite = { actions.toggleFavorite(it) },
                 )
             rootId == ALL_ROOTS ->
                 AllTracks(
                     tracks = tracks,
                     onPlay = onPlay,
                     onMore = { showTrackActions = it },
-                    onToggleFavorite = { vm.toggleFavorite(it) },
+                    onToggleFavorite = { actions.toggleFavorite(it) },
                     onExit = { onNavigate(null, emptyList()) },
                 )
             rootId == null -> RootList(
@@ -279,7 +285,7 @@ fun LibraryScreen(
                 onPlay = onPlay,
                 onPlayList = onPlayList,
                 onMore = { showTrackActions = it },
-                onToggleFavorite = { vm.toggleFavorite(it) },
+                onToggleFavorite = { actions.toggleFavorite(it) },
             )
         }
     }
@@ -293,7 +299,7 @@ fun LibraryScreen(
             ),
         ) {
             FilterSheet(
-                vm = vm,
+                actions = actions,
                 filters = filters,
                 formats = libraryTracks.map { it.format }.distinct().sorted(),
                 onDone = { showFilters = false },
@@ -315,9 +321,9 @@ fun LibraryScreen(
                     showTrackActions = null
                     onPlay(track)
                 },
-                onToggleFavorite = { vm.toggleFavorite(track) },
+                onToggleFavorite = { actions.toggleFavorite(track) },
                 onIgnore = {
-                    vm.ignore(track)
+                    actions.ignore(track)
                     showTrackActions = null
                 },
                 onDelete = {
@@ -335,7 +341,7 @@ fun LibraryScreen(
             text = { Text(stringResource(R.string.delete_body, track.name)) },
             confirmButton = {
                 TextButton(onClick = {
-                    vm.deletePermanently(track)
+                    actions.deletePermanently(track)
                     showDeleteConfirm = null
                 }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
@@ -370,13 +376,13 @@ fun LibraryScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    vm.rescan(folder.id)
+                    actions.rescan(folder.id)
                     folderMenu = null
                 }) { Text(stringResource(R.string.common_rescan)) }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    vm.removeFolder(folder)
+                    actions.removeFolder(folder)
                     folderMenu = null
                 }) { Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error) }
             },
@@ -661,7 +667,7 @@ private fun Browser(
 
 @Composable
 private fun FilterSheet(
-    vm: AppViewModel,
+    actions: UiActions,
     filters: Filters,
     formats: List<String>,
     onDone: () -> Unit,
@@ -677,12 +683,12 @@ private fun FilterSheet(
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(
                 filters.status == "all",
-                { vm.updateFilters { it.copy(status = "all") } },
+                { actions.updateFilters { it.copy(status = "all") } },
                 { Text(stringResource(R.string.common_all)) },
             )
             FilterChip(
                 filters.status == "missing",
-                { vm.updateFilters { it.copy(status = "missing") } },
+                { actions.updateFilters { it.copy(status = "missing") } },
                 { Text(stringResource(R.string.common_missing)) },
             )
         }
@@ -694,22 +700,22 @@ private fun FilterSheet(
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(
                 filters.family == null,
-                { vm.updateFilters { it.copy(family = null) } },
+                { actions.updateFilters { it.copy(family = null) } },
                 { Text(stringResource(R.string.common_all)) },
             )
             FilterChip(
                 filters.family == "tracker",
-                { vm.updateFilters { it.copy(family = "tracker") } },
+                { actions.updateFilters { it.copy(family = "tracker") } },
                 { Text(stringResource(R.string.filter_trackers)) },
             )
             FilterChip(
                 filters.family == "sid",
-                { vm.updateFilters { it.copy(family = "sid") } },
+                { actions.updateFilters { it.copy(family = "sid") } },
                 { Text(stringResource(R.string.filter_sid)) },
             )
             FilterChip(
                 filters.family == "audio",
-                { vm.updateFilters { it.copy(family = "audio") } },
+                { actions.updateFilters { it.copy(family = "audio") } },
                 { Text(stringResource(R.string.filter_audio)) },
             )
         }
@@ -721,11 +727,11 @@ private fun FilterSheet(
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(
                 filters.format == null,
-                { vm.updateFilters { it.copy(format = null) } },
+                { actions.updateFilters { it.copy(format = null) } },
                 { Text(stringResource(R.string.common_all)) },
             )
             formats.forEach { format ->
-                FilterChip(filters.format == format, { vm.updateFilters { it.copy(format = format) } }, { Text(format.uppercase()) })
+                FilterChip(filters.format == format, { actions.updateFilters { it.copy(format = format) } }, { Text(format.uppercase()) })
             }
         }
         Text(
@@ -737,16 +743,16 @@ private fun FilterSheet(
             SORT_LABELS.forEach { (sort, label) ->
                 FilterChip(
                     filters.sort == sort,
-                    { vm.updateFilters { it.copy(sort = sort) } },
+                    { actions.updateFilters { it.copy(sort = sort) } },
                     { Text(stringResource(label)) },
                 )
             }
         }
         SwitchRow(stringResource(R.string.filter_descending), filters.descending) { v ->
-            vm.updateFilters { it.copy(descending = v) }
+            actions.updateFilters { it.copy(descending = v) }
         }
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(onClick = { vm.resetFilters() }) { Text(stringResource(R.string.common_reset)) }
+            TextButton(onClick = { actions.resetFilters() }) { Text(stringResource(R.string.common_reset)) }
             TextButton(onClick = onDone) { Text(stringResource(R.string.common_done)) }
         }
     }
@@ -783,7 +789,7 @@ fun QueueScreen(
 @Composable
 fun IgnoredScreen(
     ignored: List<TrackEntity>,
-    vm: AppViewModel,
+    actions: UiActions,
     onBack: () -> Unit,
 ) {
     var confirm by remember { mutableStateOf<TrackEntity?>(null) }
@@ -814,7 +820,7 @@ fun IgnoredScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        IconButton(onClick = { vm.restore(listOf(track)) }) {
+                        IconButton(onClick = { actions.restore(listOf(track)) }) {
                             Icon(AppIcons.Refresh, contentDescription = stringResource(R.string.cd_restore))
                         }
                         IconButton(onClick = { confirm = track }) {
@@ -836,7 +842,7 @@ fun IgnoredScreen(
             text = { Text(stringResource(R.string.delete_body_short, track.name)) },
             confirmButton = {
                 TextButton(onClick = {
-                    vm.deletePermanently(track)
+                    actions.deletePermanently(track)
                     confirm = null
                 }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
@@ -844,5 +850,51 @@ fun IgnoredScreen(
                 TextButton(onClick = { confirm = null }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
+    }
+}
+
+@Preview(name = "Library folders", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun LibraryFoldersPreview() {
+    PreviewFrame { LibraryContentPreview(rootId = null) }
+}
+
+@Preview(name = "Library all tracks", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun LibraryAllTracksPreview() {
+    PreviewFrame { LibraryContentPreview(rootId = ALL_ROOTS) }
+}
+
+@Composable
+private fun LibraryContentPreview(rootId: String?) {
+    LibraryScreen(
+        actions = PreviewActions,
+        tracks = previewTracks(),
+        libraryTracks = previewTracks(),
+        folders = previewFolders(),
+        filters = Filters(),
+        rootId = rootId,
+        path = emptyList(),
+        onNavigate = { _, _ -> },
+        onPlay = {},
+        onPlayList = { _, _ -> },
+        onAddFolder = {},
+        onOpenSettings = {},
+    )
+}
+
+@Preview(name = "Queue", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun QueueScreenPreview() {
+    PreviewFrame {
+        QueueScreen(queue = previewQueue(), index = 1, onPlay = {}, onBack = {})
+    }
+}
+
+@Preview(name = "Ignored", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun IgnoredScreenPreview() {
+    PreviewFrame {
+        IgnoredScreen(ignored = previewTracks().take(2), actions = PreviewActions, onBack = {})
     }
 }

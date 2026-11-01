@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.BuildConfig
 import com.bitti06.modplayjs.R
@@ -186,4 +187,16 @@ fun LicenseTextScreen(
             }
         }
     }
+}
+
+@Preview(name = "About", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun AboutScreenPreview() {
+    PreviewFrame { AboutScreen(sampleRate = 48_000, onOpenLicenses = {}, onBack = {}) }
+}
+
+@Preview(name = "Licenses", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun LicensesScreenPreview() {
+    PreviewFrame { LicensesScreen(onOpen = {}, onBack = {}) }
 }

@@ -44,7 +44,8 @@ class AppViewModel(
     private val repo: LibraryRepository,
     private val session: PlaybackSession,
     private val store: SettingsStore,
-) : ViewModel() {
+) : ViewModel(),
+    UiActions {
     private val filtersState = MutableStateFlow(Filters())
     val filters: StateFlow<Filters> = filtersState
     private val _settings = MutableStateFlow(store.load())
@@ -59,12 +60,12 @@ class AppViewModel(
     val awaitingStart: StateFlow<Int> = session.awaitingStart
     val folders: StateFlow<List<FolderEntity>> = repo.folders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val ignored: StateFlow<List<TrackEntity>> = repo.ignored.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    val v8Available: Boolean get() = session.v8Available
-    val v8Error: String? get() = session.v8Error
-    val underruns: Int get() = session.underruns
-    val sampleRate: Int get() = session.sampleRate
-    val audioSessionId: Int get() = session.audioSessionId
-    val audioInfo: AudioOutputInfo get() = session.audioInfo
+    override val v8Available: Boolean get() = session.v8Available
+    override val v8Error: String? get() = session.v8Error
+    override val underruns: Int get() = session.underruns
+    override val sampleRate: Int get() = session.sampleRate
+    override val audioSessionId: Int get() = session.audioSessionId
+    override val audioInfo: AudioOutputInfo get() = session.audioInfo
 
     private val allTracks = repo.tracks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -108,15 +109,15 @@ class AppViewModel(
         session.setSettings(_settings.value)
     }
 
-    fun updateFilters(block: (Filters) -> Filters) {
+    override fun updateFilters(block: (Filters) -> Filters) {
         filtersState.value = block(filtersState.value)
     }
 
-    fun resetFilters() {
+    override fun resetFilters() {
         filtersState.value = Filters()
     }
 
-    fun updateSettings(block: (AndroidSettings) -> AndroidSettings) {
+    override fun updateSettings(block: (AndroidSettings) -> AndroidSettings) {
         val old = _settings.value
         val next = block(old)
         _settings.value = next
@@ -129,9 +130,13 @@ class AppViewModel(
 
     fun addFolder(uri: Uri) = viewModelScope.launch { runCatching { repo.addFolder(uri) } }
 
-    fun rescan(folderId: String? = null) = viewModelScope.launch { runCatching { repo.rescan(folderId) } }
+    override fun rescan(folderId: String?) {
+        viewModelScope.launch { runCatching { repo.rescan(folderId) } }
+    }
 
-    fun removeFolder(folder: FolderEntity) = viewModelScope.launch { repo.removeFolder(folder) }
+    override fun removeFolder(folder: FolderEntity) {
+        viewModelScope.launch { repo.removeFolder(folder) }
+    }
 
     fun play(track: TrackEntity) {
         val list = tracks.value.ifEmpty { listOf(track) }
@@ -160,7 +165,7 @@ class AppViewModel(
         session.playIndex(index)
     }
 
-    fun togglePlay() {
+    override fun togglePlay() {
         val playing = snapshot.value?.state?.playing == true
         if (playing) {
             session.pause()
@@ -170,36 +175,43 @@ class AppViewModel(
         }
     }
 
-    fun next() = session.next()
+    override fun next() = session.next()
 
-    fun previous() = session.previous()
+    override fun previous() = session.previous()
 
-    fun stop() = session.stop()
+    override fun stop() = session.stop()
 
-    fun seek(ms: Long) = session.seek(ms)
+    override fun seek(ms: Long) = session.seek(ms)
 
-    fun toggleChannel(index: Int) = session.toggleChannelMute(index)
+    override fun toggleChannel(index: Int) = session.toggleChannelMute(index)
 
-    fun soloChannel(index: Int) = session.soloChannel(index)
+    override fun soloChannel(index: Int) = session.soloChannel(index)
 
-    fun muteAll() = session.muteAllChannels()
+    override fun muteAll() = session.muteAllChannels()
 
-    fun unmuteAll() = session.unmuteAllChannels()
+    override fun unmuteAll() = session.unmuteAllChannels()
 
-    fun resetChannels() = session.resetChannels()
+    override fun resetChannels() = session.resetChannels()
 
-    fun ignore(track: TrackEntity) = viewModelScope.launch { repo.ignore(track) }
+    override fun ignore(track: TrackEntity) {
+        viewModelScope.launch { repo.ignore(track) }
+    }
 
     /** Flips the favorite flag; the stored track may be a stale snapshot, so the id is what counts. */
-    fun toggleFavorite(track: TrackEntity) =
+    override fun toggleFavorite(track: TrackEntity) {
         viewModelScope.launch {
             val current = allTracks.value.firstOrNull { it.id == track.id }
             repo.setFavorite(track.id, (current ?: track).favoriteAt == null)
         }
+    }
 
-    fun restore(tracks: List<TrackEntity>) = viewModelScope.launch { repo.restore(tracks) }
+    override fun restore(tracks: List<TrackEntity>) {
+        viewModelScope.launch { repo.restore(tracks) }
+    }
 
-    fun deletePermanently(track: TrackEntity) = viewModelScope.launch { repo.deletePermanently(track) }
+    override fun deletePermanently(track: TrackEntity) {
+        viewModelScope.launch { repo.deletePermanently(track) }
+    }
 
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory =

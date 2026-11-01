@@ -140,7 +140,7 @@ private fun AppRoot(vm: AppViewModel) {
             entry<LanguageKey> { LanguageSettingsScreen(back) }
             entry<LibrarySettingsKey> {
                 LibrarySettingsScreen(
-                    vm = vm,
+                    actions = vm,
                     folders = folders,
                     ignoredCount = ignored.size,
                     onAddFolder = { folderPicker.launch(null) },
@@ -243,7 +243,7 @@ private fun AppRoot(vm: AppViewModel) {
 
                     Tab.Library ->
                         LibraryScreen(
-                            vm = vm,
+                            actions = vm,
                             tracks = tracks,
                             libraryTracks = libraryTracks,
                             folders = folders,
@@ -268,7 +268,7 @@ private fun AppRoot(vm: AppViewModel) {
 
                     Tab.Favorites ->
                         FavoritesScreen(
-                            vm = vm,
+                            actions = vm,
                             favorites = favorites,
                             onPlay = playTrack,
                             onPlayList = playList,
@@ -394,9 +394,11 @@ private fun PlayerTab(
     val snapshot by vm.snapshot.collectAsStateWithLifecycle()
     val loading by vm.loading.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
+    val currentTrack by vm.nowPlaying.collectAsStateWithLifecycle()
     PlayerScreen(
-        vm = vm,
+        actions = vm,
         snapshot = snapshot,
+        currentTrack = currentTrack,
         settings = settings,
         loading = loading,
         error = error,
@@ -459,7 +461,7 @@ private fun DiagnosticsEntry(
     onBack: () -> Unit,
 ) {
     val snapshot by vm.snapshot.collectAsStateWithLifecycle()
-    DiagnosticsScreen(snapshot = snapshot, vm = vm, onBack = onBack)
+    DiagnosticsScreen(snapshot = snapshot, actions = vm, onBack = onBack)
 }
 
 @Composable

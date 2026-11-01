@@ -24,6 +24,31 @@ Included run configurations:
 For a full V8 build, fetch the pinned prebuilt first. Without `v8Dir` the app
 builds the stub JNI so the UI/library work can be developed.
 
+## Previews
+
+Compose has no layout files, so the equivalent of the layout editor is the
+preview pane. Every screen file carries its own `@Preview`: open the file (for
+example `ui/PlayerScreens.kt`), pick a preview at the top right of the code
+editor, and the screen renders beside it with sample data from
+`ui/PreviewData.kt`.
+
+Previews never touch Room, V8 or an `AudioTrack` — those need a device and are
+what leave a preview stuck on its start-up screen. Actions are no-ops
+(`PreviewActions`), text is read from `AndroidSnapshot` fixtures, and the back
+handler is skipped while `LocalInspectionMode` is set.
+
+`ui-tooling-preview` is a normal dependency and `ui-tooling` is
+`debugImplementation`, so the release build does not carry the preview UI.
+
+If the pane stays on "Initializing":
+
+1. `Build → Rebuild Project` once. The preview renders the debug variant; a
+   failed or not-yet-run build keeps it on the start-up screen.
+2. `File → Sync Project with Gradle Files` after pulling changes that touch
+   the catalog — a stale model still has the old dependency list.
+3. Watch the `Build` window while the pane initializes; a compile error there
+   is the reason, not the preview.
+
 ## Build
 
 ```sh

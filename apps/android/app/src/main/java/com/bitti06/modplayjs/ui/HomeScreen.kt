@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.library.FolderEntity
@@ -161,4 +162,33 @@ fun HomeScreen(
         }
         item { Spacer(Modifier.height(24.dp)) }
     }
+}
+
+@Preview(name = "Home", showBackground = true, backgroundColor = 0xFF0C0A18)
+@Composable
+private fun HomeScreenPreview() {
+    PreviewFrame { HomeScreenContentPreview() }
+}
+
+@Preview(name = "Home light", showBackground = true, backgroundColor = 0xFFFBF7FF)
+@Composable
+private fun HomeScreenLightPreview() {
+    PreviewFrame(dark = false) { HomeScreenContentPreview() }
+}
+
+@Composable
+private fun HomeScreenContentPreview() {
+    HomeScreen(
+        tracks = previewTracks(),
+        recent = previewTracks().take(3),
+        folders = previewFolders(),
+        favoritesCount = 1,
+        onAddFolder = {},
+        onRescan = {},
+        onOpenLibrary = {},
+        onOpenFavorites = {},
+        onOpenFolder = {},
+        onPlay = {},
+        onToggleFavorite = {},
+    )
 }
