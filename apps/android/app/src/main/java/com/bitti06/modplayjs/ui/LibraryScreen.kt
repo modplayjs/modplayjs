@@ -126,6 +126,8 @@ fun LibraryScreen(
     // recreated by a configuration change, so re-focus and re-show it here.
     LaunchedEffect(Unit) {
         if (searchWasFocused) {
+            // Consume it: returning to this tab later must not pop the keyboard.
+            searchWasFocused = false
             searchFocus.requestFocus()
             withFrameNanos { }
             keyboard?.show()
