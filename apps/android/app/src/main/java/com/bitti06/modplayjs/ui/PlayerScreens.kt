@@ -94,7 +94,7 @@ fun PlayerScreen(
     onOpenDetails: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenText: (TrackText) -> Unit,
-    onOpenFolder: (TrackEntity) -> Unit,
+    onOpenFolder: (TrackEntity?) -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -102,9 +102,9 @@ fun PlayerScreen(
     val snap = snapshot
     val track = snap?.track
     var channelDialog by remember { mutableStateOf(false) }
-    // The track the gesture works on: the library row of what is playing, which
-    // is what knows the folder. Null when the tune has no row in the library.
-    val openable = currentTrack
+    // Only meaningful while something is loaded; the drawer falls back to the
+    // folder list when the playing tune has no library row.
+    val openable = snap?.track != null
 
     val accent = track?.let { accentColor(it.format) } ?: MaterialTheme.colorScheme.primary
     Box(
@@ -120,13 +120,13 @@ fun PlayerScreen(
             // Swipe left for the folder the playing file lives in. Sliders,
             // the channel strip and other horizontal children claim the drag
             // first, so the gesture only fires on the free area.
-            .pointerInput(openable) {
-                val target = openable ?: return@pointerInput
+            .pointerInput(openable, currentTrack) {
+                if (!openable) return@pointerInput
                 var dragged = 0f
                 detectHorizontalDragGestures(
                     onDragStart = { dragged = 0f },
                     onDragEnd = {
-                        if (dragged < -size.width * 0.18f) onOpenFolder(target)
+                        if (dragged < -size.width * 0.18f) onOpenFolder(currentTrack)
                         dragged = 0f
                     },
                     onDragCancel = { dragged = 0f },

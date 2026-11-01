@@ -102,6 +102,11 @@ private fun AppRoot(vm: AppViewModel) {
     val backStack = rememberNavBackStack()
     var libraryRoot by rememberSaveable { mutableStateOf<String?>(null) }
     var libraryPath by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+    // The player's swipe-left drawer: the folder of the playing track. Held as
+    // data (opened) and a flag (visible) so the panel has something to render
+    // while it slides out.
+    var folderSheet by remember { mutableStateOf<FolderView?>(null) }
+    var folderSheetOpen by remember { mutableStateOf(false) }
 
     val folderPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -126,8 +131,15 @@ private fun AppRoot(vm: AppViewModel) {
         tabName = Tab.Playing.name
     }
 
+    // Back closes the drawer before it leaves the player: the panel is not a
+    // navigation destination, so NavDisplay does not know about it.
+    BackHandler(enabled = backStack.isEmpty() && tab == Tab.Playing && folderSheetOpen) {
+        folderSheetOpen = false
+    }
     // NavDisplay registers its own back handler while the stack is not empty.
-    BackHandler(enabled = backStack.isEmpty() && tab == Tab.Playing) { tabName = Tab.Library.name }
+    BackHandler(enabled = backStack.isEmpty() && tab == Tab.Playing && !folderSheetOpen) {
+        tabName = Tab.Library.name
+    }
 
     val entries =
         entryProvider<NavKey> {
@@ -169,25 +181,6 @@ private fun AppRoot(vm: AppViewModel) {
                 QueueScreen(queue, queueIndex, onPlay = { vm.playQueue(it) }, onBack = back)
             }
             entry<TextKey> { key -> TextEntry(key.kind, vm, settings, back) }
-            entry<FolderKey> { key ->
-                FolderEntry(
-                    key = key,
-                    actions = vm,
-                    tracks = tracks,
-                    libraryTracks = libraryTracks,
-                    folders = folders,
-                    filters = filters,
-                    onPlay = { track ->
-                        back()
-                        playTrack(track)
-                    },
-                    onPlayList = { list, index ->
-                        back()
-                        playList(list, index)
-                    },
-                    onBack = back,
-                )
-            }
             entry<IgnoredKey> { IgnoredScreen(ignored, vm, back) }
         }
 
@@ -303,12 +296,42 @@ private fun AppRoot(vm: AppViewModel) {
                             onOpenDetails = { navigate(DetailsKey) },
                             onOpenQueue = { navigate(QueueKey) },
                             onOpenText = { kind -> navigate(TextKey(kind)) },
-                            onOpenFolder = { track -> navigate(FolderKey(track.folderId, folderPathOf(track))) },
+                            onOpenFolder = { track ->
+                                folderSheet = track?.let { FolderView(it.folderId, folderPathOf(it)) }
+                                folderSheetOpen = true
+                            },
                             onBrowseLibrary = { tabName = Tab.Library.name },
                             onOpenSettings = { navigate(SettingsKey) },
                         )
                 }
             }
+        }
+
+        // The player's folder drawer. A panel over the tabs rather than a
+        // destination: playback and the player underneath keep running, and
+        // closing returns to the same screen.
+        SideDrawer(
+            visible = folderSheetOpen,
+            onDismiss = { folderSheetOpen = false },
+            onHidden = { folderSheet = null },
+        ) {
+            FolderSheet(
+                initial = folderSheet,
+                actions = vm,
+                tracks = tracks,
+                libraryTracks = libraryTracks,
+                folders = folders,
+                filters = filters,
+                onPlay = { track ->
+                    folderSheetOpen = false
+                    playTrack(track)
+                },
+                onPlayList = { list, index ->
+                    folderSheetOpen = false
+                    playList(list, index)
+                },
+                onClose = { folderSheetOpen = false },
+            )
         }
         if (backStack.isNotEmpty()) {
             val backdrop = MaterialTheme.colorScheme.background
@@ -410,7 +433,7 @@ private fun PlayerTab(
     onOpenDetails: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenText: (TrackText) -> Unit,
-    onOpenFolder: (TrackEntity) -> Unit,
+    onOpenFolder: (TrackEntity?) -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -440,13 +463,20 @@ private fun folderPathOf(track: TrackEntity): List<String> {
     return if (directory.isEmpty()) emptyList() else directory.split('/')
 }
 
+/** What the player's drawer should show: a folder, or the folder list. */
+private data class FolderView(
+    val folderId: String,
+    val path: List<String>,
+)
+
 /**
- * The folder browser pushed from the player, open at the directory of the
- * playing file. Picking a track plays it and returns to the player.
+ * Contents of the player's drawer: the folder of the playing track, or the
+ * folder list when the player has no library row to point at. It owns the
+ * root and path, so browsing inside the panel never changes the Library tab.
  */
 @Composable
-private fun FolderEntry(
-    key: FolderKey,
+private fun FolderSheet(
+    initial: FolderView?,
     actions: UiActions,
     tracks: List<TrackEntity>,
     libraryTracks: List<TrackEntity>,
@@ -454,28 +484,40 @@ private fun FolderEntry(
     filters: Filters,
     onPlay: (TrackEntity) -> Unit,
     onPlayList: (List<TrackEntity>, Int) -> Unit,
-    onBack: () -> Unit,
+    onClose: () -> Unit,
 ) {
-    var path by remember(key) { mutableStateOf(key.path) }
+    var rootId by remember(initial) { mutableStateOf(initial?.folderId) }
+    var path by remember(initial) { mutableStateOf(initial?.path.orEmpty()) }
+    // The header arrow mirrors the system back: up one directory, then back to
+    // the folder list, then out of the drawer.
+    val up = {
+        when {
+            path.isNotEmpty() -> path = path.dropLast(1)
+            rootId != null -> {
+                rootId = null
+                path = emptyList()
+            }
+            else -> onClose()
+        }
+    }
     LibraryScreen(
         actions = actions,
         tracks = tracks,
         libraryTracks = libraryTracks,
         folders = folders,
         filters = filters,
-        rootId = key.folderId,
+        rootId = rootId,
         path = path,
-        // The browser reports "up" from the root as a null root; here that is
-        // the end of the pushed screen, not a return to the folder list.
         onNavigate = { root, next ->
-            if (root == null) onBack() else path = next
+            rootId = root
+            path = next
         },
         onPlay = onPlay,
         onPlayList = onPlayList,
         onAddFolder = {},
         onOpenSettings = {},
-        title = folders.firstOrNull { it.id == key.folderId }?.name,
-        onBack = onBack,
+        title = rootId?.let { id -> folders.firstOrNull { it.id == id }?.name },
+        onBack = up,
     )
 }
 
