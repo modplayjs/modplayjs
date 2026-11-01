@@ -442,10 +442,13 @@ fun InfoRow(
     label: String,
     value: String,
 ) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Text(
             label,
-            modifier = Modifier.width(136.dp),
+            modifier = Modifier.width(150.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
         )
