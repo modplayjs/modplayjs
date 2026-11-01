@@ -5,7 +5,22 @@ import android.content.Intent
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+
+/**
+ * A rescan in flight. [expected] is the sum of the folders' previous counts, 0
+ * when any folder has never been scanned and the percentage is unknown.
+ */
+data class ScanProgress(
+    val folderName: String,
+    val folderIndex: Int,
+    val folderCount: Int,
+    val files: Int,
+    val expected: Int,
+)
 
 class LibraryRepository(
     private val context: Context,
@@ -36,64 +51,90 @@ class LibraryRepository(
     suspend fun rescan(folderId: String? = null): Int =
         withContext(Dispatchers.IO) {
             val targets = if (folderId != null) listOfNotNull(dao.folder(folderId)) else dao.folderList()
+            // The previous count of every folder is the only estimate of the
+            // work ahead: a SAF walk cannot know how many files follow.
+            val expectedTotal = if (targets.all { it.fileCount > 0 }) targets.sumOf { it.fileCount } else 0
             var total = 0
-            for (folder in targets) {
-                val uri = Uri.parse(folder.treeUri)
-                val entries =
-                    runCatching { scanner.scan(uri) }.getOrElse {
-                        dao.upsertFolder(folder.copy(status = "revoked", error = it.message))
-                        return@withContext total
+            var scanned = 0
+            try {
+                targets.forEachIndexed { index, folder ->
+                    val uri = Uri.parse(folder.treeUri)
+                    fun publish(files: Int) {
+                        _progress.value =
+                            ScanProgress(
+                                folderName = folder.name,
+                                folderIndex = index + 1,
+                                folderCount = targets.size,
+                                files = scanned + files,
+                                expected = expectedTotal,
+                            )
                     }
-                val allExisting = dao.tracksInFolder(folder.id).associateBy { it.documentId }
-                // Rows for types the app no longer indexes (older builds stored
-                // every file) are removed instead of being kept as "missing".
-                val dropped = allExisting.values.filterNot { SafScanner.isSupported(it.name) }.map { it.id }
-                if (dropped.isNotEmpty()) dao.deleteTracks(dropped)
-                val existing = allExisting.filterValues { SafScanner.isSupported(it.name) }
-                val seen = HashSet<String>(entries.size)
-                val rows = ArrayList<TrackEntity>(entries.size)
-                val now = System.currentTimeMillis()
-                for (e in entries) {
-                    seen.add(e.documentId)
-                    val old = existing[e.documentId]
-                    val (format, family) = SafScanner.formatOf(e.name)
-                    rows.add(
-                        TrackEntity(
-                            id = "${folder.id}:${e.documentId}",
-                            folderId = folder.id,
-                            documentUri = e.documentUri,
-                            documentId = e.documentId,
-                            relativePath = e.relativePath,
-                            name = e.name,
-                            mime = e.mime,
-                            size = e.size,
-                            lastModified = e.lastModified,
-                            format = format,
-                            family = family,
-                            availability = "available",
-                            ignoredAt = old?.ignoredAt,
-                            addedAt = old?.addedAt ?: now,
-                            lastPlayed = old?.lastPlayed,
-                            favoriteAt = old?.favoriteAt,
+                    publish(0)
+                    val entries =
+                        runCatching { scanner.scan(uri) { publish(it) } }.getOrElse {
+                            dao.upsertFolder(folder.copy(status = "revoked", error = it.message))
+                            return@withContext total
+                        }
+                    val allExisting = dao.tracksInFolder(folder.id).associateBy { it.documentId }
+                    // Rows for types the app no longer indexes (older builds stored
+                    // every file) are removed instead of being kept as "missing".
+                    val dropped = allExisting.values.filterNot { SafScanner.isSupported(it.name) }.map { it.id }
+                    if (dropped.isNotEmpty()) dao.deleteTracks(dropped)
+                    val existing = allExisting.filterValues { SafScanner.isSupported(it.name) }
+                    val seen = HashSet<String>(entries.size)
+                    val rows = ArrayList<TrackEntity>(entries.size)
+                    val now = System.currentTimeMillis()
+                    for (e in entries) {
+                        seen.add(e.documentId)
+                        val old = existing[e.documentId]
+                        val (format, family) = SafScanner.formatOf(e.name)
+                        rows.add(
+                            TrackEntity(
+                                id = "${folder.id}:${e.documentId}",
+                                folderId = folder.id,
+                                documentUri = e.documentUri,
+                                documentId = e.documentId,
+                                relativePath = e.relativePath,
+                                name = e.name,
+                                mime = e.mime,
+                                size = e.size,
+                                lastModified = e.lastModified,
+                                format = format,
+                                family = family,
+                                availability = "available",
+                                ignoredAt = old?.ignoredAt,
+                                addedAt = old?.addedAt ?: now,
+                                lastPlayed = old?.lastPlayed,
+                                favoriteAt = old?.favoriteAt,
+                            ),
+                        )
+                    }
+                    rows.chunked(500).forEach { dao.upsertTracks(it) }
+                    val missing = existing.keys.filterNot { it in seen }.map { "${folder.id}:$it" }
+                    if (missing.isNotEmpty()) dao.markMissing(missing)
+                    dao.upsertFolder(
+                        folder.copy(
+                            lastScanAt = now,
+                            status = "ok",
+                            error = null,
+                            fileCount = entries.size,
+                            canWrite = scanner.canWrite(uri),
                         ),
                     )
+                    scanned += entries.size
+                    total += entries.size
+                    publish(0)
                 }
-                rows.chunked(500).forEach { dao.upsertTracks(it) }
-                val missing = existing.keys.filterNot { it in seen }.map { "${folder.id}:$it" }
-                if (missing.isNotEmpty()) dao.markMissing(missing)
-                dao.upsertFolder(
-                    folder.copy(
-                        lastScanAt = now,
-                        status = "ok",
-                        error = null,
-                        fileCount = entries.size,
-                        canWrite = scanner.canWrite(uri),
-                    ),
-                )
-                total += entries.size
+                total
+            } finally {
+                _progress.value = null
             }
-            total
         }
+
+    /** Live rescan state, null when nothing is scanning. */
+    val progress: StateFlow<ScanProgress?> = _progress.asStateFlow()
+
+    private val _progress = MutableStateFlow<ScanProgress?>(null)
 
     suspend fun removeFolder(folder: FolderEntity) =
         withContext(Dispatchers.IO) {

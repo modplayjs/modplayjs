@@ -17,6 +17,7 @@ import com.bitti06.modplayjs.engine.QueueItem
 import com.bitti06.modplayjs.engine.SettingsStore
 import com.bitti06.modplayjs.library.FolderEntity
 import com.bitti06.modplayjs.library.LibraryRepository
+import com.bitti06.modplayjs.library.ScanProgress
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.media.PlaybackService
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +64,7 @@ class AppViewModel(
     /** Bumped when a loaded track is waiting for the player screen to draw. */
     val awaitingStart: StateFlow<Int> = session.awaitingStart
     val folders: StateFlow<List<FolderEntity>> = repo.folders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val scanProgress: StateFlow<ScanProgress?> = repo.progress
     val ignored: StateFlow<List<TrackEntity>> = repo.ignored.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     override val v8Available: Boolean get() = session.v8Available
     override val v8Error: String? get() = session.v8Error

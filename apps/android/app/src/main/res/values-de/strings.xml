@@ -62,6 +62,13 @@
     <string name="favorites_empty_title">Noch keine Favoriten</string>
     <string name="favorites_empty_body">Markiere Module, SID-Tunes oder Audiodateien in der Bibliothek als Favorit, dann erscheinen sie hier.</string>
 
+    <plurals name="scan_files">
+        <item quantity="one">%1$d Datei</item>
+        <item quantity="other">%1$d Dateien</item>
+    </plurals>
+    <string name="scan_scanning">Scanne %1$s</string>
+    <string name="scan_percent">%1$d %%</string>
+
     <!-- Library -->
     <string name="library_title">Bibliothek</string>
     <string name="cd_filters">Filter</string>

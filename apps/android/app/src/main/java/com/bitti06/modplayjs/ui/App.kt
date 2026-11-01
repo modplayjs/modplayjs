@@ -59,6 +59,7 @@ import com.bitti06.modplayjs.engine.AndroidCapabilities
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.library.FolderEntity
+import com.bitti06.modplayjs.library.ScanProgress
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
@@ -90,6 +91,7 @@ private fun AppRoot(vm: AppViewModel) {
     val queue by vm.queue.collectAsStateWithLifecycle()
     val queueIndex by vm.queueIndex.collectAsStateWithLifecycle()
     val filters by vm.filters.collectAsStateWithLifecycle()
+    val scanProgress by vm.scanProgress.collectAsStateWithLifecycle()
     val awaitingStart by vm.awaitingStart.collectAsStateWithLifecycle()
 
     // A loaded track stays silent until this screen has composed and drawn it
@@ -165,6 +167,7 @@ private fun AppRoot(vm: AppViewModel) {
                     actions = vm,
                     folders = folders,
                     ignoredCount = ignored.size,
+                    scanProgress = scanProgress,
                     onAddFolder = { folderPicker.launch(null) },
                     onOpenIgnored = { navigate(IgnoredKey) },
                     onBack = back,
@@ -277,6 +280,7 @@ private fun AppRoot(vm: AppViewModel) {
                             libraryTracks = libraryTracks,
                             folders = folders,
                             filters = filters,
+                            scanProgress = scanProgress,
                             // A removed folder or an empty library drops back to
                             // the folder list instead of an empty browser.
                             rootId =
@@ -345,6 +349,7 @@ private fun AppRoot(vm: AppViewModel) {
                 libraryTracks = libraryTracks,
                 folders = folders,
                 filters = filters,
+                scanProgress = scanProgress,
                 onPlay = { track ->
                     folderSheetOpen = false
                     playTrack(track)
@@ -557,6 +562,7 @@ private fun FolderSheet(
     libraryTracks: List<TrackEntity>,
     folders: List<FolderEntity>,
     filters: Filters,
+    scanProgress: ScanProgress?,
     onPlay: (TrackEntity) -> Unit,
     onPlayList: (List<TrackEntity>, Int) -> Unit,
     onClose: () -> Unit,
@@ -581,6 +587,7 @@ private fun FolderSheet(
         libraryTracks = libraryTracks,
         folders = folders,
         filters = filters,
+        scanProgress = scanProgress,
         rootId = rootId,
         path = path,
         onNavigate = { root, next ->

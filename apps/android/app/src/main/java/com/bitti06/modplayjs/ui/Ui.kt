@@ -28,7 +28,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.rememberSliderState
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bitti06.modplayjs.R
+import com.bitti06.modplayjs.library.ScanProgress
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
@@ -518,6 +520,59 @@ fun formatTime(ms: Long): String = DateUtils.formatElapsedTime((ms / 1000).coerc
 
 @Composable
 fun formatSize(bytes: Long): String = Formatter.formatShortFileSize(LocalContext.current, bytes)
+
+/**
+ * Live rescan state: a bar with its percentage, or the number of files found so
+ * far while the total is unknown (a folder that has never been scanned).
+ */
+@Composable
+fun ScanBanner(
+    progress: ScanProgress,
+    modifier: Modifier = Modifier,
+) {
+    val fraction =
+        if (progress.expected > 0) {
+            (progress.files.toFloat() / progress.expected).coerceIn(0f, 1f)
+        } else {
+            null
+        }
+    Column(modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.scan_scanning, progress.folderName),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                if (fraction != null) {
+                    stringResource(R.string.scan_percent, (fraction * 100).toInt())
+                } else {
+                    pluralStringResource(R.plurals.scan_files, progress.files, progress.files)
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        if (fraction != null) {
+            LinearWavyProgressIndicator(
+                progress = { fraction },
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+        } else {
+            LinearWavyProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+        }
+    }
+}
 
 /** Small clickable card used on the home screen. */
 @Composable

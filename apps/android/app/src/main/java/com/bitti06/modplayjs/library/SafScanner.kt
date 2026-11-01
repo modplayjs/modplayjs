@@ -76,7 +76,7 @@ class SafScanner(
                             relativePath = childPath,
                         ),
                     )
-                    if (out.size % 200 == 0) onProgress(out.size)
+                    if (out.size % 50 == 0) onProgress(out.size)
                 }
             }
         }

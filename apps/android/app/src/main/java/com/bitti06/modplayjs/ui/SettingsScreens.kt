@@ -44,6 +44,7 @@ import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.engine.OutputPlayState
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.library.FolderEntity
+import com.bitti06.modplayjs.library.ScanProgress
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
 @Composable
@@ -326,6 +327,7 @@ fun LibrarySettingsScreen(
     actions: UiActions,
     folders: List<FolderEntity>,
     ignoredCount: Int,
+    scanProgress: ScanProgress?,
     onAddFolder: () -> Unit,
     onOpenIgnored: () -> Unit,
     onBack: () -> Unit,
@@ -343,6 +345,7 @@ fun LibrarySettingsScreen(
                 Text(stringResource(R.string.common_rescan))
             }
         }
+        scanProgress?.let { ScanBanner(it) }
         SettingsRow(
             stringResource(R.string.ignored_files),
             pluralStringResource(R.plurals.ignored_summary, ignoredCount, ignoredCount),
@@ -656,6 +659,7 @@ private fun LibrarySettingsPreview() {
             actions = PreviewActions,
             folders = previewFolders(),
             ignoredCount = 2,
+            scanProgress = ScanProgress("Modules", 1, 2, 640, 1280),
             onAddFolder = {},
             onOpenIgnored = {},
             onBack = {},

@@ -57,6 +57,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.library.FolderEntity
+import com.bitti06.modplayjs.library.ScanProgress
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
@@ -135,6 +136,8 @@ fun LibraryScreen(
     onPlayList: (List<TrackEntity>, Int) -> Unit,
     onAddFolder: () -> Unit,
     onOpenSettings: () -> Unit,
+    /** Live rescan state; the banner sits under the search field. */
+    scanProgress: ScanProgress? = null,
     /** Set when pushed from the player; shows a back arrow and the given title. */
     title: String? = null,
     onBack: (() -> Unit)? = null,
@@ -239,6 +242,7 @@ fun LibraryScreen(
                 unfocusedBorderColor = Color.Transparent,
             ),
         )
+        scanProgress?.let { ScanBanner(it) }
         if (filtersActive) {
             Row(
                 Modifier.fillMaxWidth().padding(top = 4.dp),
