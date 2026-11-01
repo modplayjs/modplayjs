@@ -119,7 +119,7 @@ class AppViewModel(
             // it stops listing files this build cannot open.
             val version =
                 session.snapshot
-                    .mapNotNull { it.engineVersion.takeIf(String::isNotBlank) }
+                    .mapNotNull { it?.engineVersion?.takeIf(String::isNotBlank) }
                     .first()
             if (store.engineVersion != version) {
                 store.engineVersion = version

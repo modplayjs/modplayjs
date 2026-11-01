@@ -131,10 +131,10 @@ class LibraryRepository(
             }
         }
 
+    private val _progress = MutableStateFlow<ScanProgress?>(null)
+
     /** Live rescan state, null when nothing is scanning. */
     val progress: StateFlow<ScanProgress?> = _progress.asStateFlow()
-
-    private val _progress = MutableStateFlow<ScanProgress?>(null)
 
     suspend fun removeFolder(folder: FolderEntity) =
         withContext(Dispatchers.IO) {
