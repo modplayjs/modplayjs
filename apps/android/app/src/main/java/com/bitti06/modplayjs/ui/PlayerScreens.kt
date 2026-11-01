@@ -11,6 +11,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -108,8 +109,53 @@ fun PlayerScreen(
             )
             return
         }
-        InfoPanel(track, Modifier.fillMaxWidth().height(250.dp))
-        Spacer(Modifier.height(12.dp))
+        val message = track.message?.takeIf { it.isNotBlank() }
+        val instruments = track.instrumentList
+        val samples = track.sampleList
+
+        // The three info boxes take the space between the header and the
+        // transport controls, each scrolling on its own; the transport block
+        // below stays pinned just above the bottom bar.
+        Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (message == null && instruments.isEmpty() && samples.isEmpty()) {
+                InfoBox("Track", Modifier.weight(1f)) {
+                    Text(
+                        "${track.format.uppercase()} · ${track.channels} channels · ${track.tracker}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            } else {
+                if (message != null) {
+                    InfoBox("Message", Modifier.weight(1f)) {
+                        Text(message.replace("\r", ""), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                if (instruments.isNotEmpty()) {
+                    InfoBox("Instruments", Modifier.weight(1f)) {
+                        instruments.forEach { instrument ->
+                            Text(
+                                "${instrument.index + 1}. ${instrument.name.ifBlank { "(unnamed)" }}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                        }
+                    }
+                }
+                if (samples.isNotEmpty()) {
+                    InfoBox("Samples", Modifier.weight(1f)) {
+                        samples.forEach { sample ->
+                            Text(
+                                "${sample.index + 1}. ${sample.name.ifBlank { "(unnamed)" }}  ${sample.length}${if (sample.loop) " L" else ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         Text(
             track.title.ifBlank { track.name },
             style = MaterialTheme.typography.headlineSmall,
@@ -182,6 +228,7 @@ fun PlayerScreen(
             }
             ChannelStrip(snap, vm)
         }
+        Spacer(Modifier.height(8.dp))
     }
     if (channelDialog && snap != null) {
         ChannelDialog(snap, vm) { channelDialog = false }
@@ -251,46 +298,32 @@ fun SystemEffectsUnavailableDialog(onDismiss: () -> Unit) {
     )
 }
 
+/** A titled, independently scrolling box used on the Now Playing screen. */
 @Composable
-private fun InfoPanel(
-    track: AndroidTrack,
+private fun InfoBox(
+    title: String,
     modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(modifier = modifier, shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (!track.message.isNullOrBlank()) {
-                Text("MESSAGE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                Text(track.message.replace("\r", ""), style = MaterialTheme.typography.bodySmall)
-            }
-            if (track.instrumentList.isNotEmpty()) {
-                Text("INSTRUMENTS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                track.instrumentList.forEach { instrument ->
-                    Text(
-                        "${instrument.index + 1}. ${instrument.name.ifBlank { "(unnamed)" }}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                    )
-                }
-            }
-            if (track.sampleList.isNotEmpty()) {
-                Text("SAMPLES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                track.sampleList.forEach { sample ->
-                    Text(
-                        "${sample.index + 1}. ${sample.name.ifBlank { "(unnamed)" }}  ${sample.length}${if (sample.loop) " L" else ""}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                    )
-                }
-            }
-            if (track.message.isNullOrBlank() && track.instrumentList.isEmpty() && track.sampleList.isEmpty()) {
-                Text(
-                    "${track.format.uppercase()} · ${track.channels} channels · ${track.tracker}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Column(Modifier.fillMaxSize()) {
+            Text(
+                title.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 2.dp),
+            )
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 10.dp),
+                content = content,
+            )
         }
     }
 }
@@ -415,31 +448,21 @@ fun DetailsScreen(
             if (track.instrumentList.isNotEmpty()) {
                 item { SectionTitle("Instruments") }
                 items(track.instrumentList, key = { "i${it.index}" }) { instrument ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { vm.auditionInstrument(instrument.index) }) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Audition instrument")
-                        }
-                        Text(
-                            "${instrument.index + 1}. ${instrument.name.ifBlank { "(unnamed)" }}",
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
+                    Text(
+                        "${instrument.index + 1}. ${instrument.name.ifBlank { "(unnamed)" }}",
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
             if (track.sampleList.isNotEmpty()) {
                 item { SectionTitle("Samples") }
                 items(track.sampleList, key = { "s${it.index}" }) { sample ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { vm.auditionSample(sample.index) }) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Audition sample")
-                        }
-                        Text(
-                            "${sample.index + 1}. ${sample.name.ifBlank { "(unnamed)" }}  ${sample.length}${if (sample.loop) " L" else ""}",
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
+                    Text(
+                        "${sample.index + 1}. ${sample.name.ifBlank { "(unnamed)" }}  ${sample.length}${if (sample.loop) " L" else ""}",
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
             item { SectionTitle("Channels (${snap.channels.size})") }
