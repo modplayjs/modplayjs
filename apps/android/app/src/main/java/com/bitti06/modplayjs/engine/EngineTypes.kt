@@ -179,6 +179,11 @@ data class AndroidState(
 @Serializable
 data class AndroidSnapshot(
     val schemaVersion: Int = 1,
+    /**
+     * What the engine build can play, e.g. "formats:mod,xm,...". A change means
+     * formats were added or removed, so the library has to be rescanned.
+     */
+    val engineVersion: String = "",
     val state: AndroidState = AndroidState(),
     val track: AndroidTrack? = null,
     val channels: List<AndroidChannel> = emptyList(),

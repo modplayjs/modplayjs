@@ -115,6 +115,11 @@ export interface AndroidState {
 
 export interface AndroidSnapshot {
   schemaVersion: 1;
+  /**
+   * Signature of what this engine build can play, e.g. the registered format
+   * ids. The app rescans its library when it changes.
+   */
+  engineVersion: string;
   state: AndroidState;
   track: AndroidTrack | null;
   channels: AndroidChannel[];

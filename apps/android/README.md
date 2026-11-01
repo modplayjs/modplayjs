@@ -90,7 +90,9 @@ debug APK, and verifies 16 KB ELF segment alignment.
 
 - Scans folders through the Storage Access Framework (persisted tree grants),
   indexing tracker modules, SID tunes and streamed audio into Room, with
-  favourites, ignore list, search and filters.
+  favourites, ignore list, search and filters. The engine reports what it can
+  play (`formats:mod,xm,…`); when that signature changes, the library rescans
+  itself once so it stops listing formats the build no longer opens.
 - Plays through the JS core in V8: float32 stereo into an `AudioTrack`, a
   queue with repeat/shuffle/auto-advance, channel mute/solo, per-format accent
   colours and an AudioEffect panel entry.

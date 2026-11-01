@@ -67314,32 +67314,36 @@
 
   // engine/src/engine-entry.ts
   var core = new Core();
-  core.registries.registerFormat(plugin);
-  core.registries.registerFormat(hmnPlugin);
-  core.registries.registerFormat(fltPlugin);
-  core.registries.registerFormat(plugin2);
-  core.registries.registerFormat(plugin4);
-  core.registries.registerFormat(plugin3);
-  core.registries.registerFormat(plugin5);
-  core.registries.registerFormat(plugin6);
-  core.registries.registerFormat(plugin7);
-  core.registries.registerFormat(plugin8);
-  core.registries.registerFormat(plugin9);
-  core.registries.registerFormat(plugin10);
-  core.registries.registerFormat(plugin11);
-  core.registries.registerFormat(plugin12);
-  core.registries.registerFormat(mmd3Plugin);
-  core.registries.registerFormat(med2Plugin);
-  core.registries.registerFormat(med3Plugin);
-  core.registries.registerFormat(med4Plugin);
-  core.registries.registerFormat(plugin13);
-  core.registries.registerFormat(plugin14);
-  core.registries.registerFormat(plugin15);
+  var FORMAT_PLUGINS = [
+    plugin,
+    hmnPlugin,
+    fltPlugin,
+    plugin2,
+    plugin4,
+    plugin3,
+    plugin5,
+    plugin6,
+    plugin7,
+    plugin8,
+    plugin9,
+    plugin10,
+    plugin11,
+    plugin12,
+    mmd3Plugin,
+    med2Plugin,
+    med3Plugin,
+    med4Plugin,
+    plugin13,
+    plugin14,
+    plugin15,
+    pwPlugin
+  ];
+  for (const plugin16 of FORMAT_PLUGINS) core.registries.registerFormat(plugin16);
+  var ENGINE_VERSION = `formats:${FORMAT_PLUGINS.map((plugin16) => plugin16.name).join(",")}`;
   core.registries.registerEffect(fcEffect);
   setModEventReader((c, chn, row) => {
     core.registries.format("mod").readEvent(c, chn, row);
   });
-  core.registries.registerFormat(pwPlugin);
   core.registries.registerDsp(createPaulaPlugin());
   var mixer = createSoftMixerPlugin();
   core.registries.registerDsp(mixer);
@@ -67560,6 +67564,7 @@
   function snapshotObject() {
     return {
       schemaVersion: SCHEMA_VERSION,
+      engineVersion: ENGINE_VERSION,
       state: buildState(),
       track: loaded ? buildTrack() : null,
       channels: loaded ? buildChannels() : [],

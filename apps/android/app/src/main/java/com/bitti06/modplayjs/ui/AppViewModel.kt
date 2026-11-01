@@ -24,7 +24,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -109,6 +111,19 @@ class AppViewModel(
 
     init {
         session.setSettings(_settings.value)
+        viewModelScope.launch {
+            // The engine names what it can play. When that signature changes -
+            // a format added, removed or replaced - the library is rescanned so
+            // it stops listing files this build cannot open.
+            val version =
+                session.snapshot
+                    .mapNotNull { it.engineVersion.takeIf(String::isNotBlank) }
+                    .first()
+            if (store.engineVersion != version) {
+                store.engineVersion = version
+                runCatching { repo.rescan(null) }
+            }
+        }
     }
 
     override fun updateFilters(block: (Filters) -> Filters) {

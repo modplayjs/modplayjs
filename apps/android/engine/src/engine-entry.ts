@@ -53,32 +53,48 @@ import {
 } from '@modplayjs/out-android';
 
 const core = new CorePlayer();
-core.registries.registerFormat(modPlugin);
-core.registries.registerFormat(hmnPlugin);
-core.registries.registerFormat(fltPlugin);
-core.registries.registerFormat(s3mPlugin);
-core.registries.registerFormat(xmPlugin);
-core.registries.registerFormat(itPlugin);
-core.registries.registerFormat(mtmPlugin);
-core.registries.registerFormat(stmPlugin);
-core.registries.registerFormat(s69Plugin);
-core.registries.registerFormat(sfxPlugin);
-core.registries.registerFormat(digiPlugin);
-core.registries.registerFormat(asylumPlugin);
-core.registries.registerFormat(icePlugin);
-core.registries.registerFormat(medPlugin);
-core.registries.registerFormat(mmd3Plugin);
-core.registries.registerFormat(med2Plugin);
-core.registries.registerFormat(med3Plugin);
-core.registries.registerFormat(med4Plugin);
-core.registries.registerFormat(stPlugin);
-core.registries.registerFormat(sidPlugin);
-core.registries.registerFormat(fcPlugin);
+
+/**
+ * Formats in probe order: the first plugin whose test() accepts the bytes wins,
+ * so the order is part of the behaviour, not a list to sort.
+ */
+const FORMAT_PLUGINS = [
+  modPlugin,
+  hmnPlugin,
+  fltPlugin,
+  s3mPlugin,
+  xmPlugin,
+  itPlugin,
+  mtmPlugin,
+  stmPlugin,
+  s69Plugin,
+  sfxPlugin,
+  digiPlugin,
+  asylumPlugin,
+  icePlugin,
+  medPlugin,
+  mmd3Plugin,
+  med2Plugin,
+  med3Plugin,
+  med4Plugin,
+  stPlugin,
+  sidPlugin,
+  fcPlugin,
+  pwPlugin,
+];
+for (const plugin of FORMAT_PLUGINS) core.registries.registerFormat(plugin);
+
+/**
+ * What this build can play, handed to the app so it can rescan its library when
+ * the set changes (a format added, removed or replaced). Decoder changes that
+ * keep the set identical need no rescan.
+ */
+const ENGINE_VERSION = `formats:${FORMAT_PLUGINS.map((plugin) => plugin.name).join(',')}`;
+
 core.registries.registerEffect(fcEffect);
 setModEventReader((c: Core, chn: number, row: number) => {
   core.registries.format('mod').readEvent(c, chn, row);
 });
-core.registries.registerFormat(pwPlugin);
 core.registries.registerDsp(createPaulaPlugin());
 const mixer = createSoftMixerPlugin() as SoftMixer;
 core.registries.registerDsp(mixer);
@@ -312,6 +328,7 @@ function buildState(): AndroidState {
 function snapshotObject(): AndroidSnapshot {
   return {
     schemaVersion: SCHEMA_VERSION,
+    engineVersion: ENGINE_VERSION,
     state: buildState(),
     track: loaded ? buildTrack() : null,
     channels: loaded ? buildChannels() : [],

@@ -423,6 +423,12 @@ fun DiagnosticsScreen(
             "V8",
             stringResource(if (actions.v8Available) R.string.v8_available else R.string.v8_stub),
         )
+        // The signature the library was scanned with; a change triggers a
+        // rescan on the next start.
+        InfoRow(
+            stringResource(R.string.diag_engine_version),
+            snapshot?.engineVersion?.takeIf { it.isNotBlank() } ?: "—",
+        )
         val v8Error = actions.v8Error
         if (!actions.v8Available && v8Error != null) {
             Text(v8Error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
