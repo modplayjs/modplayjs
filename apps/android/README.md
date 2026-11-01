@@ -5,9 +5,9 @@ Native Android 15+ player around the existing JS core.
 ## Requirements
 
 - JDK 21
-- Android SDK 36, build-tools 36.0.0, NDK 29.0.14206865, CMake 3.22.1
+- Android SDK 37, build-tools 37.0.0, NDK 29.0.14206865, CMake 4.1.2
 - Node 22
-- Gradle 8.13
+- Gradle 9.8.2 (wrapper included)
 
 
 ## Build
@@ -17,7 +17,7 @@ npm ci
 npm run build --workspaces --if-present
 npm run build:engine -w @modplayjs/android
 cd apps/android
-gradle :app:assembleDebug
+./gradlew :app:assembleDebug
 ```
 
 V8 is a pinned prebuilt static library from NativeScript/v8-buildscripts
@@ -26,7 +26,7 @@ V8 is a pinned prebuilt static library from NativeScript/v8-buildscripts
 ```sh
 ./apps/android/scripts/fetch-v8-prebuilt.sh arm64-v8a build/v8-prebuilt
 cd apps/android
-gradle :app:assembleDebug \
+./gradlew :app:assembleDebug \
   -Pv8Dir="$PWD/../../build/v8-prebuilt/android-arm64-v8a"
 ```
 
