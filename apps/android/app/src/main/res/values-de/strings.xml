@@ -146,7 +146,6 @@
     <string name="cd_stop">Stopp</string>
     <string name="player_queue">Warteschlange</string>
     <string name="player_details">Details</string>
-    <string name="player_effects">Effekte</string>
     <string name="player_channels">Kanäle</string>
     <string name="player_channels_count">%1$d · %2$d stumm</string>
     <string name="player_expand">Erweitern</string>

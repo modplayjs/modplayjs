@@ -246,38 +246,6 @@ object AppIcons {
 
     private var _delete: ImageVector? = null
 
-    val Equalizer: ImageVector
-        get() {
-            if (_equalizer != null) {
-                return _equalizer!!
-            }
-            _equalizer = materialIcon(name = "Filled.Equalizer") {
-                materialPath {
-                    moveTo(10.0f, 20.0f)
-                    horizontalLineToRelative(4.0f)
-                    lineTo(14.0f, 4.0f)
-                    horizontalLineToRelative(-4.0f)
-                    verticalLineToRelative(16.0f)
-                    close()
-                    moveTo(4.0f, 20.0f)
-                    horizontalLineToRelative(4.0f)
-                    verticalLineToRelative(-8.0f)
-                    lineTo(4.0f, 12.0f)
-                    verticalLineToRelative(8.0f)
-                    close()
-                    moveTo(16.0f, 9.0f)
-                    verticalLineToRelative(11.0f)
-                    horizontalLineToRelative(4.0f)
-                    lineTo(20.0f, 9.0f)
-                    horizontalLineToRelative(-4.0f)
-                    close()
-                }
-            }
-            return _equalizer!!
-        }
-
-    private var _equalizer: ImageVector? = null
-
     val Favorite: ImageVector
         get() {
             if (_favorite != null) {

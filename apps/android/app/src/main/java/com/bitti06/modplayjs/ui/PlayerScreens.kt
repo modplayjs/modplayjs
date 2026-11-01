@@ -90,13 +90,11 @@ fun PlayerScreen(
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    val context = LocalContext.current
     val current by vm.nowPlaying.collectAsStateWithLifecycle()
     val errorText = error?.let { stringResource(R.string.player_error, it.track, it.reason) }
     val snap = snapshot
     val track = snap?.track
     var channelDialog by remember { mutableStateOf(false) }
-    var showEffectsDialog by remember { mutableStateOf(false) }
 
     val accent = track?.let { accentColor(it.format) } ?: MaterialTheme.colorScheme.primary
     Box(
@@ -347,11 +345,21 @@ fun PlayerScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    // Queue, details and stop share the transport row; three
+                    // labelled buttons underneath ate a whole row for two
+                    // secondary actions. SpaceEvenly keeps the touch targets
+                    // apart on narrow windows instead of overlapping them.
                     Row(
                         Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
+                        horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        IconButton(onClick = onOpenQueue) {
+                            Icon(
+                                AppIcons.PlaylistPlay,
+                                contentDescription = stringResource(R.string.player_queue),
+                            )
+                        }
                         IconButton(onClick = { vm.previous() }) {
                             Icon(
                                 AppIcons.SkipPrevious,
@@ -361,7 +369,7 @@ fun PlayerScreen(
                         Box(contentAlignment = Alignment.Center) {
                             CircularWavyProgressIndicator(
                                 progress = { fraction },
-                                modifier = Modifier.size(96.dp),
+                                modifier = Modifier.size(88.dp),
                                 color = accent,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
                             )
@@ -383,30 +391,11 @@ fun PlayerScreen(
                         IconButton(onClick = { vm.stop() }) {
                             Icon(AppIcons.Stop, contentDescription = stringResource(R.string.cd_stop))
                         }
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(onClick = onOpenQueue, modifier = Modifier.weight(1f), shape = CircleShape) {
-                            Icon(AppIcons.PlaylistPlay, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.player_queue))
-                        }
-                        FilledTonalButton(onClick = onOpenDetails, modifier = Modifier.weight(1f), shape = CircleShape) {
-                            Icon(AppIcons.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.player_details))
-                        }
-                        FilledTonalButton(
-                            onClick = {
-                                if (!openSystemAudioEffects(context, vm.audioSessionId)) {
-                                    showEffectsDialog = true
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = CircleShape,
-                        ) {
-                            Icon(AppIcons.Equalizer, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.player_effects))
+                        IconButton(onClick = onOpenDetails) {
+                            Icon(
+                                AppIcons.Info,
+                                contentDescription = stringResource(R.string.player_details),
+                            )
                         }
                     }
                     val muted = snap.channels.count { it.muted }
@@ -460,9 +449,6 @@ fun PlayerScreen(
     }
     if (channelDialog && snap != null) {
         ChannelDialog(snap, vm) { channelDialog = false }
-    }
-    if (showEffectsDialog) {
-        SystemEffectsUnavailableDialog { showEffectsDialog = false }
     }
 }
 
