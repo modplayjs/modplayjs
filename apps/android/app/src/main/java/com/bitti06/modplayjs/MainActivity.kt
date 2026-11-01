@@ -12,7 +12,7 @@ import com.bitti06.modplayjs.ui.App
 import com.bitti06.modplayjs.ui.AppViewModel
 
 class MainActivity : ComponentActivity() {
-    private val vm: AppViewModel by viewModels { AppViewModel.factory(applicationContext) }
+    private val vm: AppViewModel by viewModels { AppViewModel.factory(application) }
 
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {}

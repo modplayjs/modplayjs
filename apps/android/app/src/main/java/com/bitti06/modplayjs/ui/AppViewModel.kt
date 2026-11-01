@@ -1,6 +1,6 @@
 package com.bitti06.modplayjs.ui
 
-import android.content.Context
+import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -40,7 +40,9 @@ data class Filters(
 )
 
 class AppViewModel(
-    private val context: Context,
+    // An Application, not the Activity: a view model outlives it, and a Context
+    // field makes lint (rightly) report a leak.
+    private val context: Application,
     private val repo: LibraryRepository,
     private val session: PlaybackSession,
     private val store: SettingsStore,
@@ -98,7 +100,7 @@ class AppViewModel(
             items.getOrNull(index)?.id?.let { id -> all.firstOrNull { it.id == id } }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    /** Favorited tracks, newest favorite first. Ignored tracks are excluded. */
+    /** Tracks marked as favorite, newest first. Ignored tracks are excluded. */
     val favorites: StateFlow<List<TrackEntity>> =
         allTracks
             .map { list -> list.filter { it.favoriteAt != null }.sortedByDescending { it.favoriteAt } }
@@ -214,11 +216,11 @@ class AppViewModel(
     }
 
     companion object {
-        fun factory(context: Context): ViewModelProvider.Factory =
+        fun factory(application: Application): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer {
                     AppViewModel(
-                        context.applicationContext,
+                        application,
                         AppGraph.library,
                         AppGraph.session,
                         AppGraph.settings,
