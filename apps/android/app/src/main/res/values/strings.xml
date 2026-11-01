@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">modplayjs</string>
+    <!--
+      Deliberately empty. Used by the <attribution> element in
+      AndroidManifest.xml to absorb the platform's empty attribution tag.
+    -->
+    <string name="attribution_empty" translatable="false" />
 </resources>

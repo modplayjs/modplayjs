@@ -6,6 +6,18 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!--
+      Android 16+ runs an AppOps check with an empty attribution tag from the
+      platform audio stack while audio is playing, and logs
+      "attributionTag  not declared in manifest of <package>" for every call.
+      Declaring an attribution whose tag is the empty string satisfies that
+      check; the empty value can only be expressed through a string resource.
+      Remove this once the platform stops checking an empty tag.
+    -->
+    <attribution
+        android:label="@string/app_name"
+        android:tag="@string/attribution_empty" />
+
     <application
         android:name=".ModplayApp"
         android:allowBackup="true"
