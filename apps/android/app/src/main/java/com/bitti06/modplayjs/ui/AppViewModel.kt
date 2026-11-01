@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.bitti06.modplayjs.AppGraph
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
+import com.bitti06.modplayjs.engine.PlayError
 import com.bitti06.modplayjs.engine.PlaybackSession
 import com.bitti06.modplayjs.engine.QueueItem
 import com.bitti06.modplayjs.engine.SettingsStore
@@ -51,7 +52,7 @@ class AppViewModel(
     val queue: StateFlow<List<QueueItem>> = session.queue
     val queueIndex: StateFlow<Int> = session.queueIndex
     val loading: StateFlow<String?> = session.loading
-    val error: StateFlow<String?> = session.error
+    val error: StateFlow<PlayError?> = session.error
 
     /** Bumped when a loaded track is waiting for the player screen to draw. */
     val awaitingStart: StateFlow<Int> = session.awaitingStart

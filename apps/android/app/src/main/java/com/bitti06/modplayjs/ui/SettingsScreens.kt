@@ -1,5 +1,8 @@
 package com.bitti06.modplayjs.ui
 
+import android.app.LocaleManager
+import android.os.LocaleList
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -7,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -17,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,9 +31,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
 import com.bitti06.modplayjs.BuildConfig
+import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidCapabilities
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.library.FolderEntity
@@ -54,16 +62,17 @@ fun SettingsHub(
     onOpen: (NavKey) -> Unit,
     onBack: () -> Unit,
 ) {
-    SettingsPage("Settings", onBack) {
-        SettingsRow("Playback") { onOpen(PlaybackSettingsKey) }
-        SettingsRow("Audio") { onOpen(AudioSettingsKey) }
-        SettingsRow("Mixer") { onOpen(MixerSettingsKey) }
-        SettingsRow("SID") { onOpen(SidSettingsKey) }
-        SettingsRow("Appearance") { onOpen(AppearanceSettingsKey) }
-        SettingsRow("Library") { onOpen(LibrarySettingsKey) }
-        SettingsRow("Diagnostics") { onOpen(DiagnosticsKey) }
-        SettingsRow("About") { onOpen(AboutKey) }
-        SettingsRow("Licenses") { onOpen(LicensesKey) }
+    SettingsPage(stringResource(R.string.settings_title), onBack) {
+        SettingsRow(stringResource(R.string.settings_playback)) { onOpen(PlaybackSettingsKey) }
+        SettingsRow(stringResource(R.string.settings_audio)) { onOpen(AudioSettingsKey) }
+        SettingsRow(stringResource(R.string.settings_mixer)) { onOpen(MixerSettingsKey) }
+        SettingsRow(stringResource(R.string.settings_sid)) { onOpen(SidSettingsKey) }
+        SettingsRow(stringResource(R.string.settings_appearance)) { onOpen(AppearanceSettingsKey) }
+        SettingsRow(stringResource(R.string.settings_language)) { onOpen(LanguageKey) }
+        SettingsRow(stringResource(R.string.settings_library)) { onOpen(LibrarySettingsKey) }
+        SettingsRow(stringResource(R.string.settings_diagnostics)) { onOpen(DiagnosticsKey) }
+        SettingsRow(stringResource(R.string.settings_about)) { onOpen(AboutKey) }
+        SettingsRow(stringResource(R.string.settings_licenses)) { onOpen(LicensesKey) }
     }
 }
 
@@ -73,19 +82,23 @@ fun PlaybackSettingsScreen(
     settings: AndroidSettings,
     onBack: () -> Unit,
 ) {
-    SettingsPage("Playback", onBack) {
+    SettingsPage(stringResource(R.string.settings_playback), onBack) {
         ChoiceRow(
-            "Repeat",
-            listOf("off" to "Off", "all" to "All", "one" to "One"),
+            stringResource(R.string.repeat_label),
+            listOf(
+                "off" to stringResource(R.string.repeat_off),
+                "all" to stringResource(R.string.repeat_all),
+                "one" to stringResource(R.string.repeat_one),
+            ),
             settings.playback.repeat,
         ) { value -> vm.updateSettings { it.copy(playback = it.playback.copy(repeat = value)) } }
-        SwitchRow("Shuffle", settings.playback.shuffle) { value ->
+        SwitchRow(stringResource(R.string.shuffle), settings.playback.shuffle) { value ->
             vm.updateSettings { it.copy(playback = it.playback.copy(shuffle = value)) }
         }
-        SwitchRow("Auto-advance", settings.playback.autoAdvance) { value ->
+        SwitchRow(stringResource(R.string.auto_advance), settings.playback.autoAdvance) { value ->
             vm.updateSettings { it.copy(playback = it.playback.copy(autoAdvance = value)) }
         }
-        SwitchRow("Jam mode (mute song)", settings.playback.jamMode) { value ->
+        SwitchRow(stringResource(R.string.jam_mode), settings.playback.jamMode) { value ->
             vm.updateSettings { it.copy(playback = it.playback.copy(jamMode = value)) }
         }
     }
@@ -101,12 +114,12 @@ fun AudioSettingsScreen(
     val context = LocalContext.current
     var showEffectsDialog by remember { mutableStateOf(false) }
     val effectsAvailable = remember { hasSystemAudioEffects(context) }
-    SettingsPage("Audio", onBack) {
-        SliderRow("Volume", settings.transport.volume.toFloat(), 0f..100f) { value ->
+    SettingsPage(stringResource(R.string.settings_audio), onBack) {
+        SliderRow(stringResource(R.string.volume), settings.transport.volume.toFloat(), 0f..100f) { value ->
             vm.updateSettings { it.copy(transport = it.transport.copy(volume = value.toInt())) }
         }
         SliderRow(
-            "Pan separation",
+            stringResource(R.string.pan_separation),
             settings.transport.panSeparation.toFloat(),
             0f..100f,
             enabled = capabilities?.panSeparation != false,
@@ -114,33 +127,35 @@ fun AudioSettingsScreen(
             vm.updateSettings { it.copy(transport = it.transport.copy(panSeparation = value.toInt())) }
         }
         ChoiceRow(
-            "Interpolation",
-            listOf("0" to "Nearest", "1" to "Linear", "2" to "Spline"),
+            stringResource(R.string.interpolation),
+            listOf(
+                "0" to stringResource(R.string.interpolation_nearest),
+                "1" to stringResource(R.string.interpolation_linear),
+                "2" to stringResource(R.string.interpolation_spline),
+            ),
             settings.transport.interpolation.toString(),
         ) { value ->
             vm.updateSettings { it.copy(transport = it.transport.copy(interpolation = value.toInt())) }
         }
-        SliderRow("Voices", settings.transport.numVoices.toFloat(), 4f..64f) { value ->
+        SliderRow(stringResource(R.string.voices), settings.transport.numVoices.toFloat(), 4f..64f) { value ->
             vm.updateSettings { it.copy(transport = it.transport.copy(numVoices = value.toInt())) }
         }
-        SliderRow("Tempo factor", settings.transport.tempoFactor.toFloat(), 0.25f..4f) { value ->
+        SliderRow(stringResource(R.string.tempo_factor), settings.transport.tempoFactor.toFloat(), 0.25f..4f) { value ->
             vm.updateSettings { it.copy(transport = it.transport.copy(tempoFactor = value.toDouble())) }
         }
-        SectionTitle("Output")
-        InfoRow("Rate", "${vm.sampleRate} Hz (device)")
-        InfoRow("Session", vm.audioSessionId.toString())
+        SectionTitle(stringResource(R.string.output))
+        InfoRow(stringResource(R.string.rate), stringResource(R.string.rate_value, vm.sampleRate))
+        InfoRow(stringResource(R.string.session), vm.audioSessionId.toString())
         Text(
-            "AudioTrack always runs at the device output rate; the engine is told that rate so pitch stays correct.",
+            stringResource(R.string.audio_output_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         SettingsRow(
-            "System audio effects",
-            if (effectsAvailable) {
-                "Equalizer, bass boost and other device effects"
-            } else {
-                "Not provided by this device"
-            },
+            stringResource(R.string.audio_effects),
+            stringResource(
+                if (effectsAvailable) R.string.audio_effects_summary else R.string.audio_effects_unavailable,
+            ),
         ) {
             if (!openSystemAudioEffects(context, vm.audioSessionId)) {
                 showEffectsDialog = true
@@ -159,31 +174,38 @@ fun MixerSettingsScreen(
     capabilities: AndroidCapabilities?,
     onBack: () -> Unit,
 ) {
-    SettingsPage("Mixer", onBack) {
+    SettingsPage(stringResource(R.string.settings_mixer), onBack) {
         Text(
-            "Applies to tracker modules. OpenMPT-style modules use libxmp; MOD files can use the Paula path.",
+            stringResource(R.string.mixer_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ChoiceRow(
-            "Mixer",
+            stringResource(R.string.mixer_mode),
             listOf("libxmp" to "libxmp", "paula" to "Paula"),
             settings.mixer.mode,
             enabled = capabilities?.mixerMode != false,
         ) { value -> vm.updateSettings { it.copy(mixer = it.mixer.copy(mode = value)) } }
         ChoiceRow(
-            "Layout",
-            listOf("panned" to "Module pan", "lrlr" to "L R L R", "lrrl" to "L R R L"),
+            stringResource(R.string.mixer_layout),
+            listOf(
+                "panned" to stringResource(R.string.layout_module_pan),
+                "lrlr" to "L R L R",
+                "lrrl" to "L R R L",
+            ),
             settings.mixer.layout,
             enabled = capabilities?.mixer != false,
         ) { value -> vm.updateSettings { it.copy(mixer = it.mixer.copy(layout = value)) } }
         ChoiceRow(
-            "A500 filter",
-            listOf("a500" to "LED off", "a500led" to "LED on"),
+            stringResource(R.string.a500_filter),
+            listOf(
+                "a500" to stringResource(R.string.a500_off),
+                "a500led" to stringResource(R.string.a500_on),
+            ),
             settings.mixer.amigaFilter,
             enabled = capabilities?.amigaFilter != false,
         ) { value -> vm.updateSettings { it.copy(mixer = it.mixer.copy(amigaFilter = value)) } }
-        SliderRow("Amplify", settings.mixer.amplify.toFloat(), 1f..32f) { value ->
+        SliderRow(stringResource(R.string.amplify), settings.mixer.amplify.toFloat(), 1f..32f) { value ->
             vm.updateSettings { it.copy(mixer = it.mixer.copy(amplify = value.toInt())) }
         }
     }
@@ -195,20 +217,24 @@ fun SidSettingsScreen(
     settings: AndroidSettings,
     onBack: () -> Unit,
 ) {
-    SettingsPage("SID", onBack) {
+    SettingsPage(stringResource(R.string.settings_sid), onBack) {
         Text(
-            "Settings for SID tunes; they do not affect tracker modules or streamed audio.",
+            stringResource(R.string.sid_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ChoiceRow(
-            "Chip",
-            listOf("0" to "Header", "6581" to "6581", "8580" to "8580"),
+            stringResource(R.string.sid_chip),
+            listOf("0" to stringResource(R.string.common_header), "6581" to "6581", "8580" to "8580"),
             settings.sid.model.toString(),
         ) { value -> vm.updateSettings { it.copy(sid = it.sid.copy(model = value.toInt())) } }
         ChoiceRow(
-            "Video",
-            listOf("null" to "Header", "0" to "NTSC", "1" to "PAL"),
+            stringResource(R.string.sid_video),
+            listOf(
+                "null" to stringResource(R.string.common_header),
+                "0" to stringResource(R.string.sid_ntsc),
+                "1" to stringResource(R.string.sid_pal),
+            ),
             settings.sid.videoStandard?.toString() ?: "null",
         ) { value ->
             vm.updateSettings {
@@ -216,16 +242,24 @@ fun SidSettingsScreen(
             }
         }
         ChoiceRow(
-            "Quality",
-            listOf("light" to "Light", "hq" to "HQ", "sinc" to "Sinc"),
+            stringResource(R.string.sid_quality),
+            listOf(
+                "light" to stringResource(R.string.quality_light),
+                "hq" to stringResource(R.string.quality_hq),
+                "sinc" to stringResource(R.string.quality_sinc),
+            ),
             settings.sid.quality,
         ) { value -> vm.updateSettings { it.copy(sid = it.sid.copy(quality = value)) } }
         ChoiceRow(
-            "Channels",
-            listOf("0" to "Mono", "1" to "Stereo", "3" to "Narrow"),
+            stringResource(R.string.sid_channels),
+            listOf(
+                "0" to stringResource(R.string.sid_mono),
+                "1" to stringResource(R.string.sid_stereo),
+                "3" to stringResource(R.string.sid_narrow),
+            ),
             settings.sid.stereo.toString(),
         ) { value -> vm.updateSettings { it.copy(sid = it.sid.copy(stereo = value.toInt())) } }
-        SliderRow("Engine volume", settings.sid.volume.toFloat(), 0f..255f) { value ->
+        SliderRow(stringResource(R.string.sid_engine_volume), settings.sid.volume.toFloat(), 0f..255f) { value ->
             vm.updateSettings { it.copy(sid = it.sid.copy(volume = value.toInt())) }
         }
     }
@@ -237,17 +271,24 @@ fun AppearanceSettingsScreen(
     settings: AndroidSettings,
     onBack: () -> Unit,
 ) {
-    SettingsPage("Appearance", onBack) {
-        ChoiceRow("Theme", listOf("dark" to "Dark", "light" to "Light"), settings.view.theme) { value ->
+    SettingsPage(stringResource(R.string.settings_appearance), onBack) {
+        ChoiceRow(
+            stringResource(R.string.theme),
+            listOf(
+                "dark" to stringResource(R.string.theme_dark),
+                "light" to stringResource(R.string.theme_light),
+            ),
+            settings.view.theme,
+        ) { value ->
             vm.updateSettings { it.copy(view = it.view.copy(theme = value)) }
         }
-        SwitchRow("Strip trailing dots", settings.view.stripDots) { value ->
+        SwitchRow(stringResource(R.string.strip_dots), settings.view.stripDots) { value ->
             vm.updateSettings { it.copy(view = it.view.copy(stripDots = value)) }
         }
-        SwitchRow("Reduced motion", settings.view.reducedMotion) { value ->
+        SwitchRow(stringResource(R.string.reduced_motion), settings.view.reducedMotion) { value ->
             vm.updateSettings { it.copy(view = it.view.copy(reducedMotion = value)) }
         }
-        SwitchRow("Show channel strip", settings.view.showChannelStrip) { value ->
+        SwitchRow(stringResource(R.string.show_channel_strip), settings.view.showChannelStrip) { value ->
             vm.updateSettings { it.copy(view = it.view.copy(showChannelStrip = value)) }
         }
     }
@@ -262,23 +303,31 @@ fun LibrarySettingsScreen(
     onOpenIgnored: () -> Unit,
     onBack: () -> Unit,
 ) {
-    SettingsPage("Library", onBack) {
+    SettingsPage(stringResource(R.string.settings_library), onBack) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onAddFolder, modifier = Modifier.weight(1f)) {
                 Icon(AppIcons.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
-                Text("Add folder")
+                Text(stringResource(R.string.common_add_folder))
             }
             OutlinedButton(onClick = { vm.rescan() }) {
                 Icon(AppIcons.Refresh, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
-                Text("Rescan")
+                Text(stringResource(R.string.common_rescan))
             }
         }
-        SettingsRow("Ignored files", "$ignoredCount removed from the library", onOpenIgnored)
-        SectionTitle("Indexed folders")
+        SettingsRow(
+            stringResource(R.string.ignored_files),
+            pluralStringResource(R.plurals.ignored_summary, ignoredCount, ignoredCount),
+            onOpenIgnored,
+        )
+        SectionTitle(stringResource(R.string.indexed_folders))
         if (folders.isEmpty()) {
-            Text("No folders added yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                stringResource(R.string.no_folders_yet),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         folders.forEach { folder ->
             Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
@@ -286,8 +335,19 @@ fun LibrarySettingsScreen(
                     Column(Modifier.weight(1f)) {
                         Text(folder.name, color = MaterialTheme.colorScheme.onSurface)
                         Text(
-                            "${folder.fileCount} files · ${folder.status}" +
-                                if (folder.canWrite) " · read/write" else " · read only",
+                            pluralStringResource(
+                                R.plurals.folder_summary,
+                                folder.fileCount,
+                                folder.fileCount,
+                                if (folder.status == "ok") {
+                                    stringResource(R.string.folder_status_ok)
+                                } else {
+                                    folder.status
+                                },
+                                stringResource(
+                                    if (folder.canWrite) R.string.folder_read_write else R.string.folder_read_only,
+                                ),
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (folder.status == "ok") MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                         )
@@ -296,10 +356,17 @@ fun LibrarySettingsScreen(
                         }
                     }
                     IconButton(onClick = { vm.rescan(folder.id) }) {
-                        Icon(AppIcons.Refresh, contentDescription = "Rescan ${folder.name}")
+                        Icon(
+                            AppIcons.Refresh,
+                            contentDescription = stringResource(R.string.cd_rescan_folder, folder.name),
+                        )
                     }
                     IconButton(onClick = { vm.removeFolder(folder) }) {
-                        Icon(AppIcons.Delete, contentDescription = "Remove ${folder.name}", tint = MaterialTheme.colorScheme.error)
+                        Icon(
+                            AppIcons.Delete,
+                            contentDescription = stringResource(R.string.cd_remove_folder, folder.name),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
                 HorizontalDivider()
@@ -313,19 +380,96 @@ fun DiagnosticsScreen(
     vm: AppViewModel,
     onBack: () -> Unit,
 ) {
-    SettingsPage("Diagnostics", onBack) {
-        SectionTitle("Engine")
-        InfoRow("V8", if (vm.v8Available) "available" else "stub")
+    SettingsPage(stringResource(R.string.settings_diagnostics), onBack) {
+        SectionTitle(stringResource(R.string.engine))
+        InfoRow(
+            "V8",
+            stringResource(if (vm.v8Available) R.string.v8_available else R.string.v8_stub),
+        )
         val v8Error = vm.v8Error
         if (!vm.v8Available && v8Error != null) {
             Text(v8Error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
-        InfoRow("Output rate", "${vm.sampleRate} Hz")
-        InfoRow("Audio session", vm.audioSessionId.toString())
-        InfoRow("Underruns", vm.underruns.toString())
-        SectionTitle("Build")
-        InfoRow("Version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
-        InfoRow("Commit", BuildConfig.GIT_COMMIT)
-        InfoRow("Variant", BuildConfig.BUILD_TYPE)
+        InfoRow(stringResource(R.string.output_rate), "${vm.sampleRate} Hz")
+        InfoRow(stringResource(R.string.audio_session), vm.audioSessionId.toString())
+        InfoRow(stringResource(R.string.underruns), vm.underruns.toString())
+        SectionTitle(stringResource(R.string.build))
+        InfoRow(
+            stringResource(R.string.version),
+            "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+        )
+        InfoRow(stringResource(R.string.commit), BuildConfig.GIT_COMMIT)
+        InfoRow(stringResource(R.string.variant), BuildConfig.BUILD_TYPE)
     }
+}
+
+@Composable
+fun LanguageSettingsScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val manager = remember { context.getSystemService(LocaleManager::class.java) }
+    var selected by remember { mutableStateOf(manager.applicationLocales.toLanguageTags()) }
+    SettingsPage(stringResource(R.string.language_title), onBack) {
+        Text(
+            stringResource(R.string.language_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        LanguageRow(
+            title = stringResource(R.string.common_system_default),
+            summary = stringResource(R.string.language_system_summary),
+            selected = selected.isEmpty(),
+        ) {
+            selected = ""
+            setAppLocale(context, "")
+        }
+        SupportedLocales.forEach { tag ->
+            val locale = java.util.Locale.forLanguageTag(tag)
+            LanguageRow(
+                title = locale.getDisplayName(locale).replaceFirstChar { it.uppercase(locale) },
+                summary = tag,
+                selected = selected == tag,
+            ) {
+                selected = tag
+                setAppLocale(context, tag)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LanguageRow(
+    title: String,
+    summary: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                summary,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        RadioButton(selected = selected, onClick = onClick)
+    }
+}
+
+/** Applies a per-app locale; an empty tag means "follow the system". */
+private fun setAppLocale(
+    context: android.content.Context,
+    tag: String,
+) {
+    val manager = context.getSystemService(LocaleManager::class.java)
+    manager.applicationLocales =
+        if (tag.isEmpty()) {
+            LocaleList.getEmptyLocaleList()
+        } else {
+            LocaleList.forLanguageTags(tag)
+        }
 }

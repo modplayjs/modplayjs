@@ -49,8 +49,8 @@ class PlaybackSession(
     val loading: StateFlow<String?> = _loading.asStateFlow()
 
     /** Last load/playback failure, shown by the player instead of silence. */
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
+    private val _error = MutableStateFlow<PlayError?>(null)
+    val error: StateFlow<PlayError?> = _error.asStateFlow()
 
     @Volatile private var currentSettings = AndroidSettings()
 
@@ -176,7 +176,7 @@ class PlaybackSession(
                     paused = true
                     audio.pause()
                     val reason = t.cause?.message?.ifBlank { null } ?: t.message ?: t.javaClass.simpleName
-                    _error.value = "Cannot play ${item.name}: $reason"
+                    _error.value = PlayError(item.name, reason)
                 }
                 Log.e(TAG, "play failed: ${item.name}", t)
             } finally {

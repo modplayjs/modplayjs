@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Locales the app ships strings for. Android shows these in Settings > Apps >
+  modplayjs > Language; the in-app Language screen reads ui/SupportedLocales.kt,
+  so both lists must match.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="de" />
+</locale-config>

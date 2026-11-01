@@ -22,10 +22,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.BuildConfig
+import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
 @Composable
@@ -38,7 +40,7 @@ fun AboutScreen(
 ) {
     val uriHandler = LocalUriHandler.current
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-        ModalTopBar("About", onBack)
+        ModalTopBar(stringResource(R.string.settings_about), onBack)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -59,7 +61,7 @@ fun AboutScreen(
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        "Native tracker player · V8",
+                        stringResource(R.string.about_tagline),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -71,30 +73,45 @@ fun AboutScreen(
                     )
                 }
             }
-            SectionTitle("Build")
-            InfoRow("Version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
-            InfoRow("Commit", BuildConfig.GIT_COMMIT)
-            InfoRow("Variant", BuildConfig.BUILD_TYPE)
-            InfoRow("Package", BuildConfig.APPLICATION_ID)
-            SectionTitle("Engine")
-            InfoRow("V8", if (v8Available) "available" else "stub")
+            SectionTitle(stringResource(R.string.build))
+            InfoRow(
+                stringResource(R.string.version),
+                "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            )
+            InfoRow(stringResource(R.string.commit), BuildConfig.GIT_COMMIT)
+            InfoRow(stringResource(R.string.variant), BuildConfig.BUILD_TYPE)
+            InfoRow(stringResource(R.string.package_label), BuildConfig.APPLICATION_ID)
+            SectionTitle(stringResource(R.string.engine))
+            InfoRow(
+                "V8",
+                stringResource(if (v8Available) R.string.v8_available else R.string.v8_stub),
+            )
             if (!v8Available && v8Error != null) {
                 Text(v8Error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
-            InfoRow("Output rate", "$sampleRate Hz")
-            InfoRow("Core", "modplayjs JS engine (V8, no WebView, no WASM)")
-            SectionTitle("Links")
-            SettingsRow("Source code", "github.com/modplayjs/modplayjs") {
+            InfoRow(stringResource(R.string.output_rate), "$sampleRate Hz")
+            InfoRow(stringResource(R.string.core_label), stringResource(R.string.core))
+            SectionTitle(stringResource(R.string.links))
+            SettingsRow(
+                stringResource(R.string.source_code),
+                stringResource(R.string.source_code_summary),
+            ) {
                 uriHandler.openUri("https://github.com/modplayjs/modplayjs")
             }
-            SettingsRow("Issues", "Report a bug or request a feature") {
+            SettingsRow(
+                stringResource(R.string.issues),
+                stringResource(R.string.issues_summary),
+            ) {
                 uriHandler.openUri("https://github.com/modplayjs/modplayjs/issues")
             }
-            SettingsRow("Licenses", "Open source notices and full texts", onOpenLicenses)
+            SettingsRow(
+                stringResource(R.string.settings_licenses),
+                stringResource(R.string.licenses_summary),
+                onOpenLicenses,
+            )
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             Text(
-                "modplayjs is free software under the BSD-3-Clause license. " +
-                    "Tracker engines and decoders are ported from their original projects; see Licenses for attribution.",
+                stringResource(R.string.about_license_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -108,9 +125,9 @@ fun LicensesScreen(
     onBack: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-        ModalTopBar("Licenses", onBack)
+        ModalTopBar(stringResource(R.string.settings_licenses), onBack)
         Text(
-            "This app ships the modplayjs core, V8 and AndroidX libraries. Ported code keeps its original license.",
+            stringResource(R.string.licenses_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp),
@@ -161,7 +178,7 @@ fun LicenseTextScreen(
             }
             val url = entry.url
             if (url != null) {
-                SettingsRow("Project page", url) { uriHandler.openUri(url) }
+                SettingsRow(stringResource(R.string.project_page), url) { uriHandler.openUri(url) }
             }
             Spacer(Modifier.height(8.dp))
             HorizontalDivider()
@@ -177,7 +194,7 @@ fun LicenseTextScreen(
                 }
             } else {
                 Text(
-                    "This component is released into the public domain; no license text is required.",
+                    stringResource(R.string.public_domain_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )

@@ -64,13 +64,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AndroidSnapshot
+import com.bitti06.modplayjs.engine.PlayError
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -80,13 +83,14 @@ fun PlayerScreen(
     snapshot: AndroidSnapshot?,
     settings: AndroidSettings,
     loading: String?,
-    error: String?,
+    error: PlayError?,
     onOpenDetails: () -> Unit,
     onOpenQueue: () -> Unit,
     onBrowseLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
+    val errorText = error?.let { stringResource(R.string.player_error, it.track, it.reason) }
     val snap = snapshot
     val track = snap?.track
     var channelDialog by remember { mutableStateOf(false) }
@@ -112,17 +116,19 @@ fun PlayerScreen(
         ) {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Now Playing",
+                    stringResource(R.string.player_now_playing),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                 )
-                IconButton(onClick = onOpenSettings) { Icon(AppIcons.Settings, contentDescription = "Settings") }
+                IconButton(onClick = onOpenSettings) {
+                    Icon(AppIcons.Settings, contentDescription = stringResource(R.string.common_settings))
+                }
             }
-            if (error != null) {
+            if (errorText != null) {
                 Text(
-                    error,
+                    errorText,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
@@ -160,9 +166,9 @@ fun PlayerScreen(
                         }
                         Text(
                             text = when {
-                                error != null -> "Playback failed"
-                                loading != null -> "Loading $loading"
-                                else -> "No track loaded"
+                                error != null -> stringResource(R.string.player_failed)
+                                loading != null -> stringResource(R.string.player_loading, loading)
+                                else -> stringResource(R.string.player_no_track)
                             },
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -170,11 +176,10 @@ fun PlayerScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = if (error != null) {
-                                "Open the library and pick another file."
-                            } else {
-                                "Choose a module, SID tune or audio file to start."
-                            },
+                            text =
+                                stringResource(
+                                    if (error != null) R.string.player_error_body else R.string.player_empty_body,
+                                ),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -184,7 +189,7 @@ fun PlayerScreen(
                         FilledTonalButton(onClick = onBrowseLibrary, shape = CircleShape) {
                             Icon(AppIcons.LibraryMusic, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Browse library")
+                            Text(stringResource(R.string.common_browse_library))
                         }
                     }
                 }
@@ -199,24 +204,41 @@ fun PlayerScreen(
             val infoBoxes: @Composable (Modifier) -> Unit = { modifier ->
                 Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (message == null && instruments.isEmpty() && samples.isEmpty()) {
-                        InfoBox("Track", Modifier.weight(1f), accent) {
+                        InfoBox(stringResource(R.string.info_track), Modifier.weight(1f), accent) {
                             Text(
-                                "${track.format.uppercase()} · ${track.channels} channels · ${track.tracker}",
+                                stringResource(
+                                    R.string.player_track_summary,
+                                    track.format.uppercase(),
+                                    track.channels,
+                                    track.tracker,
+                                ),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
                     } else {
                         if (message != null) {
-                            InfoBox("Message", Modifier.weight(1f), MaterialTheme.colorScheme.tertiary) {
+                            InfoBox(
+                                stringResource(R.string.info_message),
+                                Modifier.weight(1f),
+                                MaterialTheme.colorScheme.tertiary,
+                            ) {
                                 Text(message.replace("\r", ""), style = MaterialTheme.typography.bodySmall)
                             }
                         }
                         if (instruments.isNotEmpty()) {
-                            InfoBox("Instruments", Modifier.weight(1f), MaterialTheme.colorScheme.primary) {
+                            InfoBox(
+                                stringResource(R.string.info_instruments),
+                                Modifier.weight(1f),
+                                MaterialTheme.colorScheme.primary,
+                            ) {
                                 instruments.forEach { instrument ->
                                     Text(
-                                        "${instrument.index + 1}. ${instrument.name.ifBlank { "(unnamed)" }}",
+                                        stringResource(
+                                            R.string.list_numbered,
+                                            instrument.index + 1,
+                                            instrument.name.ifBlank { stringResource(R.string.common_unnamed) },
+                                        ),
                                         style = MaterialTheme.typography.bodySmall,
                                         fontFamily = FontFamily.Monospace,
                                     )
@@ -224,10 +246,19 @@ fun PlayerScreen(
                             }
                         }
                         if (samples.isNotEmpty()) {
-                            InfoBox("Samples", Modifier.weight(1f), MaterialTheme.colorScheme.secondary) {
+                            InfoBox(
+                                stringResource(R.string.info_samples),
+                                Modifier.weight(1f),
+                                MaterialTheme.colorScheme.secondary,
+                            ) {
                                 samples.forEach { sample ->
                                     Text(
-                                        "${sample.index + 1}. ${sample.name.ifBlank { "(unnamed)" }}  ${sample.length}${if (sample.loop) " L" else ""}",
+                                        stringResource(
+                                            if (sample.loop) R.string.sample_line_loop else R.string.sample_line,
+                                            sample.index + 1,
+                                            sample.name.ifBlank { stringResource(R.string.common_unnamed) },
+                                            sample.length,
+                                        ),
                                         style = MaterialTheme.typography.bodySmall,
                                         fontFamily = FontFamily.Monospace,
                                     )
@@ -299,7 +330,12 @@ fun PlayerScreen(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = { vm.previous() }) { Icon(AppIcons.SkipPrevious, contentDescription = "Previous") }
+                        IconButton(onClick = { vm.previous() }) {
+                            Icon(
+                                AppIcons.SkipPrevious,
+                                contentDescription = stringResource(R.string.cd_previous),
+                            )
+                        }
                         Box(contentAlignment = Alignment.Center) {
                             CircularWavyProgressIndicator(
                                 progress = { fraction },
@@ -314,24 +350,28 @@ fun PlayerScreen(
                             ) {
                                 Icon(
                                     if (snap.state.playing) AppIcons.Pause else AppIcons.PlayArrow,
-                                    contentDescription = "Play or pause",
+                                    contentDescription = stringResource(R.string.common_play_pause),
                                     modifier = Modifier.size(36.dp),
                                 )
                             }
                         }
-                        IconButton(onClick = { vm.next() }) { Icon(AppIcons.SkipNext, contentDescription = "Next") }
-                        IconButton(onClick = { vm.stop() }) { Icon(AppIcons.Stop, contentDescription = "Stop") }
+                        IconButton(onClick = { vm.next() }) {
+                            Icon(AppIcons.SkipNext, contentDescription = stringResource(R.string.cd_next))
+                        }
+                        IconButton(onClick = { vm.stop() }) {
+                            Icon(AppIcons.Stop, contentDescription = stringResource(R.string.cd_stop))
+                        }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilledTonalButton(onClick = onOpenQueue, modifier = Modifier.weight(1f), shape = CircleShape) {
                             Icon(AppIcons.PlaylistPlay, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Queue")
+                            Text(stringResource(R.string.player_queue))
                         }
                         FilledTonalButton(onClick = onOpenDetails, modifier = Modifier.weight(1f), shape = CircleShape) {
                             Icon(AppIcons.Info, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Details")
+                            Text(stringResource(R.string.player_details))
                         }
                         FilledTonalButton(
                             onClick = {
@@ -344,21 +384,23 @@ fun PlayerScreen(
                         ) {
                             Icon(AppIcons.Equalizer, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Effects")
+                            Text(stringResource(R.string.player_effects))
                         }
                     }
                     val muted = snap.channels.count { it.muted }
                     if (snap.capabilities.channelMute && settings.view.showChannelStrip && snap.channels.isNotEmpty()) {
                         Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            SectionTitle("Channels")
+                            SectionTitle(stringResource(R.string.player_channels))
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                "${snap.channels.size} · $muted muted",
+                                stringResource(R.string.player_channels_count, snap.channels.size, muted),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Spacer(Modifier.weight(1f))
-                            TextButton(onClick = { channelDialog = true }) { Text("Expand") }
+                            TextButton(onClick = { channelDialog = true }) {
+                                Text(stringResource(R.string.player_expand))
+                            }
                         }
                         ChannelStrip(snap, vm)
                     }
@@ -441,21 +483,15 @@ fun SystemEffectsUnavailableDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("No system effects panel") },
-        text = {
-            Text(
-                "Android only provides the audio-effects panel when the device vendor ships one. " +
-                    "This device does not, so there is no system equalizer to open. " +
-                    "Use your headphones' or speaker's own EQ, or open the system sound settings.",
-            )
-        },
+        title = { Text(stringResource(R.string.effects_missing_title)) },
+        text = { Text(stringResource(R.string.effects_missing_body)) },
         confirmButton = {
             TextButton(onClick = {
                 onDismiss()
                 runCatching { context.startActivity(Intent(Settings.ACTION_SOUND_SETTINGS)) }
-            }) { Text("Sound settings") }
+            }) { Text(stringResource(R.string.effects_sound_settings)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) } },
     )
 }
 
@@ -538,7 +574,7 @@ private fun ChannelDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Channels") },
+        title = { Text(stringResource(R.string.player_channels)) },
         text = {
             Column {
                 LazyVerticalGrid(
@@ -568,13 +604,15 @@ private fun ChannelDialog(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    TextButton(onClick = { vm.muteAll() }) { Text("Mute all") }
-                    TextButton(onClick = { vm.unmuteAll() }) { Text("Unmute") }
-                    TextButton(onClick = { vm.resetChannels() }) { Text("Reset") }
+                    TextButton(onClick = { vm.muteAll() }) { Text(stringResource(R.string.action_mute_all)) }
+                    TextButton(onClick = { vm.unmuteAll() }) { Text(stringResource(R.string.action_unmute)) }
+                    TextButton(onClick = { vm.resetChannels() }) { Text(stringResource(R.string.common_reset)) }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
+        },
     )
 }
 
@@ -587,26 +625,29 @@ fun DetailsScreen(
     val snap = snapshot
     val track = snap?.track
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-        ModalTopBar("Track details", onBack)
+        ModalTopBar(stringResource(R.string.details_title), onBack)
         if (snap == null || track == null) {
-            EmptyState("No track loaded", "Play a module to inspect its orders, instruments and samples.")
+            EmptyState(
+                stringResource(R.string.details_empty_title),
+                stringResource(R.string.details_empty_body),
+            )
             return
         }
         LazyColumn(Modifier.fillMaxSize()) {
-            item { SectionTitle("Info") }
+            item { SectionTitle(stringResource(R.string.details_info)) }
             listOf(
-                "file" to track.name,
-                "title" to track.title,
-                "format" to track.format.uppercase(),
-                "tracker" to track.tracker,
-                "channels" to track.channels.toString(),
-                "orders" to track.orders.toString(),
-                "patterns" to track.patterns.toString(),
-                "instruments" to track.instruments.toString(),
-                "samples" to track.samples.toString(),
-                "restart" to track.restart.toString(),
-            ).forEach { (label, value) -> item { InfoRow(label, value) } }
-            item { SectionTitle("Orders") }
+                R.string.details_file to track.name,
+                R.string.details_name to track.title,
+                R.string.details_format to track.format.uppercase(),
+                R.string.details_tracker to track.tracker,
+                R.string.details_channels_label to track.channels.toString(),
+                R.string.details_orders to track.orders.toString(),
+                R.string.details_patterns to track.patterns.toString(),
+                R.string.details_instruments to track.instruments.toString(),
+                R.string.details_samples to track.samples.toString(),
+                R.string.details_restart to track.restart.toString(),
+            ).forEach { (label, value) -> item { InfoRow(stringResource(label), value) } }
+            item { SectionTitle(stringResource(R.string.details_orders)) }
             item {
                 Text(
                     track.orderList.joinToString(" ") { it.toString().padStart(2, '0') },
@@ -616,30 +657,39 @@ fun DetailsScreen(
                 )
             }
             if (track.instrumentList.isNotEmpty()) {
-                item { SectionTitle("Instruments") }
+                item { SectionTitle(stringResource(R.string.details_instruments)) }
                 items(track.instrumentList, key = { "i${it.index}" }) { instrument ->
                     Text(
-                        "${instrument.index + 1}. ${instrument.name.ifBlank { "(unnamed)" }}",
+                        stringResource(
+                            R.string.list_numbered,
+                            instrument.index + 1,
+                            instrument.name.ifBlank { stringResource(R.string.common_unnamed) },
+                        ),
                         fontFamily = FontFamily.Monospace,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
             if (track.sampleList.isNotEmpty()) {
-                item { SectionTitle("Samples") }
+                item { SectionTitle(stringResource(R.string.details_samples)) }
                 items(track.sampleList, key = { "s${it.index}" }) { sample ->
                     Text(
-                        "${sample.index + 1}. ${sample.name.ifBlank { "(unnamed)" }}  ${sample.length}${if (sample.loop) " L" else ""}",
+                        stringResource(
+                            if (sample.loop) R.string.sample_line_loop else R.string.sample_line,
+                            sample.index + 1,
+                            sample.name.ifBlank { stringResource(R.string.common_unnamed) },
+                            sample.length,
+                        ),
                         fontFamily = FontFamily.Monospace,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
-            item { SectionTitle("Channels (${snap.channels.size})") }
+            item { SectionTitle(stringResource(R.string.details_channels, snap.channels.size)) }
             if (snap.channels.none { it.canMute }) {
                 item {
                     Text(
-                        "Channel mute is not available for this engine.",
+                        stringResource(R.string.details_mute_unavailable),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -653,13 +703,15 @@ fun DetailsScreen(
                         modifier = Modifier.weight(1f),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    if (channel.solo) Text("SOLO", color = MaterialTheme.colorScheme.primary)
+                    if (channel.solo) {
+                        Text(stringResource(R.string.details_solo), color = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
-            item { SectionTitle("Message") }
+            item { SectionTitle(stringResource(R.string.details_message)) }
             item {
                 Text(
-                    track.message ?: "No module message.",
+                    track.message ?: stringResource(R.string.details_no_message),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )

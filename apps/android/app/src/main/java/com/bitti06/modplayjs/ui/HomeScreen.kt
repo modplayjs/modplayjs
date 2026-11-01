@@ -26,8 +26,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.library.FolderEntity
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
@@ -75,13 +77,13 @@ fun HomeScreen(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            "Tracker player · V8",
+                            stringResource(R.string.home_tagline),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     IconButton(onClick = onOpenSettings) {
-                        Icon(AppIcons.Settings, contentDescription = "Settings")
+                        Icon(AppIcons.Settings, contentDescription = stringResource(R.string.common_settings))
                     }
                 }
             }
@@ -91,7 +93,7 @@ fun HomeScreen(
                 Button(onClick = onAddFolder, modifier = Modifier.weight(1f)) {
                     Icon(AppIcons.CreateNewFolder, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Add folder")
+                    Text(stringResource(R.string.common_add_folder))
                 }
                 OutlinedButton(onClick = onRescan) {
                     Icon(AppIcons.Refresh, contentDescription = null)
@@ -102,21 +104,21 @@ fun HomeScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatCard(
                     tracks.size.toString(),
-                    "tracks",
+                    stringResource(R.string.stat_tracks),
                     Modifier.weight(1f),
                     onClick = onOpenLibrary,
                     accent = MaterialTheme.colorScheme.primary,
                 )
                 StatCard(
                     folders.size.toString(),
-                    "folders",
+                    stringResource(R.string.stat_folders),
                     Modifier.weight(1f),
                     onClick = onOpenLibrary,
                     accent = MaterialTheme.colorScheme.secondary,
                 )
                 StatCard(
                     favoritesCount.toString(),
-                    "favorites",
+                    stringResource(R.string.stat_favorites),
                     Modifier.weight(1f),
                     onClick = onOpenFavorites,
                     accent = MaterialTheme.colorScheme.tertiary,
@@ -126,16 +128,21 @@ fun HomeScreen(
         if (folders.isEmpty()) {
             item {
                 EmptyState(
-                    title = "No music indexed",
-                    body = "Pick a folder. The scanner indexes tracker modules, SID tunes and audio files, including subfolders.",
-                    actionLabel = "Add folder",
+                    title = stringResource(R.string.home_empty_title),
+                    body = stringResource(R.string.home_empty_body),
+                    actionLabel = stringResource(R.string.common_add_folder),
                     onAction = onAddFolder,
                 )
             }
         } else {
-            item { SectionTitle("Recently added") }
+            item { SectionTitle(stringResource(R.string.home_recent)) }
             if (recent.isEmpty()) {
-                item { Text("Nothing yet", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item {
+                    Text(
+                        stringResource(R.string.home_nothing_yet),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             } else {
                 items(recent, key = { "recent:${it.id}" }) { track ->
                     TrackRow(
@@ -147,9 +154,11 @@ fun HomeScreen(
             }
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    SectionTitle("Folders")
+                    SectionTitle(stringResource(R.string.library_folders))
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick = onOpenLibrary) { Text("Open library") }
+                    TextButton(onClick = onOpenLibrary) {
+                        Text(stringResource(R.string.home_open_library))
+                    }
                 }
             }
             items(folders, key = { "folder:${it.id}" }) { folder ->

@@ -1,3 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Default (English) strings. Every user-facing string lives here; adding a
+  locale means a values-<tag>/strings.xml with the same names plus the tag in
+  res/xml/locales_config.xml and in ui/SupportedLocales.kt.
+-->
 <resources>
     <string name="app_name">modplayjs</string>
     <!--
@@ -5,4 +11,281 @@
       AndroidManifest.xml to absorb the platform's empty attribution tag.
     -->
     <string name="attribution_empty" translatable="false" />
+
+    <!-- Shared -->
+    <string name="common_cancel">Cancel</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_done">Done</string>
+    <string name="common_reset">Reset</string>
+    <string name="common_rescan">Rescan</string>
+    <string name="common_add_folder">Add folder</string>
+    <string name="common_browse_library">Browse library</string>
+    <string name="common_missing">Missing</string>
+    <string name="common_play">Play</string>
+    <string name="common_back">Back</string>
+    <string name="common_play_pause">Play or pause</string>
+    <string name="common_track_options">Track options</string>
+    <string name="common_close">Close</string>
+    <string name="common_unnamed">(unnamed)</string>
+    <string name="common_all">All</string>
+    <string name="common_header">Header</string>
+    <string name="common_settings">Settings</string>
+    <string name="common_system_default">System default</string>
+    <string name="action_play_all">Play all</string>
+    <string name="action_mute_all">Mute all</string>
+    <string name="action_unmute">Unmute</string>
+    <string name="cd_add_favorite">Add to favorites</string>
+    <string name="cd_remove_favorite">Remove from favorites</string>
+    <string name="action_add_favorite">Add to favorites</string>
+    <string name="action_remove_favorite">Remove from favorites</string>
+    <string name="action_ignore">Remove from library</string>
+    <string name="action_ignore_summary">Keeps the file, adds it to Ignored files</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_delete_permanent">Delete permanently</string>
+    <string name="action_delete_summary">Deletes the file from storage</string>
+    <string name="cd_play_folder">Play folder</string>
+
+    <!-- Tabs -->
+    <string name="tab_home">Home</string>
+    <string name="tab_library">Library</string>
+    <string name="tab_favorites">Favorites</string>
+    <string name="tab_playing">Playing</string>
+
+    <!-- Home -->
+    <string name="home_tagline">Tracker player · V8</string>
+    <string name="stat_tracks">tracks</string>
+    <string name="stat_folders">folders</string>
+    <string name="stat_favorites">favorites</string>
+    <string name="home_empty_title">No music indexed</string>
+    <string name="home_empty_body">Pick a folder. The scanner indexes tracker modules, SID tunes and audio files, including subfolders.</string>
+    <string name="home_recent">Recently added</string>
+    <string name="home_nothing_yet">Nothing yet</string>
+    <string name="home_open_library">Open library</string>
+
+    <!-- Favorites -->
+    <plurals name="track_count">
+        <item quantity="one">%1$d track</item>
+        <item quantity="other">%1$d tracks</item>
+    </plurals>
+
+    <plurals name="favorites_summary">
+        <item quantity="one">%1$d track · tap the heart to add one</item>
+        <item quantity="other">%1$d tracks · tap the heart to add one</item>
+    </plurals>
+    <string name="favorites_empty_title">No favorites yet</string>
+    <string name="favorites_empty_body">Favorite modules, SID tunes or audio files from the library and they show up here.</string>
+
+    <!-- Library -->
+    <string name="library_title">Library</string>
+    <string name="cd_filters">Filters</string>
+    <string name="library_search_hint">Search modules, paths</string>
+    <string name="cd_clear_search">Clear search</string>
+    <string name="library_filters_active">Filters active</string>
+    <string name="folder_all_tracks">All tracks</string>
+    <string name="library_folders">Folders</string>
+    <string name="library_no_folders_title">No folders yet</string>
+    <string name="library_no_folders_body">Add a folder to index your tracker modules, SID tunes or audio files.</string>
+    <plurals name="library_results">
+        <item quantity="one">%1$d result</item>
+        <item quantity="other">%1$d results</item>
+    </plurals>
+    <string name="library_nothing_found_title">Nothing found</string>
+    <string name="library_nothing_found_body">Try a different name or part of a folder path.</string>
+    <plurals name="library_all_folders">
+        <item quantity="one">All folders · %1$d track</item>
+        <item quantity="other">All folders · %1$d tracks</item>
+    </plurals>
+    <string name="library_nothing_here_title">Nothing here</string>
+    <string name="library_nothing_here_body">Add a folder or change the filters.</string>
+    <string name="cd_folders">Folders</string>
+    <string name="library_tracks">Tracks</string>
+    <string name="library_files_here">Files here</string>
+    <string name="library_empty_folder_title">Empty folder</string>
+    <string name="library_empty_folder_body">No playable files match the current filters.</string>
+    <string name="filter_status">Status</string>
+    <string name="filter_family">Family</string>
+    <string name="filter_format">Format</string>
+    <string name="filter_sort">Sort</string>
+    <string name="filter_trackers">Trackers</string>
+    <string name="filter_sid">SID</string>
+    <string name="filter_audio">Audio</string>
+    <string name="sort_name">Name</string>
+    <string name="sort_format">Format</string>
+    <string name="sort_family">Family</string>
+    <string name="sort_size">Size</string>
+    <string name="sort_added">Added</string>
+    <string name="sort_modified">Modified</string>
+    <string name="filter_descending">Descending</string>
+    <string name="cd_folder_options">Folder options</string>
+    <string name="cd_rescan_folder">Rescan %1$s</string>
+    <string name="cd_remove_folder">Remove %1$s</string>
+    <string name="delete_title">Delete permanently?</string>
+    <string name="delete_body">“%1$s” will be deleted from storage. This cannot be undone.</string>
+    <string name="delete_body_short">“%1$s” will be deleted from storage.</string>
+    <plurals name="folder_files">
+        <item quantity="one">%1$d file · %2$s</item>
+        <item quantity="other">%1$d files · %2$s</item>
+    </plurals>
+    <string name="folder_read_write">read/write</string>
+    <string name="folder_read_only">read only</string>
+    <string name="folder_status_ok">ok</string>
+    <string name="folder_fallback">Folder</string>
+    <string name="queue_title">Queue</string>
+    <string name="ignored_title">Ignored files</string>
+    <string name="ignored_body">Removed from the library, still on your device, skipped by rescans.</string>
+    <string name="ignored_empty_title">No ignored files</string>
+    <string name="ignored_empty_body">Files you remove from the library end up here.</string>
+    <string name="cd_restore">Restore</string>
+
+    <!-- Player -->
+    <string name="player_now_playing">Now Playing</string>
+    <string name="player_no_track">No track loaded</string>
+    <string name="player_failed">Playback failed</string>
+    <string name="player_loading">Loading %1$s</string>
+    <string name="player_empty_body">Choose a module, SID tune or audio file to start.</string>
+    <string name="player_error_body">Open the library and pick another file.</string>
+    <string name="player_error">Cannot play %1$s: %2$s</string>
+    <string name="player_track_summary">%1$s · %2$d channels · %3$s</string>
+    <string name="info_track">Track</string>
+    <string name="info_message">Message</string>
+    <string name="info_instruments">Instruments</string>
+    <string name="info_samples">Samples</string>
+    <string name="list_numbered">%1$d. %2$s</string>
+    <string name="sample_line">%1$d. %2$s  %3$d</string>
+    <string name="sample_line_loop">%1$d. %2$s  %3$d L</string>
+    <string name="cd_previous">Previous</string>
+    <string name="cd_next">Next</string>
+    <string name="cd_stop">Stop</string>
+    <string name="player_queue">Queue</string>
+    <string name="player_details">Details</string>
+    <string name="player_effects">Effects</string>
+    <string name="player_channels">Channels</string>
+    <string name="player_channels_count">%1$d · %2$d muted</string>
+    <string name="player_expand">Expand</string>
+    <string name="effects_missing_title">No system effects panel</string>
+    <string name="effects_missing_body">Android only provides the audio-effects panel when the device vendor ships one. This device does not, so there is no system equalizer to open. Use your headphones\' or speaker\'s own EQ, or open the system sound settings.</string>
+    <string name="effects_sound_settings">Sound settings</string>
+    <string name="details_title">Track details</string>
+    <string name="details_empty_title">No track loaded</string>
+    <string name="details_empty_body">Play a module to inspect its orders, instruments and samples.</string>
+    <string name="details_info">Info</string>
+    <string name="details_orders">Orders</string>
+    <string name="details_instruments">Instruments</string>
+    <string name="details_samples">Samples</string>
+    <string name="details_channels">Channels (%1$d)</string>
+    <string name="details_message">Message</string>
+    <string name="details_mute_unavailable">Channel mute is not available for this engine.</string>
+    <string name="details_solo">SOLO</string>
+    <string name="details_no_message">No module message.</string>
+    <string name="details_file">File</string>
+    <string name="details_name">Title</string>
+    <string name="details_format">Format</string>
+    <string name="details_tracker">Tracker</string>
+    <string name="details_channels_label">Channels</string>
+    <string name="details_patterns">Patterns</string>
+    <string name="details_restart">Restart</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_playback">Playback</string>
+    <string name="settings_audio">Audio</string>
+    <string name="settings_mixer">Mixer</string>
+    <string name="settings_sid">SID</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_library">Library</string>
+    <string name="settings_diagnostics">Diagnostics</string>
+    <string name="settings_about">About</string>
+    <string name="settings_licenses">Licenses</string>
+    <string name="settings_language">Language</string>
+    <string name="repeat_label">Repeat</string>
+    <string name="repeat_off">Off</string>
+    <string name="repeat_all">All</string>
+    <string name="repeat_one">One</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="auto_advance">Auto-advance</string>
+    <string name="jam_mode">Jam mode (mute song)</string>
+    <string name="volume">Volume</string>
+    <string name="pan_separation">Pan separation</string>
+    <string name="interpolation">Interpolation</string>
+    <string name="interpolation_nearest">Nearest</string>
+    <string name="interpolation_linear">Linear</string>
+    <string name="interpolation_spline">Spline</string>
+    <string name="voices">Voices</string>
+    <string name="tempo_factor">Tempo factor</string>
+    <string name="output">Output</string>
+    <string name="rate">Rate</string>
+    <string name="rate_value">%1$d Hz (device)</string>
+    <string name="session">Session</string>
+    <string name="audio_output_note">AudioTrack always runs at the device output rate; the engine is told that rate so pitch stays correct.</string>
+    <string name="audio_effects">System audio effects</string>
+    <string name="audio_effects_summary">Equalizer, bass boost and other device effects</string>
+    <string name="audio_effects_unavailable">Not provided by this device</string>
+    <string name="mixer_note">Applies to tracker modules. OpenMPT-style modules use libxmp; MOD files can use the Paula path.</string>
+    <string name="mixer_mode">Mixer</string>
+    <string name="mixer_layout">Layout</string>
+    <string name="layout_module_pan">Module pan</string>
+    <string name="a500_filter">A500 filter</string>
+    <string name="a500_off">LED off</string>
+    <string name="a500_on">LED on</string>
+    <string name="amplify">Amplify</string>
+    <string name="sid_note">Settings for SID tunes; they do not affect tracker modules or streamed audio.</string>
+    <string name="sid_chip">Chip</string>
+    <string name="sid_video">Video</string>
+    <string name="sid_ntsc">NTSC</string>
+    <string name="sid_pal">PAL</string>
+    <string name="sid_quality">Quality</string>
+    <string name="quality_light">Light</string>
+    <string name="quality_hq">HQ</string>
+    <string name="quality_sinc">Sinc</string>
+    <string name="sid_channels">Channels</string>
+    <string name="sid_mono">Mono</string>
+    <string name="sid_stereo">Stereo</string>
+    <string name="sid_narrow">Narrow</string>
+    <string name="sid_engine_volume">Engine volume</string>
+    <string name="theme">Theme</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_light">Light</string>
+    <string name="strip_dots">Strip trailing dots</string>
+    <string name="reduced_motion">Reduced motion</string>
+    <string name="show_channel_strip">Show channel strip</string>
+    <string name="ignored_files">Ignored files</string>
+    <plurals name="ignored_summary">
+        <item quantity="one">%1$d removed from the library</item>
+        <item quantity="other">%1$d removed from the library</item>
+    </plurals>
+    <string name="indexed_folders">Indexed folders</string>
+    <string name="no_folders_yet">No folders added yet.</string>
+    <plurals name="folder_summary">
+        <item quantity="one">%1$d file · %2$s · %3$s</item>
+        <item quantity="other">%1$d files · %2$s · %3$s</item>
+    </plurals>
+    <string name="engine">Engine</string>
+    <string name="v8_available">available</string>
+    <string name="v8_stub">stub</string>
+    <string name="output_rate">Output rate</string>
+    <string name="audio_session">Audio session</string>
+    <string name="underruns">Underruns</string>
+    <string name="build">Build</string>
+    <string name="version">Version</string>
+    <string name="commit">Commit</string>
+    <string name="variant">Variant</string>
+    <string name="language_title">Language</string>
+    <string name="language_body">The app follows the system language unless you pick one here. This only changes this app.</string>
+    <string name="language_system_summary">Use the language set in Android settings</string>
+
+    <!-- About -->
+    <string name="about_tagline">Native tracker player · V8</string>
+    <string name="package_label">Package</string>
+    <string name="core_label">Core</string>
+    <string name="core">modplayjs JS engine (V8, no WebView, no WASM)</string>
+    <string name="links">Links</string>
+    <string name="source_code">Source code</string>
+    <string name="source_code_summary">github.com/modplayjs/modplayjs</string>
+    <string name="issues">Issues</string>
+    <string name="issues_summary">Report a bug or request a feature</string>
+    <string name="licenses_summary">Open source notices and full texts</string>
+    <string name="about_license_note">modplayjs is free software under the BSD-3-Clause license. Tracker engines and decoders are ported from their original projects; see Licenses for attribution.</string>
+    <string name="licenses_note">This app ships the modplayjs core, V8 and AndroidX libraries. Ported code keeps its original license.</string>
+    <string name="project_page">Project page</string>
+    <string name="public_domain_note">This component is released into the public domain; no license text is required.</string>
 </resources>

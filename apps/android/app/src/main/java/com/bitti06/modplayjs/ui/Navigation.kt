@@ -26,6 +26,9 @@ data object SidSettingsKey : NavKey
 data object AppearanceSettingsKey : NavKey
 
 @Serializable
+data object LanguageKey : NavKey
+
+@Serializable
 data object LibrarySettingsKey : NavKey
 
 @Serializable

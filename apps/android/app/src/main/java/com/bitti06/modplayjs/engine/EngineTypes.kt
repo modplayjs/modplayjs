@@ -191,3 +191,12 @@ data class QueueItem(
     val uri: String,
     val format: String = "",
 )
+
+/**
+ * A failed play, kept as data so the UI can format it in the user's language
+ * instead of the engine stitching an English sentence together.
+ */
+data class PlayError(
+    val track: String,
+    val reason: String,
+)

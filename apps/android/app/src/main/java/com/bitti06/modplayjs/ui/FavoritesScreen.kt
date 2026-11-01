@@ -35,8 +35,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
@@ -70,13 +73,13 @@ fun FavoritesScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Favorites",
+                        stringResource(R.string.tab_favorites),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        "${favorites.size} ${if (favorites.size == 1) "track" else "tracks"} · tap the heart to add one",
+                        pluralStringResource(R.plurals.favorites_summary, favorites.size, favorites.size),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -88,16 +91,16 @@ fun FavoritesScreen(
                 ) {
                     Icon(AppIcons.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Play all")
+                    Text(stringResource(R.string.action_play_all))
                 }
             }
         }
         Spacer(Modifier.height(10.dp))
         if (favorites.isEmpty()) {
             EmptyState(
-                title = "No favorites yet",
-                body = "Favorite modules, SID tunes or audio files from the library and they show up here.",
-                actionLabel = "Browse library",
+                title = stringResource(R.string.favorites_empty_title),
+                body = stringResource(R.string.favorites_empty_body),
+                actionLabel = stringResource(R.string.common_browse_library),
                 onAction = onBrowseLibrary,
             )
         } else {
@@ -110,7 +113,10 @@ fun FavoritesScreen(
                         onToggleFavorite = { vm.toggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { showTrackActions = track }) {
-                                Icon(AppIcons.MoreVert, contentDescription = "Track options")
+                                Icon(
+                                    AppIcons.MoreVert,
+                                    contentDescription = stringResource(R.string.common_track_options),
+                                )
                             }
                         },
                     )
@@ -153,15 +159,19 @@ fun FavoritesScreen(
     showDeleteConfirm?.let { track ->
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = null },
-            title = { Text("Delete permanently?") },
-            text = { Text("\"${track.name}\" will be deleted from storage. This cannot be undone.") },
+            title = { Text(stringResource(R.string.delete_title)) },
+            text = { Text(stringResource(R.string.delete_body, track.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     vm.deletePermanently(track)
                     showDeleteConfirm = null
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = null }) { Text("Cancel") } },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
         )
     }
 }

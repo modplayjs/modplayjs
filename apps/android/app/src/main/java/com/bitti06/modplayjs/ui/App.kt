@@ -3,6 +3,7 @@ package com.bitti06.modplayjs.ui
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,18 +50,19 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
 private enum class Tab(
-    val label: String,
+    @StringRes val label: Int,
     val icon: ImageVector,
 ) {
-    Home("Home", AppIcons.Home),
-    Library("Library", AppIcons.LibraryMusic),
-    Favorites("Favorites", AppIcons.Favorite),
-    Playing("Playing", AppIcons.MusicNote),
+    Home(R.string.tab_home, AppIcons.Home),
+    Library(R.string.tab_library, AppIcons.LibraryMusic),
+    Favorites(R.string.tab_favorites, AppIcons.Favorite),
+    Playing(R.string.tab_playing, AppIcons.MusicNote),
 }
 
 @Composable
@@ -136,6 +139,7 @@ private fun AppRoot(vm: AppViewModel) {
             entry<MixerSettingsKey> { MixerSettingsScreen(vm, settings, snapshot?.capabilities, back) }
             entry<SidSettingsKey> { SidSettingsScreen(vm, settings, back) }
             entry<AppearanceSettingsKey> { AppearanceSettingsScreen(vm, settings, back) }
+            entry<LanguageKey> { LanguageSettingsScreen(back) }
             entry<LibrarySettingsKey> {
                 LibrarySettingsScreen(
                     vm = vm,
@@ -206,8 +210,10 @@ private fun AppRoot(vm: AppViewModel) {
                             NavigationBarItem(
                                 selected = tab == item,
                                 onClick = { tabName = item.name },
-                                icon = { Icon(item.icon, contentDescription = item.label) },
-                                label = { Text(item.label) },
+                                icon = {
+                                    Icon(item.icon, contentDescription = stringResource(item.label))
+                                },
+                                label = { Text(stringResource(item.label)) },
                                 colors =
                                     NavigationBarItemDefaults.colors(
                                         indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
@@ -364,7 +370,7 @@ private fun MiniPlayer(
                 IconButton(onClick = onToggle) {
                     Icon(
                         if (snap.state.playing) AppIcons.Pause else AppIcons.PlayArrow,
-                        contentDescription = "Play or pause",
+                        contentDescription = stringResource(R.string.common_play_pause),
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }

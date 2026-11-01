@@ -44,12 +44,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
@@ -124,7 +127,7 @@ fun ModalTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
-            Icon(AppIcons.ArrowBack, contentDescription = "Back")
+            Icon(AppIcons.ArrowBack, contentDescription = stringResource(R.string.common_back))
         }
         Text(
             title,
@@ -179,14 +182,21 @@ fun TrackRow(
             )
         }
         if (track.availability == "missing") {
-            Icon(AppIcons.Warning, contentDescription = "Missing", tint = MaterialTheme.colorScheme.error)
+            Icon(
+                AppIcons.Warning,
+                contentDescription = stringResource(R.string.common_missing),
+                tint = MaterialTheme.colorScheme.error,
+            )
         }
         if (onToggleFavorite != null) {
             val favorite = track.favoriteAt != null
             IconButton(onClick = onToggleFavorite) {
                 Icon(
                     if (favorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
-                    contentDescription = if (favorite) "Remove from favorites" else "Add to favorites",
+                    contentDescription =
+                        stringResource(
+                            if (favorite) R.string.cd_remove_favorite else R.string.cd_add_favorite,
+                        ),
                     tint = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -224,19 +234,33 @@ fun TrackActionsSheet(
             FormatBadge(track.format.uppercase())
             Text(formatSize(track.size), style = MaterialTheme.typography.labelSmall)
             if (track.availability == "missing") {
-                Text("Missing", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                Text(
+                    stringResource(R.string.common_missing),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
+                )
             }
         }
         Spacer(Modifier.height(8.dp))
         HorizontalDivider()
-        SettingsRow("Play", null, onPlay)
+        SettingsRow(stringResource(R.string.common_play), null, onPlay)
         SettingsRow(
-            if (track.favoriteAt == null) "Add to favorites" else "Remove from favorites",
+            stringResource(
+                if (track.favoriteAt == null) R.string.action_add_favorite else R.string.action_remove_favorite,
+            ),
             null,
             onToggleFavorite,
         )
-        SettingsRow("Remove from library", "Keeps the file, adds it to Ignored files", onIgnore)
-        SettingsRow("Delete permanently", "Deletes the file from storage", onDelete)
+        SettingsRow(
+            stringResource(R.string.action_ignore),
+            stringResource(R.string.action_ignore_summary),
+            onIgnore,
+        )
+        SettingsRow(
+            stringResource(R.string.action_delete_permanent),
+            stringResource(R.string.action_delete_summary),
+            onDelete,
+        )
     }
 }
 
@@ -278,13 +302,15 @@ fun FolderRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "$trackCount ${if (trackCount == 1) "track" else "tracks"}",
+                pluralStringResource(R.plurals.track_count, trackCount, trackCount),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (onPlay != null) {
-            IconButton(onClick = onPlay) { Icon(AppIcons.PlayArrow, contentDescription = "Play folder") }
+            IconButton(onClick = onPlay) {
+                Icon(AppIcons.PlayArrow, contentDescription = stringResource(R.string.cd_play_folder))
+            }
         }
         trailing?.invoke()
         Icon(AppIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

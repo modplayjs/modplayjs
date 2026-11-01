@@ -49,13 +49,32 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bitti06.modplayjs.R
 import com.bitti06.modplayjs.library.FolderEntity
 import com.bitti06.modplayjs.library.TrackEntity
 import com.bitti06.modplayjs.ui.icons.AppIcons
 
 const val ALL_ROOTS = "*"
+
+/** Filter sort keys with their translated labels. */
+private val SORT_LABELS =
+    listOf(
+        "name" to R.string.sort_name,
+        "format" to R.string.sort_format,
+        "family" to R.string.sort_family,
+        "size" to R.string.sort_size,
+        "added" to R.string.sort_added,
+        "modified" to R.string.sort_modified,
+    )
+
+/** Folder status is stored as a key; only "ok" has a translation. */
+@Composable
+private fun folderStatusLabel(status: String): String =
+    if (status == "ok") stringResource(R.string.folder_status_ok) else status
 
 private data class Subfolder(
     val name: String,
@@ -147,17 +166,30 @@ fun LibraryScreen(
     Column(Modifier.fillMaxSize().safeContentPadding().padding(horizontal = 12.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Library",
+                stringResource(R.string.library_title),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(onClick = onAddFolder) { Icon(AppIcons.CreateNewFolder, contentDescription = "Add folder") }
-            IconButton(onClick = { showFilters = true }) {
-                Icon(AppIcons.FilterList, contentDescription = "Filters", tint = if (filtersActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            IconButton(onClick = onAddFolder) {
+                Icon(AppIcons.CreateNewFolder, contentDescription = stringResource(R.string.common_add_folder))
             }
-            IconButton(onClick = onOpenSettings) { Icon(AppIcons.Settings, contentDescription = "Settings") }
+            IconButton(onClick = { showFilters = true }) {
+                Icon(
+                    AppIcons.FilterList,
+                    contentDescription = stringResource(R.string.cd_filters),
+                    tint =
+                        if (filtersActive) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                )
+            }
+            IconButton(onClick = onOpenSettings) {
+                Icon(AppIcons.Settings, contentDescription = stringResource(R.string.common_settings))
+            }
         }
         OutlinedTextField(
             value = filters.search,
@@ -167,14 +199,14 @@ fun LibraryScreen(
                     .fillMaxWidth()
                     .focusRequester(searchFocus)
                     .onFocusChanged { searchWasFocused = it.isFocused },
-            placeholder = { Text("Search modules, paths") },
+            placeholder = { Text(stringResource(R.string.library_search_hint)) },
             leadingIcon = {
                 Icon(AppIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             },
             trailingIcon = {
                 if (filters.search.isNotEmpty()) {
                     IconButton(onClick = { vm.updateFilters { it.copy(search = "") } }) {
-                        Icon(AppIcons.Close, contentDescription = "Clear search")
+                        Icon(AppIcons.Close, contentDescription = stringResource(R.string.cd_clear_search))
                     }
                 }
             },
@@ -192,8 +224,13 @@ fun LibraryScreen(
                 Modifier.fillMaxWidth().padding(top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Filters active", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-                TextButton(onClick = { vm.resetFilters() }) { Text("Reset") }
+                Text(
+                    stringResource(R.string.library_filters_active),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { vm.resetFilters() }) { Text(stringResource(R.string.common_reset)) }
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -294,15 +331,19 @@ fun LibraryScreen(
     showDeleteConfirm?.let { track ->
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = null },
-            title = { Text("Delete permanently?") },
-            text = { Text("\"${track.name}\" will be deleted from storage. This cannot be undone.") },
+            title = { Text(stringResource(R.string.delete_title)) },
+            text = { Text(stringResource(R.string.delete_body, track.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     vm.deletePermanently(track)
                     showDeleteConfirm = null
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = null }) { Text("Cancel") } },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
         )
     }
 
@@ -312,7 +353,15 @@ fun LibraryScreen(
             title = { Text(folder.name) },
             text = {
                 Column {
-                    Text("${folder.fileCount} files · ${folder.status}", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        pluralStringResource(
+                            R.plurals.folder_files,
+                            folder.fileCount,
+                            folder.fileCount,
+                            folderStatusLabel(folder.status),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                     val error = folder.error
                     if (error != null) {
                         Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -323,13 +372,13 @@ fun LibraryScreen(
                 TextButton(onClick = {
                     vm.rescan(folder.id)
                     folderMenu = null
-                }) { Text("Rescan") }
+                }) { Text(stringResource(R.string.common_rescan)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     vm.removeFolder(folder)
                     folderMenu = null
-                }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error) }
             },
         )
     }
@@ -352,13 +401,13 @@ private fun RootList(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "Folders",
+                        stringResource(R.string.library_folders),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        "${tracks.size} tracks",
+                        pluralStringResource(R.plurals.track_count, tracks.size, tracks.size),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -366,7 +415,7 @@ private fun RootList(
             }
             item {
                 FolderRow(
-                    name = "All tracks",
+                    name = stringResource(R.string.folder_all_tracks),
                     trackCount = tracks.size,
                     onClick = onAll,
                 )
@@ -380,7 +429,10 @@ private fun RootList(
                 onPlay = null,
                 trailing = {
                     IconButton(onClick = { onFolderMenu(folder) }) {
-                        Icon(AppIcons.MoreVert, contentDescription = "Folder options")
+                        Icon(
+                            AppIcons.MoreVert,
+                            contentDescription = stringResource(R.string.cd_folder_options),
+                        )
                     }
                 },
             )
@@ -388,9 +440,9 @@ private fun RootList(
         if (folders.isEmpty()) {
             item {
                 EmptyState(
-                    title = "No folders yet",
-                    body = "Add a folder to index your tracker modules, SID tunes or audio files.",
-                    actionLabel = "Add folder",
+                    title = stringResource(R.string.library_no_folders_title),
+                    body = stringResource(R.string.library_no_folders_body),
+                    actionLabel = stringResource(R.string.common_add_folder),
                     onAction = onAddFolder,
                 )
             }
@@ -408,13 +460,16 @@ private fun SearchResults(
 ) {
     Column(Modifier.fillMaxSize()) {
         Text(
-            "${tracks.size} ${if (tracks.size == 1) "result" else "results"}",
+            pluralStringResource(R.plurals.library_results, tracks.size, tracks.size),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(vertical = 8.dp),
         )
         if (tracks.isEmpty()) {
-            EmptyState("Nothing found", "Try a different name or part of a folder path.")
+            EmptyState(
+                stringResource(R.string.library_nothing_found_title),
+                stringResource(R.string.library_nothing_found_body),
+            )
         } else {
             LazyColumn(Modifier.weight(1f)) {
                 items(tracks, key = { it.id }) { track ->
@@ -425,7 +480,10 @@ private fun SearchResults(
                         onToggleFavorite = { onToggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
-                                Icon(AppIcons.MoreVert, contentDescription = "Track options")
+                                Icon(
+                                    AppIcons.MoreVert,
+                                    contentDescription = stringResource(R.string.common_track_options),
+                                )
                             }
                         },
                     )
@@ -445,9 +503,11 @@ private fun AllTracks(
 ) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onExit) { Icon(AppIcons.ArrowBack, contentDescription = "Folders") }
+            IconButton(onClick = onExit) {
+                Icon(AppIcons.ArrowBack, contentDescription = stringResource(R.string.cd_folders))
+            }
             Text(
-                "All folders · ${tracks.size} ${if (tracks.size == 1) "track" else "tracks"}",
+                pluralStringResource(R.plurals.library_all_folders, tracks.size, tracks.size),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
@@ -455,7 +515,10 @@ private fun AllTracks(
         }
         HorizontalDivider()
         if (tracks.isEmpty()) {
-            EmptyState("Nothing here", "Add a folder or change the filters.")
+            EmptyState(
+                stringResource(R.string.library_nothing_here_title),
+                stringResource(R.string.library_nothing_here_body),
+            )
         } else {
             LazyColumn(Modifier.weight(1f)) {
                 items(tracks, key = { it.id }) { track ->
@@ -466,7 +529,10 @@ private fun AllTracks(
                         onToggleFavorite = { onToggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
-                                Icon(AppIcons.MoreVert, contentDescription = "Track options")
+                                Icon(
+                                    AppIcons.MoreVert,
+                                    contentDescription = stringResource(R.string.common_track_options),
+                                )
                             }
                         },
                     )
@@ -492,7 +558,7 @@ private fun Browser(
     val base = path.joinToString("/")
     val scope = remember(tracks, rootId, base) { scopeTracks(tracks, rootId, base) }
     val (subfolders, direct) = remember(scope, base) { split(scope, base) }
-    val rootName = folders.firstOrNull { it.id == rootId }?.name ?: "Folder"
+    val rootName = folders.firstOrNull { it.id == rootId }?.name ?: stringResource(R.string.folder_fallback)
     // A fresh list state per folder: opening a folder, entering a subfolder or
     // stepping up a breadcrumb always starts at the top instead of keeping the
     // scroll offset of the folder that was open before.
@@ -503,7 +569,9 @@ private fun Browser(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onExit) { Icon(AppIcons.ArrowBack, contentDescription = "Folders") }
+            IconButton(onClick = onExit) {
+                Icon(AppIcons.ArrowBack, contentDescription = stringResource(R.string.cd_folders))
+            }
             TextButton(onClick = { onNavigate(emptyList()) }) {
                 Text(rootName, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -516,7 +584,7 @@ private fun Browser(
         }
         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "${scope.size} ${if (scope.size == 1) "track" else "tracks"}",
+                pluralStringResource(R.plurals.track_count, scope.size, scope.size),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
@@ -528,13 +596,13 @@ private fun Browser(
             ) {
                 Icon(AppIcons.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Play all")
+                Text(stringResource(R.string.action_play_all))
             }
         }
         HorizontalDivider()
         LazyColumn(Modifier.weight(1f), state = listState) {
             if (subfolders.isNotEmpty()) {
-                item { SectionTitle("Folders") }
+                item { SectionTitle(stringResource(R.string.library_folders)) }
                 items(subfolders, key = { "f:${it.name}" }) { folder ->
                     val childBase = if (base.isEmpty()) folder.name else "$base/${folder.name}"
                     val childPrefix = "$childBase/"
@@ -552,7 +620,13 @@ private fun Browser(
                 }
             }
             if (direct.isNotEmpty()) {
-                item { SectionTitle(if (subfolders.isEmpty()) "Tracks" else "Files here") }
+                item {
+                    SectionTitle(
+                        stringResource(
+                            if (subfolders.isEmpty()) R.string.library_tracks else R.string.library_files_here,
+                        ),
+                    )
+                }
                 items(direct, key = { it.id }) { track ->
                     TrackRow(
                         track,
@@ -561,14 +635,22 @@ private fun Browser(
                         onToggleFavorite = { onToggleFavorite(track) },
                         trailing = {
                             IconButton(onClick = { onMore(track) }) {
-                                Icon(AppIcons.MoreVert, contentDescription = "Track options")
+                                Icon(
+                                    AppIcons.MoreVert,
+                                    contentDescription = stringResource(R.string.common_track_options),
+                                )
                             }
                         },
                     )
                 }
             }
             if (subfolders.isEmpty() && direct.isEmpty()) {
-                item { EmptyState("Empty folder", "No playable files match the current filters.") }
+                item {
+                    EmptyState(
+                        stringResource(R.string.library_empty_folder_title),
+                        stringResource(R.string.library_empty_folder_body),
+                    )
+                }
             }
             item { Spacer(Modifier.height(24.dp)) }
         }
@@ -583,37 +665,87 @@ private fun FilterSheet(
     onDone: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
-        Text("Filters", style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.cd_filters), style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
-        Text("Status", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            stringResource(R.string.filter_status),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(filters.status == "all", { vm.updateFilters { it.copy(status = "all") } }, { Text("All") })
-            FilterChip(filters.status == "missing", { vm.updateFilters { it.copy(status = "missing") } }, { Text("Missing") })
+            FilterChip(
+                filters.status == "all",
+                { vm.updateFilters { it.copy(status = "all") } },
+                { Text(stringResource(R.string.common_all)) },
+            )
+            FilterChip(
+                filters.status == "missing",
+                { vm.updateFilters { it.copy(status = "missing") } },
+                { Text(stringResource(R.string.common_missing)) },
+            )
         }
-        Text("Family", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            stringResource(R.string.filter_family),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(filters.family == null, { vm.updateFilters { it.copy(family = null) } }, { Text("All") })
-            FilterChip(filters.family == "tracker", { vm.updateFilters { it.copy(family = "tracker") } }, { Text("Trackers") })
-            FilterChip(filters.family == "sid", { vm.updateFilters { it.copy(family = "sid") } }, { Text("SID") })
-            FilterChip(filters.family == "audio", { vm.updateFilters { it.copy(family = "audio") } }, { Text("Audio") })
+            FilterChip(
+                filters.family == null,
+                { vm.updateFilters { it.copy(family = null) } },
+                { Text(stringResource(R.string.common_all)) },
+            )
+            FilterChip(
+                filters.family == "tracker",
+                { vm.updateFilters { it.copy(family = "tracker") } },
+                { Text(stringResource(R.string.filter_trackers)) },
+            )
+            FilterChip(
+                filters.family == "sid",
+                { vm.updateFilters { it.copy(family = "sid") } },
+                { Text(stringResource(R.string.filter_sid)) },
+            )
+            FilterChip(
+                filters.family == "audio",
+                { vm.updateFilters { it.copy(family = "audio") } },
+                { Text(stringResource(R.string.filter_audio)) },
+            )
         }
-        Text("Format", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            stringResource(R.string.filter_format),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(filters.format == null, { vm.updateFilters { it.copy(format = null) } }, { Text("All") })
+            FilterChip(
+                filters.format == null,
+                { vm.updateFilters { it.copy(format = null) } },
+                { Text(stringResource(R.string.common_all)) },
+            )
             formats.forEach { format ->
                 FilterChip(filters.format == format, { vm.updateFilters { it.copy(format = format) } }, { Text(format.uppercase()) })
             }
         }
-        Text("Sort", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            stringResource(R.string.filter_sort),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("name", "format", "family", "size", "added", "modified").forEach { sort ->
-                FilterChip(filters.sort == sort, { vm.updateFilters { it.copy(sort = sort) } }, { Text(sort.replaceFirstChar { c -> c.uppercase() }) })
+            SORT_LABELS.forEach { (sort, label) ->
+                FilterChip(
+                    filters.sort == sort,
+                    { vm.updateFilters { it.copy(sort = sort) } },
+                    { Text(stringResource(label)) },
+                )
             }
         }
-        SwitchRow("Descending", filters.descending) { v -> vm.updateFilters { it.copy(descending = v) } }
+        SwitchRow(stringResource(R.string.filter_descending), filters.descending) { v ->
+            vm.updateFilters { it.copy(descending = v) }
+        }
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(onClick = { vm.resetFilters() }) { Text("Reset") }
-            TextButton(onClick = onDone) { Text("Done") }
+            TextButton(onClick = { vm.resetFilters() }) { Text(stringResource(R.string.common_reset)) }
+            TextButton(onClick = onDone) { Text(stringResource(R.string.common_done)) }
         }
     }
 }
@@ -626,7 +758,7 @@ fun QueueScreen(
     onBack: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-        ModalTopBar("Queue", onBack)
+        ModalTopBar(stringResource(R.string.queue_title), onBack)
         LazyColumn(Modifier.fillMaxSize()) {
             items(queue.withIndex().toList(), key = { it.value.id }) { (i, item) ->
                 Row(
@@ -654,15 +786,18 @@ fun IgnoredScreen(
 ) {
     var confirm by remember { mutableStateOf<TrackEntity?>(null) }
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-        ModalTopBar("Ignored files", onBack)
+        ModalTopBar(stringResource(R.string.ignored_title), onBack)
         Text(
-            "Removed from the library, still on your device, skipped by rescans.",
+            stringResource(R.string.ignored_body),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp),
         )
         if (ignored.isEmpty()) {
-            EmptyState("No ignored files", "Files you remove from the library end up here.")
+            EmptyState(
+                stringResource(R.string.ignored_empty_title),
+                stringResource(R.string.ignored_empty_body),
+            )
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
                 items(ignored, key = { it.id }) { track ->
@@ -678,10 +813,14 @@ fun IgnoredScreen(
                             )
                         }
                         IconButton(onClick = { vm.restore(listOf(track)) }) {
-                            Icon(AppIcons.Refresh, contentDescription = "Restore")
+                            Icon(AppIcons.Refresh, contentDescription = stringResource(R.string.cd_restore))
                         }
                         IconButton(onClick = { confirm = track }) {
-                            Icon(AppIcons.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                            Icon(
+                                AppIcons.Delete,
+                                contentDescription = stringResource(R.string.common_delete),
+                                tint = MaterialTheme.colorScheme.error,
+                            )
                         }
                     }
                 }
@@ -691,15 +830,17 @@ fun IgnoredScreen(
     confirm?.let { track ->
         AlertDialog(
             onDismissRequest = { confirm = null },
-            title = { Text("Delete permanently?") },
-            text = { Text("\"${track.name}\" will be deleted from storage.") },
+            title = { Text(stringResource(R.string.delete_title)) },
+            text = { Text(stringResource(R.string.delete_body_short, track.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     vm.deletePermanently(track)
                     confirm = null
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirm = null }) { Text("Cancel") } },
+            dismissButton = {
+                TextButton(onClick = { confirm = null }) { Text(stringResource(R.string.common_cancel)) }
+            },
         )
     }
 }
