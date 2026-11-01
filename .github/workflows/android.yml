@@ -31,7 +31,7 @@ jobs:
       - name: Install JS deps
         run: npm ci
       - name: Build JS packages
-        run: npm run build --workspaces --if-present
+        run: npm run build
       - name: Build engine bundle
         run: npm run build:engine -w @modplayjs/android
       - name: Fetch prebuilt V8

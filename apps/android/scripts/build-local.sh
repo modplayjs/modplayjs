@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 npm ci
-npm run build --workspaces --if-present
+npm run build
 npm run build:engine -w @modplayjs/android
 ./apps/android/scripts/fetch-v8-prebuilt.sh arm64-v8a build/v8-prebuilt
 cd apps/android
