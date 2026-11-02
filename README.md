@@ -16,15 +16,15 @@ players instead of being argued about.
 
 Receipts, all reproducible with the harnesses in `tools/`:
 
-- **0 load failures across the 5,534-file corpus** — every format with a C
-  reference parser loads, and the tracker loaders produce **byte-identical**
-  `ModuleData` to libxmp (mod 1,093 · s3m 94 · it 254 · xm full pack · 170-file
-  libxmp corpus 146/146).
+- **0 load failures** in every format that has a C reference parser: all
+  **4,863** such files in the 5,534-file corpus load, and the tracker loaders
+  produce **byte-identical** `ModuleData` to libxmp (mod 1,093 · s3m 94 · it
+  254 · xm full pack · 170-file libxmp corpus 146/146).
 - **Mixer-state parity: 110 passed / 0 failed** against libxmp's own per-frame
   voice dumps (`tools/run-mixer-data-tests.sh`).
 - **Render parity: correlation 1.0000, bit-identical** on in-tune MOD/XM
   fixtures; **SID is sample-exact** against a cRSID oracle build on all 48 pack
-  tunes.
+  tunes; 74 of 76 streamed WAV/MP3/OGG files decode.
 - **OpenMPT cross-check:** on 14 of 15 three-way files our output sits exactly
   as far from OpenMPT as libxmp's does (extra distance ≤ 0.001 correlation).
   The one real divergence - a voice-pool alias — was found by that comparison
@@ -33,10 +33,17 @@ Receipts, all reproducible with the harnesses in `tools/`:
 Vibe-coded, then verified like it was written by someone you don't trust. That
 is the correct order.
 
+The corpus is not all playable by design: besides the 4,863 reference-parsed
+files it also holds 124 SID/WAV/MP3/OGG files and 546 files of 13 formats with
+no parser here (V2M, SC68, MID, AHX, SAP, YM, HSC, AMD, RAD, D00, NSF, BP, SPC).
+So the claim is "0 failures in everything a reference parser also reads", not
+"everything loads".
+
 ## Status
 
 Every file with a C reference parser loads — **0 load failures across the
-5,534-file test corpus**. Verification status by format:
+4,863 reference-parsed files of the 5,534-file test corpus**. Verification
+status by format:
 
 ### Tracker loaders (libxmp ports) — byte-exact module data
 

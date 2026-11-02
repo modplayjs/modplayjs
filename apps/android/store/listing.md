@@ -46,7 +46,7 @@ WHAT IT DOES NOT DO
 
 No online streaming, no account, no sync, no ads, no tracking. It reads the folders you pick and nothing else, and never writes to your files.
 
-modplayjs is free software under the BSD-3-Clause license. The engine is a from-scratch port verified against the C reference players libxmp, OpenMPT and cRSID: byte-identical module data, 110/0 mixer-state goldens, bit-identical renders on the reference fixtures.
+modplayjs is free software under the BSD-3-Clause license. The engine is a from-scratch port verified against the C reference players libxmp, OpenMPT and cRSID: byte-identical module data, 110/0 mixer-state goldens, bit-identical renders on the reference fixtures, and 0 load failures in every format those parsers also read.
 ```
 
 ## Full description (DE)
@@ -79,7 +79,7 @@ WAS ES NICHT MACHT
 
 Kein Streaming, kein Konto, keine Synchronisierung, keine Werbung, kein Tracking. Die App liest nur die Ordner, die du auswählst und schreibt nie in deine Dateien.
 
-modplayjs ist freie Software unter der BSD-3-Clause-Lizenz. Die Engine ist eine Eigenentwicklung, gegen die C-Referenzplayer libxmp, OpenMPT und cRSID verifiziert: byte-identische Moduldaten, 110/0 Mixer-State-Goldens, bit-identische Renderings auf den Referenzdateien.
+modplayjs ist freie Software unter der BSD-3-Clause-Lizenz. Die Engine ist eine Eigenentwicklung, gegen die C-Referenzplayer libxmp, OpenMPT und cRSID verifiziert: byte-identische Moduldaten, 110/0 Mixer-State-Goldens, bit-identische Renderings auf den Referenzdateien und 0 Ladefehler in jedem Format, das diese Parser ebenfalls lesen.
 ```
 
 ## Categorisation
