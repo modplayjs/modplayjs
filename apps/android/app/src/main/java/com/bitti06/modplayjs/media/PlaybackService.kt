@@ -211,12 +211,13 @@ class PlaybackService : MediaSessionService() {
     private val favoriteCommand = SessionCommand(FAVORITE_ACTION, Bundle.EMPTY)
 
     private fun favoriteButton(favorite: Boolean): CommandButton =
+        // The heart is one of Media3's own icons, so no drawable resource is
+        // needed and R8 can shrink ours.
         CommandButton
-            .Builder()
+            .Builder(if (favorite) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
             .setDisplayName(
                 getString(if (favorite) R.string.cd_remove_favorite else R.string.cd_add_favorite),
-            ).setIconResId(if (favorite) R.drawable.ic_media_favorite else R.drawable.ic_media_favorite_border)
-            .setSessionCommand(favoriteCommand)
+            ).setSessionCommand(favoriteCommand)
             .build()
 
     /**
@@ -228,15 +229,20 @@ class PlaybackService : MediaSessionService() {
             override fun onConnect(
                 session: MediaSession,
                 controller: MediaSession.ControllerInfo,
-            ): MediaSession.ConnectionResult =
-                MediaSession.ConnectionResult
-                    .AcceptedResultBuilder(session)
-                    .setAvailableSessionCommands(
+            ): MediaSession.ConnectionResult {
+                // The two-argument builder seeds its defaults from the trust of
+                // the controller; the card's heart is the one command on top.
+                val defaults =
+                    if (controller.isTrusted) {
                         MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS
-                            .buildUpon()
-                            .add(favoriteCommand)
-                            .build(),
-                    ).build()
+                    } else {
+                        MediaSession.ConnectionResult.DEFAULT_UNTRUSTED_SESSION_COMMANDS
+                    }
+                return MediaSession.ConnectionResult
+                    .AcceptedResultBuilder(session, controller)
+                    .setAvailableSessionCommands(defaults.buildUpon().add(favoriteCommand).build())
+                    .build()
+            }
 
             override fun onCustomCommand(
                 session: MediaSession,
