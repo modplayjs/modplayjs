@@ -63,6 +63,26 @@ release" into "resolved from Maven Central", which is the only thing the policy
 objects to. Route B removes the publishing step and replaces it with a bridge
 rewrite.
 
+### What Route A still runs into
+
+Route A has no other consumer than this app, and that is where the frictions
+are, none of them documented as a F-Droid block:
+
+| issue | detail |
+| --- | --- |
+| Namespace | Sonatype grants `io.github.<the username you signed up with>` automatically. "`io.github.<github organization name>` is not available as an automatically registered namespace", so `com.modplayjs` needs a DNS TXT record on a domain you actually own |
+| Release size | 102 MB for `libv8_monolith.a` in one release. Maven Central's 90th-percentile threshold is 78 MB of release size per organisation per month; crossing it starts a 30-day grace period, and if it keeps happening releases over that metric are refused |
+| Immutability | a published coordinate cannot be replaced, so every V8 rebuild ships as a new version and counts again against the monthly size |
+| Review discretion | the policy allows Maven Central as a source, but also reserves manual review. A prebuilt blob published by the same developer for one app can read as the GitHub download moved one hop, which is an intent argument, not a rules argument |
+
+Mitigations if A is still wanted: publish the build recipe and provenance next
+to the artifact (source repo, pinned tag, SHA-256), keep the artifact versioned
+by V8 version, and do not republish in consecutive months.
+
+If the only consumer is this app, the effort is probably not worth the
+discretion risk. A self-hosted F-Droid repository reaches the same users with no
+inclusion policy at all, and the build already works.
+
 If neither is worth it yet: a self-hosted F-Droid repository or plain APK
 releases have no inclusion policy at all, and `assembleRelease` now builds
 unsigned for exactly that.
