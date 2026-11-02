@@ -79,6 +79,13 @@ rsvg-convert -w 1024 -h 500 store/feature.svg -o store/feature-1024x500.png
 The committed PNGs are what the script copies; keep them current instead of
 editing the upload folder by hand.
 
+## Closed test
+
+`TEST-PLAN.md` is what testers are asked to try, in behaviours rather than bugs,
+and what to record. It also says where the automated evidence comes from
+(pre-launch report, parity harnesses) and matches the three sections of the
+production-access application.
+
 ## Other listing fields
 
 `listing.md` holds the short and full description in English and German, the
