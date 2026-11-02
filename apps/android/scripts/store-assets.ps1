@@ -120,6 +120,23 @@ if (-not $SkipCapture) {
 
 # ------------------------------------------------------------------ validation
 
+# Play accepts PNG or JPEG only, and the feature graphic is specified as 24-bit
+# PNG (no alpha). Check the bytes rather than trusting the file extension.
+function Get-ImageHeader([string]$Path) {
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -ge 4 -and
+        $bytes[0] -eq 0x89 -and $bytes[1] -eq 0x50 -and
+        $bytes[2] -eq 0x4E -and $bytes[3] -eq 0x47) {
+        $colorType = if ($bytes.Length -ge 26) { $bytes[25] } else { -1 }
+        $alpha = $colorType -eq 4 -or $colorType -eq 6
+        return [pscustomobject]@{ Format = "png"; Alpha = $alpha }
+    }
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xD8 -and $bytes[2] -eq 0xFF) {
+        return [pscustomobject]@{ Format = "jpeg"; Alpha = $false }
+    }
+    return [pscustomobject]@{ Format = "other"; Alpha = $false }
+}
+
 function Get-ImageInfo([string]$Path) {
     $image = [System.Drawing.Image]::FromFile($Path)
     try { [pscustomobject]@{ Width = $image.Width; Height = $image.Height } }
@@ -133,8 +150,12 @@ $icon = Join-Path $Out "icon-512.png"
 if (Test-Path $icon) {
     $info = Get-ImageInfo $icon
     $mb = (Get-Item $icon).Length / 1MB
-    $ok = $info.Width -eq 512 -and $info.Height -eq 512 -and $mb -le 1
-    if (-not $ok) { $problems += "icon-512.png must be 512x512 and <= 1 MB" }
+    $header = Get-ImageHeader $icon
+    $ok = $info.Width -eq 512 -and $info.Height -eq 512 -and $mb -le 1 -and
+          $header.Format -in @("png", "jpeg")
+    if ($header.Format -notin @("png", "jpeg")) {
+        $problems += "icon-512.png must be PNG or JPEG, not $($header.Format)"
+    } elseif (-not $ok) { $problems += "icon-512.png must be 512x512 and <= 1 MB" }
     $rows += [pscustomobject]@{ File = "icon-512.png"; Size = "$($info.Width)x$($info.Height)"; MB = "{0:N2}" -f $mb; Ok = $ok }
 }
 
@@ -142,12 +163,20 @@ $feature = Join-Path $Out "feature-1024x500.png"
 if (Test-Path $feature) {
     $info = Get-ImageInfo $feature
     $mb = (Get-Item $feature).Length / 1MB
-    $ok = $info.Width -eq 1024 -and $info.Height -eq 500 -and $mb -le 15
-    if (-not $ok) { $problems += "feature-1024x500.png must be 1024x500 and <= 15 MB" }
+    $header = Get-ImageHeader $feature
+    $ok = $info.Width -eq 1024 -and $info.Height -eq 500 -and $mb -le 15 -and
+          $header.Format -in @("png", "jpeg") -and -not $header.Alpha
+    if ($header.Format -notin @("png", "jpeg")) {
+        $problems += "feature-1024x500 graphic must be PNG or JPEG, not $($header.Format)"
+    } elseif ($header.Alpha) {
+        $problems += "feature-1024x500.png has an alpha channel; Play wants a 24-bit PNG or JPEG"
+    } elseif (-not $ok) { $problems += "feature-1024x500.png must be 1024x500 and <= 15 MB" }
     $rows += [pscustomobject]@{ File = "feature-1024x500.png"; Size = "$($info.Width)x$($info.Height)"; MB = "{0:N2}" -f $mb; Ok = $ok }
 }
 
-$shots = Get-ChildItem $Out -Filter "*.png" | Where-Object { $_.Name -match "^\d\d-" } | Sort-Object Name
+$shots = Get-ChildItem $Out -File |
+    Where-Object { $_.Name -match "^\d\d-.*\.(png|jpe?g)$" } |
+    Sort-Object Name
 foreach ($file in $shots) {
     $info = Get-ImageInfo $file.FullName
     $mb = $file.Length / 1MB
@@ -156,8 +185,14 @@ foreach ($file in $shots) {
     $sixteenByNine = [Math]::Abs($ratio - (16 / 9)) -lt 0.01
     $sidesOk = $info.Width -ge 320 -and $info.Width -le 3840 -and
                $info.Height -ge 320 -and $info.Height -le 3840
-    $ok = ($nineBySixteen -or $sixteenByNine) -and $sidesOk -and $mb -le 8
-    if (-not $ok) { $problems += "$($file.Name) fails the phone-screenshot rules" }
+    $header = Get-ImageHeader $file.FullName
+    $ok = ($nineBySixteen -or $sixteenByNine) -and $sidesOk -and $mb -le 8 -and
+          $header.Format -in @("png", "jpeg")
+    if ($header.Format -notin @("png", "jpeg")) {
+        $problems += "$($file.Name) must be PNG or JPEG, not $($header.Format)"
+    } elseif (-not $ok) {
+        $problems += "$($file.Name) fails the phone-screenshot rules"
+    }
     $rows += [pscustomobject]@{ File = $file.Name; Size = "$($info.Width)x$($info.Height)"; MB = "{0:N2}" -f $mb; Ok = $ok }
 }
 

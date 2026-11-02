@@ -16,14 +16,17 @@ from a device, so losing the folder costs one command, not the assets.
 ```
 
 The script refuses to finish if a file breaks a Play rule (size, ratio, format),
-so a rejection on the upload page becomes a message here instead.
+so a rejection on the upload page becomes a message here instead. Formats are
+read from the file bytes, not the extension: PNG and JPEG pass, anything else
+does not, and the feature graphic is also checked for an alpha channel, since
+Play specifies 24-bit PNG there.
 
 ## Slots
 
 | slot | file | Play's rule |
 | --- | --- | --- |
 | App icon | `icon-512.png` | 512 × 512, ≤ 1 MB, PNG/JPEG, 32-bit |
-| Feature graphic | `feature-1024x500.png` | 1024 × 500, ≤ 15 MB |
+| Feature graphic | `feature-1024x500.png` | 1024 × 500, ≤ 15 MB, 24-bit PNG or JPEG (no alpha) |
 | Phone screenshots | `01-…` to `06-….png` | 2–8 files, PNG/JPEG, ≤ 8 MB each, 16:9 or 9:16, sides 320–3840 px |
 | Short description | `listing.md` | ≤ 80 characters |
 | Full description | `listing.md` | ≤ 4000 characters |
