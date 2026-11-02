@@ -36,25 +36,36 @@ same APK today.
   from `store/listing.md`.
 - `apps/android/package.json` now states its licence.
 
-## The blocker, and the options
+## The blocker
 
-V8 is the JavaScript engine the whole player runs on. Options, none of them
-free:
+`libv8_monolith.a` is downloaded at build time from
+`github.com/NativeScript/v8-buildscripts/releases`, which is not one of the
+sources the policy names. V8 needs a Chromium checkout and depot_tools, so the
+F-Droid build server will not build it either.
 
-1. **F-Droid main repo — build V8 from source.** V8 needs a Chromium checkout,
-   depot_tools and hours of compute on their build server; they will not do it,
-   and the result would not be Debian-packaged. Not realistic.
-2. **Replace V8 with a Debian-packaged engine.** Debian ships duktape and
-   quickjs. The engine renders audio in JavaScript; an interpreter will not keep
-   up with a tracker mixer, so this is a rewrite plus a performance loss.
-3. **Ship a self-hosted F-Droid repo.** `fdroidserver` builds your APK from your
-   spec and users add the repo URL. Inclusion policy does not apply; the app
-   still installs and updates through the F-Droid client.
-4. **Publish the APK directly** (GitHub Releases + Obtainium, or the releases
-   page). No gate at all.
+## Trusted sources that do exist
 
-Option 3 or 4 is the honest path while V8 stays prebuilt; option 2 is the only
-route into the main repository.
+Checked 2026-11-02. The policy accepts prebuilt FLOSS binaries from Maven
+Central, Google Maven, OSS Sonatype, OSS JFrog, JitPack and Clojars, plus the
+Android/Flutter SDK, Hermes, PyPI, Nix, Rust, Go and Node toolchains. Real
+candidates on those repos:
+
+| route | artifact | licence | what it costs |
+| --- | --- | --- | --- |
+| **A. Publish our own V8 build** | anything under `com.modplayjs` on Maven Central / JitPack: the same `libv8_monolith.a` we use now | V8 is BSD-3, so redistribution is fine | a Sonatype account, a GPG key, one release per V8 bump. **No app code changes** |
+| **B. J2V8 from Maven Central** | `com.eclipsesource.j2v8:j2v8_android_arm64-v8a:6.3.0` — AAR with `jni/arm64-v8a/libj2v8.so`, 50.8 MB uncompressed, published 2025-11-13 | EPL-1.0 | rewrite `v8_jni.cpp` and the Kotlin bridge onto J2V8's Java API. The bundled V8 version is not documented; verify the engine bundle for ES2022 syntax before committing |
+| **C. Hermes** | `com.facebook.react:hermes-android:0.80.0` (Maven Central), explicitly permitted by the policy | MIT | Hermes runs bytecode on an interpreter. The mixer loops run per sample in JS; measure before assuming it keeps up |
+| **D. QuickJS / Duktape** | `app.cash.quickjs:quickjs-android`, `com.squareup.duktape:duktape-android` (Maven Central) | MIT / Apache-2.0 | same interpreter problem, plus a different embedding API |
+
+Route A is the one that keeps the engine exactly as verified: the same static
+library, the same JNI, the same audio path. It turns "downloaded from a GitHub
+release" into "resolved from Maven Central", which is the only thing the policy
+objects to. Route B removes the publishing step and replaces it with a bridge
+rewrite.
+
+If neither is worth it yet: a self-hosted F-Droid repository or plain APK
+releases have no inclusion policy at all, and `assembleRelease` now builds
+unsigned for exactly that.
 
 ## Before submitting anywhere
 
@@ -63,6 +74,6 @@ route into the main repository.
   `fastlane/metadata/android/<locale>/images/phoneScreenshots/`.
 - F-Droid wants the build to run from a clean checkout: `npm ci`,
   `npm run build`, `npm run build:engine -w @modplayjs/android`, then
-  `./gradlew :app:assembleRelease`. Every step already exists; the V8 fetch is
-  the one network dependency and the one policy problem.
+  `./gradlew :app:assembleRelease`. Every step exists; the V8 fetch is the one
+  network dependency, and route A above turns it into a plain Maven dependency.
 - A changelog file is needed per version code (`changelogs/<versionCode>.txt`).
