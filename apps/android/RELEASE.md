@@ -131,9 +131,14 @@ Store listing assets:
   `store/icon.svg`, which uses the same mark as the launcher icon.
 - **feature graphic**: `store/feature-1024x500.png` — 1024 × 500, mark plus
   wordmark, no tagline. Rendered from `store/feature.svg`.
-- **screenshots**: still needed — at least two portrait phone screenshots, German
-  ones optional.
-- short description ≤ 80 characters, full description ≤ 4000.
+- **screenshots**: at least two portrait phone screenshots, four for promotion
+  eligibility. Captured from a device, not mocked up — see `store/UPLOAD.md`.
+- short description ≤ 80 characters, full description ≤ 4000, in
+  `store/listing.md`.
+
+Everything Play asks for on that page is assembled into the git-ignored
+`store/upload/` by `scripts/store-assets.ps1`, which also validates each file
+against Play's size and aspect rules before you upload it.
 
 Both images are placeholders built around the `M` mark; replace the paths in the
 SVGs when the real logo exists and re-render, keeping the file names:

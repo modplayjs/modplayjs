@@ -12,3 +12,6 @@ main.zip
 
 # Android prebuilt V8
 /build/
+
+# Play upload assets assembled by apps/android/scripts/store-assets.ps1
+apps/android/store/upload/
