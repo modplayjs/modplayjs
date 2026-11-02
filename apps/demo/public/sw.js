@@ -109,8 +109,12 @@ self.addEventListener('fetch', (event) => {
       (async () => {
         try {
           const fresh = await fetch(req);
-          const cache = await caches.open(CACHE);
-          cache.put('./index.html', fresh.clone());
+          if (fresh.ok) {
+            // Under its own URL: caching every document as index.html made
+            // /studio.html and /privacy.html resolve to the player offline.
+            const cache = await caches.open(CACHE);
+            cache.put(req, fresh.clone());
+          }
           return withCoi(fresh);
         } catch {
           const cached =

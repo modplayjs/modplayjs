@@ -106,7 +106,11 @@ The listing is filled in once and reused per release. First upload, then
 
 Required under **App content**:
 
-- **Privacy policy**: `PRIVACY.md` is the text to publish; a URL is needed.
+- **Privacy policy**: `PRIVACY.md` is the source. The demo build renders it to
+  `privacy.html` (`apps/demo/scripts/build-privacy.mjs`, run by `prebuild`), so
+  the published URL is
+  `https://modplayjs.github.io/modplayjs/privacy.html`. Edit the markdown, not
+  the HTML; the HTML is generated and committed.
 - **Data safety**: *no* data collected and *no* data shared. The app has no
   `INTERNET` permission, no analytics, no crash SDK, and reads folders only
   through Storage Access Framework grants the user gives.

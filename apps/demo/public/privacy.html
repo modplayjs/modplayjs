@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy — modplayjs</title>
+<meta name="robots" content="index">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #0b0b12;
+    color: #e7e7ef;
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 2.5rem 1.25rem 4rem;
+  }
+  main { max-width: 46rem; margin: 0 auto; }
+  h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 .35rem; letter-spacing: -.02em; }
+  h2 {
+    font-size: 1.05rem;
+    margin: 2rem 0 .6rem;
+    color: #b9a2ff;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 600;
+  }
+  p, li { color: #cfcfdb; }
+  a { color: #8ea2ff; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .9em;
+    background: #191926;
+    border: 1px solid #262636;
+    border-radius: 4px;
+    padding: .05em .35em;
+  }
+  ul { padding-left: 1.15rem; }
+  li { margin: .3rem 0; }
+  strong { color: #f2f2f8; }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid #262636;
+    font-size: .85rem;
+    color: #8b8b9c;
+  }
+  footer a { color: #8ea2ff; }
+</style>
+</head>
+<body>
+<main>
+<h1>Privacy policy — modplayjs</h1>
+<p>modplayjs plays tracker modules, Commodore 64 SID tunes and audio files that are already on your device. It is a local player; there is no server, no account and no sync.</p>
+<h2>What the app accesses</h2>
+<ul><li><strong>Folders you pick.</strong> You add folders through Android's Storage Access Framework. The app stores the grant Android hands back, reads the file names and sizes to build its library, and reads a file only when you play it. It never writes to, deletes or modifies your files.</li><li><strong>Playback state.</strong> Volume, queue and settings are stored on the device: a small Room database and a preferences file in the app's private storage. Android's backup can include them if you have device backup enabled.</li></ul>
+<h2>What the app does not do</h2>
+<ul><li>It has no <code>INTERNET</code> permission, so it cannot send anything anywhere, and it contains no analytics, advertising, crash-reporting or attribution SDK.</li><li>It does not collect device identifiers, location, contacts, or usage data.</li><li>It does not record audio, take photos, or access the microphone or camera.</li><li>It does not share or sell anything, because it has nothing to share.</li></ul>
+<h2>Permissions</h2>
+<ul><li><code>FOREGROUND_SERVICE</code>, <code>FOREGROUND_SERVICE_MEDIA_PLAYBACK</code>, <code>WAKE_LOCK</code>: keep playback running while the screen is off.</li><li><code>POST_NOTIFICATIONS</code>: show the playback notification with its transport controls. Declining it only hides the notification.</li></ul>
+<h2>Removing your data</h2>
+<p>Uninstall the app, or use Android's <em>Clear storage</em> for modplayjs. Both delete the library database and settings. Your music files are untouched.</p>
+<h2>Contact</h2>
+<p>Issues and questions: the repository at <a href="https://github.com/modplayjs/modplayjs" rel="noreferrer">https://github.com/modplayjs/modplayjs</a>.</p>
+<footer>
+  modplayjs — <a href="./">demo and player</a> ·
+  <a href="https://github.com/modplayjs/modplayjs/blob/main/apps/android/PRIVACY.md">source of this page</a>
+</footer>
+</main>
+</body>
+</html>

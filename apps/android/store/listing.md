@@ -89,7 +89,7 @@ modplayjs ist freie Software unter der BSD-3-Clause-Lizenz. Die Engine ist eine 
 | App category | Music & audio |
 | Tags | music player, tracker, chiptune, retro |
 | Contact email | the address in the Play Console account |
-| Privacy policy URL | wherever `PRIVACY.md` is published |
+| Privacy policy URL | https://modplayjs.github.io/modplayjs/privacy.html |
 
 ## App content answers
 

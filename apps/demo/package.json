@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "privacy": "node scripts/build-privacy.mjs",
+    "prebuild": "node scripts/build-privacy.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

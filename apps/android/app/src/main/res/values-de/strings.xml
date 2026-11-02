@@ -347,6 +347,8 @@
     <string name="links">Links</string>
     <string name="source_code">Quellcode</string>
     <string name="source_code_summary">github.com/modplayjs/modplayjs</string>
+    <string name="privacy_policy">Datenschutz</string>
+    <string name="privacy_policy_summary">Worauf diese App zugreift und worauf nicht</string>
     <string name="issues">Probleme</string>
     <string name="issues_summary">Melde einen Fehler oder wünsche eine Funktion</string>
     <string name="licenses_summary">Open-Source-Hinweise und Volltexte</string>

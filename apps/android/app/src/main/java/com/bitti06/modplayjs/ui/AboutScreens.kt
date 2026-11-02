@@ -117,6 +117,12 @@ fun AboutScreen(
                 uriHandler.openUri("https://github.com/modplayjs/modplayjs/issues")
             }
             SettingsRow(
+                stringResource(R.string.privacy_policy),
+                stringResource(R.string.privacy_policy_summary),
+            ) {
+                uriHandler.openUri(PRIVACY_URL)
+            }
+            SettingsRow(
                 stringResource(R.string.settings_licenses),
                 stringResource(R.string.licenses_summary),
                 onOpenLicenses,
@@ -214,6 +220,13 @@ fun LicenseTextScreen(
         }
     }
 }
+
+/**
+ * Rendered from `apps/android/PRIVACY.md` into the demo site by
+ * `apps/demo/scripts/build-privacy.mjs`, so the Play listing and this row share
+ * one URL.
+ */
+private const val PRIVACY_URL = "https://modplayjs.github.io/modplayjs/privacy.html"
 
 @Preview(name = "About", showBackground = true, backgroundColor = 0xFF0C0A18)
 @Composable
