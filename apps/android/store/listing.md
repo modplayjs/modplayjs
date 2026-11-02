@@ -4,19 +4,29 @@ Text for the listing, kept in the repository so a release does not have to
 reinvent it. Character limits are Play's: short description ≤ 80, full
 description ≤ 4000.
 
-## Short description (EN, ≤ 80)
+## App name (both languages)
+
+```
+modplayjs
+```
+
+A brand, so it stays untranslated. Play allows a different name per language but
+there is nothing to localise here; keeping the default and the German one
+identical also stops the two listings drifting apart.
+
+## Short description (en-US, ≤ 80)
 
 ```
 Tracker, SID and chiptune player. Offline, no account, no ads.
 ```
 
-## Short description (DE, ≤ 80)
+## Short description (de-DE, ≤ 80)
 
 ```
 Tracker-, SID- und Chiptune-Player. Offline, ohne Konto, ohne Werbung.
 ```
 
-## Full description (EN)
+## Full description (en-US, ≤ 4000)
 
 ```
 modplayjs plays tracker modules, Commodore 64 SID tunes and audio files that are already on your phone. Everything is local: no account, no server, no ads, no analytics. The app has no INTERNET permission at all.
@@ -49,7 +59,7 @@ No online streaming, no account, no sync, no ads, no tracking. It reads the fold
 modplayjs is free software under the BSD-3-Clause license. The engine is a from-scratch port verified against the C reference players libxmp, OpenMPT and cRSID: byte-identical module data, 110/0 mixer-state goldens, bit-identical renders on the reference fixtures, and 0 load failures in every format those parsers also read.
 ```
 
-## Full description (DE)
+## Full description (de-DE, ≤ 4000)
 
 ```
 modplayjs spielt Tracker-Module, C64-SID-Musik und Audiodateien ab, die schon auf deinem Telefon liegen. Alles läuft lokal: kein Konto, kein Server, keine Werbung, keine Analyse. Die App hat nicht einmal die INTERNET-Berechtigung.
@@ -67,7 +77,7 @@ FÜR DAS HÖREN VON TRACKERN GEBAUT
 - Audio-Panel mit Lautstärke, Panning, Interpolation, Stimmenzahl, Tempo und Mixer, per Wischen am Player erreichbar
 - Kanal-Stummschaltung und Solo, Vorhören von Instrumenten und Samples
 - SID-Optionen: Chipmodell, Filter, Stereo, Qualität und CIA-Timing
-- Wiederholung (aus / alle / eins) und automatischer Weiterschalten
+- Wiederholung (aus / alle / eins) und automatisches Weiterschalten
 - Wiedergabe läuft bei ausgeschaltetem Bildschirm weiter, mit Sperrbildschirm- und Headset-Steuerung
 - Wiedergabe setzt nach dem Schließen an derselben Stelle fort, auch über einen Neustart hinweg
 
@@ -77,9 +87,9 @@ Hell, dunkel oder System, Material 3 Expressive, eigene Akzent- und Pattern-Farb
 
 WAS ES NICHT MACHT
 
-Kein Streaming, kein Konto, keine Synchronisierung, keine Werbung, kein Tracking. Die App liest nur die Ordner, die du auswählst und schreibt nie in deine Dateien.
+Kein Streaming, kein Konto, keine Synchronisierung, keine Werbung, kein Tracking. Die App liest nur die Ordner, die du auswählst, und schreibt nie in deine Dateien.
 
-modplayjs ist freie Software unter der BSD-3-Clause-Lizenz. Die Engine ist eine Eigenentwicklung, gegen die C-Referenzplayer libxmp, OpenMPT und cRSID verifiziert: byte-identische Moduldaten, 110/0 Mixer-State-Goldens, bit-identische Renderings auf den Referenzdateien und 0 Ladefehler in jedem Format, das diese Parser ebenfalls lesen.
+modplayjs ist freie Software unter der BSD-3-Clause-Lizenz. Die Engine ist eine Eigenentwicklung und wurde gegen die C-Referenzplayer libxmp, OpenMPT und cRSID verifiziert: byte-identische Moduldaten, 110/0 Mixer-State-Goldens, bit-identische Renderings auf den Referenzdateien und 0 Ladefehler in jedem Format, das diese Parser ebenfalls lesen.
 ```
 
 ## Categorisation
