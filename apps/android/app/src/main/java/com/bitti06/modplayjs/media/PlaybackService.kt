@@ -152,6 +152,11 @@ class PlaybackService : MediaSessionService() {
     private fun buildSession(): MediaSession =
         MediaSession
             .Builder(this, player)
+            // Every session needs its own id: Media3 keeps a process-wide
+            // registry and refuses a second live session on an id that is
+            // taken, which is what the default id "" collides on. Unix time is
+            // enough, sessions are seconds apart and must be unique, not stable.
+            .setId("modplay-${System.currentTimeMillis()}")
             .setCallback(callback)
             .setSessionActivity(
                 PendingIntent.getActivity(
@@ -173,12 +178,16 @@ class PlaybackService : MediaSessionService() {
         val now = SystemClock.elapsedRealtime()
         if (now - lastSessionAt < SESSION_MIN_GAP_MS) return
         lastSessionAt = now
+        // Released before the successor is built, so the two never overlap.
         val old = mediaSession
-        val fresh = buildSession()
-        addSession(fresh)
         removeSession(old)
-        runCatching { old.release() }
+        old.release()
+        val fresh = buildSession()
         mediaSession = fresh
+        addSession(fresh)
+        // The new session's controller connects asynchronously; nudge once it
+        // can have posted, so the card carries the new track.
+        nudge()
     }
 
     /** Re-attaches the card shortly after the player changed, once Media3 rebuilt it. */
