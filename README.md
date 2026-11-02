@@ -6,6 +6,33 @@ ported from reference player code (libxmp, OpenMPT, cRSID, stb_vorbis,
 minimp3) and verified against C reference oracles at the loader-byte and
 render-sample level.
 
+## Written by AI
+
+Every line of this engine and of the Android app was written by an AI
+assistant. Not "assisted", not "reviewed suggestions" — written. That is the
+whole point of the numbers in the next section: an LLM does not get the
+benefit of the doubt, so everything is measured against the C reference
+players instead of being argued about.
+
+Receipts, all reproducible with the harnesses in `tools/`:
+
+- **0 load failures across the 5,534-file corpus** — every format with a C
+  reference parser loads, and the tracker loaders produce **byte-identical**
+  `ModuleData` to libxmp (mod 1,093 · s3m 94 · it 254 · xm full pack · 170-file
+  libxmp corpus 146/146).
+- **Mixer-state parity: 110 passed / 0 failed** against libxmp's own per-frame
+  voice dumps (`tools/run-mixer-data-tests.sh`).
+- **Render parity: correlation 1.0000, bit-identical** on in-tune MOD/XM
+  fixtures; **SID is sample-exact** against a cRSID oracle build on all 48 pack
+  tunes.
+- **OpenMPT cross-check:** on 14 of 15 three-way files our output sits exactly
+  as far from OpenMPT as libxmp's does (extra distance ≤ 0.001 correlation).
+  The one real divergence - a voice-pool alias — was found by that comparison
+  and fixed: 0.7939 → **0.9998** vs libxmp.
+
+Vibe-coded, then verified like it was written by someone you don't trust. That
+is the correct order.
+
 ## Status
 
 Every file with a C reference parser loads — **0 load failures across the

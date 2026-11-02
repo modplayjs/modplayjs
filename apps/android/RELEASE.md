@@ -16,8 +16,9 @@ keytool -genkeypair -v \
   -keyalg RSA -keysize 4096 -validity 10000
 ```
 
-Store it at `apps/android/upload.jks` (git-ignored) and create
-`apps/android/keystore.properties` (also git-ignored):
+Store it at `apps/android/upload.jks` (git-ignored), copy
+`keystore.properties.template` to `apps/android/keystore.properties` and fill it
+in (also git-ignored):
 
 ```properties
 storeFile=upload.jks
@@ -45,6 +46,10 @@ screen shows. Both can be overridden per build, so no file has to change:
 ```
 
 Without the flags the values in `app/build.gradle.kts` (`1`, `0.0.1`) are used.
+
+**Until the Play pipeline is ready, stay on `0.0.1` / `1`.** After the first
+upload every build needs `-PversionCode` above the previous one, so bump before
+building, not after.
 
 ## 3. Build the bundle
 
@@ -112,6 +117,9 @@ Required under **App content**:
 - **Foreground service**: `mediaPlayback` is a permitted use — say so if asked.
 - **Notifications**: `POST_NOTIFICATIONS` is requested at first start for the
   playback notification.
+
+Listing copy lives in `store/listing.md` (short and full description in both
+languages, app-content answers, categorisation). Use it verbatim.
 
 Store listing assets:
 

@@ -155,9 +155,10 @@ tasks.matching { it.name in releaseTaskNames }.configureEach {
                 "arm64-v8a` or pass -Pv8Dir=<dir>; without it the stub JNI is built."
         }
         check(uploadSigningReady) {
-            "Release builds need an upload keystore: create apps/android/keystore.properties " +
-                "or set MODPLAY_KEYSTORE_PATH, MODPLAY_KEYSTORE_PASSWORD, MODPLAY_KEY_ALIAS and " +
-                "MODPLAY_KEY_PASSWORD. See apps/android/RELEASE.md."
+            "Release builds need an upload keystore: copy keystore.properties.template to " +
+                "apps/android/keystore.properties and fill it in, or set MODPLAY_KEYSTORE_PATH, " +
+                "MODPLAY_KEYSTORE_PASSWORD, MODPLAY_KEY_ALIAS and MODPLAY_KEY_PASSWORD. " +
+                "See apps/android/RELEASE.md."
         }
     }
 }

@@ -79,7 +79,12 @@ Or simply:
 
 `RELEASE.md` is the runbook: upload keystore, version bump, `bundleRelease`,
 artifact checks (16 KB alignment, signature, manifest) and the Play Console
-checklist. `PRIVACY.md` is the privacy policy text for the store listing.
+checklist. `PRIVACY.md` is the privacy policy text for the store listing and
+`store/listing.md` holds the listing copy in both languages, so neither has to
+be written under pressure at upload time.
+
+The version stays `0.0.1` (`versionCode 1`) until the Play pipeline is ready;
+the first upload is what fixes the numbering.
 
 ## CI
 

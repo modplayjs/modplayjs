@@ -363,6 +363,9 @@
     <string name="issues">Issues</string>
     <string name="issues_summary">Report a bug or request a feature</string>
     <string name="licenses_summary">Open source notices and full texts</string>
+    <string name="about_written_by_ai_title">Written by AI</string>
+    <string name="about_written_by_ai">The engine and this app were written by an AI assistant, then measured against the C reference players instead of being taken on trust.</string>
+    <string name="about_written_by_ai_checks">0 load failures across 5,534 files, byte-identical module data, 110/0 mixer-state goldens and bit-identical renders. Details and harnesses are in the repository.</string>
     <string name="about_license_note">modplayjs is free software under the BSD-3-Clause license. Tracker engines and decoders are ported from their original projects; see Licenses for attribution.</string>
     <string name="licenses_note">This app ships the modplayjs core, V8 and AndroidX libraries. Ported code keeps its original license.</string>
     <string name="project_page">Project page</string>

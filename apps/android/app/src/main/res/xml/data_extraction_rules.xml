@@ -3,9 +3,11 @@
     <cloud-backup>
         <include domain="database" path="modplayjs.db" />
         <include domain="sharedpref" path="modplayjs.xml" />
+        <include domain="sharedpref" path="modplayjs-play.xml" />
     </cloud-backup>
     <device-transfer>
         <include domain="database" path="modplayjs.db" />
         <include domain="sharedpref" path="modplayjs.xml" />
+        <include domain="sharedpref" path="modplayjs-play.xml" />
     </device-transfer>
 </data-extraction-rules>
