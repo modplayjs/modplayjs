@@ -143,9 +143,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
 
-// A release build must carry the real engine and a signature: the stub JNI
-// plays nothing, and Play rejects an unsigned bundle. Failing here beats
-// discovering either after upload.
+// A release build always needs the real engine: the stub JNI plays nothing, so
+// that check applies to every release task.
 val releaseTaskNames =
     setOf("packageRelease", "packageReleaseBundle", "assembleRelease", "bundleRelease")
 tasks.matching { it.name in releaseTaskNames }.configureEach {
@@ -154,11 +153,21 @@ tasks.matching { it.name in releaseTaskNames }.configureEach {
             "Release builds need the V8 prebuilt. Run `node apps/android/scripts/fetch-v8.mjs " +
                 "arm64-v8a` or pass -Pv8Dir=<dir>; without it the stub JNI is built."
         }
+    }
+}
+
+// Only the Play bundle needs our upload key: Play rejects an unsigned bundle,
+// while an APK distributor (F-Droid, a store, a self-hosted repo) signs the APK
+// itself and must be able to build it without our keystore. `assembleRelease`
+// therefore produces an unsigned APK; `bundleRelease` still stops here.
+val uploadTaskNames = setOf("packageReleaseBundle", "bundleRelease")
+tasks.matching { it.name in uploadTaskNames }.configureEach {
+    doFirst {
         check(uploadSigningReady) {
-            "Release builds need an upload keystore: copy keystore.properties.template to " +
+            "Upload bundles need an upload keystore: copy keystore.properties.template to " +
                 "apps/android/keystore.properties and fill it in, or set MODPLAY_KEYSTORE_PATH, " +
                 "MODPLAY_KEYSTORE_PASSWORD, MODPLAY_KEY_ALIAS and MODPLAY_KEY_PASSWORD. " +
-                "See apps/android/RELEASE.md."
+                "An APK via :app:assembleRelease builds unsigned. See apps/android/RELEASE.md."
         }
     }
 }

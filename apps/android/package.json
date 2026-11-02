@@ -1,6 +1,7 @@
 {
   "name": "@modplayjs/android",
   "private": true,
+  "license": "BSD-3-Clause",
   "version": "0.2.1",
   "type": "module",
   "scripts": {

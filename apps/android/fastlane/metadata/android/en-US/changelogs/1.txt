@@ -1,0 +1,4 @@
+First release.
+
+Tracker, SID and chiptune player with a realtime pattern view, a folder browser
+that follows the playing file, and playback that survives a restart.

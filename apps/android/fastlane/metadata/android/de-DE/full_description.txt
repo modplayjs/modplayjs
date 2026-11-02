@@ -1,0 +1,28 @@
+modplayjs spielt Tracker-Module, C64-SID-Musik und Audiodateien ab, die schon auf deinem Telefon liegen. Alles läuft lokal: kein Konto, kein Server, keine Werbung, keine Analyse. Die App hat nicht einmal die INTERNET-Berechtigung.
+
+WAS ABGESPIELT WIRD
+
+MOD, S3M, XM, IT, MTM, STM, 669, MED/OctaMED, ICE, Asylum, DIGI Booster, Future Composer, MO3, C64-SID (PSID/RSID) sowie WAV/MP3/OGG. Gepackte Module in den gängigen ProWizard-Formaten werden beim Laden entpackt.
+
+FÜR DAS HÖREN VON TRACKERN GEBAUT
+
+- Bibliothek aus den Ordnern, die du freigibst, mit Suche, Format- und Kanalfiltern, Favoriten und Ignorierliste
+- Ordneransicht, die bei der laufenden Datei öffnet
+- Echtzeit-Pattern-Ansicht: alle Kanäle, mitlaufende Zeile, Noten-, Instrument-, Volume- und Effektspalten in deinen Farben
+- Bildschirmfüllende Monospace-Ansicht für die Tracker-Nachricht und die Instrument- und Sample-Tabellen, damit das Spaltenlayout erhalten bleibt
+- Audio-Panel mit Lautstärke, Panning, Interpolation, Stimmenzahl, Tempo und Mixer, per Wischen am Player erreichbar
+- Kanal-Stummschaltung und Solo, Vorhören von Instrumenten und Samples
+- SID-Optionen: Chipmodell, Filter, Stereo, Qualität und CIA-Timing
+- Wiederholung (aus / alle / eins) und automatisches Weiterschalten
+- Wiedergabe läuft bei ausgeschaltetem Bildschirm weiter, mit Sperrbildschirm- und Headset-Steuerung
+- Wiedergabe setzt nach dem Schließen an derselben Stelle fort, auch über einen Neustart hinweg
+
+DARSTELLUNG
+
+Hell, dunkel oder System, Material 3 Expressive, eigene Akzent- und Pattern-Farben, Deutsch oder Englisch, einstellbare Textgröße.
+
+WAS ES NICHT MACHT
+
+Kein Streaming, kein Konto, keine Synchronisierung, keine Werbung, kein Tracking. Die App liest nur die Ordner, die du auswählst, und schreibt nie in deine Dateien.
+
+modplayjs ist freie Software unter der BSD-3-Clause-Lizenz. Die Engine ist eine Eigenentwicklung und wurde gegen die C-Referenzplayer libxmp, OpenMPT und cRSID verifiziert: byte-identische Moduldaten, 110/0 Mixer-State-Goldens, bit-identische Renderings auf den Referenzdateien und 0 Ladefehler in jedem Format, das diese Parser ebenfalls lesen.

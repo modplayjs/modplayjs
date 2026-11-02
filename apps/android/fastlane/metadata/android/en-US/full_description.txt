@@ -1,0 +1,28 @@
+modplayjs plays tracker modules, Commodore 64 SID tunes and audio files that are already on your phone. Everything is local: no account, no server, no ads, no analytics. The app has no INTERNET permission at all.
+
+WHAT IT PLAYS
+
+MOD, S3M, XM, IT, MTM, STM, 669, MED/OctaMED, ICE, Asylum, DIGI Booster, Future Composer, MO3, Commodore 64 SID (PSID/RSID) and streamed WAV/MP3/OGG. Packed modules in the usual ProWizard formats are unpacked on load.
+
+BUILT FOR LISTENING TO TRACKERS
+
+- Library from the folders you grant, with search, format and channel filters, favourites and an ignore list
+- Folder browser that opens at the file that is playing
+- Realtime pattern view: every channel, the playing row followed, note / instrument / volume / effect columns in colours you choose
+- Full-screen, monospace readers for the tracker message and the instrument and sample tables, so column layout survives
+- Audio panel with volume, pan, interpolation, voice count, tempo and the mixer, reachable by swiping the player
+- Channel mute and solo, instrument and sample audition
+- SID options: chip model, filter, stereo, quality and CIA timing
+- Repeat (off / all / one) and auto-advance
+- Playback continues when the screen is off, with lock-screen and headset controls
+- Playback resumes where it left off after the app was closed, even across a restart
+
+CHOOSE HOW IT LOOKS
+
+Light, dark or system theme, Material 3 Expressive, your own accent and pattern colours, English or German, adjustable text size.
+
+WHAT IT DOES NOT DO
+
+No online streaming, no account, no sync, no ads, no tracking. It reads the folders you pick and nothing else, and never writes to your files.
+
+modplayjs is free software under the BSD-3-Clause license. The engine is a from-scratch port verified against the C reference players libxmp, OpenMPT and cRSID: byte-identical module data, 110/0 mixer-state goldens, bit-identical renders on the reference fixtures, and 0 load failures in every format those parsers also read.

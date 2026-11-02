@@ -79,6 +79,12 @@ rsvg-convert -w 1024 -h 500 store/feature.svg -o store/feature-1024x500.png
 The committed PNGs are what the script copies; keep them current instead of
 editing the upload folder by hand.
 
+## F-Droid
+
+`FDROID.md` is the inclusion-policy audit: what passes, what does not (the
+prebuilt V8), and what was changed for it. The listing F-Droid reads lives in
+`apps/android/fastlane/metadata/android/`, not here.
+
 ## Closed test
 
 `TEST-PLAN.md` is what testers are asked to try, in behaviours rather than bugs,
