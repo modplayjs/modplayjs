@@ -477,10 +477,13 @@ class XrPlayer(
     private fun positionFor(degrees: Float): Vector3 {
         val rad = Math.toRadians(degrees.toDouble())
         val r = ringRadius
+        // Azimuth 0 must land in front of the viewer. Spatial SDK is
+        // left-handed with +Z forward (the runtime logs
+        // "corrected forward: 0 0 1"), so forward is +Z, not -Z.
         return Vector3(
             ringCenterX + (Math.sin(rad) * r).toFloat(),
             RING_Y,
-            ringCenterZ - (Math.cos(rad) * r).toFloat(),
+            ringCenterZ + (Math.cos(rad) * r).toFloat(),
         )
     }
 

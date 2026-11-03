@@ -23,22 +23,45 @@ class PanelLayout(private val context: Context) {
     var free: Boolean = prefs.getBoolean(KEY_FREE, false)
         private set
 
-    /** Default arc, from the positions the activity used before. */
+    init {
+        // Layouts saved before the coordinate fix hold z < 0 and would put
+        // every panel behind the viewer again. Drop them once.
+        if (prefs.getInt(KEY_VERSION, 1) < LAYOUT_VERSION) {
+            val edit = prefs.edit()
+            for (key in prefs.all.keys) {
+                if (key != KEY_FREE && key != KEY_VERSION) edit.remove(key)
+            }
+            edit.putInt(KEY_VERSION, LAYOUT_VERSION).apply()
+        }
+    }
+
+    /**
+     * Panels face the viewer: the arc is authored at +Z (forward) and each
+     * panel is turned 180 degrees, exactly as Meta's "Build and position your
+     * first panel" tutorial does.
+     */
+    private val facingUser = Quaternion(0f, 180f, 0f)
+
+    /**
+     * Default arc in front of the viewer, floor-relative (the scene uses
+     * ReferenceSpace.LOCAL_FLOOR, so Y = 0 is the floor and 1.45 m is eye
+     * height), 1.1-2 m out along +Z.
+     */
     fun defaultPose(id: Int): Pose =
         when (id) {
-            PANEL_MAIN -> Pose(Vector3(0f, 1.45f, -1.7f))
-            PANEL_LIBRARY -> Pose(Vector3(-1.25f, 1.35f, -1.35f))
-            PANEL_SETTINGS -> Pose(Vector3(1.25f, 1.35f, -1.35f))
-            PANEL_DEBUG -> Pose(Vector3(1.6f, 0.85f, -1.15f))
-            PANEL_PATTERN -> Pose(Vector3(-1.55f, 0.85f, -1.25f))
-            PANEL_DETAILS -> Pose(Vector3(0f, 0.75f, -2.05f))
-            else -> Pose()
+            PANEL_MAIN -> Pose(Vector3(0f, 1.45f, 1.7f), facingUser)
+            PANEL_LIBRARY -> Pose(Vector3(-1.25f, 1.35f, 1.35f), facingUser)
+            PANEL_SETTINGS -> Pose(Vector3(1.25f, 1.35f, 1.35f), facingUser)
+            PANEL_DEBUG -> Pose(Vector3(1.6f, 0.85f, 1.15f), facingUser)
+            PANEL_PATTERN -> Pose(Vector3(-1.55f, 0.85f, 1.25f), facingUser)
+            PANEL_DETAILS -> Pose(Vector3(0f, 0.75f, 2.05f), facingUser)
+            else -> Pose(Vector3(0f, 1.45f, 1.7f), facingUser)
         }
 
     fun savedPose(id: Int): Pose? {
         if (!prefs.contains("x$id")) return null
         return Pose(
-            Vector3(prefs.getFloat("x$id", 0f), prefs.getFloat("y$id", 1.4f), prefs.getFloat("z$id", -1.5f)),
+            Vector3(prefs.getFloat("x$id", 0f), prefs.getFloat("y$id", 1.4f), prefs.getFloat("z$id", 1.5f)),
             Quaternion(
                 prefs.getFloat("qx$id", 0f),
                 prefs.getFloat("qy$id", 0f),
@@ -121,5 +144,9 @@ class PanelLayout(private val context: Context) {
         const val PANEL_DETAILS = 6
 
         private const val KEY_FREE = "free"
+        private const val KEY_VERSION = "layoutVersion"
+
+        /** Bumped whenever the default poses change incompatibly. */
+        private const val LAYOUT_VERSION = 2
     }
 }

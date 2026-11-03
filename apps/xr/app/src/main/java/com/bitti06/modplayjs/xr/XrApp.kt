@@ -16,10 +16,6 @@ object XrApp {
     /** Passthrough state, shared by the settings panel and the activity. */
     val passthrough = MutableStateFlow(false)
 
-    /** Set by the activity once the scene exists. */
-    @Volatile
-    var passthroughSetter: ((Boolean) -> Unit)? = null
-
     /** Opens the system document picker; set by the activity. */
     @Volatile
     var pickFiles: (() -> Unit)? = null
@@ -42,7 +38,7 @@ object XrApp {
 
     fun setPassthrough(on: Boolean) {
         passthrough.value = on
-        passthroughSetter?.invoke(on)
+        Skybox.setPassthrough(on)
     }
 
     fun requestFiles() {

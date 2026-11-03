@@ -180,13 +180,12 @@ class XrActivity : AppSystemActivity() {
     override fun onSceneReady() {
         super.onSceneReady()
         player.attachScene(scene, spatialAudio)
-        XrApp.passthroughSetter = { on -> scene.enablePassthrough(on) }
         scene.setReferenceSpace(ReferenceSpace.LOCAL_FLOOR)
-        // Panels are authored in world space in front of the user (z < 0).
-        // The samples use setViewOrigin(z = 2, yaw = 180) because their GLXF
-        // content is authored around +Z; applying that to our poses rotates
-        // them behind the headset, which looks like a black screen.
+        // Left-handed scene, +Z forward. Keep the default origin: the arc is
+        // authored at +Z with a 180 degree yaw, so it lands in front without
+        // moving the viewer.
         scene.setViewOrigin(0f, 0f, 0f, 0f)
+        Skybox.install(scene, this)
 
         val ids = listOf(
             R.id.panel_main to PanelLayout.PANEL_MAIN,
@@ -204,13 +203,22 @@ class XrActivity : AppSystemActivity() {
         Log.i(TAG, "panels placed: ${panels.size}, free=${layout.free}")
         for ((id, entity) in panels) {
             val pose = runCatching { entity.getComponent<Transform>().transform }.getOrNull()
-            Log.i(TAG, "  panel $id at ${pose?.t}")
+            Log.i(TAG, "  panel $id at ${pose?.t} rot ${pose?.q}")
         }
     }
 
     override fun onPause() {
         if (::layout.isInitialized && layout.free) layout.save(panels)
         super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The runtime restarts the session around MRUK anchor discovery
+        // (XR_SESSION_STATE_STOPPING -> IDLE -> READY in the log) and the
+        // compositor loses the passthrough layer with it. Re-assert the
+        // chosen state, which also restores the dome when passthrough is off.
+        Skybox.reapply()
     }
 
     private fun requestScenePermission() {
