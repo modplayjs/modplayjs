@@ -21,6 +21,7 @@ import com.meta.spatial.toolkit.PanelRegistration
 import com.meta.spatial.toolkit.PanelStyleOptions
 import com.meta.spatial.toolkit.QuadShapeOptions
 import com.meta.spatial.toolkit.Transform
+import android.util.Log
 import com.meta.spatial.toolkit.UIPanelSettings
 import com.meta.spatial.toolkit.Visible
 import com.meta.spatial.vr.VRFeature
@@ -181,7 +182,11 @@ class XrActivity : AppSystemActivity() {
         player.attachScene(scene, spatialAudio)
         XrApp.passthroughSetter = { on -> scene.enablePassthrough(on) }
         scene.setReferenceSpace(ReferenceSpace.LOCAL_FLOOR)
-        scene.setViewOrigin(0f, 0f, 1.9f, 180f)
+        // Panels are authored in world space in front of the user (z < 0).
+        // The samples use setViewOrigin(z = 2, yaw = 180) because their GLXF
+        // content is authored around +Z; applying that to our poses rotates
+        // them behind the headset, which looks like a black screen.
+        scene.setViewOrigin(0f, 0f, 0f, 0f)
 
         val ids = listOf(
             R.id.panel_main to PanelLayout.PANEL_MAIN,
@@ -196,6 +201,11 @@ class XrActivity : AppSystemActivity() {
             panels[layoutId] = entity
         }
         layout.apply(panels)
+        Log.i(TAG, "panels placed: ${panels.size}, free=${layout.free}")
+        for ((id, entity) in panels) {
+            val pose = runCatching { entity.getComponent<Transform>().transform }.getOrNull()
+            Log.i(TAG, "  panel $id at ${pose?.t}")
+        }
     }
 
     override fun onPause() {
@@ -225,6 +235,7 @@ class XrActivity : AppSystemActivity() {
     }
 
     companion object {
+        private const val TAG = "modplay-xr"
         const val REQUEST_USE_SCENE = 1
         const val REQUEST_PICK_MODULES = 2
         const val REQUEST_PICK_TREE = 3
