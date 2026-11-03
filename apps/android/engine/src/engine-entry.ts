@@ -115,6 +115,7 @@ let sidBytes: Uint8Array | null = null;
 let channelMutes: boolean[] = [];
 let soloChannel: number | null = null;
 let savedMutes: boolean[] | null = null;
+let spatialEnabled = false;
 
 const isStreamed = (): boolean => streamed !== null;
 const isSid = (): boolean => core.module?.format === 'sid';
@@ -147,6 +148,7 @@ function applySettings(): void {
     amigaFilter: settings.mixer.amigaFilter,
     amplify: settings.mixer.amplify,
   });
+  mixer.spatial = spatialEnabled && !isSid();
   if (!isSid()) applyMutes();
 }
 
@@ -745,11 +747,98 @@ function command(json: string): string {
     case 'setAutoAdvance':
       settings.playback.autoAdvance = c.enabled === true;
       break;
+    case 'setSpatial':
+      spatialEnabled = c.enabled === true;
+      applySettings();
+      break;
+    case 'spatialInfo':
+      return spatialInfo();
     default:
       setSetting(s(c.key), c.value);
       break;
   }
   return snapshot();
+}
+
+/**
+ * Spatial render: one mono stem per tracker channel, taken from the mixer's
+ * per-channel buses. The pan/layout information is not applied here — it
+ * leaves as an azimuth in spatialInfo(), so the XR host can place each
+ * channel as its own audio object.
+ */
+const spatialStage: Float32Array[] = [];
+let spatialStageLen = 0;
+let spatialStageOff = 0;
+
+function spatialChannels(): number {
+  return core.module?.chn ?? 0;
+}
+
+function azimuthFor(i: number): number {
+  const layout = settings.mixer.layout;
+  if (layout !== 'panned' && i < 4) {
+    const left = layout === 'lrlr' ? i % 2 === 0 : i === 0 || i === 3;
+    const magnitude = i < 2 ? 45 : 15;
+    return left ? -magnitude : magnitude;
+  }
+  const xc = core.channelStates[i];
+  const pan = xc ? (xc.info_finalpan - 0x80) / 0x80 : 0;
+  return pan * 60 * (settings.transport.panSeparation / 100);
+}
+
+function spatialInfo(): string {
+  const n = spatialChannels();
+  const azimuths: number[] = [];
+  for (let i = 0; i < n; i++) azimuths.push(Math.round(azimuthFor(i) * 10) / 10);
+  return JSON.stringify({
+    enabled: spatialEnabled,
+    available: loaded && !isStreamed() && !isSid(),
+    layout: settings.mixer.layout,
+    channels: n,
+    azimuths,
+  });
+}
+
+function renderSpatial(frames: number): Float32Array {
+  if (!loaded || !playing || paused || ended || frames <= 0) return new Float32Array(0);
+  if (isStreamed() || isSid()) return new Float32Array(0);
+  const n = spatialChannels();
+  if (n <= 0) return new Float32Array(0);
+  const mix = core.dsp() as unknown as { spatial: boolean; stemOut: Float32Array[] };
+  mix.spatial = true;
+  const out = new Float32Array(n * frames);
+  let filled = 0;
+  while (filled < frames) {
+    if (spatialStageOff >= spatialStageLen) {
+      const scratch = new Float32Array(core.ticksize * 2);
+      const ret = core.playBuffer(scratch, scratch.length);
+      if (ret <= 0) {
+        if (ret < 0) ended = true;
+        break;
+      }
+      spatialStageLen = core.ticksize;
+      spatialStageOff = 0;
+      for (let ch = 0; ch < n; ch++) {
+        const src = mix.stemOut[ch];
+        let dst = spatialStage[ch];
+        if (!dst || dst.length < spatialStageLen) {
+          dst = new Float32Array(spatialStageLen);
+          spatialStage[ch] = dst;
+        } else {
+          dst.fill(0, 0, spatialStageLen);
+        }
+        if (src) dst.set(src.subarray(0, spatialStageLen));
+      }
+    }
+    const take = Math.min(spatialStageLen - spatialStageOff, frames - filled);
+    for (let ch = 0; ch < n; ch++) {
+      const src = spatialStage[ch];
+      if (src) out.set(src.subarray(spatialStageOff, spatialStageOff + take), ch * frames + filled);
+    }
+    spatialStageOff += take;
+    filled += take;
+  }
+  return filled === frames ? out : out.subarray(0, n * filled);
 }
 
 const api = {
@@ -760,6 +849,8 @@ const api = {
   stop,
   seek,
   render,
+  renderSpatial,
+  spatialInfo,
   command,
   snapshot,
   setSettings: (json: string): void => {

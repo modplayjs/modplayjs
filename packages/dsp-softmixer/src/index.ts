@@ -325,6 +325,17 @@ export class SoftMixer implements DspPlugin {
   private dischargeFrames = 0;
   /** ticksize × 2 int accumulators (s->buf32). */
   private buf32 = new Int32Array(0);
+
+  /**
+   * Spatial mode: every module channel is mixed into its own mono bus instead
+   * of the stereo pair, so the host can feed one audio object per channel.
+   * The pan/layout information is not applied here — it becomes the object's
+   * azimuth in the host. Off by default; the stereo path is untouched.
+   */
+  spatial = false;
+  /** Mono stems of the last rendered tick, normalised to [-1, 1]. */
+  readonly stemOut: Float32Array[] = [];
+  private stemBuf: Int32Array[] = [];
   /** Per-voice Paula state (vi->paula; one per voice slot). */
   private paula: PaulaState[] = [];
   private paulaVoicesInited = -1;
@@ -419,9 +430,18 @@ export class SoftMixer implements DspPlugin {
 
     // libxmp_mixer_prepare (mixer.c:449-469): clear the tick buffer.
     buf32.fill(0, 0, ticksize * 2);
+    if (this.spatial) this.prepareStems(core, ticksize);
 
     for (let voc = 0; voc < voices.length; voc++) {
       const vi = voices[voc]!;
+
+      // Spatial: this voice writes into its channel's mono bus. Everything
+      // else (positions, ramps, anticlick) keeps operating on one buffer.
+      const stem =
+        this.spatial && vi.chn >= 0 && vi.chn < this.stemBuf.length
+          ? this.stemBuf[vi.chn]!
+          : null;
+      const mixBuf = stem ?? buf32;
 
       // do_anticlick discharge of a cut voice (mixer.c:535-541): only
       // when interp > NEAREST (mixer.c:537-539). C discharges into the
@@ -429,7 +449,7 @@ export class SoftMixer implements DspPlugin {
       // buffer is cleared per tick, and the discharge lands at its start.
       if ((vi.flags & VoiceFlag.ANTICLICK) !== 0) {
         if (coreInterp > 0) {
-          this.doAnticlick(buf32, 0, vi, this.dischargeFrames);
+          this.doAnticlick(mixBuf, 0, vi, this.dischargeFrames);
         }
         vi.flags &= ~VoiceFlag.ANTICLICK;
       }
@@ -469,7 +489,14 @@ export class SoftMixer implements DspPlugin {
         pan = hardLeft ? -0x80 : 0x7f;
       }
       let volL: number, volR: number;
-      if (pan === 0x8000) {
+      if (stem !== null) {
+        // Mono bus: the azimuth is applied by the host, so both channels
+        // carry the same amplitude and the pan is not baked in here.
+        // 0x80 is the centre-pan gain of the stereo split above; matching it
+        // keeps the summed stems at the same level as a centred mix.
+        volL = vol * 0x80;
+        volR = vol * 0x80;
+      } else if (pan === 0x8000) {
         volL = vol * 0x80;
         volR = -vol * 0x80;
       } else {
@@ -596,20 +623,20 @@ export class SoftMixer implements DspPlugin {
             // Hipolito capture pre-values (mixer.c:645-653): the LAST
             // frame of this chunk, before this voice's mix.
             const lastNeg = bufPos + (samples - 1) * 2;
-            const prevL = buf32[lastNeg] ?? 0;
-            const prevR = buf32[lastNeg + 1] ?? 0;
+            const prevL = mixBuf[lastNeg] ?? 0;
+            const prevR = mixBuf[lastNeg + 1] ?? 0;
 
             if (paula !== null && !bits16 && !stereo) {
               // The C's libxmp_a500_mixers[] only has mono 8-bit entries;
               // other voices hit NULL mix_fn and are skipped silently
               // (mixer.c:685 `if (mix_fn != NULL)`).
               this.mixPaula(
-                buf32, bufPos, nativeOf(xxs), posInt, frac,
+                mixBuf, bufPos, nativeOf(xxs), posInt, frac,
                 vlOf(volL), vrOf(volR), stepFixed, samples, tabnum, paula,
               );
             } else if (paula === null) {
               this.mixSample(
-                buf32, bufPos, xxs, posInt, frac, vi,
+                mixBuf, bufPos, xxs, posInt, frac, vi,
                 volL, volR, deltaL, deltaR,
                 stepFixed, samples, rsize,
               );
@@ -617,8 +644,8 @@ export class SoftMixer implements DspPlugin {
 
             // Hipolito post-capture (mixer.c:716-718): the voice's own
             // last-frame contribution = post − pre of the LAST frame.
-            vi.sleft = (buf32[lastNeg] ?? 0) - prevL;
-            vi.sright = (buf32[lastNeg + 1] ?? 0) - prevR;
+            vi.sleft = (mixBuf[lastNeg] ?? 0) - prevL;
+            vi.sright = (mixBuf[lastNeg + 1] ?? 0) - prevR;
             bufPosAfter = bufPos + samples * 2;
 
             // old_vl bookkeeping (mixer.c:710-711).
@@ -652,7 +679,7 @@ export class SoftMixer implements DspPlugin {
         ) {
           if (size > 0) {
             // do_anticlick + set_sample_end(1) (mixer.c:720-726).
-            this.doAnticlick(buf32, bufPosAfter, vi, size);
+            this.doAnticlick(mixBuf, bufPosAfter, vi, size);
             this.setSampleEnd(core, vi, 1);
           }
           size = 0;
@@ -669,7 +696,7 @@ export class SoftMixer implements DspPlugin {
           if ((vi.flags & VoiceFlag.SAMPLE_QUEUED) !== 0) {
             // Protracker sample swap (mixer.c:733-755).
             if (size > 0) {
-              this.doAnticlick(buf32, bufPosAfter, vi, size);
+              this.doAnticlick(mixBuf, bufPosAfter, vi, size);
             }
             // The C short-circuits the <0 check before touching the
             // sample table (mixer.c:728) — this MOD hits it: voices
@@ -714,7 +741,10 @@ export class SoftMixer implements DspPlugin {
         volEnd = Math.trunc((volEnd * this.mvol) / this.mvolbase);
       }
       let volL2: number, volR2: number;
-      if (panEnd === 0x8000) {
+      if (stem !== null) {
+        volL2 = volEnd * 0x80;
+        volR2 = volEnd * 0x80;
+      } else if (panEnd === 0x8000) {
         volL2 = volEnd * 0x80;
         volR2 = -volEnd * 0x80;
       } else {
@@ -724,6 +754,50 @@ export class SoftMixer implements DspPlugin {
       vi.old_vl = volL2;
       vi.old_vr = volR2;
     } // voices
+
+    if (this.spatial) this.downmixStems(buf32, ticksize);
+  }
+
+  /** Allocate/clear one mono accumulator per module channel for this tick. */
+  private prepareStems(core: CoreIface, ticksize: number): void {
+    const n = core.channelStates.length;
+    while (this.stemBuf.length < n) this.stemBuf.push(new Int32Array(0));
+    while (this.stemOut.length < n) this.stemOut.push(new Float32Array(0));
+    for (let ch = 0; ch < n; ch++) {
+      let b = this.stemBuf[ch]!;
+      if (b.length < ticksize * 2) {
+        b = new Int32Array(ticksize * 2);
+        this.stemBuf[ch] = b;
+      }
+      b.fill(0, 0, ticksize * 2);
+      let o = this.stemOut[ch]!;
+      if (o.length < ticksize) {
+        o = new Float32Array(ticksize);
+        this.stemOut[ch] = o;
+      }
+    }
+  }
+
+  /**
+   * Publish the mono stems and keep the stereo buffer populated, so a spatial
+   * render still yields a usable stereo fallback (and the existing parity
+   * tests keep seeing the same buffer shape).
+   */
+  private downmixStems(buf32: Int32Array, ticksize: number): void {
+    const shift = DOWNMIX_SHIFT - this.amplify;
+    for (let ch = 0; ch < this.stemBuf.length; ch++) {
+      const src = this.stemBuf[ch]!;
+      const dst = this.stemOut[ch]!;
+      for (let i = 0; i < ticksize; i++) {
+        const v = src[i * 2]!;
+        buf32[i * 2] = (buf32[i * 2] ?? 0) + v;
+        buf32[i * 2 + 1] = (buf32[i * 2 + 1] ?? 0) + v;
+        let smp = v >> shift;
+        if (smp > LIM16_HI) smp = LIM16_HI;
+        else if (smp < LIM16_LO) smp = LIM16_LO;
+        dst[i] = smp / 32768;
+      }
+    }
   }
 
   /**

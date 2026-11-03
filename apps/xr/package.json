@@ -1,0 +1,18 @@
+{
+  "name": "@modplayjs/xr",
+  "private": true,
+  "license": "BSD-3-Clause",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:engine": "esbuild ../../apps/android/engine/src/engine-entry.ts --bundle --format=iife --target=es2022 --platform=neutral --legal-comments=none --outfile=app/src/main/assets/engine/engine.js",
+    "assemble": "npm run build:engine && ./gradlew :app:assembleDebug",
+    "lint": "./gradlew :app:lintDebug",
+    "typecheck": "tsc -p ../../apps/android/engine/tsconfig.json --noEmit",
+    "install:xr": "adb install -r app/build/outputs/apk/debug/app-debug.apk"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12",
+    "typescript": "^7.0.2"
+  }
+}

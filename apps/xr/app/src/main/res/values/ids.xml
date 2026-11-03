@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="panel_main" type="id" />
+    <item name="panel_library" type="id" />
+    <item name="panel_settings" type="id" />
+    <item name="panel_debug" type="id" />
+    <item name="panel_pattern" type="id" />
+    <item name="panel_details" type="id" />
+</resources>
