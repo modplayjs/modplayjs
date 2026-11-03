@@ -56,23 +56,55 @@ val buildEngine =
 
 tasks.named("preBuild").configure { dependsOn(buildEngine) }
 
-// Fail loudly when the V8 prebuilt is missing: without it the JNI layer builds
-// as a stub and the app would start with no audio engine.
-val v8Check =
-    tasks.register("checkV8Prebuilt") {
-        group = "verification"
-        description = "Verifies the arm64 V8 static library is present"
-        doLast {
-            if (v8Path == null) {
-                logger.warn(
-                    "V8 prebuilt missing at build/v8-prebuilt/android-arm64-v8a; " +
-                        "the app will build with a stub engine",
-                )
-            }
+// V8 prebuilt: fetch it when missing, then verify. Fetching happens before
+// CMake configures, so a build that downloads V8 reports that it must run
+// again before the native layer actually links it.
+val v8Lib = File(defaultV8, "lib/libv8_monolith.a")
+
+val fetchV8 =
+    tasks.register<Exec>("fetchV8") {
+        group = "build"
+        description = "Downloads the arm64 V8 prebuilt when it is missing"
+        workingDir = rootProject.projectDir
+        commandLine(
+            "node",
+            rootProject.file("../android/scripts/fetch-v8.mjs").absolutePath,
+            "arm64-v8a",
+        )
+        onlyIf("V8 library missing and node on PATH") {
+            !v8Lib.isFile && (onPath("node") || onPath("node.exe"))
         }
     }
 
-tasks.named("preBuild").configure { dependsOn(v8Check) }
+val checkV8Prebuilt =
+    tasks.register("checkV8Prebuilt") {
+        group = "verification"
+        description = "Ensures the arm64 V8 static library exists (fetches it if needed)"
+        dependsOn(fetchV8)
+        doLast {
+            if (v8Lib.isFile) {
+                // Fetching inside this build happens after the CMake arguments
+                // were evaluated, so the current run still links the stub.
+                if (v8Path == null) {
+                    logger.warn(
+                        "V8 was just fetched; run the build again so CMake picks up " +
+                            "build/v8-prebuilt/android-arm64-v8a",
+                    )
+                }
+                return@doLast
+            }
+            val releaseBuild =
+                gradle.startParameter.taskNames.any {
+                    it.contains("Release", ignoreCase = true) || it.contains("bundle", ignoreCase = true)
+                }
+            val message =
+                "V8 prebuilt missing at build/v8-prebuilt/android-arm64-v8a. " +
+                    "Run `node apps/android/scripts/fetch-v8.mjs arm64-v8a` (needs node on PATH)."
+            if (releaseBuild) throw GradleException(message) else logger.warn(message)
+        }
+    }
+
+tasks.named("preBuild").configure { dependsOn(checkV8Prebuilt) }
 
 android {
     namespace = "com.bitti06.modplayjs.xr"

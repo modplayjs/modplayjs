@@ -22,8 +22,13 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 `preBuild` runs `:app:buildEngine` (npm + esbuild) automatically, so the APK
 never carries a stale `engine.js`. Manual run: `./gradlew :app:buildEngine`.
 If npm is not on `PATH` the task is skipped with a warning and the existing
-bundle is kept. `:app:checkV8Prebuilt` warns when the arm64 V8 library is
-missing (the app would then build with a stub engine).
+bundle is kept.
+
+`:app:fetchV8` downloads the pinned arm64 V8 prebuilt
+(`apps/android/scripts/fetch-v8.mjs`) when `libv8_monolith.a` is missing;
+`preBuild` depends on `:app:checkV8Prebuilt`, which triggers that fetch and then
+fails for release tasks (warns for debug) if the library still is not there.
+A build that fetched V8 in the same run still links the stub — run it once more.
 
 `local.properties` must point at the Android SDK; `compileSdk` is 34,
 `minSdk` is 34, Horizon OS manifest level 69 (target 81).
