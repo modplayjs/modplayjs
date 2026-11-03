@@ -628,8 +628,12 @@ class XrPlayer(
                         }.toSet()
                     }.getOrDefault(current.muted)
                 } ?: current.muted,
-            pattern = readPattern(state?.get("pattern")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
-                .copy(row = state?.get("row")?.jsonPrimitive?.content?.toIntOrNull() ?: 0),
+            pattern = if (loaded) {
+                readPattern(state?.get("pattern")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
+                    .copy(row = state?.get("row")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
+            } else {
+                PatternData()
+            },
             details = track?.entries
                 ?.filterNot { (k, _) -> k in setOf("instrumentList", "sampleList", "orderList", "artwork") }
                 ?.map { (k, v) -> k to v.toString().trim('"').take(80) }

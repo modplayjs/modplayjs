@@ -150,9 +150,10 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeCommand(JNIEnv* env, jobject, j
         v8::Local<v8::Value> res;
         if (fnv.As<v8::Function>()->Call(ctx, fnv, 1, args).ToLocal(&res)) out = to_string(e, res);
     }
+    std::string sent(c);
     env->ReleaseStringUTFChars(json, c);
     if (try_catch.HasCaught()) {
-        LOGE("command: %s", to_string(e, try_catch.Exception()).c_str());
+        LOGE("command %s: %s", sent.c_str(), to_string(e, try_catch.Exception()).c_str());
         out = "{\"error\":\"command\"}";
     }
     return env->NewStringUTF(out.c_str());
