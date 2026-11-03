@@ -42,13 +42,13 @@ import com.bitti06.modplayjs.xr.library.TrackFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private enum class Filter(@StringRes val label: Int) {
+private enum class Filter(@get:StringRes val label: Int) {
     All(R.string.xr_filter_all),
     Favorites(R.string.xr_filter_favorites),
     Recent(R.string.xr_filter_recent),
 }
 
-private enum class Sort(@StringRes val label: Int) {
+private enum class Sort(@get:StringRes val label: Int) {
     Name(R.string.xr_sort_name),
     Format(R.string.xr_sort_format),
     Size(R.string.xr_sort_size),
