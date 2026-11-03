@@ -28,6 +28,10 @@ fun signingValue(property: String, environment: String): String? =
 
 // The engine is TypeScript. Bundle it before every build so the APK can never
 // ship a stale engine.js. Skips (with a warning) when npm is not on PATH.
+val isWindows: Boolean = System.getProperty("os.name").lowercase().contains("win")
+val npmCommand: String = if (isWindows) "npm.cmd" else "npm"
+val nodeCommand: String = if (isWindows) "node.exe" else "node"
+
 fun onPath(name: String): Boolean =
     System.getenv("PATH")
         ?.split(File.pathSeparator)
@@ -40,15 +44,15 @@ val buildEngine =
         group = "build"
         description = "Bundles apps/android/engine into assets/engine/engine.js"
         workingDir = rootProject.projectDir
-        commandLine("npm", "run", "build:engine")
+        commandLine(npmCommand, "run", "build:engine")
         inputs.files(
             fileTree(rootProject.file("../android/engine/src")),
             fileTree(rootProject.file("../../packages")) { include("*/src/**") },
         ).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("engineSources")
         outputs.file(engineBundle)
-        onlyIf("npm on PATH") { onPath("npm") || onPath("npm.cmd") }
+        onlyIf("npm on PATH") { onPath(npmCommand) }
         doFirst {
-            if (!onPath("npm") && !onPath("npm.cmd")) {
+            if (!onPath(npmCommand)) {
                 logger.warn("npm not found: keeping the existing engine.js (may be stale)")
             }
         }
@@ -67,12 +71,12 @@ val fetchV8 =
         description = "Downloads the arm64 V8 prebuilt when it is missing"
         workingDir = rootProject.projectDir
         commandLine(
-            "node",
+            nodeCommand,
             rootProject.file("../android/scripts/fetch-v8.mjs").absolutePath,
             "arm64-v8a",
         )
         onlyIf("V8 library missing and node on PATH") {
-            !v8Lib.isFile && (onPath("node") || onPath("node.exe"))
+            !v8Lib.isFile && onPath(nodeCommand)
         }
     }
 
