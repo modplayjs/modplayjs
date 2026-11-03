@@ -1,12 +1,27 @@
 import java.io.File
 import java.util.Properties
 
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        // Applied via classpath instead of the plugins DSL so the Kotlin
+        // compiler that Meta ships can be excluded: KGP warns when a second
+        // kotlin-compiler-embeddable is on the build classpath.
+        classpath("com.meta.spatial:spatial-gradle-plugin-impl:0.15.0") {
+            exclude(group = "org.jetbrains.kotlin", module = "kotlin-compiler-embeddable")
+        }
+    }
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.meta.spatial.plugin)
 }
 
 val repoRoot = rootProject.projectDir.parentFile.parentFile
@@ -109,6 +124,8 @@ val checkV8Prebuilt =
     }
 
 tasks.named("preBuild").configure { dependsOn(checkV8Prebuilt) }
+
+apply(plugin = "com.meta.spatial.plugin")
 
 android {
     namespace = "com.bitti06.modplayjs.xr"

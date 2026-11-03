@@ -33,6 +33,12 @@ A build that fetched V8 in the same run still links the stub — run it once mor
 `local.properties` must point at the Android SDK; `compileSdk` is 34,
 `minSdk` is 34, Horizon OS manifest level 69 (target 81).
 
+The Meta spatial plugin is applied from an explicit `buildscript` classpath
+instead of the `plugins {}` DSL, so its `kotlin-compiler-embeddable` can be
+excluded — otherwise Kotlin 2.2 warns about a second compiler on the build
+classpath. The plugin version is pinned there (`spatial-gradle-plugin-impl`),
+keep it in sync with `libs.versions.toml`.
+
 ### Host architecture
 
 JDK, Gradle, Node and esbuild run as native arm64. Two Google components exist
