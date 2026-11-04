@@ -183,10 +183,11 @@ fun NowPlayingPanel() {
             Text("🔊", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Slider(
                 value = volume,
-                onValueChange = {
-                    volume = it
-                    player?.setVolume(it.toInt())
-                },
+                // Dragging only moves the thumb; the release sends the one
+                // command. Committing per pixel re-serialised the settings and
+                // published a full state on every drag step.
+                onValueChange = { volume = it },
+                onValueChangeFinished = { player?.setVolume(volume.toInt()) },
                 valueRange = 0f..100f,
                 colors = SliderDefaults.colors(
                     thumbColor = MaterialTheme.colorScheme.primary,

@@ -67,28 +67,42 @@ fun LibraryPanel() {
     var sort by remember { mutableStateOf(Sort.Name) }
     var query by remember { mutableStateOf("") }
     var scanId by remember { mutableIntStateOf(0) }
+    // Bumped on a star tap: favorites live in SharedPreferences, so the
+    // filtered list has to be rebuilt while the library itself is unchanged.
+    var favoritesVersion by remember { mutableIntStateOf(0) }
     val version by XrApp.libraryVersion.collectAsState()
+    // favourites() copies a string set out of SharedPreferences; doing it per
+    // row (twice: glyph + colour) was a prefs read per track per recompose.
+    val favorites = remember(version, favoritesVersion) { library.favorites() }
 
+    // One scan per library version change. Rescans walk every tree and
+    // DocumentFile child on the IO pool, so they stay off the frame path and
+    // never repeat for an identical button press.
     LaunchedEffect(scanId, version) {
         result = withContext(Dispatchers.IO) { library.scan() }
     }
 
-    val filtered =
-        when (filter) {
-            Filter.All -> result.tracks
-            Filter.Favorites -> result.tracks.filter { library.isFavorite(it.uri) }
-            Filter.Recent -> {
-                val byUri = result.tracks.associateBy { it.uri.toString() }
-                library.recents().mapNotNull { byUri[it] }
-            }
-        }.filter { query.isBlank() || it.title.contains(query, ignoreCase = true) }
-
+    // Filter + sort run on every recomposition otherwise, over the whole
+    // library: thousands of title.lowercase() calls per keystroke. Both are
+    // pure, so key them on the inputs.
     val shown: List<TrackFile> =
-        when (sort) {
-            Sort.Name -> filtered.sortedBy { it.title.lowercase() }
-            Sort.Format -> filtered.sortedWith(compareBy({ it.format }, { it.title.lowercase() }))
-            Sort.Size -> filtered.sortedByDescending { it.size }
-            Sort.Folder -> filtered.sortedWith(compareBy({ it.folder }, { it.title.lowercase() }))
+        remember(result, filter, sort, query, favorites) {
+            val filtered =
+                when (filter) {
+                    Filter.All -> result.tracks
+                    Filter.Favorites -> result.tracks.filter { it.uri.toString() in favorites }
+                    Filter.Recent -> {
+                        val byUri = result.tracks.associateBy { it.uri.toString() }
+                        library.recents().mapNotNull { byUri[it] }
+                    }
+                }.filter { query.isBlank() || it.title.contains(query, ignoreCase = true) }
+
+            when (sort) {
+                Sort.Name -> filtered.sortedBy { it.title.lowercase() }
+                Sort.Format -> filtered.sortedWith(compareBy({ it.format }, { it.title.lowercase() }))
+                Sort.Size -> filtered.sortedByDescending { it.size }
+                Sort.Folder -> filtered.sortedWith(compareBy({ it.folder }, { it.title.lowercase() }))
+            }
         }
 
     Column(
@@ -168,7 +182,7 @@ fun LibraryPanel() {
                         onClick = { XrApp.requestFolder() },
                     )
                     StatCard(
-                        count = result.tracks.count { library.isFavorite(it.uri) }.toString(),
+                        count = result.tracks.count { it.uri.toString() in favorites }.toString(),
                         label = stringResource(R.string.stat_favorites),
                         color = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.weight(1f),
@@ -364,10 +378,12 @@ fun LibraryPanel() {
                                 }
                                 .padding(horizontal = 3.dp),
                         )
+                        // One membership test per row instead of two prefs reads.
+                        val isFavorite = track.uri.toString() in favorites
                         Text(
-                            if (library.isFavorite(track.uri)) "★" else "☆",
+                            if (isFavorite) "★" else "☆",
                             fontSize = 11.sp,
-                            color = if (library.isFavorite(track.uri)) {
+                            color = if (isFavorite) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
@@ -375,7 +391,9 @@ fun LibraryPanel() {
                             modifier = Modifier
                                 .clickable {
                                     library.toggleFavorite(track.uri)
-                                    XrApp.libraryChanged()
+                                    // A star only touches favourites; a full
+                                    // libraryChanged() would rescan every tree.
+                                    favoritesVersion++
                                 }
                                 .padding(horizontal = 3.dp),
                         )

@@ -57,6 +57,7 @@ class XrActivity : AppSystemActivity() {
     private var lastTrackLoaded: Boolean? = null
     private var lastSettingsOpen: Boolean? = null
     private var lastDebugSources: Boolean? = null
+    private var lastDetailsCount = -1
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun registerFeatures(): List<SpatialFeature> {
@@ -266,28 +267,33 @@ class XrActivity : AppSystemActivity() {
         val trackChanged = (lastTrackLoaded != hasTrack)
         val settingsChanged = (lastSettingsOpen != isSettingsOpen)
         val debugChanged = (lastDebugSources != isDebug)
+        val detailsChanged = (lastDetailsCount != state.details.size)
 
-        if (trackChanged || settingsChanged || debugChanged) {
-            lastTrackLoaded = hasTrack
-            lastSettingsOpen = isSettingsOpen
-            lastDebugSources = isDebug
+        // The flow emits a new state on every snapshot (2 Hz while playing).
+        // Six setComponent calls plus a layout pass per tick were pure waste,
+        // so bail out unless something the panels care about actually changed.
+        if (!trackChanged && !settingsChanged && !debugChanged && !detailsChanged) return
 
-            if (trackChanged) {
-                layout.apply(panels, hasTrack = hasTrack)
+        lastTrackLoaded = hasTrack
+        lastSettingsOpen = isSettingsOpen
+        lastDebugSources = isDebug
+        lastDetailsCount = state.details.size
+
+        if (trackChanged) {
+            layout.apply(panels, hasTrack = hasTrack)
+        }
+
+        for ((layoutId, entity) in panels) {
+            val shouldBeVisible = when (layoutId) {
+                PanelLayout.PANEL_MAIN -> hasTrack
+                PanelLayout.PANEL_LIBRARY -> true
+                PanelLayout.PANEL_SETTINGS -> isSettingsOpen
+                PanelLayout.PANEL_PATTERN -> hasTrack
+                PanelLayout.PANEL_DETAILS -> hasTrack && state.details.isNotEmpty()
+                PanelLayout.PANEL_DEBUG -> isDebug
+                else -> true
             }
-
-            for ((layoutId, entity) in panels) {
-                val shouldBeVisible = when (layoutId) {
-                    PanelLayout.PANEL_MAIN -> hasTrack
-                    PanelLayout.PANEL_LIBRARY -> true
-                    PanelLayout.PANEL_SETTINGS -> isSettingsOpen
-                    PanelLayout.PANEL_PATTERN -> hasTrack
-                    PanelLayout.PANEL_DETAILS -> hasTrack && state.details.isNotEmpty()
-                    PanelLayout.PANEL_DEBUG -> isDebug
-                    else -> true
-                }
-                entity.setComponent(Visible(shouldBeVisible))
-            }
+            entity.setComponent(Visible(shouldBeVisible))
         }
     }
 

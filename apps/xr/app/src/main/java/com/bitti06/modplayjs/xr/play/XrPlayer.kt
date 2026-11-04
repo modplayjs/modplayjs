@@ -33,6 +33,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -109,6 +110,9 @@ class XrPlayer(
     private var durationMs = 0L
     private var lastSnapshotAt = 0L
     private var spatialInfo: SpatialInfo = SpatialInfo()
+    private var cachedPatternIndex = -1
+    private var cachedPattern: PatternData? = null
+    private var markerSizes = FloatArray(16) { -1f }
 
     private val scratchShort = ShortArray(BLOCK * 2)
 
@@ -134,8 +138,12 @@ class XrPlayer(
 
     fun setRing(radius: Float, centerX: Float, centerZ: Float) {
         submit {
+            val clamped = radius.coerceIn(0.4f, 3.0f)
+            if (clamped == ringRadius && centerX == ringCenterX && centerZ == ringCenterZ && radiusManual) {
+                return@submit
+            }
             radiusManual = true
-            ringRadius = radius.coerceIn(0.4f, 3.0f)
+            ringRadius = clamped
             ringCenterX = centerX
             ringCenterZ = centerZ
             prefs.edit()
@@ -179,9 +187,12 @@ class XrPlayer(
     fun start() {
         if (running.getAndSet(true)) return
         thread = Thread({
+            // Audio priority, not MAX: MAX outranks the VR compositor and the
+            // frame thread, so a long render block would drop frames.
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO)
             engine = V8Engine(context)
             loop()
-        }, "modplay-xr-audio").apply { priority = Thread.MAX_PRIORITY; start() }
+        }, "modplay-xr-audio").apply { start() }
     }
 
     fun stop() {
@@ -194,6 +205,8 @@ class XrPlayer(
         submit {
             try {
                 val eng = engine ?: error("V8 engine unavailable")
+                cachedPatternIndex = -1
+                cachedPattern = null
                 eng.setSampleRate(SAMPLE_RATE)
                 eng.load(bytes, name)
                 pushSettings()
@@ -209,6 +222,8 @@ class XrPlayer(
                 publish(playing)
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to load module '$name'", t)
+                cachedPatternIndex = -1
+                cachedPattern = null
                 loaded = false
                 playing = false
                 _state.value = _state.value.copy(
@@ -295,6 +310,10 @@ class XrPlayer(
     fun setVolume(percent: Int) {
         val v = percent.coerceIn(0, 100)
         submit {
+            // `settings` is owned by this thread, so the comparison has to
+            // happen here. The slider commits once per drag, but a repeat
+            // would still re-serialise settings and publish a full state.
+            if (v == settings.transport.volume) return@submit
             engine?.command("""{"type":"setVolume","value":$v}""")
             settings = settings.copy(transport = settings.transport.copy(volume = v))
             settingsStore.save(settings)
@@ -330,12 +349,17 @@ class XrPlayer(
                 task = queue.poll()
             }
             if (playing && outputMode != 0) {
+                // WRITE_BLOCKING paces this loop at one block per iteration.
                 runCatching { renderBlock() }.onFailure { Log.e(TAG, "render failed", it) }
+                maybeRefreshState()
             } else {
-                Thread.sleep(4)
+                // Idle: wait for a command instead of spinning at 250 Hz. The
+                // 50 ms cap still lets the 1 Hz paused snapshot through.
+                queue.poll(IDLE_POLL_MS, TimeUnit.MILLISECONDS)?.let { task ->
+                    runCatching(task).onFailure { Log.e(TAG, "command failed", it) }
+                }
+                maybeRefreshState()
             }
-            if (!playing) Thread.sleep(4)
-            maybeRefreshState()
         }
     }
 
@@ -366,8 +390,18 @@ class XrPlayer(
             return
         }
         val n = frames.size
-        for (i in 0 until n) scratchShort[i] = (frames[i].coerceIn(-1f, 1f) * 32767f).toInt().toShort()
-        outputs.firstOrNull()?.track?.write(scratchShort, 0, n, AudioTrack.WRITE_BLOCKING)
+        // Hot loop: inline clamp, no per-sample Math.abs/max calls.
+        for (i in 0 until n) {
+            val v = frames[i]
+            val c = if (v > 1f) 1f else if (v < -1f) -1f else v
+            scratchShort[i] = (c * 32767f).toInt().toShort()
+        }
+        val out = outputs.firstOrNull()?.track
+        if (out == null) {
+            outputMode = 0
+            return
+        }
+        out.write(scratchShort, 0, n, AudioTrack.WRITE_BLOCKING)
     }
 
     private fun writeSpatial(stems: FloatArray) {
@@ -378,11 +412,13 @@ class XrPlayer(
             val out = outputs.getOrNull(ch) ?: continue
             if (out.track.playState != AudioTrack.PLAYSTATE_PLAYING) out.track.play()
             var peak = 0f
+            val base = ch * BLOCK
             for (i in 0 until BLOCK) {
-                val v = stems[ch * BLOCK + i].coerceIn(-1f, 1f)
-                val a = kotlin.math.abs(v)
+                val v = stems[base + i]
+                val c = if (v > 1f) 1f else if (v < -1f) -1f else v
+                val a = if (c < 0f) -c else c
                 if (a > peak) peak = a
-                scratchShort[i] = (v * 32767f).toInt().toShort()
+                scratchShort[i] = (c * 32767f).toInt().toShort()
             }
             levels[ch] = (levels[ch] * 0.7f) + (peak * 0.3f)
             out.track.write(scratchShort, 0, BLOCK, AudioTrack.WRITE_BLOCKING)
@@ -518,6 +554,9 @@ class XrPlayer(
     private fun rebuildMarkers() {
         destroyMarkers()
         if (outputMode != 2) return
+        if (markerSizes.size < spatialInfo.channels) {
+            markerSizes = FloatArray(spatialInfo.channels) { -1f }
+        }
         for (i in 0 until spatialInfo.channels) {
             val entity = Entity.create(
                 Mesh("mesh://sphere".toUri(), com.meta.spatial.toolkit.MeshCollision.NoCollision),
@@ -536,24 +575,38 @@ class XrPlayer(
     private fun destroyMarkers() {
         for (m in markers) runCatching { m.destroy() }
         markers.clear()
+        markerSizes.fill(-1f)
     }
 
     // ---------------------------------------------------------------- state
 
     private fun maybeRefreshState() {
         val now = System.currentTimeMillis()
-        if (now - lastSnapshotAt < 250) return
+        // Playing: 2 Hz is enough - the position label has second resolution
+        // and every publish makes all six Compose panels recompose. Paused:
+        // nothing moves, so 1 Hz keeps solo/mute/pattern edits visible.
+        val interval = if (playing) SNAPSHOT_ACTIVE_MS else SNAPSHOT_IDLE_MS
+        if (now - lastSnapshotAt < interval) return
         lastSnapshotAt = now
         publish(playing)
-        if (outputMode == 2) updatePositions()
+        // Azimuths only change on load/layout switches, which already rebuild
+        // the outputs; polling spatialInfo here was one extra V8 JSON round
+        // trip per tick. All that is left is the level-driven marker size.
+        if (debugVisible && outputMode == 2) applyMarkerLevels()
     }
 
-    private fun updatePositions() {
-        val info = readSpatialInfo()
-        if (info.channels != outChannels) return
-        if (info.azimuths == spatialInfo.azimuths) return
-        spatialInfo = info
-        applyPositions()
+    /** Marker size follows the channel level; positions and colours stay put. */
+    private fun applyMarkerLevels() {
+        for (i in markers.indices) {
+            val lvl = levels.getOrElse(i) { 0f }
+            val size = MARKER_MIN + lvl * MARKER_RANGE
+            // A jumping 2 cm sphere is unreadable and each setComponent
+            // dirties the entity; 5 mm of hysteresis keeps it steady.
+            val shown = if (i < markerSizes.size) markerSizes[i] else -1f
+            if (kotlin.math.abs(size - shown) < MARKER_STEP) continue
+            markers[i].setComponent(Scale(Vector3(size, size, size)))
+            markerSizes[i] = size
+        }
     }
 
     private fun readSpatialInfo(): SpatialInfo {
@@ -578,6 +631,9 @@ class XrPlayer(
 
     private fun readPattern(pattern: Int): PatternData {
         if (pattern < 0) return PatternData()
+        // cells/rows/channels only change with the module, not with the
+        // playhead: cache the last pattern instead of re-parsing every tick.
+        cachedPattern?.let { if (cachedPatternIndex == pattern) return it }
         val eng = engine ?: return PatternData()
         val raw = runCatching { eng.command("""{"type":"getPattern","pattern":$pattern}""") }.getOrNull()
             ?: return PatternData()
@@ -594,12 +650,16 @@ class XrPlayer(
                 channels = channels,
                 cells = cells,
                 row = 0,
-            )
+            ).also {
+                cachedPatternIndex = it.pattern
+                cachedPattern = it
+            }
         }.getOrDefault(PatternData())
     }
 
     private fun publish(isPlaying: Boolean) {
         val eng = engine ?: return
+        val previous = _state.value
         val snap = runCatching {
             Json.parseToJsonElement(eng.snapshot()) as? JsonObject
         }.getOrNull()
@@ -612,14 +672,19 @@ class XrPlayer(
             format = track?.get("format")?.jsonPrimitive?.content ?: current.format,
             channels = track?.get("channels")?.jsonPrimitive?.content?.toIntOrNull() ?: current.channels,
             playing = isPlaying,
-            positionMs = state?.get("positionMs")?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
+            // Whole seconds only: the label shows seconds, and a state that
+            // does not change is not re-emitted, so the panels skip a
+            // recompose on every tick that lands inside the same second.
+            positionMs = state?.get("positionMs")?.jsonPrimitive?.content?.toLongOrNull()
+                ?.let { it / 1000L * 1000L } ?: 0L,
             durationMs = state?.get("durationMs")?.jsonPrimitive?.content?.toLongOrNull() ?: durationMs,
             spatialAvailable = spatialInfo.available,
             spatialEnabled = spatialInfo.enabled,
             layout = spatialInfo.layout,
             azimuths = spatialInfo.azimuths,
             debugSources = debugVisible,
-            levels = levels.toList(),
+            // Only the debug markers read this; skip the copy otherwise.
+            levels = if (debugVisible) levels.toList() else emptyList(),
             volume = settings.transport.volume,
             solo = snap?.get("soloChannel")?.jsonPrimitive?.content?.toIntOrNull() ?: -1,
             muted = snap?.get("channels")
@@ -645,6 +710,10 @@ class XrPlayer(
                 ?: current.details,
             message = track?.get("message")?.jsonPrimitive?.content ?: current.message,
         )
+        // Only log transitions, not every tick.
+        if (previous.loaded != _state.value.loaded) {
+            Log.i(TAG, "state: loaded=${_state.value.loaded}")
+        }
     }
 
     private fun pushSettings() {
@@ -664,7 +733,13 @@ class XrPlayer(
         const val SAMPLE_RATE = 48000
         const val BLOCK = 960
         private const val REGISTER_BASE = 1000
+        private const val SNAPSHOT_ACTIVE_MS = 500L
+        private const val SNAPSHOT_IDLE_MS = 1000L
+        private const val IDLE_POLL_MS = 50L
         private const val RING_Y = 1.4f
+        private const val MARKER_MIN = 0.02f
+        private const val MARKER_RANGE = 0.10f
+        private const val MARKER_STEP = 0.005f
         private const val KEY_RADIUS = "radius"
         private const val KEY_RADIUS_MANUAL = "radiusManual"
 

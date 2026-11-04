@@ -104,11 +104,11 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeLoad(JNIEnv* env, jobject, jlon
     v8::Context::Scope context_scope(ctx);
     v8::TryCatch try_catch(e->isolate);
     const jsize len = env->GetArrayLength(bytes);
-    std::vector<uint8_t> data(static_cast<size_t>(len));
-    env->GetByteArrayRegion(bytes, 0, len, reinterpret_cast<jbyte*>(data.data()));
-    v8::Local<v8::ArrayBuffer> ab = v8::ArrayBuffer::New(e->isolate, data.size());
-    memcpy(ab->GetBackingStore()->Data(), data.data(), data.size());
-    v8::Local<v8::Uint8Array> u8 = v8::Uint8Array::New(ab, 0, data.size());
+    // Read the module straight into V8's backing store: the old path made a
+    // full std::vector copy first, which doubled peak memory for big modules.
+    v8::Local<v8::ArrayBuffer> ab = v8::ArrayBuffer::New(e->isolate, static_cast<size_t>(len));
+    env->GetByteArrayRegion(bytes, 0, len, reinterpret_cast<jbyte*>(ab->GetBackingStore()->Data()));
+    v8::Local<v8::Uint8Array> u8 = v8::Uint8Array::New(ab, 0, static_cast<size_t>(len));
     const char* n = env->GetStringUTFChars(name, nullptr);
     v8::Local<v8::String> nameStr = v8::String::NewFromUtf8(e->isolate, n).ToLocalChecked();
     env->ReleaseStringUTFChars(name, n);
@@ -184,9 +184,10 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeRender(JNIEnv* env, jobject, jl
     size_t len = arr->Length();
     auto store = arr->Buffer()->GetBackingStore();
     const auto* base = static_cast<const float*>(store->Data()) + (arr->ByteOffset() / sizeof(float));
-    std::vector<float> buf(base, base + len);
+    // Copy once, straight from the V8 backing store into the Java array. The
+    // std::vector copy added ~8 KB of churn per 20 ms audio block.
     jfloatArray out = env->NewFloatArray(static_cast<jsize>(len));
-    if (out) env->SetFloatArrayRegion(out, 0, static_cast<jsize>(len), buf.data());
+    if (out) env->SetFloatArrayRegion(out, 0, static_cast<jsize>(len), base);
     return out;
 }
 
@@ -215,9 +216,8 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeRenderSpatial(JNIEnv* env, jobj
     size_t len = arr->Length();
     auto store = arr->Buffer()->GetBackingStore();
     const auto* base = static_cast<const float*>(store->Data()) + (arr->ByteOffset() / sizeof(float));
-    std::vector<float> buf(base, base + len);
     jfloatArray out = env->NewFloatArray(static_cast<jsize>(len));
-    if (out) env->SetFloatArrayRegion(out, 0, static_cast<jsize>(len), buf.data());
+    if (out) env->SetFloatArrayRegion(out, 0, static_cast<jsize>(len), base);
     return out;
 }
 

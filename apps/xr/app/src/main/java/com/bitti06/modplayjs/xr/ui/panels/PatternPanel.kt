@@ -19,8 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,10 +53,13 @@ fun PatternPanel() {
     val pattern = state.pattern
     val listState = rememberLazyListState()
 
-    // Instant scroll to follow active playhead row without animation overhead
+    // Follow the playhead, but only jump when it actually moved: the state
+    // emits at 2 Hz and scrollToItem against the same index still relayouts.
     LaunchedEffect(pattern.row, pattern.pattern) {
         if (pattern.rows > 0 && pattern.row in 0 until pattern.rows) {
-            listState.scrollToItem(pattern.row)
+            if (listState.firstVisibleItemIndex != pattern.row) {
+                listState.scrollToItem(pattern.row)
+            }
         }
     }
 
