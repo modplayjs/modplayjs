@@ -42,10 +42,12 @@ import com.bitti06.modplayjs.xr.R
 import com.bitti06.modplayjs.xr.XrApp
 import com.bitti06.modplayjs.xr.play.XrPlayer
 
-private val ROW_NUM_WIDTH = 24.dp
-private val CELL_WIDTH = 76.dp
-private val ROW_HEIGHT = 16.dp
-private val HEADER_HEIGHT = 18.dp
+// Same proportions as the phone app's PatternScreen (10 sp in a 15 dp row),
+// scaled to a panel you read from ~2 m instead of ~30 cm.
+private val ROW_NUM_WIDTH = 26.dp
+private val CELL_WIDTH = 88.dp
+private val ROW_HEIGHT = 20.dp
+private val HEADER_HEIGHT = 22.dp
 
 /** "C-4 01 40 A0F": note, instrument, volume, effect at fixed widths. */
 private const val CELL_CHARS = 13
@@ -221,7 +223,7 @@ private fun PatternRow(
     ) {
         Text(
             row.toString().padStart(2, '0'),
-            fontSize = 7.sp,
+            fontSize = 8.sp,
             fontFamily = FontFamily.Monospace,
             color = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -238,11 +240,13 @@ private fun PatternRow(
                 remember(cell, palette) {
                     annotatedCell(cell, palette)
                 }
+            // No `color =` here: the AnnotatedString carries one per field, and
+            // a Text-level colour would override them. The phone app does the
+            // same; only the row background marks the playhead.
             Text(
                 text,
-                fontSize = 7.sp,
+                fontSize = 8.sp,
                 fontFamily = FontFamily.Monospace,
-                color = if (active) scheme.onPrimaryContainer else scheme.onSurface,
                 maxLines = 1,
                 softWrap = false,
                 modifier = Modifier.width(CELL_WIDTH),

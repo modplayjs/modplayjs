@@ -665,9 +665,22 @@ class XrPlayer(
         val pattern = obj["pattern"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
         val current = _state.value
         if (current.pattern.row == row && current.pattern.pattern == pattern) return
+
+        // The order moved on: the cells belong to the old pattern, so fetch the
+        // new one now instead of showing the previous grid for up to a snapshot
+        // interval. readPattern caches by index, so this costs one V8 call per
+        // pattern change, not per poll.
+        val data =
+            if (current.pattern.pattern != pattern) {
+                // Keep the old grid if the fetch came back empty: a blank panel
+                // mid-song reads as a crash.
+                readPattern(pattern).takeIf { it.cells.isNotEmpty() } ?: current.pattern
+            } else {
+                current.pattern
+            }
         _state.value =
             current.copy(
-                pattern = current.pattern.copy(row = row, pattern = pattern),
+                pattern = data.copy(row = row.coerceIn(0, (data.rows - 1).coerceAtLeast(0))),
                 positionMs = obj["positionMs"]?.jsonPrimitive?.content?.toLongOrNull()
                     ?.let { it / 1000L * 1000L } ?: current.positionMs,
             )
@@ -884,8 +897,13 @@ class XrPlayer(
         private const val SNAPSHOT_ACTIVE_MS = 500L
         private const val SNAPSHOT_IDLE_MS = 1000L
 
-        /** ~8 polls per second: one row per poll at a typical 120 ms per row. */
-        private const val PLAYHEAD_MS = 120L
+        /**
+         * 16 polls per second, matching the phone app, which drops its snapshot
+         * interval to 60 ms while the pattern view is open
+         * (PlaybackSession.FAST_REFRESH_MS). At 60 ms even a speed-1 module
+         * cannot outrun the poll.
+         */
+        private const val PLAYHEAD_MS = 60L
         private const val IDLE_POLL_MS = 50L
         private const val RING_Y = 1.4f
         private const val MARKER_MIN = 0.02f
