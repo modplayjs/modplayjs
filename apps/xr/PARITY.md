@@ -43,15 +43,45 @@ lives in `com.bitti06.modplayjs.xr` and is reachable from a panel.
 Registered wider than the rest (2.2 x 0.95 m) so the three module text blocks —
 message, instruments, samples — sit side by side, each its own tinted card with
 an independent scroll and a drawn scrollbar. Tapping a card expands it over the
-whole panel: the panel is registered with `enableTransparent = true`, and the
-expanded state paints no background, so the room behind the panel is the
-backdrop. The text then uses 11 sp monospace with a blurred black shadow
-(`TextStyle.shadow`) instead of a plate, which keeps it legible without hiding
-the environment.
+whole panel, and the expanded state paints no background, so the room behind the
+panel is the backdrop. See "Hole punching" below for what the panel config has to
+set for that to be actual see-through rather than blended dark. The text then
+uses 11 sp monospace with a blurred black shadow (`TextStyle.shadow`) instead of
+a plate, which keeps it legible without hiding the environment.
 
 The facts (orders, key/value rows) move below the three cards and keep their own
 `LazyColumn`. The card tint is `lerp(surfaceContainer, accent, 0.18f)`, the same
 blend the phone app uses in `InfoBox`.
+
+## Hole punching and thumbstick scroll
+
+Meta's layer page gives transparency as a five-part recipe, and `enableTransparent`
+is only one of the five:
+
+```kotlin
+layerConfig = LayerConfig(filters = LayerFilters.HIGHEST_QUALITY, zIndex = -1)
+layerBlendType = PanelShapeLayerBlendType.ALPHA_BLEND
+enableLayerFeatheredEdge = true
+alphaMode = AlphaMode.HOLE_PUNCH
+panelShader = SceneMaterial.HOLE_PUNCH_PANEL_SHADER
+```
+
+All five live in `TransparentPanelSettings`, which wraps the ordinary details-panel
+`UIPanelSettings`, so width, height, `dpPerMeter` and the render mode stay the same
+as every other panel. `filters` is also available through
+`PanelRenderMode.Layer(filters = …)`, but that overload builds its `LayerConfig`
+with `zIndex = 0`, and the documented recipe asks for -1; naming the `LayerConfig`
+outright covers both in one place.
+
+`Scene.enableHolePunching(true)` is deliberately **not** called. It is a
+scene-wide switch, and the documented recipe above is per panel: the same page
+reaches hole punching entirely through `PanelConfigOptions`. Nothing in the
+recipe asks for the scene flag.
+
+`Scene.setPanelControllerScrollFactor(1.6f)` multiplies the thumbstick scroll
+speed on panels once in `onSceneReady`. A 32-channel pattern is wider than the
+panel, and at the default factor crossing it takes an unreasonable number of
+thumbstick pushes.
 
 ## Panel animation
 

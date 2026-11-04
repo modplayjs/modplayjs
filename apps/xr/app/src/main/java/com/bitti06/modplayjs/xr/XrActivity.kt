@@ -273,6 +273,10 @@ class XrActivity : AppSystemActivity() {
         // Documented knob: multiplies the thumbstick scroll speed on panels.
         // 1.6 lets a 32-channel pattern be crossed in a reasonable time.
         scene.setPanelControllerScrollFactor(1.6f)
+        // No scene.enableHolePunching(true): it is a scene-wide switch, while
+        // Meta's hole-punch recipe (layer page) is per panel - layerConfig,
+        // blend type, feathering, alphaMode and panelShader on that panel's
+        // PanelConfigOptions, all of it in TransparentPanelSettings.
         Skybox.install(scene, this, launchedInPassthrough = scene.isSystemPassthroughEnabled())
 
         // VRC.Quest.Input.4: on focus loss the hands and controllers must be

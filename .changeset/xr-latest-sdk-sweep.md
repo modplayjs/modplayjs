@@ -19,9 +19,11 @@ table.
   37.
 - Gradle wrapper 9.6.0 -> 9.5.0, the minimum AGP 9.3 requires.
 - Spatial SDK stays 0.15.0 (the newest, 29 Oct 2026); Meta VR OS SDK stays 207.
-- The transparent details panel now uses `AlphaMode.HOLE_PUNCH` with
-  `SceneMaterial.HOLE_PUNCH_PANEL_SHADER`, which is what Meta's layer page
-  prescribes for transparent layer panels.
+- The transparent details panel now uses Meta's full hole-punch recipe from the
+  layer page: `LayerConfig(filters = HIGHEST_QUALITY, zIndex = -1)`,
+  `ALPHA_BLEND`, feathered edge, `AlphaMode.HOLE_PUNCH` and
+  `SceneMaterial.HOLE_PUNCH_PANEL_SHADER`. `enableTransparent` alone only blends;
+  it does not punch the transparent pixels out of the layer.
 - `Scene.setPanelControllerScrollFactor(1.6f)` so a 32-channel pattern can be
   crossed with the thumbstick in reasonable time.
 - The pulled `gradle.properties` compatibility switches are documented in
