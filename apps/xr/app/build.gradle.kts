@@ -10,8 +10,9 @@ buildscript {
     }
     dependencies {
         // Applied via classpath instead of the plugins DSL so the Kotlin
-        // compiler that Meta ships can be excluded: KGP warns when a second
-        // kotlin-compiler-embeddable is on the build classpath.
+        // compiler that Meta ships (2.2.0) can be excluded: KGP 2.3.21 warns
+        // when a second kotlin-compiler-embeddable sits on the build
+        // classpath.
         classpath("com.meta.spatial:spatial-gradle-plugin-impl:0.15.0") {
             exclude(group = "org.jetbrains.kotlin", module = "kotlin-compiler-embeddable")
         }
@@ -130,7 +131,10 @@ apply(plugin = "com.meta.spatial.plugin")
 
 android {
     namespace = "com.bitti06.modplayjs.xr"
-    compileSdk = 34
+    // 36 is what the current androidx line requires (core-ktx 1.18,
+    // activity-compose 1.13 declare minCompileSdk=36). targetSdk stays 34:
+    // immersive apps on the Horizon Store must target 32-34.
+    compileSdk = 36
     ndkVersion = "29.0.14206865"
 
     defaultConfig {

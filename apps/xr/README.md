@@ -30,10 +30,28 @@ bundle is kept.
 fails for release tasks (warns for debug) if the library still is not there.
 A build that fetched V8 in the same run still links the stub — run it once more.
 
-`local.properties` must point at the Android SDK; `compileSdk` is 34,
-`minSdk` is 34. The Horizon OS level is declared with the current
+`local.properties` must point at the Android SDK. `compileSdk` is 36
+(platform 36 must be installed), `minSdk` and `targetSdk` stay 34: the Horizon
+Store requires immersive apps to target 32-34. The Horizon OS level is declared
+with the current
 `uses-metavr-sdk` element (`minSdkVersion` 69, `targetSdkVersion` 81) instead
 of the older `uses-horizonos-sdk`; both are accepted by the Store.
+
+Dependency versions are the newest ones that still work with AGP 8.13.2 and
+`compileSdk` 36, not simply the newest published: `core-ktx` 1.19 and
+`lifecycle` 2.11 need `compileSdk` 37 plus AGP 9.1, and Compose 1.12 needs the
+same. The ceiling is therefore:
+
+| Artifact | Version | Why not newer |
+|---|---|---|
+| Kotlin | 2.3.21 | newest; AGP 8.13.2 ships R8 with Kotlin 2.3 support |
+| Compose BOM | 2026.06.01 (Compose UI 1.11.4) | 2026.08.00+ ships UI 1.12, needs `compileSdk` 37 |
+| core-ktx | 1.18.0 | 1.19.x needs `compileSdk` 37 + AGP 9.1 |
+| activity-compose | 1.13.0 | newest; `minCompileSdk` 36 |
+| lifecycle | 2.10.0 | 2.11.0 needs `compileSdk` 37 |
+| coroutines | 1.11.0 | newest |
+| serialization | 1.12.0 | newest |
+| AGP / Gradle | 8.13.2 / 8.14.6 | AGP 9.x is a breaking major and needs `compileSdk` 37 |
 
 Spatial SDK is on the newest release line, `0.15.0` (`libs.versions.toml`,
 `spatialsdk`). It is a breaking release: hierarchy scale is now the default and
