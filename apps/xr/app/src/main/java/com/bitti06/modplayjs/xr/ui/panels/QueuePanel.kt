@@ -73,7 +73,7 @@ fun QueuePanel() {
             )
             Text(
                 stringResource(R.string.xr_queue_meta, tracks.size),
-                fontSize = 9.sp,
+                fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -83,7 +83,7 @@ fun QueuePanel() {
         if (tracks.isEmpty()) {
             Text(
                 stringResource(R.string.xr_queue_empty),
-                fontSize = 9.sp,
+                fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(14.dp),
             )
@@ -108,7 +108,7 @@ fun QueuePanel() {
                 ) {
                     Text(
                         if (playing) "▶" else (index + 1).toString().padStart(2, '0'),
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         color = if (playing) MaterialTheme.colorScheme.onPrimaryContainer
                         else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -123,7 +123,7 @@ fun QueuePanel() {
                         )
                         Text(
                             "${track.format.uppercase()} · ${track.size / 1024}K",
-                            fontSize = 7.sp,
+                            fontSize = 9.sp,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

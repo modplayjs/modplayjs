@@ -57,7 +57,7 @@ fun DebugPanel() {
             Text(
                 if (state.spatialEnabled) "  ${state.channels} objects · ${state.layout}"
                 else "  " + stringResource(R.string.xr_debug_stereo),
-                fontSize = 9.sp,
+                fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
@@ -76,7 +76,7 @@ fun DebugPanel() {
         if (!state.canMute) {
             Text(
                 stringResource(R.string.xr_debug_mute_unavailable),
-                fontSize = 8.sp,
+                fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -97,13 +97,13 @@ fun DebugPanel() {
                     )
                     Text(
                         "CH ${(ch + 1).toString().padStart(2, '0')}",
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
                         "${az.toInt()}°",
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 2.dp),
@@ -124,7 +124,7 @@ fun DebugPanel() {
                     }
                     Text(
                         "${(level * 100).toInt()}",
-                        fontSize = 7.sp,
+                        fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -133,7 +133,7 @@ fun DebugPanel() {
         }
         Text(
             stringResource(R.string.xr_debug_hint),
-            fontSize = 8.sp,
+            fontSize = 10.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

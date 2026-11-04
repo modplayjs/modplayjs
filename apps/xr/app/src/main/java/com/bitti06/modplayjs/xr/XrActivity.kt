@@ -18,6 +18,7 @@ import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
+import com.meta.spatial.isdk.IsdkDefaultCursorSystem
 import com.meta.spatial.isdk.IsdkSystem
 import com.meta.spatial.toolkit.AvatarSystem
 import com.meta.spatial.toolkit.MeshCollision
@@ -31,7 +32,7 @@ import com.meta.spatial.toolkit.UIPanelRenderOptions
 import com.meta.spatial.toolkit.UIPanelSettings
 import com.meta.spatial.toolkit.Visible
 import com.meta.spatial.vr.VRFeature
-import com.bitti06.modplayjs.xr.input.MenuButtonSystem
+import com.bitti06.modplayjs.xr.input.ControllerInputSystem
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.layout.PanelAnimator
 import com.bitti06.modplayjs.xr.layout.PanelLayout
@@ -71,6 +72,8 @@ class XrActivity : AppSystemActivity() {
     private var resumeAfterPause = false
     private var avatarSystem: AvatarSystem? = null
     private var isdkSystem: IsdkSystem? = null
+    /** Draws the hover dot and the controller laser; silenced off-focus. */
+    private var cursorSystem: IsdkDefaultCursorSystem? = null
     private var lastRecenterNs = 0L
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -292,12 +295,13 @@ class XrActivity : AppSystemActivity() {
         // absent, and a missing avatar must never take the app down.
         avatarSystem = runCatching { systemManager.findSystem<AvatarSystem>() }.getOrNull()
         isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
+        cursorSystem =
+            runCatching { systemManager.findSystem<IsdkDefaultCursorSystem>() }.getOrNull()
         updateAvatarVisibility(hasFocus = true)
 
-        // VRC.Quest.Input.1: the controller's menu button opens the in-app menu.
-        // It works in both modalities; hands have no menu button and reach the
-        // same panel through its gear chip.
-        systemManager.registerSystem(MenuButtonSystem { XrApp.toggleSettings() })
+        // VRC.Quest.Input.1 (menu button) and the visible laser, both of which
+        // the Interaction SDK leaves to the app.
+        systemManager.registerSystem(ControllerInputSystem { XrApp.toggleSettings() })
 
         val ids = listOf(
             R.id.panel_main to PanelLayout.PANEL_MAIN,
@@ -384,7 +388,7 @@ class XrActivity : AppSystemActivity() {
         // Only what the current player state can actually use. The rules, in
         // one place:
         //
-        //   nothing loaded   library (+ settings/debug when asked for)
+        //   nothing loaded   library + now playing (+ settings/debug when asked)
         //   module loaded    + now playing, + pattern when it has patterns,
         //                    + details when the track reports any
         //   overlays         settings, queue, ignored: only while open
@@ -394,7 +398,10 @@ class XrActivity : AppSystemActivity() {
         for ((layoutId, entity) in panels) {
             val shouldBeVisible = when (layoutId) {
                 PanelLayout.PANEL_LIBRARY -> true
-                PanelLayout.PANEL_MAIN -> hasTrack
+                // Always on: with nothing loaded it shows the "no track" state
+                // and the push hint, so the app never opens as a single panel
+                // off to the left of an empty room.
+                PanelLayout.PANEL_MAIN -> true
                 // SID and streamed modules have no pattern data; showing an
                 // empty grid there is noise, so the panel stays hidden.
                 PanelLayout.PANEL_PATTERN -> hasTrack && state.canPattern
@@ -497,6 +504,9 @@ class XrActivity : AppSystemActivity() {
             setShowControllers(hasFocus)
         }
         isdkSystem?.active = hasFocus
+        // Stops the pointer and empties the cursor and laser pools, so no beam
+        // is left hanging in the air over the Universal Menu.
+        cursorSystem?.enableInput(hasFocus)
     }
 
     /**

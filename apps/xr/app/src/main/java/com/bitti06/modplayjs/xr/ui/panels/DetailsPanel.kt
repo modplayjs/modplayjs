@@ -172,7 +172,7 @@ private fun Collapsed(
         if (state.trackDetail.orderList.isNotBlank()) {
             Text(
                 state.trackDetail.orderList,
-                fontSize = 7.sp,
+                fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
@@ -226,14 +226,14 @@ private fun Collapsed(
                 ) {
                     Text(
                         key,
-                        fontSize = 7.sp,
+                        fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         value,
-                        fontSize = 7.sp,
+                        fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.weight(2f),

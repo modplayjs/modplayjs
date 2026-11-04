@@ -65,7 +65,7 @@ fun InfoCard(
                 shadow = Shadow(color = Color.Black, offset = Offset(0f, 0f), blurRadius = 10f),
             )
         } else {
-            TextStyle(fontFamily = FontFamily.Monospace, fontSize = 7.5.sp, lineHeight = 10.sp)
+            TextStyle(fontFamily = FontFamily.Monospace, fontSize = 9.sp, lineHeight = 10.sp)
         }
 
     Column(
@@ -113,7 +113,7 @@ fun InfoCard(
         if (empty) {
             Text(
                 "—",
-                fontSize = 8.sp,
+                fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             )

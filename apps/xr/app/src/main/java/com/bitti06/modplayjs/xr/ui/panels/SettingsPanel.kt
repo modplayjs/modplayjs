@@ -100,13 +100,13 @@ fun SettingsPanel() {
                     if (!state.spatialAvailable) {
                         Text(
                             stringResource(R.string.xr_spatial_unavailable),
-                            fontSize = 8.sp,
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.tertiary,
                         )
                     } else if (state.layout.isNotBlank()) {
                         Text(
                             stringResource(R.string.xr_spatial_objects, state.channels, state.layout),
-                            fontSize = 8.sp,
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -131,7 +131,7 @@ fun SettingsPanel() {
                                     R.string.xr_scene_denied
                                 },
                             ),
-                            fontSize = 8.sp,
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -143,7 +143,7 @@ fun SettingsPanel() {
                     if (radiusManual) {
                         Text(
                             stringResource(R.string.xr_auto),
-                            fontSize = 8.sp,
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
@@ -162,13 +162,13 @@ fun SettingsPanel() {
                         stringResource(
                             if (freeLayout) R.string.xr_free_hint else R.string.xr_stationary_hint,
                         ),
-                        fontSize = 8.sp,
+                        fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (freeLayout) {
                         Text(
                             stringResource(R.string.xr_layout_reset),
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
@@ -183,7 +183,7 @@ fun SettingsPanel() {
                     if (state.azimuths.isNotEmpty()) {
                         Text(
                             state.azimuths.joinToString("  ") { "${it.toInt()}°" },
-                            fontSize = 8.sp,
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.tertiary,
                         )
                     }
@@ -247,7 +247,7 @@ fun SettingsPanel() {
                     if (!state.canMixer) {
                         Text(
                             stringResource(R.string.xr_mixer_unavailable),
-                            fontSize = 8.sp,
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -296,7 +296,7 @@ fun SettingsPanel() {
                 Section(stringResource(R.string.xr_section_appearance)) {
                     Text(
                         stringResource(R.string.xr_theme_note),
-                        fontSize = 8.sp,
+                        fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     ToggleRow(stringResource(R.string.xr_reduced_motion), if (settings.view.reducedMotion) onLabel else offLabel, settings.view.reducedMotion) {
@@ -350,13 +350,13 @@ fun SettingsPanel() {
                             library.favorites().size,
                             library.ignoredUris().size,
                         ),
-                        fontSize = 8.sp,
+                        fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
                             stringResource(R.string.xr_add_folder),
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
@@ -366,7 +366,7 @@ fun SettingsPanel() {
                         )
                         Text(
                             stringResource(R.string.xr_clear_ignored),
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
@@ -381,7 +381,7 @@ fun SettingsPanel() {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if ((XrApp.playlist?.tracks?.size ?: 0) > 0) Text(
                             stringResource(R.string.xr_queue),
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
@@ -391,7 +391,7 @@ fun SettingsPanel() {
                         )
                         if (library.ignoredUris().isNotEmpty()) Text(
                             stringResource(R.string.xr_ignored),
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
@@ -409,13 +409,13 @@ fun SettingsPanel() {
                         ) {
                             Text(
                                 tree.lastPathSegment ?: tree.toString(),
-                                fontSize = 8.sp,
+                                fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f),
                             )
                             Text(
                                 "✕",
-                                fontSize = 9.sp,
+                                fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
@@ -442,7 +442,7 @@ fun SettingsPanel() {
                             player?.sessionId() ?: 0,
                             state.channels,
                         ),
-                        fontSize = 8.sp,
+                        fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -462,7 +462,7 @@ fun SettingsPanel() {
                 Section(stringResource(R.string.xr_section_licenses)) {
                     Text(
                         stringResource(R.string.xr_licenses_text),
-                        fontSize = 7.sp,
+                        fontSize = 9.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -472,7 +472,7 @@ fun SettingsPanel() {
                 Section(stringResource(R.string.xr_section_about)) {
                     Text(
                         stringResource(R.string.xr_about_line, BuildConfig.VERSION_NAME),
-                        fontSize = 8.sp,
+                        fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -523,12 +523,12 @@ private fun Options(
     onPick: (String) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(label, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         options.forEach { (text, value) ->
             val on = value == current
             Text(
                 text,
-                fontSize = 8.sp,
+                fontSize = 10.sp,
                 color = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
@@ -551,11 +551,11 @@ private fun ToggleRow(
     onToggle: () -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface)
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
             Text(
                 value,
-                fontSize = 8.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (on) MaterialTheme.colorScheme.onSecondaryContainer
                 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -580,10 +580,10 @@ private fun StepperRow(
     onStep: (Float) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
             StepChip("−") { onStep(-1f) }
-            Text(value, fontSize = 9.sp, color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(horizontal = 4.dp))
+            Text(value, fontSize = 11.sp, color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(horizontal = 4.dp))
             StepChip("+") { onStep(1f) }
         }
     }
@@ -624,7 +624,7 @@ private fun PatternColorRow(
     ) {
         Text(
             label,
-            fontSize = 9.sp,
+            fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
@@ -651,7 +651,7 @@ private fun PatternColorRow(
                 } else {
                     String.format("#%06X", value and 0xFFFFFF)
                 },
-                fontSize = 8.sp,
+                fontSize = 10.sp,
                 color = if (value == null) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {

@@ -9,16 +9,15 @@ import com.meta.spatial.isdk.IsdkGrabMovementType
 import com.meta.spatial.isdk.IsdkGrabProxy
 import com.meta.spatial.isdk.IsdkGrabbable
 import com.meta.spatial.isdk.IsdkPanelGrabHandle
-import com.meta.spatial.toolkit.Grabbable
-import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Transform
 
 /**
  * Panel placement: a fixed arc, or free placement the user arranges by hand.
  *
- * Free mode writes a [Grabbable] and persists poses; stationary removes it again
- * (the Interaction SDK would otherwise keep the panel grabbable) and re-applies
- * the arc. Mode switches slide via [PanelAnimator]; a reset lands instantly.
+ * Free mode writes the Interaction SDK's grabbable and persists poses;
+ * stationary removes it again (otherwise the panel keeps following the hand) and
+ * re-applies the arc. Mode switches slide via [PanelAnimator]; a reset lands
+ * instantly.
  */
 class PanelLayout(
     context: Context,
@@ -50,7 +49,10 @@ class PanelLayout(
      */
     fun defaultPose(id: Int, @Suppress("UNUSED_PARAMETER") hasTrack: Boolean = false): Pose =
         when (id) {
-            PANEL_MAIN -> Pose(Vector3(0f, 1.45f, 1.95f), facingUser)
+            // The panel you look at most, so it is the one that sits closest:
+            // 1.70 m instead of 1.95 m makes every glyph a tenth larger without
+            // closing the gap to the library on the left.
+            PANEL_MAIN -> Pose(Vector3(0f, 1.45f, 1.70f), facingUser)
             PANEL_LIBRARY -> Pose(Vector3(-1.75f, 1.45f, 1.75f), facingUser)
             PANEL_SETTINGS -> Pose(Vector3(1.75f, 1.45f, 1.75f), facingUser)
             PANEL_PATTERN -> Pose(Vector3(-1.75f, 0.45f, 1.75f), facingUser)
@@ -61,7 +63,7 @@ class PanelLayout(
             // Second row, further out: these two open from Settings.
             PANEL_QUEUE -> Pose(Vector3(-0.95f, 1.45f, 2.4f), facingUser)
             PANEL_IGNORED -> Pose(Vector3(0.95f, 1.45f, 2.4f), facingUser)
-            else -> Pose(Vector3(0f, 1.45f, 1.95f), facingUser)
+            else -> Pose(Vector3(0f, 1.45f, 1.70f), facingUser)
         }
 
     fun savedPose(id: Int): Pose? {
@@ -187,16 +189,18 @@ class PanelLayout(
     }
 
     /**
-     * Stationary mode has to remove the components, not just disable them: the
-     * Interaction SDK turns a Grabbable panel into an interactable with collision
-     * volume and grab handles, so an entity that keeps them keeps moving in the
-     * user's hand. [IsdkGrabbable] and the proxy are what the SDK actually
-     * writes here, so they go too; leaving them behind would keep the panel
-     * live after "stationary" was chosen.
+     * Free mode is the Interaction SDK's own path: [IsdkGrabbable] plus the
+     * panel grab handle the SDK attaches to every `Panel`. There is no toolkit
+     * `Grabbable` here on purpose — for panels the SDK derives collision and
+     * handles from `Panel` itself, so the legacy component only added a second,
+     * competing grab path.
+     *
+     * Stationary removes the components instead of disabling them: the handle
+     * reads [IsdkGrabbable] to start a grab, but leaving it in place would still
+     * draw the handle bars around a panel the user asked to pin down.
      */
     private fun setGrabbable(entity: Entity, enabled: Boolean) {
         if (!enabled) {
-            entity.tryRemoveComponent<Grabbable>()
             entity.tryRemoveComponent<IsdkGrabbable>()
             entity.tryRemoveComponent<IsdkGrabProxy>()
             entity.tryRemoveComponent<IsdkPanelGrabHandle>()
@@ -205,27 +209,39 @@ class PanelLayout(
         // A slide in progress would fight the hand; drop it for this entity.
         animator?.cancel(entity)
 
-        // The toolkit component is the switch the SDK watches: IsdkComponentCreationSystem
-        // derives the SDK-side collider and grab handle from it, and without it
-        // the panel is not grabbable at all. PIVOT_Y keeps the old behaviour of
-        // not letting a panel be pushed through the floor.
-        entity.setComponent(
-            Grabbable(
-                enabled = true,
-                type = GrabbableType.PIVOT_Y,
-                minHeight = 0.3f,
-                maxHeight = 3.0f,
-            ),
-        )
-        // AxialBillboard, not Direct: a grabbed panel stays upright and turns
-        // towards the viewer, so text is readable wherever the hand puts it. The
-        // toolkit path could not do that — it only ever rotated around Y.
-        entity.setComponent(
-            IsdkGrabbable(
-                enabled = true,
-                movementType = IsdkGrabMovementType.AxialBillboard,
-            ),
-        )
+        // Re-writing the component resets its grab state, so it is only written
+        // when it is missing or still says something else. This runs on every
+        // track change, and a track change must not drop a panel mid-grab.
+        val current = runCatching { entity.tryGetComponent<IsdkGrabbable>() }.getOrNull()
+        val grabbableIsUsable =
+            if (current == null) {
+                false
+            } else {
+                val usable =
+                    current.enabled && current.movementType == IsdkGrabMovementType.AxialBillboard
+                runCatching { current.recycle() }
+                usable
+            }
+        if (!grabbableIsUsable) {
+            // AxialBillboard, not Direct: a grabbed panel stays upright and
+            // turns towards the viewer, so text is readable wherever the hand
+            // puts it.
+            entity.setComponent(
+                IsdkGrabbable(
+                    enabled = true,
+                    movementType = IsdkGrabMovementType.AxialBillboard,
+                ),
+            )
+        }
+        // IsdkComponentCreationSystem only adds the handle when the Panel
+        // component changes, so a panel that was stationary once needs it back.
+        // These are the same all-defaults values the creation system writes.
+        val handle = runCatching { entity.tryGetComponent<IsdkPanelGrabHandle>() }.getOrNull()
+        if (handle == null) {
+            entity.setComponent(IsdkPanelGrabHandle())
+        } else {
+            runCatching { handle.recycle() }
+        }
     }
 
     companion object {
@@ -242,10 +258,11 @@ class PanelLayout(
         private const val KEY_VERSION = "layoutVersion"
 
         /**
-         * Bumped because poses saved while [savedPose] read the quaternion in
-         * the wrong order may themselves be upside down: they were written from
-         * a panel the user saw flipped.
+         * Bumped when the arc itself changes or when a saved pose would be read
+         * wrongly. 33: the main panel moved 1.95 m -> 1.70 m and free mode no
+         * longer writes the toolkit Grabbable, so poses from 32 belong to a
+         * different layout.
          */
-        private const val LAYOUT_VERSION = 32
+        private const val LAYOUT_VERSION = 33
     }
 }

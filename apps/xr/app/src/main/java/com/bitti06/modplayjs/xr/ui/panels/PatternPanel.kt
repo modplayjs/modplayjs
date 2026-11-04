@@ -113,7 +113,7 @@ fun PatternPanel() {
                 } else {
                     "  —"
                 },
-                fontSize = 8.sp,
+                fontSize = 9.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
@@ -174,7 +174,7 @@ private fun PatternHeader(channels: Int, line: Color) {
     ) {
         Text(
             "#",
-            fontSize = 8.sp,
+            fontSize = 9.sp,
             fontFamily = FontFamily.Monospace,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -185,7 +185,7 @@ private fun PatternHeader(channels: Int, line: Color) {
         repeat(channels) { ch ->
             Text(
                 "C${(ch + 1).toString().padStart(2, '0')}",
-                fontSize = 8.sp,
+                fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -223,7 +223,7 @@ private fun PatternRow(
     ) {
         Text(
             row.toString().padStart(2, '0'),
-            fontSize = 8.sp,
+            fontSize = 9.sp,
             fontFamily = FontFamily.Monospace,
             color = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -245,7 +245,7 @@ private fun PatternRow(
             // same; only the row background marks the playhead.
             Text(
                 text,
-                fontSize = 8.sp,
+                fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace,
                 maxLines = 1,
                 softWrap = false,

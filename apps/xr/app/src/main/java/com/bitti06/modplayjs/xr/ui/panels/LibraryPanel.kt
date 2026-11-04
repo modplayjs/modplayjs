@@ -128,7 +128,7 @@ fun LibraryPanel() {
                 )
                 Text(
                     stringResource(R.string.home_tagline),
-                    fontSize = 9.sp,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -207,7 +207,7 @@ fun LibraryPanel() {
                         val on = entry == filter
                         Text(
                             stringResource(entry.label),
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
                             color = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
@@ -222,7 +222,7 @@ fun LibraryPanel() {
 
                     Text(
                         stringResource(R.string.xr_folders),
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
@@ -232,7 +232,7 @@ fun LibraryPanel() {
                     )
                     Text(
                         stringResource(R.string.xr_files),
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
@@ -242,7 +242,7 @@ fun LibraryPanel() {
                     )
                     Text(
                         stringResource(R.string.xr_sort, stringResource(sort.label)),
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
@@ -254,7 +254,7 @@ fun LibraryPanel() {
                     )
                     Text(
                         stringResource(R.string.xr_rescan),
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
@@ -302,7 +302,7 @@ fun LibraryPanel() {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     "${folder.name} ${folder.files}",
-                                    fontSize = 8.sp,
+                                    fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -332,7 +332,7 @@ fun LibraryPanel() {
                             Filter.Recent -> stringResource(R.string.xr_empty_recent)
                             else -> stringResource(R.string.xr_empty_library)
                         },
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -351,7 +351,7 @@ fun LibraryPanel() {
                     ) {
                         Text(
                             track.format,
-                            fontSize = 8.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier
@@ -368,7 +368,7 @@ fun LibraryPanel() {
                         )
                         Text(
                             track.folder,
-                            fontSize = 7.sp,
+                            fontSize = 9.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                         )
@@ -404,7 +404,7 @@ fun LibraryPanel() {
                         )
                         Text(
                             "${track.size / 1024}K",
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -440,7 +440,7 @@ private fun StatCard(
         )
         Text(
             label,
-            fontSize = 8.sp,
+            fontSize = 10.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

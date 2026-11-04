@@ -65,7 +65,7 @@ fun IgnoredPanel() {
             )
             Text(
                 ignored.size.toString(),
-                fontSize = 9.sp,
+                fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -75,7 +75,7 @@ fun IgnoredPanel() {
         if (ignored.isEmpty()) {
             Text(
                 stringResource(R.string.xr_ignored_empty),
-                fontSize = 9.sp,
+                fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(14.dp),
             )
@@ -111,7 +111,7 @@ fun IgnoredPanel() {
                     )
                     Text(
                         stringResource(R.string.xr_restore),
-                        fontSize = 8.sp,
+                        fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))

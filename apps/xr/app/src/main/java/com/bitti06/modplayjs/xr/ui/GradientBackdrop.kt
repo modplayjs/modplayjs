@@ -30,12 +30,15 @@ fun GradientBackdrop(
     // the same without the animation and the panel costs nothing per frame.
     val start = Offset(0.28f, 0.22f)
     val end = Offset(0.78f, 0.82f)
-    val panelBg = Color(0xD916112A)
+    // #16112A at 85 % read as black against the night sky of the skybox. The
+    // base is now a visible indigo and nearly opaque, so a panel is a surface
+    // and not a hole.
+    val panelBg = Color(0xF52B2452)
     val borderBrush = Brush.linearGradient(
         colors = listOf(
-            Color(0x80B49BFF),
-            Color(0x405FE3C0),
-            Color(0x30FFFFFF),
+            Color(0xC0B49BFF),
+            Color(0x705FE3C0),
+            Color(0x55FFFFFF),
         ),
     )
 
@@ -43,14 +46,14 @@ fun GradientBackdrop(
         modifier = modifier
             .fillMaxSize()
             .clip(shape)
-            .border(1.5.dp, borderBrush, shape)
+            .border(2.dp, borderBrush, shape)
             .background(panelBg)
             .background(
                 Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFFB49BFF).copy(alpha = 0.25f),
-                        Color(0xFF5FE3C0).copy(alpha = 0.12f),
-                        Color(0x0016112A),
+                        Color(0xFFB49BFF).copy(alpha = 0.36f),
+                        Color(0xFF5FE3C0).copy(alpha = 0.18f),
+                        Color(0x002B2452),
                     ),
                     center = start,
                     radius = 900f,
@@ -59,8 +62,8 @@ fun GradientBackdrop(
             .background(
                 Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFFFF9BC2).copy(alpha = 0.16f),
-                        Color(0x0016112A),
+                        Color(0xFFFF9BC2).copy(alpha = 0.22f),
+                        Color(0x002B2452),
                     ),
                     center = end,
                     radius = 700f,
