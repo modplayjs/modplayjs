@@ -572,13 +572,17 @@ class XrPlayer(
         )
     }
 
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
     private fun applyPositions() {
-        for (i in 0 until minOf(spatialInfo.channels, entities.size)) {
-            entities[i]?.setComponent(Transform(Pose(positionFor(spatialInfo.azimuths.getOrElse(i) { 0f }))))
-        }
-        for (i in markers.indices) {
-            val pos = positionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
-            markers[i].setComponent(Transform(Pose(Vector3(pos.x, pos.y - 0.12f, pos.z))))
+        mainHandler.post {
+            for (i in 0 until minOf(spatialInfo.channels, entities.size)) {
+                entities[i]?.setComponent(Transform(Pose(positionFor(spatialInfo.azimuths.getOrElse(i) { 0f }))))
+            }
+            for (i in markers.indices) {
+                val pos = positionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
+                markers[i].setComponent(Transform(Pose(Vector3(pos.x, pos.y - 0.12f, pos.z))))
+            }
         }
     }
 

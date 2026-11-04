@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.compose.ui.platform.ComposeView
+import kotlinx.coroutines.flow.combine
 import com.meta.spatial.compose.ComposeFeature
 import com.meta.spatial.compose.ComposeViewPanelRegistration
 import com.meta.spatial.core.Entity
@@ -74,12 +75,8 @@ class XrActivity : AppSystemActivity() {
     override fun registerFeatures(): List<SpatialFeature> {
         spatialAudio = SpatialAudioFeature()
         mrukFeature = MRUKFeature(this, systemManager)
-        // VRFeature defaults to VrInputSystemType.INTERACTION_SDK: hands and
-        // controllers both arrive as pointer events, so panels get poke,
-        // ray and grab from either input without a second code path
-        // (VRC.Quest.Input.5/7/8).
         return listOf(
-            VRFeature(this),
+            VRFeature(this, inputSystemType = com.meta.spatial.vr.VrInputSystemType.SIMPLE_CONTROLLER),
             ComposeFeature(),
             spatialAudio,
             mrukFeature,
@@ -270,6 +267,14 @@ class XrActivity : AppSystemActivity() {
         avatarSystem = runCatching { systemManager.findSystem<AvatarSystem>() }.getOrNull()
         isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
         updateAvatarVisibility(hasFocus = true)
+
+        val grabbableSystem = runCatching { systemManager.findSystem<com.meta.spatial.toolkit.GrabbableSystem>() }.getOrNull()
+        grabbableSystem?.active = true
+        grabbableSystem?.grabButtons =
+            com.meta.spatial.runtime.ButtonBits.ButtonSqueezeR or
+                com.meta.spatial.runtime.ButtonBits.ButtonSqueezeL or
+                com.meta.spatial.runtime.ButtonBits.ButtonTriggerR or
+                com.meta.spatial.runtime.ButtonBits.ButtonTriggerL
 
         val ids = listOf(
             R.id.panel_main to PanelLayout.PANEL_MAIN,

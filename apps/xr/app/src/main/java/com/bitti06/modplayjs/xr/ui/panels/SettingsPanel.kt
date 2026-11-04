@@ -268,7 +268,7 @@ fun SettingsPanel() {
                         settings.sid.stereo.toString(),
                     ) { set { s -> s.copy(sid = s.sid.copy(stereo = it.toInt())) } }
                     StepperRow(stringResource(R.string.xr_volume), "${settings.sid.volume}") { step ->
-                        set { s -> s.copy(sid = s.sid.copy(volume = (s.sid.volume + step * 16).coerceIn(0, 255))) }
+                        set { s -> s.copy(sid = s.sid.copy(volume = (s.sid.volume + (step * 16).toInt()).coerceIn(0, 255))) }
                     }
                 }
             }

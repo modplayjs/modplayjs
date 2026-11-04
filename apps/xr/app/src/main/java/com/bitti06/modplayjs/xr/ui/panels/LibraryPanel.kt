@@ -106,11 +106,10 @@ fun LibraryPanel() {
             }
         }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
+    com.bitti06.modplayjs.xr.ui.GradientBackdrop {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+        ) {
         // Sticky Header: App Title, Tagline & Gear Icon to open Settings
         Row(
             modifier = Modifier
