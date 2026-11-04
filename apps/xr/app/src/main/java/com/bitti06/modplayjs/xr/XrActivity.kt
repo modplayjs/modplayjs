@@ -221,6 +221,13 @@ class XrActivity : AppSystemActivity() {
         XrApp.libraryChanged()
     }
 
+    override fun onSpatialShutdown() {
+        // Guaranteed to run before the activity dies, unlike onStop/onDestroy,
+        // so a grabbed arrangement survives a kill from the OS.
+        saveFreeLayout()
+        super.onSpatialShutdown()
+    }
+
     override fun onDestroy() {
         activityScope.cancel()
         player.stop()
@@ -397,7 +404,7 @@ class XrActivity : AppSystemActivity() {
     }
 
     override fun onPause() {
-        if (::layout.isInitialized && layout.free) layout.save(panels)
+        saveFreeLayout()
         super.onPause()
     }
 
@@ -408,7 +415,12 @@ class XrActivity : AppSystemActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         updateAvatarVisibility(hasFocus)
-        if (!hasFocus && ::layout.isInitialized && layout.free) layout.save(panels)
+        if (!hasFocus) saveFreeLayout()
+    }
+
+    /** Persist where the user left the panels, if free placement is active. */
+    private fun saveFreeLayout() {
+        if (::layout.isInitialized && layout.free) layout.save(panels)
     }
 
     /**

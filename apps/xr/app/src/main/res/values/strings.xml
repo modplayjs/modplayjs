@@ -125,4 +125,6 @@
     <string name="xr_color_default">theme</string>
     <string name="xr_spatial_unavailable">This module cannot be split into objects (SID/streamed): the stereo path is used.</string>
     <string name="xr_spatial_objects">%1$d objects · layout %2$s · positions from the channel pan</string>
+    <string name="xr_free_hint">Grab a panel by its frame to move it; positions are kept between sessions.</string>
+    <string name="xr_stationary_hint">Panels sit in a fixed arc. Switching to free restores where you left them.</string>
 </resources>

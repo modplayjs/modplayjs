@@ -125,4 +125,6 @@
     <string name="xr_color_default">Theme</string>
     <string name="xr_spatial_unavailable">Dieses Modul lässt sich nicht in Objekte trennen (SID/Stream): es läuft über Stereo.</string>
     <string name="xr_spatial_objects">%1$d Objekte · Layout %2$s · Positionen aus dem Kanal-Pan</string>
+    <string name="xr_free_hint">Panel am Rahmen greifen und verschieben; die Positionen bleiben erhalten.</string>
+    <string name="xr_stationary_hint">Panel stehen im festen Bogen. Zurück auf Frei stellt deine Anordnung wieder her.</string>
 </resources>

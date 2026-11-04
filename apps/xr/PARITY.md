@@ -36,6 +36,20 @@ lives in `com.bitti06.modplayjs.xr` and is reachable from a panel.
 | System audio effects (equalizer) | `PlayerScreens.kt` | **no** — replaced by spatial settings |
 | Spatial audio (objects, layout, pan, HRTF) | — | **yes**, XR only |
 
+## Panel placement: free vs stationary
+
+| | free | stationary |
+|---|---|---|
+| pose | user's, saved per panel id | fixed arc, `defaultPose(id)` |
+| `Grabbable` | set | **removed** (ISDK turns it into a grabbable interactable otherwise) |
+| track change | keeps the user's pose | re-applies the arc |
+| switching | restores the saved arrangement | saves the arrangement first, then applies the arc |
+| reset | wipes saved poses and returns to the arc | same |
+
+Free poses are written to `xr.layout` on input-focus loss, on pause and in
+`onSpatialShutdown`, so a grab survives both a restart and an OS kill.
+Free mode is the default (`free = true` in the panel prefs).
+
 ## Panel visibility per player state
 
 The activity owns one rule table (`updatePanelVisibilityAndLayout`):

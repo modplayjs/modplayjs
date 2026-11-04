@@ -65,33 +65,57 @@ class PanelLayout(context: Context) {
         )
     }
 
-    /** Apply default or saved poses and attach grabbables. */
+    /**
+     * Place the panels and set whether they can be grabbed.
+     *
+     * In free mode a panel that already has a Transform is left alone: the user
+     * put it there, and a track change must not yank it back into the arc. Only
+     * new panels (first placement) and stationary mode get a written pose.
+     */
     fun apply(entities: Map<Int, Entity>, hasTrack: Boolean = false) {
         for ((id, entity) in entities) {
-            val pose = if (free) savedPose(id) ?: defaultPose(id, hasTrack) else defaultPose(id, hasTrack)
-            entity.setComponent(Transform(pose))
-            attachGrabbable(entity)
+            val placed = entity.tryGetComponent<Transform>() != null
+            if (!free || !placed) {
+                val pose =
+                    if (free) {
+                        savedPose(id) ?: defaultPose(id, hasTrack)
+                    } else {
+                        defaultPose(id, hasTrack)
+                    }
+                entity.setComponent(Transform(pose))
+            }
+            setGrabbable(entity, free)
         }
     }
 
+    /**
+     * Switch between free and stationary.
+     *
+     * Free -> stationary saves where the user left everything and then puts the
+     * arc back, but the saved poses stay: switching back to free restores the
+     * arrangement instead of starting over.
+     */
     fun setFree(on: Boolean, entities: Map<Int, Entity>, hasTrack: Boolean = false) {
         if (!on) save(entities)
         free = on
         prefs.edit().putBoolean(KEY_FREE, on).apply()
-        if (on) {
-            for ((id, entity) in entities) {
-                entity.setComponent(Transform(savedPose(id) ?: defaultPose(id, hasTrack)))
-                attachGrabbable(entity)
-            }
-        } else {
-            reset(entities, hasTrack)
+        for ((id, entity) in entities) {
+            val pose =
+                if (on) {
+                    savedPose(id) ?: defaultPose(id, hasTrack)
+                } else {
+                    defaultPose(id, hasTrack)
+                }
+            entity.setComponent(Transform(pose))
+            setGrabbable(entity, on)
         }
     }
 
+    /** Deliberate wipe: back to the arc and forget the saved arrangement. */
     fun reset(entities: Map<Int, Entity>, hasTrack: Boolean = false) {
         for ((id, entity) in entities) {
             entity.setComponent(Transform(defaultPose(id, hasTrack)))
-            attachGrabbable(entity)
+            setGrabbable(entity, free)
         }
         val edit = prefs.edit()
         for (id in entities.keys) {
@@ -122,15 +146,26 @@ class PanelLayout(context: Context) {
         edit.apply()
     }
 
-    private fun attachGrabbable(entity: Entity) {
-        val toolkitGrabbable = Grabbable(
-            enabled = true,
-            type = GrabbableType.PIVOT_Y,
-            minHeight = 0.3f,
-            maxHeight = 3.0f,
-        )
-        toolkitGrabbable.enabled = true
-        entity.setComponent(toolkitGrabbable)
+    /**
+     * Stationary mode has to remove the component, not just disable it: the
+     * Interaction SDK turns a Grabbable panel into a grabbable interactable
+     * (grab handles and all), so an entity that keeps the component keeps
+     * moving in the user's hand.
+     */
+    private fun setGrabbable(entity: Entity, enabled: Boolean) {
+        if (!enabled) {
+            entity.tryRemoveComponent<Grabbable>()
+            return
+        }
+        val grabbable =
+            Grabbable(
+                enabled = true,
+                type = GrabbableType.PIVOT_Y,
+                minHeight = 0.3f,
+                maxHeight = 3.0f,
+            )
+        grabbable.enabled = true
+        entity.setComponent(grabbable)
     }
 
     companion object {

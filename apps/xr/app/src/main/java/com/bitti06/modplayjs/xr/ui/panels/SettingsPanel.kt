@@ -139,6 +139,13 @@ fun SettingsPanel() {
                     ToggleRow(stringResource(R.string.xr_free_layout), if (freeLayout) onLabel else offLabel, freeLayout) {
                         XrApp.requestFreeLayout(!freeLayout)
                     }
+                    Text(
+                        stringResource(
+                            if (freeLayout) R.string.xr_free_hint else R.string.xr_stationary_hint,
+                        ),
+                        fontSize = 8.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     if (freeLayout) {
                         Text(
                             stringResource(R.string.xr_layout_reset),
