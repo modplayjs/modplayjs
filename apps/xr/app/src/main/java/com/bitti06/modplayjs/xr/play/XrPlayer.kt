@@ -6,11 +6,11 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.util.Log
+import androidx.core.net.toUri
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.EngineJson
 import com.bitti06.modplayjs.engine.SettingsStore
 import com.bitti06.modplayjs.engine.V8Engine
-import androidx.core.net.toUri
 import com.meta.spatial.core.Color4
 import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
@@ -28,23 +28,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonArray
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Audio path for the XR app.
+ * Owns the V8 render thread and AudioTrack streaming.
  *
- * One thread owns V8 and the AudioTracks. Commands are queued and drained
- * between render blocks, so the engine is never touched from two threads and
- * the audio callback never waits for the UI.
- *
- * Stereo mode writes one interleaved track. Spatial mode asks the engine for
- * one mono stem per module channel, opens one AudioTrack per stem and registers
- * each session with [SpatialAudioFeature]; the entity's position is the
- * channel's azimuth, so the platform HRTF does the panning and head tracking.
+ * All V8 methods must run on the exact same thread that created the V8 Isolate.
+ * Here, `engine` is created inside the `"modplay-xr-audio"` thread when `start()` is called.
  */
 class XrPlayer(
     private val context: Context,
@@ -83,7 +78,8 @@ class XrPlayer(
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
 
-    private val engine = V8Engine(context)
+    @Volatile
+    private var engine: V8Engine? = null
     private val settingsStore = SettingsStore(context)
     private var settings: AndroidSettings = settingsStore.load()
 
@@ -114,7 +110,6 @@ class XrPlayer(
     private var lastSnapshotAt = 0L
     private var spatialInfo: SpatialInfo = SpatialInfo()
 
-    private val scratch = FloatArray(BLOCK * 2)
     private val scratchShort = ShortArray(BLOCK * 2)
 
     private data class TrackOut(
@@ -137,10 +132,6 @@ class XrPlayer(
         this.spatialAudio = spatialAudio
     }
 
-    /**
-     * Move/resize the emitter ring, e.g. to the centre of the scanned room.
-     * A radius from here is treated as an explicit user choice.
-     */
     fun setRing(radius: Float, centerX: Float, centerZ: Float) {
         submit {
             radiusManual = true
@@ -155,10 +146,6 @@ class XrPlayer(
         }
     }
 
-    /**
-     * Room-derived placement. Keeps the user's radius once they touched the
-     * control, but always accepts the room centre.
-     */
     fun setRingAuto(radius: Float, centerX: Float, centerZ: Float) {
         submit {
             if (!radiusManual) ringRadius = radius.coerceIn(0.5f, 2.5f)
@@ -168,7 +155,6 @@ class XrPlayer(
         }
     }
 
-    /** User radius that follows the room size again. */
     fun resetRadiusAuto() {
         submit {
             radiusManual = false
@@ -178,13 +164,10 @@ class XrPlayer(
 
     fun isRadiusManual(): Boolean = radiusManual
 
-    /** Current radius in metres, for the settings panel. */
     fun ringRadius(): Float = ringRadius
 
-    /** Change the radius, keeping the ring centred where MRUK put it. */
     fun setRadius(radius: Float) = setRing(radius, ringCenterX, ringCenterZ)
 
-    /** Show/hide one marker per audio object, coloured per channel. */
     fun setDebugSources(on: Boolean) {
         submit {
             debugVisible = on
@@ -195,7 +178,10 @@ class XrPlayer(
 
     fun start() {
         if (running.getAndSet(true)) return
-        thread = Thread({ loop() }, "modplay-xr-audio").apply { priority = Thread.MAX_PRIORITY; start() }
+        thread = Thread({
+            engine = V8Engine(context)
+            loop()
+        }, "modplay-xr-audio").apply { priority = Thread.MAX_PRIORITY; start() }
     }
 
     fun stop() {
@@ -204,27 +190,47 @@ class XrPlayer(
         releaseOutputs()
     }
 
-    fun load(bytes: ByteArray, name: String, format: String) {
+    fun load(bytes: ByteArray, name: String, format: String, autoPlay: Boolean = true) {
         submit {
-            engine.setSampleRate(SAMPLE_RATE)
-            engine.load(bytes, name)
-            pushSettings()
-            durationMs = snapshotLong("durationMs")
-            loaded = true
-            playing = false
-            rebuildOutputs()
-            publish(false)
+            try {
+                val eng = engine ?: error("V8 engine unavailable")
+                eng.setSampleRate(SAMPLE_RATE)
+                eng.load(bytes, name)
+                pushSettings()
+                durationMs = snapshotLong("durationMs")
+                loaded = true
+                if (autoPlay) {
+                    eng.command("{\"type\":\"play\"}")
+                    playing = true
+                } else {
+                    playing = false
+                }
+                rebuildOutputs()
+                publish(playing)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to load module '$name'", t)
+                loaded = false
+                playing = false
+                _state.value = _state.value.copy(
+                    loaded = false,
+                    playing = false,
+                    error = t.message ?: "Failed to load module $name",
+                )
+                rebuildOutputs()
+                publish(false)
+            }
         }
     }
 
     fun togglePlay() {
         submit {
             if (!loaded) return@submit
+            val eng = engine ?: return@submit
             if (playing) {
-                engine.command("{\"type\":\"pause\"}")
+                eng.command("{\"type\":\"pause\"}")
                 playing = false
             } else {
-                engine.command("{\"type\":\"play\"}")
+                eng.command("{\"type\":\"play\"}")
                 playing = true
             }
             publish(playing)
@@ -233,29 +239,27 @@ class XrPlayer(
 
     fun stopPlayback() {
         submit {
-            engine.command("{\"type\":\"stop\"}")
+            engine?.command("{\"type\":\"stop\"}")
             playing = false
             publish(false)
         }
     }
 
     fun seek(ms: Long) {
-        submit { engine.command("""{"type":"seek","positionMs":$ms}""") }
+        submit { engine?.command("""{"type":"seek","positionMs":$ms}""") }
     }
 
-    /** Called from the audio thread when a module reaches its end. */
     @Volatile
     var onEnded: (() -> Unit)? = null
 
     fun setJamMode(on: Boolean) {
         submit {
-            engine.command("""{"type":"setJamMode","enabled":$on}""")
+            engine?.command("""{"type":"setJamMode","enabled":$on}""")
             settings = settings.copy(playback = settings.playback.copy(jamMode = on))
             settingsStore.save(settings)
         }
     }
 
-    /** Apply an arbitrary settings change and persist it. */
     fun update(transform: (AndroidSettings) -> AndroidSettings) {
         submit {
             settings = transform(settings)
@@ -267,12 +271,12 @@ class XrPlayer(
 
     fun settingsSnapshot(): AndroidSettings = settings
 
-    /** Audio session of the first track, for the diagnostics page. */
     fun sessionId(): Int = outputs.firstOrNull()?.sessionId ?: 0
 
     fun setSpatialEnabled(enabled: Boolean) {
         submit {
-            engine.command("""{"type":"setSpatial","enabled":$enabled}""")
+            engine?.command("""{"type":"setSpatial","enabled":$enabled}""")
+            spatialInfo = spatialInfo.copy(enabled = enabled)
             rebuildOutputs()
             publish(playing)
         }
@@ -280,7 +284,7 @@ class XrPlayer(
 
     fun setLayout(layout: String) {
         submit {
-            engine.command("""{"type":"setMixerLayout","value":"$layout"}""")
+            engine?.command("""{"type":"setMixerLayout","value":"$layout"}""")
             settings = settings.copy(mixer = settings.mixer.copy(layout = layout))
             settingsStore.save(settings)
             rebuildOutputs()
@@ -288,11 +292,10 @@ class XrPlayer(
         }
     }
 
-    /** App-level volume (0..100). No system permission involved. */
     fun setVolume(percent: Int) {
         val v = percent.coerceIn(0, 100)
         submit {
-            engine.command("""{"type":"setVolume","value":$v}""")
+            engine?.command("""{"type":"setVolume","value":$v}""")
             settings = settings.copy(transport = settings.transport.copy(volume = v))
             settingsStore.save(settings)
             publish(playing)
@@ -301,14 +304,14 @@ class XrPlayer(
 
     fun toggleSolo(channel: Int) {
         submit {
-            engine.command("""{"type":"soloChannel","index":$channel}""")
+            engine?.command("""{"type":"soloChannel","index":$channel}""")
             publish(playing)
         }
     }
 
     fun toggleMute(channel: Int) {
         submit {
-            engine.command("""{"type":"toggleChannelMute","index":$channel}""")
+            engine?.command("""{"type":"toggleChannelMute","index":$channel}""")
             publish(playing)
         }
     }
@@ -337,24 +340,23 @@ class XrPlayer(
     }
 
     private fun renderBlock() {
+        val eng = engine ?: return
         if (outputMode == 2) {
-            val stems = engine.renderSpatial(BLOCK)
+            val stems = eng.renderSpatial(BLOCK)
             if (stems.size >= outChannels * BLOCK) {
                 writeSpatial(stems)
                 return
             }
             if (stems.isEmpty()) {
-                // End of the module: nothing more to render.
                 playing = false
                 publish(false)
                 onEnded?.invoke()
                 return
             }
-            // Cannot split this source (SID / streamed): fall back to stereo.
             openStereo()
             return
         }
-        val frames = engine.render(BLOCK)
+        val frames = eng.render(BLOCK)
         if (frames.isEmpty()) {
             if (playing) {
                 playing = false
@@ -477,9 +479,6 @@ class XrPlayer(
     private fun positionFor(degrees: Float): Vector3 {
         val rad = Math.toRadians(degrees.toDouble())
         val r = ringRadius
-        // Azimuth 0 must land in front of the viewer. Spatial SDK is
-        // left-handed with +Z forward (the runtime logs
-        // "corrected forward: 0 0 1"), so forward is +Z, not -Z.
         return Vector3(
             ringCenterX + (Math.sin(rad) * r).toFloat(),
             RING_Y,
@@ -558,9 +557,10 @@ class XrPlayer(
     }
 
     private fun readSpatialInfo(): SpatialInfo {
-        val raw = runCatching { engine.spatialInfo() }.getOrNull() ?: return SpatialInfo()
+        val eng = engine ?: return SpatialInfo()
+        val raw = runCatching { eng.spatialInfo() }.getOrNull() ?: return SpatialInfo()
         return runCatching {
-            val obj = Json.parseToJsonElement(raw).jsonObject
+            val obj = Json.parseToJsonElement(raw) as? JsonObject ?: return SpatialInfo()
             SpatialInfo(
                 enabled = obj["enabled"]?.jsonPrimitive?.content == "true",
                 available = obj["available"]?.jsonPrimitive?.content == "true",
@@ -574,14 +574,15 @@ class XrPlayer(
         }.getOrElse { SpatialInfo() }
     }
 
-    fun engineAvailable(): Boolean = engine.available
+    fun engineAvailable(): Boolean = engine?.available == true
 
     private fun readPattern(pattern: Int): PatternData {
         if (pattern < 0) return PatternData()
-        val raw = runCatching { engine.command("""{"type":"getPattern","pattern":$pattern}""") }.getOrNull()
+        val eng = engine ?: return PatternData()
+        val raw = runCatching { eng.command("""{"type":"getPattern","pattern":$pattern}""") }.getOrNull()
             ?: return PatternData()
         return runCatching {
-            val obj = Json.parseToJsonElement(raw).jsonObject
+            val obj = Json.parseToJsonElement(raw) as? JsonObject ?: return PatternData()
             val rows = obj["rows"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             val channels = obj["channels"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             val cells = obj["cells"]?.let { arr ->
@@ -598,11 +599,12 @@ class XrPlayer(
     }
 
     private fun publish(isPlaying: Boolean) {
+        val eng = engine ?: return
         val snap = runCatching {
-            Json.parseToJsonElement(engine.snapshot()).jsonObject
+            Json.parseToJsonElement(eng.snapshot()) as? JsonObject
         }.getOrNull()
-        val state = snap?.get("state")?.jsonObject
-        val track = snap?.get("track")?.jsonObject
+        val state = snap?.get("state") as? JsonObject
+        val track = snap?.get("track") as? JsonObject
         val current = _state.value
         _state.value = current.copy(
             loaded = loaded,
@@ -623,12 +625,12 @@ class XrPlayer(
             muted = snap?.get("channels")
                 ?.let { element ->
                     runCatching {
-                        element.jsonArray.mapNotNull { entry ->
-                            val obj = entry.jsonObject
-                            val index = obj["index"]?.jsonPrimitive?.content?.toIntOrNull()
-                            val muted = obj["muted"]?.jsonPrimitive?.content == "true"
+                        (element as? kotlinx.serialization.json.JsonArray)?.mapNotNull { entry ->
+                            val obj = entry as? JsonObject
+                            val index = obj?.get("index")?.jsonPrimitive?.content?.toIntOrNull()
+                            val muted = obj?.get("muted")?.jsonPrimitive?.content == "true"
                             if (muted && index != null) index else null
-                        }.toSet()
+                        }?.toSet()
                     }.getOrDefault(current.muted)
                 } ?: current.muted,
             pattern = if (loaded) {
@@ -647,12 +649,13 @@ class XrPlayer(
 
     private fun pushSettings() {
         val json = EngineJson.encodeToString(AndroidSettings.serializer(), settings)
-        engine.command("{\"type\":\"setSettings\",\"settings\":$json}")
+        engine?.command("{\"type\":\"setSettings\",\"settings\":$json}")
     }
 
     private fun snapshotLong(key: String): Long =
         runCatching {
-            Json.parseToJsonElement(engine.snapshot()).jsonObject["state"]?.jsonObject
+            val eng = engine ?: return 0L
+            Json.parseToJsonElement(eng.snapshot()).jsonObject["state"]?.jsonObject
                 ?.get(key)?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
         }.getOrDefault(0L)
 
@@ -664,10 +667,10 @@ class XrPlayer(
         private const val RING_Y = 1.4f
         private const val KEY_RADIUS = "radius"
         private const val KEY_RADIUS_MANUAL = "radiusManual"
-        /** Half the smaller room axis minus 60 cm, so no object sits in a wall. */
+
         fun autoRadius(roomWidth: Float, roomDepth: Float): Float =
             ((minOf(roomWidth, roomDepth) / 2f) - 0.6f).coerceIn(0.5f, 2.5f)
-        /** ARGB of a channel marker; the debug panel uses the same palette. */
+
         fun colorArgb(index: Int): Int = CHANNEL_COLORS[index % CHANNEL_COLORS.size]
 
         private val CHANNEL_COLORS = intArrayOf(

@@ -9,6 +9,7 @@ import java.io.File
 
 data class TrackFile(
     val uri: Uri,
+    val filename: String,
     val title: String,
     val format: String,
     val size: Long,
@@ -28,14 +29,10 @@ data class ScanResult(
 )
 
 /**
- * Module index with parity to the phone app's library sources:
- *
- *  - the app's own directories (`adb push`),
+ * Module index with 1:1 parity to phone app's SafScanner and LibraryRepository:
+ *  - local app directories (`adb push`),
  *  - single documents picked with `ACTION_OPEN_DOCUMENT`,
  *  - whole trees picked with `ACTION_OPEN_DOCUMENT_TREE`.
- *
- * Tree and document grants are persisted, so the library survives restarts.
- * Ignored files are remembered per URI and filtered from every scan.
  */
 class Library(private val context: Context) {
 
@@ -144,14 +141,17 @@ class Library(private val context: Context) {
         var skipped = 0
 
         fun add(uri: Uri, name: String, size: Long, folder: String) {
-            if (uri.toString() in ignored) {
-                skipped++
+            if (name.startsWith(".") || size == 0L || uri.toString() in ignored) {
+                if (uri.toString() in ignored) skipped++
                 return
             }
-            val format = formatOf(name) ?: return
+            if (!isSupported(name)) return
+            val format = formatOf(name)
+            val title = if (name.contains('.')) name.substringBeforeLast('.') else name
             out[uri.toString()] = TrackFile(
                 uri = uri,
-                title = name.substringBeforeLast('.'),
+                filename = name,
+                title = title.ifBlank { name },
                 format = format,
                 size = size,
                 folder = folder,
@@ -161,9 +161,9 @@ class Library(private val context: Context) {
         for (root in roots()) {
             if (!root.isDirectory) continue
             root.walkTopDown()
-                .filter { it.isFile }
+                .filter { it.isFile && !it.name.startsWith(".") && it.length() > 0 }
                 .forEach { file ->
-                    add(Uri.fromFile(file), file.name, file.length(), "adb")
+                    add(Uri.fromFile(file), file.name, file.length(), root.name)
                 }
         }
 
@@ -208,9 +208,18 @@ class Library(private val context: Context) {
         }
     }
 
-    fun read(track: TrackFile): ByteArray =
-        context.contentResolver.openInputStream(track.uri)?.use { it.readBytes() }
-            ?: error("cannot open ${track.title}")
+    fun read(track: TrackFile): ByteArray {
+        val uri = track.uri
+        if (uri.scheme == "file" || uri.scheme == null) {
+            val file = File(uri.path ?: uri.toString())
+            if (file.exists() && file.isFile) {
+                return file.readBytes()
+            }
+        }
+        return context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: File(uri.path ?: "").takeIf { it.exists() }?.readBytes()
+            ?: error("cannot open ${track.title} (${track.uri})")
+    }
 
     private fun displayName(uri: Uri): String? {
         val queried =
@@ -243,11 +252,6 @@ class Library(private val context: Context) {
                 } ?: 0L
         }.getOrDefault(0L)
 
-    private fun formatOf(name: String): String? {
-        val ext = name.substringAfterLast('.', "").lowercase()
-        return if (ext in FORMATS) ext.uppercase() else null
-    }
-
     companion object {
         private const val KEY_PICKED = "picked"
         private const val KEY_TREES = "trees"
@@ -257,9 +261,34 @@ class Library(private val context: Context) {
         private const val MAX_RECENTS = 24
         private const val MAX_DEPTH = 12
 
-        val FORMATS = setOf(
-            "mod", "xm", "it", "s3m", "mtm", "stm", "669", "med", "mo3", "sid",
-            "fc", "sfx", "digi", "ice", "asylum", "hmn", "flt", "st",
+        /**
+         * Parity format table matching phone app's SafScanner.
+         */
+        val FORMATS = mapOf(
+            "mod" to "MOD", "flt" to "MOD", "hmn" to "MOD", "mmd" to "MOD",
+            "mmd0" to "MOD", "mmd1" to "MOD", "mmd2" to "MOD", "mmd3" to "MOD", "mmdc" to "MOD",
+            "s3m" to "S3M", "xm" to "XM", "it" to "IT", "mtm" to "MTM", "stm" to "STM", "st" to "ST",
+            "669" to "669", "sfx" to "SFX", "digi" to "DIGI", "asylum" to "ICE", "ice" to "ICE",
+            "med" to "MED", "med2" to "MED", "med3" to "MED", "med4" to "MED", "fc13" to "FC", "fc14" to "FC",
+            "sid" to "SID", "pow" to "PACKED", "pp" to "PACKED", "xpk" to "PACKED", "pack" to "PACKED",
+            "p61" to "PACKED", "utz" to "PACKED", "wav" to "WAV", "mp3" to "MP3", "ogg" to "OGG",
         )
+
+        fun isSupported(name: String): Boolean {
+            val ext = extensionOf(name)
+            if (FORMATS.containsKey(ext)) return true
+            val prefix = name.substringBefore('.').lowercase()
+            return FORMATS.containsKey(prefix) || !name.contains('.')
+        }
+
+        fun formatOf(name: String): String {
+            val ext = extensionOf(name)
+            if (FORMATS.containsKey(ext)) return FORMATS.getValue(ext)
+            val prefix = name.substringBefore('.').lowercase()
+            if (FORMATS.containsKey(prefix)) return FORMATS.getValue(prefix)
+            return "MOD"
+        }
+
+        private fun extensionOf(name: String): String = name.substringAfterLast('.', "").lowercase()
     }
 }

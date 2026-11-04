@@ -6,12 +6,14 @@ import android.os.LocaleList
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,12 +28,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.xr.BuildConfig
-import androidx.compose.ui.res.stringResource
 import com.bitti06.modplayjs.xr.R
 import com.bitti06.modplayjs.xr.XrApp
 import com.bitti06.modplayjs.xr.library.Library
@@ -56,269 +58,305 @@ fun SettingsPanel() {
         player?.update(transform)
     }
 
-    LazyColumn(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        item { Header(stringResource(R.string.xr_settings)) }
+        // Sticky Header with Title and Gear Close Icon
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.xr_settings),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clickable { XrApp.toggleSettings() }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text("⚙", fontSize = 13.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text("✕", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+        }
 
-        item {
-            Section(stringResource(R.string.xr_section_spatial)) {
-                ToggleRow(
-                    stringResource(R.string.xr_spatial_audio),
-                    if (state.spatialEnabled) onLabel else offLabel,
-                    state.spatialEnabled,
-                ) { player?.setSpatialEnabled(!state.spatialEnabled) }
-                Options(
-                    stringResource(R.string.xr_layout),
-                    listOf(stringResource(R.string.xr_pan) to "panned", "LR·LR" to "lrlr", "LR·RL" to "lrrl"),
-                    settings.mixer.layout,
-                ) { player?.setLayout(it) }
-                ToggleRow(stringResource(R.string.xr_passthrough), if (passthrough) onLabel else offLabel, passthrough) {
-                    XrApp.setPassthrough(!passthrough)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            item {
+                Section(stringResource(R.string.xr_section_spatial)) {
+                    ToggleRow(
+                        stringResource(R.string.xr_spatial_audio),
+                        if (state.spatialEnabled) onLabel else offLabel,
+                        state.spatialEnabled,
+                    ) { player?.setSpatialEnabled(!state.spatialEnabled) }
+                    Options(
+                        stringResource(R.string.xr_layout),
+                        listOf(stringResource(R.string.xr_pan) to "panned", "LR·LR" to "lrlr", "LR·RL" to "lrrl"),
+                        settings.mixer.layout,
+                    ) { player?.setLayout(it) }
+                    ToggleRow(stringResource(R.string.xr_passthrough), if (passthrough) onLabel else offLabel, passthrough) {
+                        XrApp.setPassthrough(!passthrough)
+                    }
+                    StepperRow(stringResource(R.string.xr_ring), String.format("%.1f m", radius), manual = radiusManual) { step ->
+                        radius = (radius + step).coerceIn(0.4f, 3.0f)
+                        radiusManual = true
+                        player?.setRadius(radius)
+                    }
+                    if (radiusManual) {
+                        Text(
+                            stringResource(R.string.xr_auto),
+                            fontSize = 8.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.surfaceContainer)
+                                .clickable {
+                                    player?.resetRadiusAuto()
+                                    radiusManual = false
+                                }
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                    ToggleRow(stringResource(R.string.xr_free_layout), if (freeLayout) onLabel else offLabel, freeLayout) {
+                        XrApp.requestFreeLayout(!freeLayout)
+                    }
+                    if (freeLayout) {
+                        Text(
+                            stringResource(R.string.xr_layout_reset),
+                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                .clickable { XrApp.requestLayoutReset() }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                    }
+                    ToggleRow(stringResource(R.string.xr_source_markers), if (state.debugSources) onLabel else offLabel, state.debugSources) {
+                        player?.setDebugSources(!state.debugSources)
+                    }
+                    if (state.azimuths.isNotEmpty()) {
+                        Text(
+                            state.azimuths.joinToString("  ") { "${it.toInt()}°" },
+                            fontSize = 8.sp,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                    }
                 }
-                StepperRow(stringResource(R.string.xr_ring), String.format("%.1f m", radius), manual = radiusManual) { step ->
-                    radius = (radius + step).coerceIn(0.4f, 3.0f)
-                    radiusManual = true
-                    player?.setRadius(radius)
+            }
+
+            item {
+                Section(stringResource(R.string.xr_section_playback)) {
+                    Options(
+                        stringResource(R.string.xr_repeat),
+                        listOf(stringResource(R.string.xr_off) to "off", stringResource(R.string.xr_all) to "all", stringResource(R.string.xr_one) to "one"),
+                        settings.playback.repeat,
+                    ) { set { s -> s.copy(playback = s.playback.copy(repeat = it)) } }
+                    ToggleRow(stringResource(R.string.xr_shuffle), if (settings.playback.shuffle) onLabel else offLabel, settings.playback.shuffle) {
+                        set { s -> s.copy(playback = s.playback.copy(shuffle = !s.playback.shuffle)) }
+                    }
+                    ToggleRow(stringResource(R.string.xr_auto_advance), if (settings.playback.autoAdvance) onLabel else offLabel, settings.playback.autoAdvance) {
+                        set { s -> s.copy(playback = s.playback.copy(autoAdvance = !s.playback.autoAdvance)) }
+                    }
+                    ToggleRow(stringResource(R.string.xr_jam), if (settings.playback.jamMode) onLabel else offLabel, settings.playback.jamMode) {
+                        player?.setJamMode(!settings.playback.jamMode)
+                    }
                 }
-                if (radiusManual) {
+            }
+
+            item {
+                Section(stringResource(R.string.xr_section_audio)) {
+                    StepperRow(stringResource(R.string.xr_pan), "${settings.transport.panSeparation}") { step ->
+                        set { s ->
+                            s.copy(
+                                transport = s.transport.copy(
+                                    panSeparation = (s.transport.panSeparation + (step * 10).toInt()).coerceIn(0, 100),
+                                ),
+                            )
+                        }
+                    }
+                    Options(
+                        stringResource(R.string.xr_interpolation),
+                        listOf("N" to "0", "L" to "1", "S" to "2"),
+                        settings.transport.interpolation.toString(),
+                    ) { set { s -> s.copy(transport = s.transport.copy(interpolation = it.toInt())) } }
+                    StepperRow(stringResource(R.string.xr_voices), "${settings.transport.numVoices}") { step ->
+                        set { s ->
+                            s.copy(transport = s.transport.copy(numVoices = (s.transport.numVoices + (step * 4).toInt()).coerceIn(4, 128)))
+                        }
+                    }
+                    StepperRow(stringResource(R.string.xr_tempo), String.format("%.2f×", settings.transport.tempoFactor)) { step ->
+                        set { s ->
+                            s.copy(
+                                transport = s.transport.copy(
+                                    tempoFactor = (s.transport.tempoFactor + step * 0.05).coerceIn(0.25, 4.0),
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Section(stringResource(R.string.xr_section_mixer)) {
+                    Options(
+                        stringResource(R.string.xr_mode),
+                        listOf("libxmp" to "libxmp", "Paula" to "paula"),
+                        settings.mixer.mode,
+                    ) { set { s -> s.copy(mixer = s.mixer.copy(mode = it)) } }
+                    Options(
+                        stringResource(R.string.xr_filter),
+                        listOf(stringResource(R.string.xr_led_off) to "a500", stringResource(R.string.xr_led_on) to "a500led"),
+                        settings.mixer.amigaFilter,
+                    ) { set { s -> s.copy(mixer = s.mixer.copy(amigaFilter = it)) } }
+                }
+            }
+
+            item {
+                Section(stringResource(R.string.xr_section_sid)) {
+                    Options(
+                        stringResource(R.string.xr_chip),
+                        listOf("6581" to "6581", "8580" to "8580"),
+                        settings.sid.model.toString(),
+                    ) { set { s -> s.copy(sid = s.sid.copy(model = it.toInt())) } }
+                    Options(
+                        stringResource(R.string.xr_video),
+                        listOf("PAL" to "1", "NTSC" to "0"),
+                        (settings.sid.videoStandard ?: 1).toString(),
+                    ) { set { s -> s.copy(sid = s.sid.copy(videoStandard = it.toInt())) } }
+                    Options(
+                        stringResource(R.string.xr_quality),
+                        listOf(stringResource(R.string.xr_light) to "light", stringResource(R.string.xr_hq) to "hq", stringResource(R.string.xr_sinc) to "sinc"),
+                        settings.sid.quality,
+                    ) { set { s -> s.copy(sid = s.sid.copy(quality = it)) } }
+                    Options(
+                        stringResource(R.string.xr_channels),
+                        listOf(stringResource(R.string.xr_mono) to "0", stringResource(R.string.xr_stereo) to "1", stringResource(R.string.xr_narrow) to "3"),
+                        settings.sid.stereo.toString(),
+                    ) { set { s -> s.copy(sid = s.sid.copy(stereo = it.toInt())) } }
+                }
+            }
+
+            item {
+                Section(stringResource(R.string.xr_section_appearance)) {
+                    ToggleRow(stringResource(R.string.xr_reduced_motion), if (settings.view.reducedMotion) onLabel else offLabel, settings.view.reducedMotion) {
+                        set { s -> s.copy(view = s.view.copy(reducedMotion = !s.view.reducedMotion)) }
+                    }
+                    ToggleRow(stringResource(R.string.xr_channel_strip), if (settings.view.showChannelStrip) onLabel else offLabel, settings.view.showChannelStrip) {
+                        set { s -> s.copy(view = s.view.copy(showChannelStrip = !s.view.showChannelStrip)) }
+                    }
+                    ToggleRow(stringResource(R.string.xr_pattern_view), if (settings.view.patternView) onLabel else offLabel, settings.view.patternView) {
+                        set { s -> s.copy(view = s.view.copy(patternView = !s.view.patternView)) }
+                    }
+                    ToggleRow(stringResource(R.string.xr_follow), if (settings.view.follow) onLabel else offLabel, settings.view.follow) {
+                        set { s -> s.copy(view = s.view.copy(follow = !s.view.follow)) }
+                    }
+                    ToggleRow(stringResource(R.string.xr_strip_dots), if (settings.view.stripDots) onLabel else offLabel, settings.view.stripDots) {
+                        set { s -> s.copy(view = s.view.copy(stripDots = !s.view.stripDots)) }
+                    }
+                    Options(
+                        stringResource(R.string.xr_visualizer),
+                        listOf(stringResource(R.string.xr_vis_off) to "off", stringResource(R.string.xr_vis_levels) to "spectrum", stringResource(R.string.xr_vis_wave) to "waveform", stringResource(R.string.xr_vis_both) to "both"),
+                        settings.view.visualizer,
+                    ) { set { s -> s.copy(view = s.view.copy(visualizer = it)) } }
+                }
+            }
+
+            item {
+                Section(stringResource(R.string.xr_section_library)) {
                     Text(
-                        stringResource(R.string.xr_auto),
+                        stringResource(
+                            R.string.xr_library_summary,
+                            library.treeUris().size,
+                            library.pickedCount(),
+                            library.favorites().size,
+                            library.ignoredUris().size,
+                        ),
                         fontSize = 8.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.surfaceContainer)
-                            .clickable {
-                                player?.resetRadiusAuto()
-                                radiusManual = false
-                            }
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                }
-                ToggleRow(stringResource(R.string.xr_free_layout), if (freeLayout) onLabel else offLabel, freeLayout) {
-                    XrApp.requestFreeLayout(!freeLayout)
-                }
-                if (freeLayout) {
                     Text(
-                        stringResource(R.string.xr_layout_reset),
+                        stringResource(R.string.xr_clear_ignored),
                         fontSize = 9.sp,
                         color = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                            .clickable { XrApp.requestLayoutReset() }
+                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                            .clickable {
+                                library.clearIgnored()
+                                XrApp.libraryChanged()
+                            }
                             .padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                 }
-                ToggleRow(stringResource(R.string.xr_source_markers), if (state.debugSources) onLabel else offLabel, state.debugSources) {
-                    player?.setDebugSources(!state.debugSources)
-                }
-                if (state.azimuths.isNotEmpty()) {
+            }
+
+            item {
+                Section(stringResource(R.string.xr_section_diagnostics)) {
                     Text(
-                        state.azimuths.joinToString("  ") { "${it.toInt()}°" },
+                        stringResource(
+                            R.string.xr_diag_line,
+                            stringResource(
+                                if (player?.engineAvailable() == true) R.string.xr_engine_v8
+                                else R.string.xr_engine_missing,
+                            ),
+                            player?.sessionId() ?: 0,
+                            state.channels,
+                        ),
                         fontSize = 8.sp,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-        }
 
-        item {
-            Section(stringResource(R.string.xr_section_playback)) {
-                Options(
-                    stringResource(R.string.xr_repeat),
-                    listOf(stringResource(R.string.xr_off) to "off", stringResource(R.string.xr_all) to "all", stringResource(R.string.xr_one) to "one"),
-                    settings.playback.repeat,
-                ) { set { s -> s.copy(playback = s.playback.copy(repeat = it)) } }
-                ToggleRow(stringResource(R.string.xr_shuffle), if (settings.playback.shuffle) onLabel else offLabel, settings.playback.shuffle) {
-                    set { s -> s.copy(playback = s.playback.copy(shuffle = !s.playback.shuffle)) }
-                }
-                ToggleRow(stringResource(R.string.xr_auto_advance), if (settings.playback.autoAdvance) onLabel else offLabel, settings.playback.autoAdvance) {
-                    set { s -> s.copy(playback = s.playback.copy(autoAdvance = !s.playback.autoAdvance)) }
-                }
-                ToggleRow(stringResource(R.string.xr_jam), if (settings.playback.jamMode) onLabel else offLabel, settings.playback.jamMode) {
-                    player?.setJamMode(!settings.playback.jamMode)
+            item {
+                Section(stringResource(R.string.xr_section_language)) {
+                    Options(
+                        stringResource(R.string.xr_app_language),
+                        listOf(stringResource(R.string.xr_lang_system) to "sys", stringResource(R.string.xr_lang_de) to "de", stringResource(R.string.xr_lang_en) to "en"),
+                        currentLocaleTag(context),
+                    ) { setLocale(context, it) }
                 }
             }
-        }
 
-        item {
-            Section(stringResource(R.string.xr_section_audio)) {
-                StepperRow(stringResource(R.string.xr_pan), "${settings.transport.panSeparation}") { step ->
-                    set { s ->
-                        s.copy(
-                            transport = s.transport.copy(
-                                panSeparation = (s.transport.panSeparation + (step * 10).toInt()).coerceIn(0, 100),
-                            ),
-                        )
-                    }
-                }
-                Options(
-                    stringResource(R.string.xr_interpolation),
-                    listOf("N" to "0", "L" to "1", "S" to "2"),
-                    settings.transport.interpolation.toString(),
-                ) { set { s -> s.copy(transport = s.transport.copy(interpolation = it.toInt())) } }
-                StepperRow(stringResource(R.string.xr_voices), "${settings.transport.numVoices}") { step ->
-                    set { s ->
-                        s.copy(transport = s.transport.copy(numVoices = (s.transport.numVoices + (step * 4).toInt()).coerceIn(4, 128)))
-                    }
-                }
-                StepperRow(stringResource(R.string.xr_tempo), String.format("%.2f×", settings.transport.tempoFactor)) { step ->
-                    set { s ->
-                        s.copy(
-                            transport = s.transport.copy(
-                                tempoFactor = (s.transport.tempoFactor + step * 0.05).coerceIn(0.25, 4.0),
-                            ),
-                        )
-                    }
+            item {
+                Section(stringResource(R.string.xr_section_licenses)) {
+                    Text(
+                        stringResource(R.string.xr_licenses_text),
+                        fontSize = 7.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
-        }
 
-        item {
-            Section(stringResource(R.string.xr_section_mixer)) {
-                Options(
-                    stringResource(R.string.xr_mode),
-                    listOf("libxmp" to "libxmp", "Paula" to "paula"),
-                    settings.mixer.mode,
-                ) { set { s -> s.copy(mixer = s.mixer.copy(mode = it)) } }
-                Options(
-                    stringResource(R.string.xr_filter),
-                    listOf(stringResource(R.string.xr_led_off) to "a500", stringResource(R.string.xr_led_on) to "a500led"),
-                    settings.mixer.amigaFilter,
-                ) { set { s -> s.copy(mixer = s.mixer.copy(amigaFilter = it)) } }
-            }
-        }
-
-        item {
-            Section(stringResource(R.string.xr_section_sid)) {
-                Options(
-                    stringResource(R.string.xr_chip),
-                    listOf("6581" to "6581", "8580" to "8580"),
-                    settings.sid.model.toString(),
-                ) { set { s -> s.copy(sid = s.sid.copy(model = it.toInt())) } }
-                Options(
-                    stringResource(R.string.xr_video),
-                    listOf("PAL" to "1", "NTSC" to "0"),
-                    (settings.sid.videoStandard ?: 1).toString(),
-                ) { set { s -> s.copy(sid = s.sid.copy(videoStandard = it.toInt())) } }
-                Options(
-                    stringResource(R.string.xr_quality),
-                    listOf(stringResource(R.string.xr_light) to "light", stringResource(R.string.xr_hq) to "hq", stringResource(R.string.xr_sinc) to "sinc"),
-                    settings.sid.quality,
-                ) { set { s -> s.copy(sid = s.sid.copy(quality = it)) } }
-                Options(
-                    stringResource(R.string.xr_channels),
-                    listOf(stringResource(R.string.xr_mono) to "0", stringResource(R.string.xr_stereo) to "1", stringResource(R.string.xr_narrow) to "3"),
-                    settings.sid.stereo.toString(),
-                ) { set { s -> s.copy(sid = s.sid.copy(stereo = it.toInt())) } }
-            }
-        }
-
-        item {
-            Section(stringResource(R.string.xr_section_appearance)) {
-                ToggleRow(stringResource(R.string.xr_reduced_motion), if (settings.view.reducedMotion) onLabel else offLabel, settings.view.reducedMotion) {
-                    set { s -> s.copy(view = s.view.copy(reducedMotion = !s.view.reducedMotion)) }
+            item {
+                Section(stringResource(R.string.xr_section_about)) {
+                    Text(
+                        stringResource(R.string.xr_about_line, BuildConfig.VERSION_NAME),
+                        fontSize = 8.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                ToggleRow(stringResource(R.string.xr_channel_strip), if (settings.view.showChannelStrip) onLabel else offLabel, settings.view.showChannelStrip) {
-                    set { s -> s.copy(view = s.view.copy(showChannelStrip = !s.view.showChannelStrip)) }
-                }
-                ToggleRow(stringResource(R.string.xr_pattern_view), if (settings.view.patternView) onLabel else offLabel, settings.view.patternView) {
-                    set { s -> s.copy(view = s.view.copy(patternView = !s.view.patternView)) }
-                }
-                ToggleRow(stringResource(R.string.xr_follow), if (settings.view.follow) onLabel else offLabel, settings.view.follow) {
-                    set { s -> s.copy(view = s.view.copy(follow = !s.view.follow)) }
-                }
-                ToggleRow(stringResource(R.string.xr_strip_dots), if (settings.view.stripDots) onLabel else offLabel, settings.view.stripDots) {
-                    set { s -> s.copy(view = s.view.copy(stripDots = !s.view.stripDots)) }
-                }
-                Options(
-                    stringResource(R.string.xr_visualizer),
-                    listOf(stringResource(R.string.xr_vis_off) to "off", stringResource(R.string.xr_vis_levels) to "spectrum", stringResource(R.string.xr_vis_wave) to "waveform", stringResource(R.string.xr_vis_both) to "both"),
-                    settings.view.visualizer,
-                ) { set { s -> s.copy(view = s.view.copy(visualizer = it)) } }
-            }
-        }
-
-        item {
-            Section(stringResource(R.string.xr_section_library)) {
-                Text(
-                    stringResource(
-                        R.string.xr_library_summary,
-                        library.treeUris().size,
-                        library.pickedCount(),
-                        library.favorites().size,
-                        library.ignoredUris().size,
-                    ),
-                    fontSize = 8.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    stringResource(R.string.xr_clear_ignored),
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
-                        .clickable {
-                            library.clearIgnored()
-                            XrApp.libraryChanged()
-                        }
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                )
-            }
-        }
-
-        item {
-            Section(stringResource(R.string.xr_section_diagnostics)) {
-                Text(
-                    stringResource(
-                        R.string.xr_diag_line,
-                        stringResource(
-                            if (player?.engineAvailable() == true) R.string.xr_engine_v8
-                            else R.string.xr_engine_missing,
-                        ),
-                        player?.sessionId() ?: 0,
-                        state.channels,
-                    ),
-                    fontSize = 8.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        item {
-            Section(stringResource(R.string.xr_section_language)) {
-                Options(
-                    stringResource(R.string.xr_app_language),
-                    listOf(stringResource(R.string.xr_lang_system) to "sys", stringResource(R.string.xr_lang_de) to "de", stringResource(R.string.xr_lang_en) to "en"),
-                    currentLocaleTag(context),
-                ) { setLocale(context, it) }
-            }
-        }
-
-        item {
-            Section(stringResource(R.string.xr_section_licenses)) {
-                Text(
-                    stringResource(R.string.xr_licenses_text),
-                    fontSize = 7.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        item {
-            Section(stringResource(R.string.xr_section_about)) {
-                Text(
-                    stringResource(R.string.xr_about_line, BuildConfig.VERSION_NAME),
-                    fontSize = 8.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }
@@ -338,11 +376,6 @@ private fun setLocale(context: Context, tag: String) {
         "en" -> LocaleList(Locale.ENGLISH)
         else -> LocaleList.getEmptyLocaleList()
     }
-}
-
-@Composable
-private fun Header(text: String) {
-    Text(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
 }
 
 @Composable

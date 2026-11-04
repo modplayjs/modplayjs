@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">modplay XR</string>
+    <string name="home_tagline">Chiptune &amp; Tracker Modul Player</string>
+    <string name="stat_tracks">Titel</string>
+    <string name="stat_folders">Ordner</string>
+    <string name="stat_favorites">Favoriten</string>
     <string name="xr_library">Bibliothek</string>
     <string name="xr_settings">Einstellungen</string>
     <string name="xr_details">Details</string>

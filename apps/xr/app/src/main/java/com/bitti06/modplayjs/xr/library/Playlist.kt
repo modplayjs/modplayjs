@@ -64,12 +64,14 @@ class Playlist(private val library: Library) {
     private fun load() {
         val track = tracks.getOrNull(index) ?: return
         val player = XrApp.player ?: return
-        runCatching {
+        try {
             val bytes = library.read(track)
-            player.load(bytes, track.title, track.format)
+            player.load(bytes, track.filename, track.format, autoPlay = true)
             player.setJamMode(jamMode)
             library.recordPlay(track.uri)
             XrApp.libraryChanged()
+        } catch (e: Exception) {
+            android.util.Log.e("modplay-xr", "Failed to load track '${track.title}' (${track.uri})", e)
         }
     }
 }

@@ -30,11 +30,18 @@ object XrApp {
     /** Panel layout: false = fixed arc, true = free-floating/grabbable. */
     val freeLayout = MutableStateFlow(false)
 
+    /** Settings panel visibility state toggled via gear icon (hidden on start). */
+    val settingsOpen = MutableStateFlow(false)
+
     @Volatile
     var setFreeLayout: ((Boolean) -> Unit)? = null
 
     @Volatile
     var resetLayout: (() -> Unit)? = null
+
+    fun toggleSettings() {
+        settingsOpen.value = !settingsOpen.value
+    }
 
     fun setPassthrough(on: Boolean) {
         passthrough.value = on

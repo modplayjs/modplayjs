@@ -6,7 +6,7 @@
       __defProp(target, name, { get: all[name], enumerable: true });
   };
 
-  // packages/core/src/model/constants.ts
+  // ../../packages/core/src/model/constants.ts
   var Quirk = {
     S3MLOOP: 1 << 0,
     // S3M loop mode
@@ -160,7 +160,7 @@
   var C4_PAL_RATE = 8287;
   var C4_NTSC_RATE = 8363;
 
-  // packages/core/src/model/fx.ts
+  // ../../packages/core/src/model/fx.ts
   var fx_exports = {};
   __export(fx_exports, {
     EX_CUT: () => EX_CUT,
@@ -383,7 +383,7 @@
   var FX_PITCH_SUB = 185;
   var FX_LINE_JUMP = 186;
 
-  // packages/core/src/model/model.ts
+  // ../../packages/core/src/model/model.ts
   var SampleFlags = {
     /** 16-bit sample data. */
     BITS16: 1 << 0,
@@ -477,7 +477,7 @@
   var XMP_KEY_CUT = 130;
   var XMP_KEY_FADE = 131;
 
-  // packages/core/src/errors.ts
+  // ../../packages/core/src/errors.ts
   var ModplayError = class extends Error {
     constructor(message) {
       super(message);
@@ -498,7 +498,7 @@
   var SampleError = class extends ModplayError {
   };
 
-  // packages/core/src/virtual.ts
+  // ../../packages/core/src/virtual.ts
   var PERIOD_BASE = 13696;
   function noteToPeriodMix(n, b) {
     return PERIOD_BASE / Math.pow(2, (n + b / 12800) / 12);
@@ -1309,7 +1309,7 @@
     }
   };
 
-  // packages/core/src/samples.ts
+  // ../../packages/core/src/samples.ts
   var MAX_SAMPLE_SIZE = 268435456;
   var DecodeFlag = {
     /** SAMPLE_FLAG_DIFF: delta-encoded samples. */
@@ -1570,7 +1570,7 @@
     }
   };
 
-  // packages/core/src/depack/md5.ts
+  // ../../packages/core/src/depack/md5.ts
   var S = [
     7,
     12,
@@ -1698,7 +1698,7 @@
     return hex;
   }
 
-  // packages/core/src/registry.ts
+  // ../../packages/core/src/registry.ts
   var Registries = class {
     formats = /* @__PURE__ */ new Map();
     /** Format plugins in registration order — probe order matters. */
@@ -1782,7 +1782,7 @@
     }
   };
 
-  // packages/core/src/flow.ts
+  // ../../packages/core/src/flow.ts
   function resetFlow(f) {
     f.jumpline = 0;
     f.jump = -1;
@@ -1892,7 +1892,7 @@
     return { get, set };
   }
 
-  // packages/core/src/scan.ts
+  // ../../packages/core/src/scan.ts
   var XMP_MARK_END = 255;
   var XMP_MIN_BPM = 32;
   var NO_SEQUENCE = 255;
@@ -2454,7 +2454,7 @@
     }
   };
 
-  // packages/core/src/depack/ice.ts
+  // ../../packages/core/src/depack/ice.ts
   var DEPACK_LIMIT = 268435456;
   var ICE_BUFFER_SIZE = 4096;
   var VERSION_113 = 113;
@@ -2840,7 +2840,7 @@
     throw new PackedModuleError("not an ICE file");
   }
 
-  // packages/core/src/depack/pp.ts
+  // ../../packages/core/src/depack/pp.ts
   function readmem24b(m, off) {
     return m[off] << 16 | m[off + 1] << 8 | m[off + 2];
   }
@@ -2943,7 +2943,7 @@
     return ok ? dest : null;
   }
 
-  // packages/core/src/depack/moduleQuirks.ts
+  // ../../packages/core/src/depack/moduleQuirks.ts
   var XmpMode = {
     AUTO: 0,
     MOD: 1,
@@ -3016,7 +3016,7 @@
     { md5: "ca378c0e874f1ecda3e98bdd11468d69", flags: XmpFlag.VBLANK, mode: XmpMode.AUTO }
   ];
 
-  // packages/core/src/effects/helpers.ts
+  // ../../packages/core/src/effects/helpers.ts
   var WAVEFORM_SIZE = 64;
   var SINE_WAVE = [
     0,
@@ -3297,7 +3297,7 @@
     xc.porta.dir = xc.period < xc.porta.target ? 1 : -1;
   }
 
-  // packages/core/src/effects/state.ts
+  // ../../packages/core/src/effects/state.ts
   var VolSlideFlag = {
     VOL_SLIDE: 1 << 0,
     PAN_SLIDE: 1 << 1,
@@ -3347,7 +3347,7 @@
     RELEASE: 1 << 1 | 1 << 10
   };
 
-  // packages/core/src/effects/fx.ts
+  // ../../packages/core/src/effects/fx.ts
   function fxPanbrello(_core, xc, fxp) {
     SET(xc, VolSlideFlag.PANBRELLO);
     setLfoNotzero(xc.panbrello.lfo, LSN2(fxp) << 4, MSN2(fxp));
@@ -3376,7 +3376,7 @@
     xc.freq.fslide = 0.25 * fxp;
   }
 
-  // packages/core/src/effects/vfx.ts
+  // ../../packages/core/src/effects/vfx.ts
   var XMP_MIN_BPM2 = 20;
   var ROWDELAY_ON = 1 << 0;
   var ROWDELAY_FIRST_FRAME = 1 << 1;
@@ -3659,7 +3659,7 @@
     }
   }
 
-  // packages/core/src/effects/extras.ts
+  // ../../packages/core/src/effects/extras.ts
   var MED_VER_210 = 528;
   var MED_VER_300 = 768;
   var MED_VER_320 = 800;
@@ -4145,7 +4145,7 @@
     }
   }
 
-  // packages/core/src/effects/process.ts
+  // ../../packages/core/src/effects/process.ts
   var PERIOD_BASE3 = 13696;
   var NOTE_GLISSANDO_BIT = 1 << 9;
   function processFx(core2, xc, chn, ev, fnum, hooks = {}) {
@@ -4864,7 +4864,7 @@
     }
   }
 
-  // packages/core/src/effects/midi-macro.ts
+  // ../../packages/core/src/effects/midi-macro.ts
   var CLAMP = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
   function midiNibble(core2, xc, chn, midiStr, inSt) {
     if (inSt.buffer >= 0) {
@@ -5009,7 +5009,7 @@
     }
   }
 
-  // packages/core/src/effects/tick.ts
+  // ../../packages/core/src/effects/tick.ts
   var TREMOR_ON = 128;
   var TREMOR_SUPPRESS = 64;
   var PAN_SURROUND = 32768;
@@ -5997,7 +5997,7 @@
     return ins >>> 0 < m.ins && ins >= 0 && m.instruments[ins] !== void 0 && (m.instruments[ins].nsm ?? 0) > 0;
   }
 
-  // packages/core/src/effects/readevent.ts
+  // ../../packages/core/src/effects/readevent.ts
   function isValidInstrument(core2, ins) {
     const mod = core2.module;
     return ins >= 0 && ins < mod.ins && (mod.instruments[ins]?.nsm ?? 0) > 0;
@@ -6116,7 +6116,7 @@
     }
   }
 
-  // packages/core/src/effects/readevent-st3.ts
+  // ../../packages/core/src/effects/readevent-st3.ts
   function readEventSt3(core2, e, chn) {
     const mod = core2.module;
     const xc = core2.ctx.channelStates[chn];
@@ -6209,7 +6209,7 @@
     }
   }
 
-  // packages/core/src/effects/readevent-ft2.ts
+  // ../../packages/core/src/effects/readevent-ft2.ts
   var FT2_NOTE_BN1 = 11;
   var FT2_NOTE_C0 = 12;
   var FT2_NOTE_AS9 = 130;
@@ -6342,7 +6342,7 @@
     }
   }
 
-  // packages/core/src/effects/readevent-it.ts
+  // ../../packages/core/src/effects/readevent-it.ts
   var XMP_KEY_OFF2 = 129;
   var XMP_KEY_CUT2 = 130;
   var XMP_KEY_FADE2 = 131;
@@ -6805,7 +6805,7 @@
     }
   }
 
-  // packages/core/src/core.ts
+  // ../../packages/core/src/core.ts
   var MSN3 = (v) => v >> 4 & 15;
   var LSN3 = (v) => v & 15;
   var XMP_MARK_END2 = 255;
@@ -8021,7 +8021,7 @@
     }
   };
 
-  // packages/fmt-mod/src/tracker.ts
+  // ../../packages/fmt-mod/src/tracker.ts
   var TrackerId = {
     PROTRACKER: 0,
     NOISETRACKER: 1,
@@ -8222,7 +8222,7 @@
     return id;
   }
 
-  // packages/fmt-mod/src/mod.ts
+  // ../../packages/fmt-mod/src/mod.ts
   var SF_FULLREP = 512;
   var SF_ADPCM = 16384;
   var XMP_MAX_CHANNELS = 64;
@@ -8850,7 +8850,7 @@
     return mod;
   }
 
-  // packages/fmt-mod/src/modcore.ts
+  // ../../packages/fmt-mod/src/modcore.ts
   function copyTitle2(r, n) {
     let s = "";
     for (let i = 0; i < n && i < r.length; i++) {
@@ -9078,7 +9078,7 @@
     return mod;
   }
 
-  // packages/fmt-mod/src/readevent.ts
+  // ../../packages/fmt-mod/src/readevent.ts
   function readEventDispatch(core2, chn, row) {
     const mod = core2.module;
     const xc = core2.ctx.channelStates[chn];
@@ -9220,7 +9220,7 @@
     }
   }
 
-  // packages/fmt-mod/src/hmn.ts
+  // ../../packages/fmt-mod/src/hmn.ts
   var SF_FULLREP2 = 512;
   function readmem16b2(m, o) {
     return m[o] << 8 | m[o + 1];
@@ -9568,7 +9568,7 @@
     return mod;
   }
 
-  // packages/fmt-mod/src/flt.ts
+  // ../../packages/fmt-mod/src/flt.ts
   var SF_FULLREP3 = 512;
   function readmem16b3(m, o) {
     return m[o] << 8 | m[o + 1];
@@ -10049,7 +10049,7 @@
     }
   };
 
-  // packages/fmt-mod/src/index.ts
+  // ../../packages/fmt-mod/src/index.ts
   var plugin = {
     name: "mod",
     test: modTest,
@@ -10067,7 +10067,7 @@
     }
   };
 
-  // packages/fmt-s3m/src/s3m.ts
+  // ../../packages/fmt-s3m/src/s3m.ts
   var MAGIC_SCRM = 1396920909;
   var MAGIC_SCRS = 1396920915;
   var S3M_EOR = 0;
@@ -10734,7 +10734,7 @@
     }
   };
 
-  // packages/fmt-it/src/itsex.ts
+  // ../../packages/fmt-it/src/itsex.ts
   var READ_BITS_MASK = (n) => (1 << n) - 1;
   var TEMP_BUFFER_LEN = 65536;
   function readBits2(s, buf, n) {
@@ -10934,7 +10934,7 @@
     buf[o + 1] = v >> 8 & 255;
   }
 
-  // packages/fmt-it/src/it.ts
+  // ../../packages/fmt-it/src/it.ts
   var MAGIC_IMPM = 1229803597;
   var MAGIC_IMPI = 1229803593;
   var MAGIC_IMPS = 1229803603;
@@ -12250,7 +12250,7 @@
     }
   };
 
-  // packages/stb-vorbis/src/types.ts
+  // ../../packages/stb-vorbis/src/types.ts
   var MAX_BLOCKSIZE_LOG = 13;
   var MAX_BLOCKSIZE = 1 << MAX_BLOCKSIZE_LOG;
   var FAST_HUFFMAN_TABLE_SIZE = 1 << 10;
@@ -12258,7 +12258,7 @@
   var STB_VORBIS_FAST_HUFFMAN_LENGTH = 10;
   var NO_CODE = 255;
 
-  // packages/stb-vorbis/src/stream.ts
+  // ../../packages/stb-vorbis/src/stream.ts
   function get8(z) {
     if (z.streamPos >= z.streamEnd) {
       z.eof = true;
@@ -12447,7 +12447,7 @@
     }
   }
 
-  // packages/stb-vorbis/src/codebook.ts
+  // ../../packages/stb-vorbis/src/codebook.ts
   function bitReverse(n) {
     n = (n & 2863311530) >>> 1 | (n & 1431655765) << 1;
     n = (n & 3435973836) >>> 2 | (n & 858993459) << 2;
@@ -12725,7 +12725,7 @@
     return true;
   }
 
-  // packages/stb-vorbis/src/residue.ts
+  // ../../packages/stb-vorbis/src/residue.ts
   function decodeSparse(z, c) {
     let v = decodeRawShared(z, c);
     if (c.sparse) v = c.sortedValues[v];
@@ -12887,7 +12887,7 @@
     }
   }
 
-  // packages/stb-vorbis/src/imdct.ts
+  // ../../packages/stb-vorbis/src/imdct.ts
   function computeTwiddleFactors(n, A, B2, C2) {
     const n4 = n >> 2, n8 = n >> 3;
     for (let k = 0, k2 = 0; k < n4; ++k, k2 += 2) {
@@ -13054,7 +13054,7 @@
     }
   }
 
-  // packages/stb-vorbis/src/mdct.ts
+  // ../../packages/stb-vorbis/src/mdct.ts
   function inverseMdct(buffer, n, f, blocktype) {
     const n2 = n >> 1, n4 = n >> 2, n8 = n >> 3;
     const buf2 = new Float32Array(n2);
@@ -13234,7 +13234,7 @@
     }
   }
 
-  // packages/stb-vorbis/src/crc32.ts
+  // ../../packages/stb-vorbis/src/crc32.ts
   var CRC32_POLY = 79764919;
   var crcTable = new Uint32Array(256);
   var crcInitialized = false;
@@ -13250,10 +13250,10 @@
     crcInitialized = true;
   }
 
-  // packages/stb-vorbis/src/tables.ts
+  // ../../packages/stb-vorbis/src/tables.ts
   var INVERSE_DB_TABLE = [10649863e-14, 11341951e-14, 12079015e-14, 12863978e-14, 13699951e-14, 14590251e-14, 15538408e-14, 16548181e-14, 17623575e-14, 18768855e-14, 19988561e-14, 2128753e-13, 22670913e-14, 24144197e-14, 25713223e-14, 27384213e-14, 29163793e-14, 31059021e-14, 33077411e-14, 35226968e-14, 37516214e-14, 39954229e-14, 4255068e-13, 45315863e-14, 48260743e-14, 51396998e-14, 54737065e-14, 58294187e-14, 62082472e-14, 66116941e-14, 70413592e-14, 74989464e-14, 79862701e-14, 8505263e-13, 90579828e-14, 96466216e-14, 10273513e-13, 10941144e-13, 11652161e-13, 12409384e-13, 13215816e-13, 14074654e-13, 14989305e-13, 15963394e-13, 17000785e-13, 18105592e-13, 19282195e-13, 20535261e-13, 21869758e-13, 23290978e-13, 24804557e-13, 26416497e-13, 2813319e-12, 29961443e-13, 31908506e-13, 33982101e-13, 36190449e-13, 38542308e-13, 41047004e-13, 4371447e-12, 46555282e-13, 49580707e-13, 5280274e-12, 5623416e-12, 59888572e-13, 63780469e-13, 67925283e-13, 72339451e-13, 77040476e-13, 82047e-10, 87378876e-13, 93057248e-13, 99104632e-13, 10554501e-12, 11240392e-12, 11970856e-12, 12748789e-12, 13577278e-12, 14459606e-12, 15399272e-12, 16400004e-12, 17465768e-12, 18600792e-12, 19809576e-12, 21096914e-12, 22467911e-12, 23928002e-12, 25482978e-12, 27139006e-12, 28902651e-12, 30780908e-12, 32781225e-12, 34911534e-12, 37180282e-12, 39596466e-12, 42169667e-12, 4491009e-11, 47828601e-12, 50936773e-12, 54246931e-12, 57772202e-12, 61526565e-12, 65524908e-12, 69783085e-12, 74317983e-12, 79147585e-12, 8429104e-11, 89768747e-12, 95602426e-12, 10181521e-11, 10843174e-11, 11547824e-11, 12298267e-11, 13097477e-11, 13948625e-11, 14855085e-11, 15820453e-11, 16848555e-11, 17943469e-11, 19109536e-11, 20351382e-11, 21673929e-11, 23082423e-11, 24582449e-11, 26179955e-11, 27881276e-11, 29693158e-11, 31622787e-11, 33677814e-11, 35866388e-11, 38197188e-11, 40679456e-11, 43323036e-11, 46138411e-11, 49136745e-11, 52329927e-11, 55730621e-11, 59352311e-11, 63209358e-11, 67317058e-11, 716917e-9, 7635063e-10, 81312324e-11, 86596457e-11, 92223983e-11, 98217216e-11, 0.0010459992, 0.0011139742, 0.0011863665, 0.0012634633, 0.0013455702, 0.0014330129, 0.0015261382, 0.0016253153, 0.0017309374, 0.0018434235, 0.0019632195, 0.0020908006, 0.0022266726, 0.0023713743, 0.0025254795, 0.0026895994, 0.0028643847, 0.0030505286, 0.0032487691, 0.0034598925, 0.0036847358, 0.0039241906, 0.0041792066, 4450795e-9, 0.0047400328, 0.0050480668, 0.0053761186, 0.0057254891, 0.0060975636, 0.0064938176, 0.0069158225, 0.0073652516, 0.0078438871, 0.0083536271, 0.0088964928, 9474637e-9, 0.010090352, 0.01074608, 0.011444421, 0.012188144, 0.012980198, 0.013823725, 0.014722068, 0.015678791, 0.016697687, 0.017782797, 0.018938423, 0.020169149, 0.021479854, 0.022875735, 0.02436233, 0.025945531, 0.027631618, 0.029427276, 0.031339626, 0.033376252, 0.035545228, 0.037855157, 0.040315199, 0.042935108, 0.045725273, 0.048696758, 0.051861348, 0.055231591, 0.05882085, 0.062643361, 0.066714279, 0.071049749, 0.075666962, 0.080584227, 0.085821044, 0.091398179, 0.097337747, 0.1036633, 0.11039993, 0.11757434, 0.12521498, 0.13335215, 0.14201813, 0.15124727, 0.16107617, 0.1715438, 0.18269168, 0.19456402, 0.20720788, 0.22067342, 0.23501402, 0.25028656, 0.26655159, 0.28387361, 0.30232132, 0.32196786, 0.34289114, 0.36517414, 0.38890521, 0.41417847, 0.44109412, 0.4697589, 0.50028648, 0.53279791, 0.56742212, 0.6042964, 0.64356699, 0.68538959, 0.72993007, 0.77736504, 0.8278826, 0.88168307, 0.9389798, 1];
 
-  // packages/stb-vorbis/src/vorbis.ts
+  // ../../packages/stb-vorbis/src/vorbis.ts
   var PAGEFLAG_first_page = 2;
   var PAGEFLAG_last_page = 4;
   var PAGEFLAG_continued_packet2 = 1;
@@ -14146,7 +14146,7 @@
     return f.outputs;
   }
 
-  // packages/fmt-xm/src/xm.ts
+  // ../../packages/fmt-xm/src/xm.ts
   var XM_EVENT_PACKING = 128;
   var XM_EVENT_NOTE_FOLLOWS = 1;
   var XM_EVENT_INSTRUMENT_FOLLOWS = 2;
@@ -15078,7 +15078,7 @@
     }
   };
 
-  // packages/fmt-mtm/src/mtm.ts
+  // ../../packages/fmt-mtm/src/mtm.ts
   var MAX_SAMPLE_SIZE5 = 268435456;
   var XMP_MAX_CHANNELS3 = 64;
   var SAMPLE_FLAG_UNS3 = 1 << 10;
@@ -15403,7 +15403,7 @@
     }
   };
 
-  // packages/fmt-stm/src/stm.ts
+  // ../../packages/fmt-stm/src/stm.ts
   var STM_MIX_RATE = 23863;
   var STM_TYPE_SONG = 1;
   var STM_TYPE_MODULE = 2;
@@ -15837,7 +15837,7 @@
     }
   };
 
-  // packages/fmt-669/src/sixtysixtynine.ts
+  // ../../packages/fmt-669/src/sixtysixtynine.ts
   var MAX_SAMPLE_SIZE6 = 268435456;
   var SAMPLE_FLAG_UNS4 = 1 << 10;
   function zeroEnvelope10() {
@@ -16084,7 +16084,7 @@
     }
   };
 
-  // packages/fmt-sfx/src/sfx.ts
+  // ../../packages/fmt-sfx/src/sfx.ts
   var MAGIC_SONG = 1397706311;
   function periodToNote2(p) {
     if (p <= 0) return 0;
@@ -16358,7 +16358,7 @@
     }
   };
 
-  // packages/fmt-digi/src/digi.ts
+  // ../../packages/fmt-digi/src/digi.ts
   function zeroEnvelope12() {
     return { flags: 0, npt: 0, scl: 0, sus: 0, sue: 0, lps: 0, lpe: 0, x: [], y: [] };
   }
@@ -16626,7 +16626,7 @@
     }
   };
 
-  // packages/fmt-asylum/src/asylum.ts
+  // ../../packages/fmt-asylum/src/asylum.ts
   function readmem32l7(m, off) {
     return (m[off] | m[off + 1] << 8 | m[off + 2] << 16 | m[off + 3] << 24) >>> 0;
   }
@@ -16831,7 +16831,7 @@
     }
   };
 
-  // packages/fmt-ice/src/ice.ts
+  // ../../packages/fmt-ice/src/ice.ts
   var MAGIC_MTN_ = 1297370624;
   var MAGIC_IT10 = 1230254384;
   function readmem32b6(m, off) {
@@ -17050,7 +17050,7 @@
     }
   };
 
-  // packages/fmt-med/src/mmdCommon.ts
+  // ../../packages/fmt-med/src/mmdCommon.ts
   var MED_VER_2102 = MED_VER_210;
   var MED_VER_3002 = MED_VER_300;
   var MED_VER_3202 = MED_VER_320;
@@ -17393,7 +17393,7 @@
     return s.replace(/ +$/, "");
   }
 
-  // packages/fmt-med/src/instr.ts
+  // ../../packages/fmt-med/src/instr.ts
   function emptySynth() {
     return {
       defaultdecay: 0,
@@ -17860,7 +17860,7 @@
     return out;
   }
 
-  // packages/fmt-med/src/mmd1.ts
+  // ../../packages/fmt-med/src/mmd1.ts
   var XMP_MAX_KEYS2 = 121;
   function mmd1Test(bytes) {
     if (bytes.length < 4) return false;
@@ -18271,7 +18271,7 @@
     return mod;
   }
 
-  // packages/fmt-med/src/mmd3.ts
+  // ../../packages/fmt-med/src/mmd3.ts
   var XMP_MAX_KEYS3 = 121;
   function mmd3Test(bytes) {
     if (bytes.length < 4) return false;
@@ -18672,7 +18672,7 @@
     return mod;
   }
 
-  // packages/fmt-med/src/med2.ts
+  // ../../packages/fmt-med/src/med2.ts
   function med2Test(bytes) {
     if (bytes.length < 4) return false;
     return bytes[0] === 77 && bytes[1] === 69 && bytes[2] === 68 && bytes[3] === 2;
@@ -18897,7 +18897,7 @@
     return Math.round(12 * Math.log(13696 / period) / Math.LN2) + 1;
   }
 
-  // packages/fmt-med/src/med3.ts
+  // ../../packages/fmt-med/src/med3.ts
   var MASK = 2147483648;
   var M0F_LINEMSK0F = 1;
   var M0F_LINEMSK1F = 2;
@@ -19302,7 +19302,7 @@
     return mod;
   }
 
-  // packages/fmt-med/src/med4.ts
+  // ../../packages/fmt-med/src/med4.ts
   var FX_VOLSLIDE3 = 10;
   var FX_BREAK3 = 13;
   var FX_EXTENDED3 = 14;
@@ -19987,7 +19987,7 @@
     return mod;
   }
 
-  // packages/fmt-med/src/readevent.ts
+  // ../../packages/fmt-med/src/readevent.ts
   function trackerVersion(core2) {
     const extras = core2.module.extras;
     return extras?.kind === "med" ? extras.trackerVersion : 0;
@@ -20120,7 +20120,7 @@
     }
   }
 
-  // packages/fmt-med/src/index.ts
+  // ../../packages/fmt-med/src/index.ts
   function makePlugin(name, test, load2) {
     return {
       name,
@@ -20139,7 +20139,7 @@
   var med3Plugin = makePlugin("med3", med3Test, med3Load);
   var med4Plugin = makePlugin("med4", med4Test, med4Load);
 
-  // packages/fmt-st/src/st.ts
+  // ../../packages/fmt-st/src/st.ts
   var ST_MAX_PATTERN_ERRORS = 22;
   var ST_TRUNCATION_LIMIT = 93;
   var PERIOD = [
@@ -20575,7 +20575,7 @@
     }
   };
 
-  // packages/fmt-sid/src/config.ts
+  // ../../packages/fmt-sid/src/config.ts
   var CRSID_OVERSAMPLING_RATIO = 5;
   var CRSID_FILTERTABLE_RESOLUTION = 12;
   var CRSID_OVERSAMPLING_FILTERTABLE_RESOLUTION = 13;
@@ -20583,7 +20583,7 @@
   var CRSID_RESAMPLER_SINCPERIOD_SAMPLES = 256;
   var CRSID_RESAMPLER_SINCWINDOW_MAGNITUDE = 2048;
 
-  // packages/fmt-sid/src/c64types.ts
+  // ../../packages/fmt-sid/src/c64types.ts
   function CRSID_BYTE_LOG2(x) {
     return x < 2 ? 0 : x < 4 ? 1 : x < 8 ? 2 : x < 16 ? 3 : x < 32 ? 4 : x < 64 ? 5 : x < 128 ? 6 : x < 256 ? 7 : 8;
   }
@@ -20710,7 +20710,7 @@
     return entry >>> 16;
   }
 
-  // packages/fmt-sid/src/instance.ts
+  // ../../packages/fmt-sid/src/instance.ts
   var cRSID = {
     CLImode: 0,
     SampleBufferLength: 0,
@@ -20757,10 +20757,10 @@
   };
   var cRSID_C64 = createC64instance();
 
-  // packages/fmt-sid/src/host.ts
+  // ../../packages/fmt-sid/src/host.ts
   var CRSID_FILEVERSION_WEBSID = 78;
 
-  // packages/fmt-sid/src/mem.ts
+  // ../../packages/fmt-sid/src/mem.ts
   function cRSID_generateMemoryBankPointers(C64) {
     for (let i = 0; i < 4; ++i) {
       for (let j = 0; j < 256; ++j) {
@@ -20889,7 +20889,7 @@
     C64.IObankWR[56580] = C64.IObankWR[56581] = 255;
   }
 
-  // packages/fmt-sid/src/cia.ts
+  // ../../packages/fmt-sid/src/cia.ts
   function cRSID_createCIAchip(C64, CIA, baseaddress) {
     CIA.ChipModel = 0;
     CIA.BaseAddress = baseaddress;
@@ -20996,7 +20996,7 @@
     C64.IObankRD[CIA.BasePtrRD + INTERRUPTS] = 0;
   }
 
-  // packages/fmt-sid/src/vic.ts
+  // ../../packages/fmt-sid/src/vic.ts
   function cRSID_createVICchip(C64, baseaddress) {
     C64.VIC.ChipModel = 0;
     C64.VIC.BaseAddress = baseaddress;
@@ -21047,7 +21047,7 @@
     C64.IObankRD[vicRD + INTERRUPT] &= ~(VIC_IRQ | RASTERROW_MATCH_IRQ);
   }
 
-  // packages/fmt-sid/src/cpu.ts
+  // ../../packages/fmt-sid/src/cpu.ts
   var N = 128;
   var V = 64;
   var B = 16;
@@ -21761,7 +21761,7 @@
     return 0;
   }
 
-  // packages/fmt-sid/src/combiwaves.ts
+  // ../../packages/fmt-sid/src/combiwaves.ts
   var CRSID_SawTriangle = new Uint8Array([
     0,
     0,
@@ -38155,7 +38155,7 @@
     255
   ]);
 
-  // packages/fmt-sid/src/filtercurves.ts
+  // ../../packages/fmt-sid/src/filtercurves.ts
   var CRSID_Resonances8580 = new Uint16Array([
     5792,
     5311,
@@ -46397,7 +46397,7 @@
     0
   ]);
 
-  // packages/fmt-sid/src/sidoutputs.ts
+  // ../../packages/fmt-sid/src/sidoutputs.ts
   var FRACTIONAL_BITS = 12;
   var FRACTIONAL_SHIFTS = FRACTIONAL_BITS;
   var CRSID_FILTERTABLE_MAGNITUDE = 1 << CRSID_FILTERTABLE_RESOLUTION;
@@ -46508,7 +46508,7 @@
     }
   }
 
-  // packages/fmt-sid/src/sidadsr.ts
+  // ../../packages/fmt-sid/src/sidadsr.ts
   var cRSID_ADSR_DAC_6581 = new Uint8Array([
     0,
     2,
@@ -47090,7 +47090,7 @@
     }
   }
 
-  // packages/fmt-sid/src/sidoscwaves.ts
+  // ../../packages/fmt-sid/src/sidoscwaves.ts
   function getPW(C64, channelptr) {
     const W = C64.IObankWR;
     return ((W[channelptr + 3] & 15) << 8 | W[channelptr + 2]) << 4 >>> 0;
@@ -47414,7 +47414,7 @@
     return SIDwavOutput;
   }
 
-  // packages/fmt-sid/src/sid.ts
+  // ../../packages/fmt-sid/src/sid.ts
   function cRSID_createSIDchip(C64, SID, model, channel, baseaddress) {
     SID.ChipModel = model;
     SID.Channel = channel;
@@ -47452,7 +47452,7 @@
     return SID.Output;
   }
 
-  // packages/fmt-sid/src/sincwindow.ts
+  // ../../packages/fmt-sid/src/sincwindow.ts
   var SincWindow = new Int16Array([
     0,
     0,
@@ -48992,7 +48992,7 @@
     0
   ]);
 
-  // packages/fmt-sid/src/psiddigi.ts
+  // ../../packages/fmt-sid/src/psiddigi.ts
   var D418_VOL_RANGE = 16;
   var DIGI_MAX = D418_VOL_RANGE - 1;
   var DIGI_MASK = DIGI_MAX;
@@ -49045,7 +49045,7 @@
     return Math.trunc(st.Output / C64.Attenuation);
   }
 
-  // packages/fmt-sid/src/sidrouting.ts
+  // ../../packages/fmt-sid/src/sidrouting.ts
   function divTrunc3(a, b) {
     return Math.trunc(a / b);
   }
@@ -49498,7 +49498,7 @@
     return Output;
   }
 
-  // packages/fmt-sid/src/c64.ts
+  // ../../packages/fmt-sid/src/c64.ts
   var VOLUME_MAX = 15;
   var CHANNELS2 = 3 + 1;
   var SID_FULLVOLUME = CHANNELS2 * VOLUME_MAX;
@@ -49717,7 +49717,7 @@
     return Output;
   }
 
-  // packages/fmt-sid/src/loader.ts
+  // ../../packages/fmt-sid/src/loader.ts
   function cRSID_decodeSIDheader(filedata) {
     const be16 = (o) => filedata[o] << 8 | filedata[o + 1];
     const magic = String.fromCharCode(filedata[0], filedata[1], filedata[2], filedata[3]);
@@ -49956,7 +49956,7 @@
     cRSID.Paused = 0;
   }
 
-  // packages/fmt-sid/src/songlengths.ts
+  // ../../packages/fmt-sid/src/songlengths.ts
   var subtuneDurations = [];
   var dbLoaded = false;
   function parseSongLength(tok) {
@@ -49996,7 +49996,7 @@
     return out;
   }
 
-  // packages/fmt-sid/src/sidseek.ts
+  // ../../packages/fmt-sid/src/sidseek.ts
   var sidTuneBytes = null;
   var sidTuneHeader = null;
   var sidTuneSubtune = 1;
@@ -50034,7 +50034,7 @@
     }
   }
 
-  // packages/fmt-sid/src/settings.ts
+  // ../../packages/fmt-sid/src/settings.ts
   function applySidSettingsLive(s) {
     cRSID.MainVolume = Math.max(0, Math.min(255, Math.round(s.volume)));
     cRSID.HighQualitySID = s.highQualitySID ? 1 : 0;
@@ -50051,7 +50051,7 @@
     return cRSID_C64.SIDchipCount;
   }
 
-  // packages/fmt-sid/src/sidplugin.ts
+  // ../../packages/fmt-sid/src/sidplugin.ts
   var SID_STUB_CHANNELS = 1;
   var SID_STUB_ROWS = 64;
   function cRSID_sidTest(bytes) {
@@ -50167,7 +50167,7 @@
     }
   };
 
-  // packages/fmt-fc/src/linearTables.ts
+  // ../../packages/fmt-fc/src/linearTables.ts
   var IT_SINUS_TABLE = [
     0,
     2,
@@ -50427,7 +50427,7 @@
     -2
   ];
 
-  // packages/fmt-fc/src/synth.ts
+  // ../../packages/fmt-fc/src/synth.ts
   var JUMP_EVENTS = [
     1 /* Jump */,
     2 /* JumpIfTrue */,
@@ -51489,7 +51489,7 @@
     return period < 1 ? 1 : period;
   }
 
-  // packages/fmt-fc/src/fc.ts
+  // ../../packages/fmt-fc/src/fc.ts
   var FC_MAX_SIZE = 524288;
   function sequenceSizeOf(h) {
     if (h.sequenceSize > 0) return h.sequenceSize;
@@ -52417,7 +52417,7 @@
     return (v.flags & 64) === 0;
   }
 
-  // packages/fmt-prowizard/src/pw-pp.ts
+  // ../../packages/fmt-prowizard/src/pw-pp.ts
   function put8(out, b) {
     out.push(b & 255);
   }
@@ -52653,7 +52653,7 @@
     depack: (data, start) => depackPp21Pp30(data, start, true)
   };
 
-  // packages/fmt-prowizard/src/ptktable.ts
+  // ../../packages/fmt-prowizard/src/ptktable.ts
   var ptkTable = [
     [0, 0],
     [3, 88],
@@ -52700,7 +52700,7 @@
     return n >= 0 && n < ptkTable.length;
   }
 
-  // packages/fmt-prowizard/src/pw-p40.ts
+  // ../../packages/fmt-prowizard/src/pw-p40.ts
   var MAGIC_P40A = 1345597505;
   var MAGIC_P40B = 1345597506;
   var MAGIC_P41A = 1345597761;
@@ -52889,7 +52889,7 @@
     depack: depackP4x
   };
 
-  // packages/fmt-prowizard/src/pw-theplayer.ts
+  // ../../packages/fmt-prowizard/src/pw-theplayer.ts
   var PW_MOD_MAGIC2 = 1294879534;
   function put83(out, b) {
     out.push(b & 255);
@@ -53184,7 +53184,7 @@
     depack: (data, start) => theplayerDepack(data, start, 96)
   };
 
-  // packages/fmt-prowizard/src/pw-tp1.ts
+  // ../../packages/fmt-prowizard/src/pw-tp1.ts
   var PW_MOD_MAGIC3 = 1294879534;
   function put84(out, b) {
     out.push(b & 255);
@@ -53320,7 +53320,7 @@
     depack: depackTp1
   };
 
-  // packages/fmt-prowizard/src/pw-tp3.ts
+  // ../../packages/fmt-prowizard/src/pw-tp3.ts
   var PW_MOD_MAGIC4 = 1294879534;
   function put85(out, b) {
     out.push(b & 255);
@@ -53489,7 +53489,7 @@
     depack: (data, start) => depackTp23(data, start, 2)
   };
 
-  // packages/fmt-prowizard/src/pw-unic.ts
+  // ../../packages/fmt-prowizard/src/pw-unic.ts
   var MAGIC_M_K_ = 1294879534;
   var MAGIC_UNIC = 1431193923;
   var MAGIC_0000 = 0;
@@ -53704,7 +53704,7 @@
     depack: depackUnic
   };
 
-  // packages/fmt-prowizard/src/pw-unic2.ts
+  // ../../packages/fmt-prowizard/src/pw-unic2.ts
   function put87(out, b) {
     out.push(b & 255);
   }
@@ -53841,7 +53841,7 @@
     depack: depackUnic2
   };
 
-  // packages/fmt-prowizard/src/pw-np12.ts
+  // ../../packages/fmt-prowizard/src/pw-np12.ts
   var PW_MOD_MAGIC5 = 1294879534;
   function put88(out, b) {
     out.push(b & 255);
@@ -54027,7 +54027,7 @@
     depack: (data, st) => depackNp12(data, st, false)
   };
 
-  // packages/fmt-prowizard/src/pw-np3.ts
+  // ../../packages/fmt-prowizard/src/pw-np3.ts
   var PW_MOD_MAGIC6 = 1294879534;
   function put89(out, b) {
     out.push(b & 255);
@@ -54201,7 +54201,7 @@
     depack: depackNp3
   };
 
-  // packages/fmt-prowizard/src/pw-xann.ts
+  // ../../packages/fmt-prowizard/src/pw-xann.ts
   var SMP_DESC_ADDRESS = 518;
   var PAT_DATA_ADDRESS = 1084;
   function put810(out, b) {
@@ -54429,7 +54429,7 @@
     depack: depackXann
   };
 
-  // packages/fmt-prowizard/src/pw-wn.ts
+  // ../../packages/fmt-prowizard/src/pw-wn.ts
   var PW_MOD_MAGIC7 = 1294879534;
   function put811(out, b) {
     out.push(b & 255);
@@ -54486,7 +54486,7 @@
     depack: depackWn
   };
 
-  // packages/fmt-prowizard/src/pw-zen.ts
+  // ../../packages/fmt-prowizard/src/pw-zen.ts
   var PW_MOD_MAGIC8 = 1294879534;
   function put812(out, b) {
     out.push(b & 255);
@@ -54622,7 +54622,7 @@
     depack: depackZen
   };
 
-  // packages/fmt-prowizard/src/pw-ksm.ts
+  // ../../packages/fmt-prowizard/src/pw-ksm.ts
   var PW_MOD_MAGIC9 = 1294879534;
   function put813(out, b) {
     out.push(b & 255);
@@ -54792,7 +54792,7 @@
     depack: depackKsm
   };
 
-  // packages/fmt-prowizard/src/pw-hrt.ts
+  // ../../packages/fmt-prowizard/src/pw-hrt.ts
   var PW_MOD_MAGIC10 = 1294879534;
   function put814(out, b) {
     out.push(b & 255);
@@ -54874,7 +54874,7 @@
     depack: depackHrt
   };
 
-  // packages/fmt-prowizard/src/pw-mp.ts
+  // ../../packages/fmt-prowizard/src/pw-mp.ts
   var MAGIC_TRK1 = 1414679345;
   var PW_MOD_MAGIC11 = 1294879534;
   function put815(out, b) {
@@ -55007,7 +55007,7 @@
     depack: depackMp
   };
 
-  // packages/fmt-prowizard/src/pw-di.ts
+  // ../../packages/fmt-prowizard/src/pw-di.ts
   var PW_MOD_MAGIC12 = 1294879534;
   function put816(out, b) {
     out.push(b & 255);
@@ -55149,7 +55149,7 @@
     depack: depackDi
   };
 
-  // packages/fmt-prowizard/src/pw-ac1d.ts
+  // ../../packages/fmt-prowizard/src/pw-ac1d.ts
   var NO_NOTE = 255;
   function put817(out, b) {
     out.push(b & 255);
@@ -55265,7 +55265,7 @@
     depack: depackAc1d
   };
 
-  // packages/fmt-prowizard/src/pw-eureka.ts
+  // ../../packages/fmt-prowizard/src/pw-eureka.ts
   var PW_MOD_MAGIC13 = 1294879534;
   function put32b18(out, v) {
     out.push(v >>> 24 & 255, v >> 16 & 255, v >> 8 & 255, v & 255);
@@ -55394,7 +55394,7 @@
     depack: depackEu
   };
 
-  // packages/fmt-prowizard/src/pw-fcm.ts
+  // ../../packages/fmt-prowizard/src/pw-fcm.ts
   var PW_MOD_MAGIC14 = 1294879534;
   function put818(out, b) {
     out.push(b & 255);
@@ -55480,7 +55480,7 @@
     depack: depackFcm
   };
 
-  // packages/fmt-prowizard/src/pw-fuchs.ts
+  // ../../packages/fmt-prowizard/src/pw-fuchs.ts
   var PW_MOD_MAGIC15 = 1294879534;
   function put32b20(out, v) {
     out.push(v >>> 24 & 255, v >> 16 & 255, v >> 8 & 255, v & 255);
@@ -55589,7 +55589,7 @@
     depack: depackFuchs
   };
 
-  // packages/fmt-prowizard/src/pw-skyt.ts
+  // ../../packages/fmt-prowizard/src/pw-skyt.ts
   var PW_MOD_MAGIC16 = 1294879534;
   function put819(out, b) {
     out.push(b & 255);
@@ -55691,7 +55691,7 @@
     depack: depackSkyt
   };
 
-  // packages/fmt-prowizard/src/pw-starpack.ts
+  // ../../packages/fmt-prowizard/src/pw-starpack.ts
   function put820(out, v) {
     out.push(v & 255);
   }
@@ -55902,7 +55902,7 @@
     depack: depackStarpack
   };
 
-  // packages/fmt-prowizard/src/prowiz.ts
+  // ../../packages/fmt-prowizard/src/prowiz.ts
   function readmem16b6(d, off) {
     return d[off] << 8 | d[off + 1];
   }
@@ -55985,7 +55985,7 @@
     return out;
   }
 
-  // packages/fmt-prowizard/src/pw-plugin.ts
+  // ../../packages/fmt-prowizard/src/pw-plugin.ts
   function pwTest(bytes) {
     return pwCheck(bytes, 0) !== null;
   }
@@ -56004,7 +56004,7 @@
     }
   };
 
-  // packages/dsp-paula/src/index.ts
+  // ../../packages/dsp-paula/src/index.ts
   var PAULA_FREQUENCY = 70937892e-1 / 2;
   function periodToRate(period, sampleRate2) {
     if (period === 0) return 0;
@@ -56152,7 +56152,7 @@
     return new Paula();
   }
 
-  // packages/dsp-softmixer/src/blep-tables.ts
+  // ../../packages/dsp-softmixer/src/blep-tables.ts
   var WINSINC_A500_OFF = new Int32Array([
     131072,
     131072,
@@ -60254,7 +60254,7 @@
     0
   ]);
 
-  // packages/dsp-softmixer/src/paula.ts
+  // ../../packages/dsp-softmixer/src/paula.ts
   var PAULA_HZ = 3546895;
   var MINIMUM_INTERVAL = 16;
   var BLEP_SCALE = 17;
@@ -60328,7 +60328,7 @@
     }
   };
 
-  // packages/dsp-softmixer/src/lut.ts
+  // ../../packages/dsp-softmixer/src/lut.ts
   var cubic_spline_lut0 = new Int16Array([
     0,
     -8,
@@ -64434,7 +64434,7 @@
     -8
   ]);
 
-  // packages/dsp-softmixer/src/index.ts
+  // ../../packages/dsp-softmixer/src/index.ts
   var SMIX_SHIFT = 16;
   var SMIX_MASK = 65535;
   var C4_PERIOD = 428;
@@ -65227,7 +65227,7 @@
     return new SoftMixer(options);
   }
 
-  // packages/stream-audio/src/adpcm.ts
+  // ../../packages/stream-audio/src/adpcm.ts
   var IMA_STEP_TABLE = [
     7,
     8,
@@ -65393,7 +65393,7 @@
     return out.subarray(0, written * channels);
   }
 
-  // packages/stream-audio/src/wav.ts
+  // ../../packages/stream-audio/src/wav.ts
   function parseWavHeader(b) {
     if (b.length < 44) return null;
     if (b[0] !== 82 || b[1] !== 73 || b[2] !== 70 || b[3] !== 70) return null;
@@ -65467,7 +65467,7 @@
     return { pcm, channels: info.channels, sampleRate: info.sampleRate };
   }
 
-  // packages/fmt-mo3/src/mp3tables.ts
+  // ../../packages/fmt-mo3/src/mp3tables.ts
   var TABS = new Int16Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 785, 785, 785, 785, 784, 784, 784, 784, 513, 513, 513, 513, 513, 513, 513, 513, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, -255, 1313, 1298, 1282, 785, 785, 785, 785, 784, 784, 784, 784, 769, 769, 769, 769, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 290, 288, -255, 1313, 1298, 1282, 769, 769, 769, 769, 529, 529, 529, 529, 529, 529, 529, 529, 528, 528, 528, 528, 528, 528, 528, 528, 512, 512, 512, 512, 512, 512, 512, 512, 290, 288, -253, -318, -351, -367, 785, 785, 785, 785, 784, 784, 784, 784, 769, 769, 769, 769, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 819, 818, 547, 547, 275, 275, 275, 275, 561, 560, 515, 546, 289, 274, 288, 258, -254, -287, 1329, 1299, 1314, 1312, 1057, 1057, 1042, 1042, 1026, 1026, 784, 784, 784, 784, 529, 529, 529, 529, 529, 529, 529, 529, 769, 769, 769, 769, 768, 768, 768, 768, 563, 560, 306, 306, 291, 259, -252, -413, -477, -542, 1298, -575, 1041, 1041, 784, 784, 784, 784, 769, 769, 769, 769, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, -383, -399, 1107, 1092, 1106, 1061, 849, 849, 789, 789, 1104, 1091, 773, 773, 1076, 1075, 341, 340, 325, 309, 834, 804, 577, 577, 532, 532, 516, 516, 832, 818, 803, 816, 561, 561, 531, 531, 515, 546, 289, 289, 288, 258, -252, -429, -493, -559, 1057, 1057, 1042, 1042, 529, 529, 529, 529, 529, 529, 529, 529, 784, 784, 784, 784, 769, 769, 769, 769, 512, 512, 512, 512, 512, 512, 512, 512, -382, 1077, -415, 1106, 1061, 1104, 849, 849, 789, 789, 1091, 1076, 1029, 1075, 834, 834, 597, 581, 340, 340, 339, 324, 804, 833, 532, 532, 832, 772, 818, 803, 817, 787, 816, 771, 290, 290, 290, 290, 288, 258, -253, -349, -414, -447, -463, 1329, 1299, -479, 1314, 1312, 1057, 1057, 1042, 1042, 1026, 1026, 785, 785, 785, 785, 784, 784, 784, 784, 769, 769, 769, 769, 768, 768, 768, 768, -319, 851, 821, -335, 836, 850, 805, 849, 341, 340, 325, 336, 533, 533, 579, 579, 564, 564, 773, 832, 578, 548, 563, 516, 321, 276, 306, 291, 304, 259, -251, -572, -733, -830, -863, -879, 1041, 1041, 784, 784, 784, 784, 769, 769, 769, 769, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, -511, -527, -543, 1396, 1351, 1381, 1366, 1395, 1335, 1380, -559, 1334, 1138, 1138, 1063, 1063, 1350, 1392, 1031, 1031, 1062, 1062, 1364, 1363, 1120, 1120, 1333, 1348, 881, 881, 881, 881, 375, 374, 359, 373, 343, 358, 341, 325, 791, 791, 1123, 1122, -703, 1105, 1045, -719, 865, 865, 790, 790, 774, 774, 1104, 1029, 338, 293, 323, 308, -799, -815, 833, 788, 772, 818, 803, 816, 322, 292, 307, 320, 561, 531, 515, 546, 289, 274, 288, 258, -251, -525, -605, -685, -765, -831, -846, 1298, 1057, 1057, 1312, 1282, 785, 785, 785, 785, 784, 784, 784, 784, 769, 769, 769, 769, 512, 512, 512, 512, 512, 512, 512, 512, 1399, 1398, 1383, 1367, 1382, 1396, 1351, -511, 1381, 1366, 1139, 1139, 1079, 1079, 1124, 1124, 1364, 1349, 1363, 1333, 882, 882, 882, 882, 807, 807, 807, 807, 1094, 1094, 1136, 1136, 373, 341, 535, 535, 881, 775, 867, 822, 774, -591, 324, 338, -671, 849, 550, 550, 866, 864, 609, 609, 293, 336, 534, 534, 789, 835, 773, -751, 834, 804, 308, 307, 833, 788, 832, 772, 562, 562, 547, 547, 305, 275, 560, 515, 290, 290, -252, -397, -477, -557, -622, -653, -719, -735, -750, 1329, 1299, 1314, 1057, 1057, 1042, 1042, 1312, 1282, 1024, 1024, 785, 785, 785, 785, 784, 784, 784, 784, 769, 769, 769, 769, -383, 1127, 1141, 1111, 1126, 1140, 1095, 1110, 869, 869, 883, 883, 1079, 1109, 882, 882, 375, 374, 807, 868, 838, 881, 791, -463, 867, 822, 368, 263, 852, 837, 836, -543, 610, 610, 550, 550, 352, 336, 534, 534, 865, 774, 851, 821, 850, 805, 593, 533, 579, 564, 773, 832, 578, 578, 548, 548, 577, 577, 307, 276, 306, 291, 516, 560, 259, 259, -250, -2107, -2507, -2764, -2909, -2974, -3007, -3023, 1041, 1041, 1040, 1040, 769, 769, 769, 769, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, -767, -1052, -1213, -1277, -1358, -1405, -1469, -1535, -1550, -1582, -1614, -1647, -1662, -1694, -1726, -1759, -1774, -1807, -1822, -1854, -1886, 1565, -1919, -1935, -1951, -1967, 1731, 1730, 1580, 1717, -1983, 1729, 1564, -1999, 1548, -2015, -2031, 1715, 1595, -2047, 1714, -2063, 1610, -2079, 1609, -2095, 1323, 1323, 1457, 1457, 1307, 1307, 1712, 1547, 1641, 1700, 1699, 1594, 1685, 1625, 1442, 1442, 1322, 1322, -780, -973, -910, 1279, 1278, 1277, 1262, 1276, 1261, 1275, 1215, 1260, 1229, -959, 974, 974, 989, 989, -943, 735, 478, 478, 495, 463, 506, 414, -1039, 1003, 958, 1017, 927, 942, 987, 957, 431, 476, 1272, 1167, 1228, -1183, 1256, -1199, 895, 895, 941, 941, 1242, 1227, 1212, 1135, 1014, 1014, 490, 489, 503, 487, 910, 1013, 985, 925, 863, 894, 970, 955, 1012, 847, -1343, 831, 755, 755, 984, 909, 428, 366, 754, 559, -1391, 752, 486, 457, 924, 997, 698, 698, 983, 893, 740, 740, 908, 877, 739, 739, 667, 667, 953, 938, 497, 287, 271, 271, 683, 606, 590, 712, 726, 574, 302, 302, 738, 736, 481, 286, 526, 725, 605, 711, 636, 724, 696, 651, 589, 681, 666, 710, 364, 467, 573, 695, 466, 466, 301, 465, 379, 379, 709, 604, 665, 679, 316, 316, 634, 633, 436, 436, 464, 269, 424, 394, 452, 332, 438, 363, 347, 408, 393, 448, 331, 422, 362, 407, 392, 421, 346, 406, 391, 376, 375, 359, 1441, 1306, -2367, 1290, -2383, 1337, -2399, -2415, 1426, 1321, -2431, 1411, 1336, -2447, -2463, -2479, 1169, 1169, 1049, 1049, 1424, 1289, 1412, 1352, 1319, -2495, 1154, 1154, 1064, 1064, 1153, 1153, 416, 390, 360, 404, 403, 389, 344, 374, 373, 343, 358, 372, 327, 357, 342, 311, 356, 326, 1395, 1394, 1137, 1137, 1047, 1047, 1365, 1392, 1287, 1379, 1334, 1364, 1349, 1378, 1318, 1363, 792, 792, 792, 792, 1152, 1152, 1032, 1032, 1121, 1121, 1046, 1046, 1120, 1120, 1030, 1030, -2895, 1106, 1061, 1104, 849, 849, 789, 789, 1091, 1076, 1029, 1090, 1060, 1075, 833, 833, 309, 324, 532, 532, 832, 772, 818, 803, 561, 561, 531, 560, 515, 546, 289, 274, 288, 258, -250, -1179, -1579, -1836, -1996, -2124, -2253, -2333, -2413, -2477, -2542, -2574, -2607, -2622, -2655, 1314, 1313, 1298, 1312, 1282, 785, 785, 785, 785, 1040, 1040, 1025, 1025, 768, 768, 768, 768, -766, -798, -830, -862, -895, -911, -927, -943, -959, -975, -991, -1007, -1023, -1039, -1055, -1070, 1724, 1647, -1103, -1119, 1631, 1767, 1662, 1738, 1708, 1723, -1135, 1780, 1615, 1779, 1599, 1677, 1646, 1778, 1583, -1151, 1777, 1567, 1737, 1692, 1765, 1722, 1707, 1630, 1751, 1661, 1764, 1614, 1736, 1676, 1763, 1750, 1645, 1598, 1721, 1691, 1762, 1706, 1582, 1761, 1566, -1167, 1749, 1629, 767, 766, 751, 765, 494, 494, 735, 764, 719, 749, 734, 763, 447, 447, 748, 718, 477, 506, 431, 491, 446, 476, 461, 505, 415, 430, 475, 445, 504, 399, 460, 489, 414, 503, 383, 474, 429, 459, 502, 502, 746, 752, 488, 398, 501, 473, 413, 472, 486, 271, 480, 270, -1439, -1455, 1357, -1471, -1487, -1503, 1341, 1325, -1519, 1489, 1463, 1403, 1309, -1535, 1372, 1448, 1418, 1476, 1356, 1462, 1387, -1551, 1475, 1340, 1447, 1402, 1386, -1567, 1068, 1068, 1474, 1461, 455, 380, 468, 440, 395, 425, 410, 454, 364, 467, 466, 464, 453, 269, 409, 448, 268, 432, 1371, 1473, 1432, 1417, 1308, 1460, 1355, 1446, 1459, 1431, 1083, 1083, 1401, 1416, 1458, 1445, 1067, 1067, 1370, 1457, 1051, 1051, 1291, 1430, 1385, 1444, 1354, 1415, 1400, 1443, 1082, 1082, 1173, 1113, 1186, 1066, 1185, 1050, -1967, 1158, 1128, 1172, 1097, 1171, 1081, -1983, 1157, 1112, 416, 266, 375, 400, 1170, 1142, 1127, 1065, 793, 793, 1169, 1033, 1156, 1096, 1141, 1111, 1155, 1080, 1126, 1140, 898, 898, 808, 808, 897, 897, 792, 792, 1095, 1152, 1032, 1125, 1110, 1139, 1079, 1124, 882, 807, 838, 881, 853, 791, -2319, 867, 368, 263, 822, 852, 837, 866, 806, 865, -2399, 851, 352, 262, 534, 534, 821, 836, 594, 594, 549, 549, 593, 593, 533, 533, 848, 773, 579, 579, 564, 578, 548, 563, 276, 276, 577, 576, 306, 291, 516, 560, 305, 305, 275, 259, -251, -892, -2058, -2620, -2828, -2957, -3023, -3039, 1041, 1041, 1040, 1040, 769, 769, 769, 769, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, -511, -527, -543, -559, 1530, -575, -591, 1528, 1527, 1407, 1526, 1391, 1023, 1023, 1023, 1023, 1525, 1375, 1268, 1268, 1103, 1103, 1087, 1087, 1039, 1039, 1523, -604, 815, 815, 815, 815, 510, 495, 509, 479, 508, 463, 507, 447, 431, 505, 415, 399, -734, -782, 1262, -815, 1259, 1244, -831, 1258, 1228, -847, -863, 1196, -879, 1253, 987, 987, 748, -767, 493, 493, 462, 477, 414, 414, 686, 669, 478, 446, 461, 445, 474, 429, 487, 458, 412, 471, 1266, 1264, 1009, 1009, 799, 799, -1019, -1276, -1452, -1581, -1677, -1757, -1821, -1886, -1933, -1997, 1257, 1257, 1483, 1468, 1512, 1422, 1497, 1406, 1467, 1496, 1421, 1510, 1134, 1134, 1225, 1225, 1466, 1451, 1374, 1405, 1252, 1252, 1358, 1480, 1164, 1164, 1251, 1251, 1238, 1238, 1389, 1465, -1407, 1054, 1101, -1423, 1207, -1439, 830, 830, 1248, 1038, 1237, 1117, 1223, 1148, 1236, 1208, 411, 426, 395, 410, 379, 269, 1193, 1222, 1132, 1235, 1221, 1116, 976, 976, 1192, 1162, 1177, 1220, 1131, 1191, 963, 963, -1647, 961, 780, -1663, 558, 558, 994, 993, 437, 408, 393, 407, 829, 978, 813, 797, 947, -1743, 721, 721, 377, 392, 844, 950, 828, 890, 706, 706, 812, 859, 796, 960, 948, 843, 934, 874, 571, 571, -1919, 690, 555, 689, 421, 346, 539, 539, 944, 779, 918, 873, 932, 842, 903, 888, 570, 570, 931, 917, 674, 674, -2575, 1562, -2591, 1609, -2607, 1654, 1322, 1322, 1441, 1441, 1696, 1546, 1683, 1593, 1669, 1624, 1426, 1426, 1321, 1321, 1639, 1680, 1425, 1425, 1305, 1305, 1545, 1668, 1608, 1623, 1667, 1592, 1638, 1666, 1320, 1320, 1652, 1607, 1409, 1409, 1304, 1304, 1288, 1288, 1664, 1637, 1395, 1395, 1335, 1335, 1622, 1636, 1394, 1394, 1319, 1319, 1606, 1621, 1392, 1392, 1137, 1137, 1137, 1137, 345, 390, 360, 375, 404, 373, 1047, -2751, -2767, -2783, 1062, 1121, 1046, -2799, 1077, -2815, 1106, 1061, 789, 789, 1105, 1104, 263, 355, 310, 340, 325, 354, 352, 262, 339, 324, 1091, 1076, 1029, 1090, 1060, 1075, 833, 833, 788, 788, 1088, 1028, 818, 818, 803, 803, 561, 561, 531, 531, 816, 771, 546, 546, 289, 274, 288, 258, -253, -317, -381, -446, -478, -509, 1279, 1279, -811, -1179, -1451, -1756, -1900, -2028, -2189, -2253, -2333, -2414, -2445, -2511, -2526, 1313, 1298, -2559, 1041, 1041, 1040, 1040, 1025, 1025, 1024, 1024, 1022, 1007, 1021, 991, 1020, 975, 1019, 959, 687, 687, 1018, 1017, 671, 671, 655, 655, 1016, 1015, 639, 639, 758, 758, 623, 623, 757, 607, 756, 591, 755, 575, 754, 559, 543, 543, 1009, 783, -575, -621, -685, -749, 496, -590, 750, 749, 734, 748, 974, 989, 1003, 958, 988, 973, 1002, 942, 987, 957, 972, 1001, 926, 986, 941, 971, 956, 1e3, 910, 985, 925, 999, 894, 970, -1071, -1087, -1102, 1390, -1135, 1436, 1509, 1451, 1374, -1151, 1405, 1358, 1480, 1420, -1167, 1507, 1494, 1389, 1342, 1465, 1435, 1450, 1326, 1505, 1310, 1493, 1373, 1479, 1404, 1492, 1464, 1419, 428, 443, 472, 397, 736, 526, 464, 464, 486, 457, 442, 471, 484, 482, 1357, 1449, 1434, 1478, 1388, 1491, 1341, 1490, 1325, 1489, 1463, 1403, 1309, 1477, 1372, 1448, 1418, 1433, 1476, 1356, 1462, 1387, -1439, 1475, 1340, 1447, 1402, 1474, 1324, 1461, 1371, 1473, 269, 448, 1432, 1417, 1308, 1460, -1711, 1459, -1727, 1441, 1099, 1099, 1446, 1386, 1431, 1401, -1743, 1289, 1083, 1083, 1160, 1160, 1458, 1445, 1067, 1067, 1370, 1457, 1307, 1430, 1129, 1129, 1098, 1098, 268, 432, 267, 416, 266, 400, -1887, 1144, 1187, 1082, 1173, 1113, 1186, 1066, 1050, 1158, 1128, 1143, 1172, 1097, 1171, 1081, 420, 391, 1157, 1112, 1170, 1142, 1127, 1065, 1169, 1049, 1156, 1096, 1141, 1111, 1155, 1080, 1126, 1154, 1064, 1153, 1140, 1095, 1048, -2159, 1125, 1110, 1137, -2175, 823, 823, 1139, 1138, 807, 807, 384, 264, 368, 263, 868, 838, 853, 791, 867, 822, 852, 837, 866, 806, 865, 790, -2319, 851, 821, 836, 352, 262, 850, 805, 849, -2399, 533, 533, 835, 820, 336, 261, 578, 548, 563, 577, 532, 532, 832, 772, 562, 562, 547, 547, 305, 275, 560, 515, 290, 290, 288, 258]);
   var TAB32 = [130, 162, 193, 209, 44, 28, 76, 140, 9, 9, 9, 9, 9, 9, 9, 9, 190, 254, 222, 238, 126, 94, 157, 157, 109, 61, 173, 205];
   var TAB33 = [252, 236, 220, 204, 188, 172, 156, 140, 124, 108, 92, 76, 60, 44, 28, 12];
@@ -65527,7 +65527,7 @@
   var G_PAN = [0, 1, 0.21132487, 0.78867513, 0.3660254, 0.6339746, 0.5, 0.5, 0.6339746, 0.3660254, 0.78867513, 0.21132487, 1, 0];
   var G_EXPFRAC = [931322575e-18, 783145814e-18, 658544508e-18, 553767716e-18];
 
-  // packages/fmt-mo3/src/minimp3.ts
+  // ../../packages/fmt-mo3/src/minimp3.ts
   var MAX_FREE_FORMAT_FRAME_SIZE = 2304;
   var MAX_FRAME_SYNC_MATCHES = 10;
   var MAX_L3_FRAME_PAYLOAD_BYTES = MAX_FREE_FORMAT_FRAME_SIZE;
@@ -66503,7 +66503,7 @@
     return success ? hdrFrameSamples(dec.header) : 0;
   }
 
-  // packages/stream-audio/src/mp3.ts
+  // ../../packages/stream-audio/src/mp3.ts
   function decodeMp3File(b) {
     const dec = {
       mdctOverlap: [new Float32Array(288), new Float32Array(288)],
@@ -66548,7 +66548,7 @@
     return { pcm: all, channels: channels || 1, sampleRate: hz };
   }
 
-  // packages/stream-audio/src/ogg.ts
+  // ../../packages/stream-audio/src/ogg.ts
   function decodeOggFile(b) {
     const err = { v: 0 };
     const f = stbVorbisOpenMemory(b, err);
@@ -66579,7 +66579,7 @@
     return { pcm: all, channels: f.channels, sampleRate: f.sampleRate };
   }
 
-  // packages/stream-audio/src/source.ts
+  // ../../packages/stream-audio/src/source.ts
   function detectStreamedFormat(bytes, name) {
     if (bytes.length > 38 && bytes[0] === 69 && bytes[1] === 120 && bytes[2] === 116 && bytes[3] === 101) return null;
     if (bytes.length > 1084) {
@@ -66686,10 +66686,10 @@
     };
   }
 
-  // packages/out-android/src/types.ts
+  // ../../packages/out-android/src/types.ts
   var SCHEMA_VERSION = 1;
 
-  // packages/out-android/src/defaults.ts
+  // ../../packages/out-android/src/defaults.ts
   var DEFAULT_SETTINGS = {
     schemaVersion: 1,
     transport: {
@@ -66741,7 +66741,7 @@
     };
   }
 
-  // apps/android/engine/src/engine-entry.ts
+  // ../android/engine/src/engine-entry.ts
   var core = new Core();
   var FORMAT_PLUGINS = [
     plugin,

@@ -1,7 +1,7 @@
 package com.bitti06.modplayjs.xr.ui.panels
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -31,17 +31,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bitti06.modplayjs.xr.XrApp
-import androidx.compose.ui.res.stringResource
 import com.bitti06.modplayjs.xr.R
+import com.bitti06.modplayjs.xr.XrApp
 import com.bitti06.modplayjs.xr.play.XrPlayer
-import com.bitti06.modplayjs.xr.ui.GradientBackdrop
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -51,169 +50,183 @@ fun NowPlayingPanel() {
     val player = XrApp.player
     var volume by remember { mutableFloatStateOf((XrApp.player?.state?.value?.volume ?: 100).toFloat()) }
 
-    GradientBackdrop {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Tag(if (state.format.isBlank()) "—" else state.format)
-                Spacer(Modifier.width(6.dp))
-                Tag(
-                    if (state.spatialEnabled) "SPATIAL · ${state.channels}" else "STEREO",
-                    accent = state.spatialEnabled,
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    if (state.spatialEnabled) state.layout else "48 kHz",
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Text(
-                state.title.ifBlank { stringResource(R.string.xr_no_track) },
-                fontSize = 19.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        // Top Header
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Tag(if (state.format.isBlank()) "—" else state.format)
+            Spacer(Modifier.width(6.dp))
+            Tag(
+                if (state.spatialEnabled) "SPATIAL · ${state.channels}" else "STEREO",
+                accent = state.spatialEnabled,
             )
+            Spacer(Modifier.weight(1f))
             Text(
-                if (state.loaded) {
-                    "${state.channels} ch · ${formatTime(state.positionMs)} / ${formatTime(state.durationMs)}"
-                } else {
-                    stringResource(
-                        R.string.xr_push_hint,
-                        "Android/data/com.bitti06.modplayjs.xr/files/modules",
-                    )
-                },
-                fontSize = 11.sp,
+                if (state.spatialEnabled) state.layout else "48 kHz",
+                fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
             )
-
-            Waveform(active = state.playing)
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            Spacer(Modifier.width(8.dp))
+            // Gear icon button to open/toggle Settings panel
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .clickable { XrApp.toggleSettings() }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                CircleButton("■") { player?.stopPlayback() }
-                CircleButton("|◀") { XrApp.playlist?.previous() }
-                CircleButton(if (state.playing) "❚❚" else "▶", primary = true) { player?.togglePlay() }
-                CircleButton("▶|") { XrApp.playlist?.next() }
-                Text(
-                    "−10s",
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clickable { player?.seek((state.positionMs - 10_000L).coerceAtLeast(0L)) }
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                )
-                Text(
-                    "+10s",
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clickable { player?.seek(state.positionMs + 10_000) }
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                )
+                Text("⚙", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
             }
+        }
 
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(formatTime(state.positionMs), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                val progress =
-                    if (state.durationMs > 0) {
-                        (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
-                    } else {
-                        0f
-                    }
+        Text(
+            state.title.ifBlank { stringResource(R.string.xr_no_track) },
+            fontSize = 19.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+        )
+        Text(
+            if (state.loaded) {
+                "${state.channels} ch · ${formatTime(state.positionMs)} / ${formatTime(state.durationMs)}"
+            } else {
+                stringResource(
+                    R.string.xr_push_hint,
+                    "Android/data/com.bitti06.modplayjs.xr/files/modules",
+                )
+            },
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+
+        Waveform(active = state.playing)
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            CircleButton("■") { player?.stopPlayback() }
+            CircleButton("|◀") { XrApp.playlist?.previous() }
+            CircleButton(if (state.playing) "❚❚" else "▶", primary = true) { player?.togglePlay() }
+            CircleButton("▶|") { XrApp.playlist?.next() }
+            Text(
+                "−10s",
+                fontSize = 9.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clickable { player?.seek((state.positionMs - 10_000L).coerceAtLeast(0L)) }
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+            )
+            Text(
+                "+10s",
+                fontSize = 9.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clickable { player?.seek(state.positionMs + 10_000) }
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+            )
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(formatTime(state.positionMs), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val progress =
+                if (state.durationMs > 0) {
+                    (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
+                } else {
+                    0f
+                }
+            Column(
+                Modifier
+                    .weight(1f)
+                    .height(14.dp)
+                    .pointerInput(state.durationMs) {
+                        detectTapGestures { offset ->
+                            if (state.durationMs > 0 && size.width > 0) {
+                                val fraction = (offset.x / size.width).coerceIn(0f, 1f)
+                                player?.seek((fraction * state.durationMs).toLong())
+                            }
+                        }
+                    },
+            ) {
                 Column(
                     Modifier
-                        .weight(1f)
-                        .height(14.dp)
-                        .pointerInput(state.durationMs) {
-                            detectTapGestures { offset ->
-                                if (state.durationMs > 0 && size.width > 0) {
-                                    val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                                    player?.seek((fraction * state.durationMs).toLong())
-                                }
-                            }
-                        },
+                        .fillMaxWidth()
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                 ) {
                     Column(
                         Modifier
-                            .fillMaxWidth()
+                            .fillMaxWidth(progress)
                             .height(5.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                    ) {
-                        Column(
-                            Modifier
-                                .fillMaxWidth(progress)
-                                .height(5.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary),
-                                    ),
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary),
                                 ),
-                        ) {}
-                    }
+                            ),
+                    ) {}
                 }
-                Text(formatTime(state.durationMs), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            Text(formatTime(state.durationMs), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text("🔊", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Slider(
-                    value = volume,
-                    onValueChange = {
-                        volume = it
-                        player?.setVolume(it.toInt())
-                    },
-                    valueRange = 0f..100f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-                    modifier = Modifier.weight(1f).height(24.dp),
-                )
-                Text(
-                    "${volume.toInt()}",
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(22.dp),
-                )
-            }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("🔊", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Slider(
+                value = volume,
+                onValueChange = {
+                    volume = it
+                    player?.setVolume(it.toInt())
+                },
+                valueRange = 0f..100f,
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+                modifier = Modifier.weight(1f).height(24.dp),
+            )
+            Text(
+                "${volume.toInt()}",
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(22.dp),
+            )
+        }
 
-            if (state.channels in 1..16) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    for (i in 0 until state.channels) {
-                        val muted = state.muted.contains(i)
-                        Text(
-                            (i + 1).toString().padStart(2, '0'),
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = when {
-                                state.solo == i -> MaterialTheme.colorScheme.secondary
-                                muted -> MaterialTheme.colorScheme.outline
-                                state.spatialEnabled && i < state.azimuths.size -> MaterialTheme.colorScheme.tertiary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainer)
-                                .combinedClickable(
-                                    onClick = { player?.toggleMute(i) },
-                                    onLongClick = { player?.toggleSolo(i) },
-                                )
-                                .padding(horizontal = 5.dp, vertical = 2.dp),
-                        )
-                    }
+        if (state.channels in 1..16) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (i in 0 until state.channels) {
+                    val muted = state.muted.contains(i)
+                    Text(
+                        (i + 1).toString().padStart(2, '0'),
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = when {
+                            state.solo == i -> MaterialTheme.colorScheme.secondary
+                            muted -> MaterialTheme.colorScheme.outline
+                            state.spatialEnabled && i < state.azimuths.size -> MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                            .combinedClickable(
+                                onClick = { player?.toggleMute(i) },
+                                onLongClick = { player?.toggleSolo(i) },
+                            )
+                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                    )
                 }
             }
         }

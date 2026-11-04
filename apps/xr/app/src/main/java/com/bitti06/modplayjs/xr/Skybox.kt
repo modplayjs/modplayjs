@@ -89,8 +89,15 @@ object Skybox {
 
     private fun applyState(on: Boolean) {
         val s = scene ?: return
-        s.enablePassthrough(on)
-        dome?.setComponent(Visible(!on))
+        if (on) {
+            s.setBackfillColor(Color4(0f, 0f, 0f, 0f))
+            dome?.setComponent(Visible(false))
+            s.enablePassthrough(true)
+        } else {
+            s.setBackfillColor(NIGHT)
+            dome?.setComponent(Visible(true))
+            s.enablePassthrough(false)
+        }
     }
 
     private const val PREFS = "xr.display"

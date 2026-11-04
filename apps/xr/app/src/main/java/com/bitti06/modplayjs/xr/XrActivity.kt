@@ -4,27 +4,32 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.compose.ui.platform.ComposeView
 import com.meta.spatial.compose.ComposeFeature
-import com.meta.spatial.mruk.MRUKFeature
 import com.meta.spatial.compose.ComposeViewPanelRegistration
 import com.meta.spatial.core.Entity
-import com.meta.spatial.core.Pose
 import com.meta.spatial.core.SpatialFeature
-import com.meta.spatial.core.Vector3
+import com.meta.spatial.mruk.MRUKFeature
+import com.meta.spatial.runtime.ButtonBits
+import com.meta.spatial.runtime.PanelShapeLayerBlendType
 import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
+import com.meta.spatial.toolkit.GrabbableSystem
+import com.meta.spatial.toolkit.MeshCollision
 import com.meta.spatial.toolkit.Panel
 import com.meta.spatial.toolkit.PanelRegistration
+import com.meta.spatial.toolkit.PanelRenderMode
 import com.meta.spatial.toolkit.PanelStyleOptions
 import com.meta.spatial.toolkit.QuadShapeOptions
 import com.meta.spatial.toolkit.Transform
-import android.util.Log
+import com.meta.spatial.toolkit.UIPanelRenderOptions
 import com.meta.spatial.toolkit.UIPanelSettings
 import com.meta.spatial.toolkit.Visible
 import com.meta.spatial.vr.VRFeature
+import com.meta.spatial.vr.VrInputSystemType
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.layout.PanelLayout
 import com.bitti06.modplayjs.xr.library.Playlist
@@ -36,6 +41,11 @@ import com.bitti06.modplayjs.xr.ui.panels.DebugPanel
 import com.bitti06.modplayjs.xr.ui.panels.DetailsPanel
 import com.bitti06.modplayjs.xr.ui.panels.PatternPanel
 import com.bitti06.modplayjs.xr.ui.panels.SettingsPanel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class XrActivity : AppSystemActivity() {
 
@@ -44,12 +54,16 @@ class XrActivity : AppSystemActivity() {
     private lateinit var mrukFeature: MRUKFeature
     private lateinit var layout: PanelLayout
     private val panels = LinkedHashMap<Int, Entity>()
+    private var lastTrackLoaded: Boolean? = null
+    private var lastSettingsOpen: Boolean? = null
+    private var lastDebugSources: Boolean? = null
+    private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun registerFeatures(): List<SpatialFeature> {
         spatialAudio = SpatialAudioFeature()
         mrukFeature = MRUKFeature(this, systemManager)
         return listOf(
-            VRFeature(this),
+            VRFeature(this, inputSystemType = VrInputSystemType.SIMPLE_CONTROLLER),
             ComposeFeature(),
             spatialAudio,
             mrukFeature,
@@ -58,12 +72,12 @@ class XrActivity : AppSystemActivity() {
 
     override fun registerPanels(): List<PanelRegistration> =
         listOf(
-            panel(R.id.panel_main, 1.9f, 1.15f) { NowPlayingPanel() },
-            panel(R.id.panel_library, 1.5f, 1.05f) { LibraryPanel() },
-            panel(R.id.panel_settings, 1.4f, 1.0f) { SettingsPanel() },
-            panel(R.id.panel_debug, 1.2f, 1.0f) { DebugPanel() },
-            panel(R.id.panel_pattern, 1.35f, 1.05f) { PatternPanel() },
-            panel(R.id.panel_details, 1.2f, 1.0f) { DetailsPanel() },
+            panel(R.id.panel_main, 1.8f, 1.05f) { NowPlayingPanel() },
+            panel(R.id.panel_library, 1.4f, 0.95f) { LibraryPanel() },
+            panel(R.id.panel_settings, 1.4f, 0.95f) { SettingsPanel() },
+            panel(R.id.panel_debug, 1.4f, 0.85f) { DebugPanel() },
+            panel(R.id.panel_pattern, 1.4f, 0.85f) { PatternPanel() },
+            panel(R.id.panel_details, 1.4f, 0.70f) { DetailsPanel() },
         )
 
     private fun panel(
@@ -76,6 +90,7 @@ class XrActivity : AppSystemActivity() {
             id,
             composeViewCreator = { _, ctx ->
                 ComposeView(ctx).apply {
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
                     setContent { XrTheme { content() } }
                 }
             },
@@ -83,7 +98,13 @@ class XrActivity : AppSystemActivity() {
                 UIPanelSettings(
                     shape = QuadShapeOptions(width = width, height = height),
                     style = PanelStyleOptions(themeResourceId = R.style.PanelAppThemeTransparent),
-                    display = DpPerMeterDisplayOptions(),
+                    display = DpPerMeterDisplayOptions(dpPerMeter = 500f, resolutionScale = 1.2f),
+                    rendering = UIPanelRenderOptions(
+                        renderMode = PanelRenderMode.Layer(
+                            layerBlendType = PanelShapeLayerBlendType.ALPHA_BLEND,
+                            enableLayerFeatheredEdge = true,
+                        ),
+                    ),
                 )
             },
         )
@@ -109,10 +130,14 @@ class XrActivity : AppSystemActivity() {
         layout = PanelLayout(this)
         XrApp.freeLayout.value = layout.free
         XrApp.setFreeLayout = { on ->
-            layout.setFree(on, panels)
+            val hasTrack = XrApp.player?.state?.value?.loaded ?: false
+            layout.setFree(on, panels, hasTrack)
             XrApp.freeLayout.value = layout.free
         }
-        XrApp.resetLayout = { layout.reset(panels) }
+        XrApp.resetLayout = {
+            val hasTrack = XrApp.player?.state?.value?.loaded ?: false
+            layout.reset(panels, hasTrack)
+        }
         player = XrPlayer(this)
         XrApp.player = player
         XrApp.playlist = Playlist(Library(this)).also { playlist ->
@@ -135,7 +160,10 @@ class XrActivity : AppSystemActivity() {
                         Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
                 )
             }
-        startActivityForResult(intent, REQUEST_PICK_MODULES)
+        val options = android.app.ActivityOptions.makeBasic().apply {
+            setLaunchBounds(android.graphics.Rect(0, 0, 1280, 800))
+        }
+        startActivityForResult(intent, REQUEST_PICK_MODULES, options.toBundle())
     }
 
     private fun openFolderPicker() {
@@ -146,7 +174,10 @@ class XrActivity : AppSystemActivity() {
                         Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
                 )
             }
-        startActivityForResult(intent, REQUEST_PICK_TREE)
+        val options = android.app.ActivityOptions.makeBasic().apply {
+            setLaunchBounds(android.graphics.Rect(0, 0, 1280, 800))
+        }
+        startActivityForResult(intent, REQUEST_PICK_TREE, options.toBundle())
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -172,6 +203,7 @@ class XrActivity : AppSystemActivity() {
     }
 
     override fun onDestroy() {
+        activityScope.cancel()
         player.stop()
         XrApp.player = null
         super.onDestroy()
@@ -181,11 +213,17 @@ class XrActivity : AppSystemActivity() {
         super.onSceneReady()
         player.attachScene(scene, spatialAudio)
         scene.setReferenceSpace(ReferenceSpace.LOCAL_FLOOR)
-        // Left-handed scene, +Z forward. Keep the default origin: the arc is
-        // authored at +Z with a 180 degree yaw, so it lands in front without
-        // moving the viewer.
         scene.setViewOrigin(0f, 0f, 0f, 0f)
         Skybox.install(scene, this)
+
+        // Configure controller grab buttons to allow gripping or triggering panels
+        val grabbableSystem = systemManager.findSystem<GrabbableSystem>()
+        grabbableSystem.active = true
+        grabbableSystem.grabButtons =
+            ButtonBits.ButtonSqueezeR or
+                ButtonBits.ButtonSqueezeL or
+                ButtonBits.ButtonTriggerR or
+                ButtonBits.ButtonTriggerL
 
         val ids = listOf(
             R.id.panel_main to PanelLayout.PANEL_MAIN,
@@ -196,14 +234,60 @@ class XrActivity : AppSystemActivity() {
             R.id.panel_details to PanelLayout.PANEL_DETAILS,
         )
         for ((panelId, layoutId) in ids) {
-            val entity = Entity.create(Panel(panelId), Visible(true))
+            val entity = Entity.create(
+                Panel(panelId, MeshCollision.LineTest),
+                Visible(true),
+            )
             panels[layoutId] = entity
         }
-        layout.apply(panels)
+
+        layout.apply(panels, hasTrack = false)
+
+        // Dynamically adjust panel visibility and positions as tracks are loaded/unloaded or settings is toggled
+        activityScope.launch {
+            kotlinx.coroutines.flow.combine(player.state, XrApp.settingsOpen) { state, isSettingsOpen ->
+                Pair(state, isSettingsOpen)
+            }.collect { (state, isSettingsOpen) ->
+                updatePanelVisibilityAndLayout(state, isSettingsOpen)
+            }
+        }
+
         Log.i(TAG, "panels placed: ${panels.size}, free=${layout.free}")
         for ((id, entity) in panels) {
             val pose = runCatching { entity.getComponent<Transform>().transform }.getOrNull()
             Log.i(TAG, "  panel $id at ${pose?.t} rot ${pose?.q}")
+        }
+    }
+
+    private fun updatePanelVisibilityAndLayout(state: XrPlayer.State, isSettingsOpen: Boolean) {
+        val hasTrack = state.loaded
+        val isDebug = state.debugSources
+
+        val trackChanged = (lastTrackLoaded != hasTrack)
+        val settingsChanged = (lastSettingsOpen != isSettingsOpen)
+        val debugChanged = (lastDebugSources != isDebug)
+
+        if (trackChanged || settingsChanged || debugChanged) {
+            lastTrackLoaded = hasTrack
+            lastSettingsOpen = isSettingsOpen
+            lastDebugSources = isDebug
+
+            if (trackChanged) {
+                layout.apply(panels, hasTrack = hasTrack)
+            }
+
+            for ((layoutId, entity) in panels) {
+                val shouldBeVisible = when (layoutId) {
+                    PanelLayout.PANEL_MAIN -> hasTrack
+                    PanelLayout.PANEL_LIBRARY -> true
+                    PanelLayout.PANEL_SETTINGS -> isSettingsOpen
+                    PanelLayout.PANEL_PATTERN -> hasTrack
+                    PanelLayout.PANEL_DETAILS -> hasTrack && state.details.isNotEmpty()
+                    PanelLayout.PANEL_DEBUG -> isDebug
+                    else -> true
+                }
+                entity.setComponent(Visible(shouldBeVisible))
+            }
         }
     }
 
@@ -214,10 +298,6 @@ class XrActivity : AppSystemActivity() {
 
     override fun onResume() {
         super.onResume()
-        // The runtime restarts the session around MRUK anchor discovery
-        // (XR_SESSION_STATE_STOPPING -> IDLE -> READY in the log) and the
-        // compositor loses the passthrough layer with it. Re-assert the
-        // chosen state, which also restores the dome when passthrough is off.
         Skybox.reapply()
     }
 
