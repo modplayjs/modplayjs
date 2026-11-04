@@ -1,6 +1,6 @@
 package com.bitti06.modplayjs.xr.ui.panels
 
-import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.ScrollIndicatorState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -138,7 +138,7 @@ fun InfoCard(
                 }
             }
             Scrollbar(
-                state = scroll,
+                indicator = scroll.scrollIndicatorState,
                 color = accent,
                 wide = expanded,
             )
@@ -147,22 +147,31 @@ fun InfoCard(
 }
 
 /**
- * A thumb whose length is the visible fraction and whose position is
- * `value / maxValue`. Both come from [ScrollState] itself, so no measurement
- * or layout listener is needed.
+ * A thumb drawn from Compose's [ScrollIndicatorState].
+ *
+ * That interface is the platform's own answer to "what should a scrollbar
+ * show": it exposes `scrollOffset`, `contentSize` and `viewportSize` and is
+ * implemented by `ScrollState`, `LazyListState` and the pager/grid states. Using
+ * it instead of `value`/`maxValue` means the same bar can later drive a lazy
+ * list without a second implementation. Compose ships no Scrollbar composable on
+ * Android (only the desktop artifact has `VerticalScrollbar`), so the drawing is
+ * still ours.
  */
 @Composable
 fun Scrollbar(
-    state: ScrollState,
+    indicator: ScrollIndicatorState?,
     color: Color,
     wide: Boolean,
 ) {
-    val max = state.maxValue
-    val viewport = state.viewportSize
-    if (max <= 0 || viewport <= 0) return
+    // Null until the viewport has been measured once.
+    if (indicator == null) return
+    val viewport = indicator.viewportSize
+    val content = indicator.contentSize
+    if (viewport <= 0 || content <= viewport) return
 
-    val thumb = (viewport.toFloat() / (viewport + max)).coerceIn(0.08f, 1f)
-    val progress = state.value.toFloat() / max
+    val thumb = (viewport.toFloat() / content).coerceIn(MIN_THUMB, 1f)
+    val travel = content - viewport
+    val progress = (indicator.scrollOffset.toFloat() / travel).coerceIn(0f, 1f)
     val before = progress * (1f - thumb)
     val after = (1f - thumb - before).coerceAtLeast(0f)
 
@@ -187,3 +196,6 @@ fun Scrollbar(
 
 /** Column weights must be positive; this is the floor for the tiny gaps. */
 private const val MIN_WEIGHT = 0.0001f
+
+/** Even a huge module keeps a grabbable thumb on screen. */
+private const val MIN_THUMB = 0.08f
