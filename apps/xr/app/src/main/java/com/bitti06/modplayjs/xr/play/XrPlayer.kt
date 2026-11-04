@@ -32,7 +32,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.jsonArray
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -142,7 +141,6 @@ class XrPlayer(
         val index: Int,
         val sessionId: Int,
         val track: AudioTrack,
-        val registerId: Int,
     )
 
     private data class SpatialInfo(
@@ -495,7 +493,7 @@ class XrPlayer(
 
     private fun openStereo() {
         val track = newTrack(AudioFormat.CHANNEL_OUT_STEREO, null)
-        outputs += TrackOut(0, track.audioSessionId, track, -1)
+        outputs += TrackOut(0, track.audioSessionId, track)
         outputMode = 1
         outChannels = 1
         track.play()
@@ -516,7 +514,7 @@ class XrPlayer(
             val track = newTrack(AudioFormat.CHANNEL_OUT_MONO, sessionId)
             val registerId = REGISTER_BASE + i
             feature.registerAudioSessionId(registerId, track.audioSessionId)
-            outputs += TrackOut(i, track.audioSessionId, track, registerId)
+            outputs += TrackOut(i, track.audioSessionId, track)
             val p = positionFor(info.azimuths.getOrElse(i) { 0f })
             val entity = Entity.create(
                 Transform(Pose(p)),

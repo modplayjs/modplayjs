@@ -38,6 +38,14 @@ lives in `com.bitti06.modplayjs.xr` and is reachable from a panel.
 
 ## Panel placement: free vs stationary
 
+## Panel animation
+
+Switching modes slides the panels into place (320 ms, smoothstep, position +
+`Quaternion.slerp`) via `PanelAnimator`, a `SystemBase` registered with the
+`SystemManager`, which calls `execute()` once per frame. Grabbing a panel
+cancels its own slide. First placement and an explicit reset are instant: a
+panel should appear where it belongs instead of flying in from the origin.
+
 | | free | stationary |
 |---|---|---|
 | pose | user's, saved per panel id | fixed arc, `defaultPose(id)` |

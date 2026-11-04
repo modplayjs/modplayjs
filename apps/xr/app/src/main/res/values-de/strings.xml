@@ -5,7 +5,6 @@
     <string name="stat_tracks">Titel</string>
     <string name="stat_folders">Ordner</string>
     <string name="stat_favorites">Favoriten</string>
-    <string name="xr_library">Bibliothek</string>
     <string name="xr_settings">Einstellungen</string>
     <string name="xr_details">Details</string>
     <string name="xr_sources">Quellen</string>
@@ -28,7 +27,6 @@
     <string name="xr_sort_size">Größe</string>
     <string name="xr_sort_folder">Ordner</string>
     <string name="xr_search_hint">Suche: Titel</string>
-    <string name="xr_ignored_count">%1$d ignoriert</string>
     <string name="xr_empty_favorites">Noch keine Favoriten — Stern in der Liste antippen.</string>
     <string name="xr_empty_recent">Noch nichts gespielt.</string>
     <string name="xr_empty_library">Keine Module. „Ordner“ pickt einen Baum, „Dateien“ einzelne Module.</string>

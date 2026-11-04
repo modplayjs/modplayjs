@@ -31,6 +31,7 @@ import com.meta.spatial.toolkit.UIPanelSettings
 import com.meta.spatial.toolkit.Visible
 import com.meta.spatial.vr.VRFeature
 import com.bitti06.modplayjs.xr.library.Library
+import com.bitti06.modplayjs.xr.layout.PanelAnimator
 import com.bitti06.modplayjs.xr.layout.PanelLayout
 import com.bitti06.modplayjs.xr.library.Playlist
 import com.bitti06.modplayjs.xr.play.XrPlayer
@@ -55,6 +56,7 @@ class XrActivity : AppSystemActivity() {
     private lateinit var player: XrPlayer
     private lateinit var mrukFeature: MRUKFeature
     private lateinit var layout: PanelLayout
+    private val panelAnimator = PanelAnimator()
     private val panels = LinkedHashMap<Int, Entity>()
     private var lastTrackLoaded: Boolean? = null
     private var lastSettingsOpen: Boolean? = null
@@ -146,7 +148,10 @@ class XrActivity : AppSystemActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        layout = PanelLayout(this)
+        // Panel slides run as a system: the SystemManager calls execute() once
+        // per frame, which is the documented place for per-frame work.
+        systemManager.registerSystem(panelAnimator)
+        layout = PanelLayout(this, panelAnimator)
         XrApp.freeLayout.value = layout.free
         XrApp.setFreeLayout = { on ->
             val hasTrack = XrApp.player?.state?.value?.loaded ?: false

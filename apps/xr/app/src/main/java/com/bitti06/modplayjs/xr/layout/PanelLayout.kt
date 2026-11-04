@@ -10,11 +10,17 @@ import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Transform
 
 /**
- * Adaptive panel layout:
- * - Every panel has a fixed, upright 3D spatial location in the arc.
- * - Every panel features an active [Grabbable] component allowing direct manipulation.
+ * Panel placement: a fixed arc, or free placement the user arranges by hand.
+ *
+ * Free mode writes a [Grabbable] and persists poses; stationary removes the
+ * component again (ISDK would otherwise keep the panel grabbable) and re-applies
+ * the arc. Mode switches slide via [PanelAnimator]; a reset lands instantly.
  */
-class PanelLayout(context: Context) {
+class PanelLayout(
+    context: Context,
+    /** Slides panels to their target pose instead of teleporting them. */
+    private val animator: PanelAnimator? = null,
+) {
 
     private val prefs = context.getSharedPreferences("xr.layout", Context.MODE_PRIVATE)
 
@@ -66,6 +72,19 @@ class PanelLayout(context: Context) {
     }
 
     /**
+     * Move one panel. Switching modes animates so the arc change is followable;
+     * an explicit reset lands immediately, because a reset should.
+     */
+    private fun place(entity: Entity, pose: Pose, animate: Boolean = true) {
+        if (animate && animator != null) {
+            animator.moveTo(entity, pose)
+        } else {
+            animator?.cancel(entity)
+            entity.setComponent(Transform(pose))
+        }
+    }
+
+    /**
      * Place the panels and set whether they can be grabbed.
      *
      * In free mode a panel that already has a Transform is left alone: the user
@@ -82,7 +101,9 @@ class PanelLayout(context: Context) {
                     } else {
                         defaultPose(id, hasTrack)
                     }
-                entity.setComponent(Transform(pose))
+                // First placement is instant: a panel should appear where it
+                // belongs, not fly in from the origin.
+                place(entity, pose, animate = false)
             }
             setGrabbable(entity, free)
         }
@@ -116,7 +137,7 @@ class PanelLayout(context: Context) {
                 } else {
                     defaultPose(id, hasTrack)
                 }
-            entity.setComponent(Transform(pose))
+            place(entity, pose)
             setGrabbable(entity, on)
         }
     }
@@ -124,7 +145,7 @@ class PanelLayout(context: Context) {
     /** Deliberate wipe: back to the arc and forget the saved arrangement. */
     fun reset(entities: Map<Int, Entity>, hasTrack: Boolean = false) {
         for ((id, entity) in entities) {
-            entity.setComponent(Transform(defaultPose(id, hasTrack)))
+            place(entity, defaultPose(id, hasTrack), animate = false)
             setGrabbable(entity, free)
         }
         val edit = prefs.edit()
@@ -167,6 +188,8 @@ class PanelLayout(context: Context) {
             entity.tryRemoveComponent<Grabbable>()
             return
         }
+        // A slide in progress would fight the hand; drop it for this entity.
+        animator?.cancel(entity)
         val grabbable =
             Grabbable(
                 enabled = true,

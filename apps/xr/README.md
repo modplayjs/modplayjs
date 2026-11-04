@@ -8,8 +8,11 @@ layer and the settings model are shared with the phone app:
 
 - `engine.js` — bundled from `apps/android/engine/src/engine-entry.ts`
 - `v8_jni.cpp` + `build/v8-prebuilt/android-arm64-v8a` — the V8 embedding
-- `com.bitti06.modplayjs.engine.*` Kotlin — copied verbatim so the JNI symbol
-  names (`Java_com_bitti06_modplayjs_engine_V8Engine_*`) link unchanged
+- `com.bitti06.modplayjs.engine.{V8Engine,EngineTypes,SettingsStore}` Kotlin —
+  the JNI symbol names (`Java_com_bitti06_modplayjs_engine_V8Engine_*`) have to
+  match, so the class and package cannot move. `V8Engine` carries the
+  XR-only `renderSpatial()`; `PcmRing` is deliberately not copied, the XR
+  player writes `AudioTrack` directly.
 
 ## Build
 
