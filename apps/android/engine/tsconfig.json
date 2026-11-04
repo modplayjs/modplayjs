@@ -22,6 +22,8 @@
       "@modplayjs/fmt-sid": ["../../../packages/fmt-sid/src/index.ts"],
       "@modplayjs/fmt-fc": ["../../../packages/fmt-fc/src/index.ts"],
       "@modplayjs/fmt-prowizard": ["../../../packages/fmt-prowizard/src/index.ts"],
+      "@modplayjs/fmt-mo3": ["../../../packages/fmt-mo3/src/index.ts"],
+      "@modplayjs/stb-vorbis": ["../../../packages/stb-vorbis/src/index.ts"],
       "@modplayjs/dsp-paula": ["../../../packages/dsp-paula/src/index.ts"],
       "@modplayjs/dsp-softmixer": ["../../../packages/dsp-softmixer/src/index.ts"],
       "@modplayjs/stream-audio": ["../../../packages/stream-audio/src/index.ts"],
