@@ -11,10 +11,8 @@ import com.meta.spatial.toolkit.Transform
 
 /**
  * Adaptive panel layout:
- * - When no track is playing, the Library panel is centered directly in front of the viewer.
- * - When a track is loaded, the Now Playing panel takes center stage and the Library shifts left.
- *
- * Every panel features active [Grabbable] component allowing direct hand and controller manipulation.
+ * - Every panel has a fixed, upright 3D spatial location in the arc.
+ * - Every panel features an active [Grabbable] component allowing direct manipulation.
  */
 class PanelLayout(context: Context) {
 
@@ -31,17 +29,17 @@ class PanelLayout(context: Context) {
 
     /**
      * Default spatial poses in ReferenceSpace.LOCAL_FLOOR.
-     * Every panel has a fixed, upright 3D location in the arc.
+     * All quads use Quaternion.fromEuler(0f, 0f, 180f) for 100% upright ComposeView surfaces.
      */
     fun defaultPose(id: Int, @Suppress("UNUSED_PARAMETER") hasTrack: Boolean = false): Pose =
         when (id) {
-            PANEL_MAIN -> Pose(Vector3(0f, 1.45f, 1.95f), Quaternion.fromEuler(0f, 0f, 0f))
-            PANEL_LIBRARY -> Pose(Vector3(-1.75f, 1.45f, 1.75f), Quaternion.fromEuler(0f, -25f, 0f))
-            PANEL_SETTINGS -> Pose(Vector3(1.75f, 1.45f, 1.75f), Quaternion.fromEuler(0f, 25f, 0f))
-            PANEL_PATTERN -> Pose(Vector3(-1.75f, 0.45f, 1.75f), Quaternion.fromEuler(-10f, -25f, 0f))
-            PANEL_DETAILS -> Pose(Vector3(0f, 0.45f, 1.85f), Quaternion.fromEuler(-18f, 0f, 0f))
-            PANEL_DEBUG -> Pose(Vector3(1.75f, 0.45f, 1.75f), Quaternion.fromEuler(-10f, 25f, 0f))
-            else -> Pose(Vector3(0f, 1.45f, 1.95f), Quaternion.fromEuler(0f, 0f, 0f))
+            PANEL_MAIN -> Pose(Vector3(0f, 1.45f, 1.95f), Quaternion.fromEuler(0f, 0f, 180f))
+            PANEL_LIBRARY -> Pose(Vector3(-1.75f, 1.45f, 1.75f), Quaternion.fromEuler(0f, 0f, 180f))
+            PANEL_SETTINGS -> Pose(Vector3(1.75f, 1.45f, 1.75f), Quaternion.fromEuler(0f, 0f, 180f))
+            PANEL_PATTERN -> Pose(Vector3(-1.75f, 0.45f, 1.75f), Quaternion.fromEuler(0f, 0f, 180f))
+            PANEL_DETAILS -> Pose(Vector3(0f, 0.45f, 1.85f), Quaternion.fromEuler(0f, 0f, 180f))
+            PANEL_DEBUG -> Pose(Vector3(1.75f, 0.45f, 1.75f), Quaternion.fromEuler(0f, 0f, 180f))
+            else -> Pose(Vector3(0f, 1.45f, 1.95f), Quaternion.fromEuler(0f, 0f, 180f))
         }
 
     fun savedPose(id: Int): Pose? {
@@ -136,6 +134,6 @@ class PanelLayout(context: Context) {
         private const val KEY_FREE = "free"
         private const val KEY_VERSION = "layoutVersion"
 
-        private const val LAYOUT_VERSION = 10
+        private const val LAYOUT_VERSION = 30
     }
 }
