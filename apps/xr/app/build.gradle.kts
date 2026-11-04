@@ -1,4 +1,5 @@
 import java.io.File
+import org.gradle.api.tasks.PathSensitivity
 import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -10,7 +11,7 @@ buildscript {
     }
     dependencies {
         // Applied via classpath instead of the plugins DSL so the Kotlin
-        // compiler that Meta ships (2.2.0) can be excluded: KGP 2.3.21 warns
+        // compiler that Meta ships (2.2.0) can be excluded: KGP 2.4.x warns
         // when a second kotlin-compiler-embeddable sits on the build
         // classpath.
         classpath("com.meta.spatial:spatial-gradle-plugin-impl:0.15.0") {

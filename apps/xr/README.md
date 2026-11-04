@@ -44,14 +44,18 @@ same. The ceiling is therefore:
 
 | Artifact | Version | Why not newer |
 |---|---|---|
-| Kotlin | 2.3.21 | newest; AGP 8.13.2 ships R8 with Kotlin 2.3 support |
+| Kotlin | 2.4.21 | newest; KGP 2.4.x supports Gradle up to 9.7 and AGP up to 9.3.1 |
 | Compose BOM | 2026.06.01 (Compose UI 1.11.4) | 2026.08.00+ ships UI 1.12, needs `compileSdk` 37 |
 | core-ktx | 1.18.0 | 1.19.x needs `compileSdk` 37 + AGP 9.1 |
 | activity-compose | 1.13.0 | newest; `minCompileSdk` 36 |
 | lifecycle | 2.10.0 | 2.11.0 needs `compileSdk` 37 |
 | coroutines | 1.11.0 | newest |
 | serialization | 1.12.0 | newest |
-| AGP / Gradle | 8.13.2 / 8.14.6 | AGP 9.x is a breaking major and needs `compileSdk` 37 |
+| AGP / Gradle | 8.13.2 / 9.4.1 | AGP 9.x is a breaking major and needs `compileSdk` 37 |
+
+The wrapper is on **Gradle 9.4.1**, which is what Meta ships with the 0.15.0
+samples. AGP 8.13.2 needs Gradle >= 8.13, so 9.4.1 is fine; the reverse pairing
+(old AGP on the Gradle 9 wrapper) is what fails during native/CMake model sync.
 
 Spatial SDK is on the newest release line, `0.15.0` (`libs.versions.toml`,
 `spatialsdk`). It is a breaking release: hierarchy scale is now the default and
