@@ -27,6 +27,14 @@
     <uses-feature android:name="com.oculus.feature.VIRTUAL_KEYBOARD" android:required="false" />
     <uses-feature android:name="oculus.software.overlay_keyboard" android:required="false" />
 
+    <!-- Hands and controllers. The permission uses the current horizonos.* name
+         (Meta's Spatial SDK gaze page declares exactly this pair); the feature
+         has no horizonos spelling, so oculus.software.handtracking stays.
+         required=false = "controllers and hands", and both modalities reach every
+         interaction: Interaction SDK gives hands a ray, direct touch on panels
+         and grabbing, exactly like the controllers. -->
+    <uses-feature android:name="oculus.software.handtracking" android:required="false" />
+    <uses-permission android:name="horizonos.permission.HAND_TRACKING" />
     <!-- Scene model for room geometry (walls, furniture). Both are required by
          MRUK; the horizonos.permission.* aliases are system-granted implicitly
          and are not documented as declarable, so the com.oculus names stay. -->

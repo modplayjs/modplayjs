@@ -13,13 +13,11 @@ import com.meta.spatial.compose.ComposeViewPanelRegistration
 import com.meta.spatial.core.Entity
 import com.meta.spatial.core.SpatialFeature
 import com.meta.spatial.mruk.MRUKFeature
-import com.meta.spatial.runtime.ButtonBits
 import com.meta.spatial.runtime.PanelShapeLayerBlendType
 import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
-import com.meta.spatial.toolkit.GrabbableSystem
 import com.meta.spatial.isdk.IsdkSystem
 import com.meta.spatial.toolkit.AvatarSystem
 import com.meta.spatial.toolkit.MeshCollision
@@ -32,9 +30,8 @@ import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.UIPanelRenderOptions
 import com.meta.spatial.toolkit.UIPanelSettings
 import com.meta.spatial.toolkit.Visible
-import com.meta.spatial.vr.InputSystem
 import com.meta.spatial.vr.VRFeature
-import com.meta.spatial.vr.VrInputSystemType
+import com.bitti06.modplayjs.xr.input.MenuButtonSystem
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.layout.PanelAnimator
 import com.bitti06.modplayjs.xr.layout.PanelLayout
@@ -74,19 +71,18 @@ class XrActivity : AppSystemActivity() {
     private var resumeAfterPause = false
     private var avatarSystem: AvatarSystem? = null
     private var isdkSystem: IsdkSystem? = null
-    /** The legacy controller pointer; silenced while another app has focus. */
-    private var inputSystem: InputSystem? = null
     private var lastRecenterNs = 0L
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun registerFeatures(): List<SpatialFeature> {
         spatialAudio = SpatialAudioFeature()
         mrukFeature = MRUKFeature(this, systemManager)
-        // The app runs the legacy controller input on purpose: with the
-        // Interaction SDK, ISDK turns every Grabbable panel into an interactable
-        // with grab handles, which fights the arc. Panels still take clicks.
+        // Interaction SDK, the SDK default and the only system that turns hand
+        // input into the same pointer events as controllers: ray, pinch and
+        // direct touch on panels, and grabbing with either modality. The legacy
+        // InputSystem is controller-only, so hands could not drive the panels.
         return listOf(
-            VRFeature(this, inputSystemType = VrInputSystemType.SIMPLE_CONTROLLER),
+            VRFeature(this),
             ComposeFeature(),
             spatialAudio,
             mrukFeature,
@@ -296,15 +292,12 @@ class XrActivity : AppSystemActivity() {
         // absent, and a missing avatar must never take the app down.
         avatarSystem = runCatching { systemManager.findSystem<AvatarSystem>() }.getOrNull()
         isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
-        inputSystem = runCatching { systemManager.findSystem<InputSystem>() }.getOrNull()
         updateAvatarVisibility(hasFocus = true)
 
-        // With SIMPLE_CONTROLLER the legacy GrabbableSystem is the grab path;
-        // ISDK is not registered, so nothing else handles a Grabbable panel.
-        systemManager.findSystem<GrabbableSystem>().apply {
-            active = true
-            grabButtons = ButtonBits.ButtonSqueezeR or ButtonBits.ButtonSqueezeL
-        }
+        // VRC.Quest.Input.1: the controller's menu button opens the in-app menu.
+        // It works in both modalities; hands have no menu button and reach the
+        // same panel through its gear chip.
+        systemManager.registerSystem(MenuButtonSystem { XrApp.toggleSettings() })
 
         val ids = listOf(
             R.id.panel_main to PanelLayout.PANEL_MAIN,
@@ -494,10 +487,9 @@ class XrActivity : AppSystemActivity() {
 
     /**
      * VRC.Quest.Input.4: hide the user's hands and controllers and ignore all
-     * their input while another app has focus. The pointer is turned off
-     * explicitly: with SIMPLE_CONTROLLER nothing else does it, so an open
-     * library or settings panel would otherwise still react to a squeeze behind
-     * the Universal Menu. The app keeps rendering throughout.
+     * their input while another app has focus. IsdkSystem stops ticking, which
+     * is where every pointer event is generated, so nothing can be clicked
+     * behind the Universal Menu. The app keeps rendering throughout.
      */
     private fun updateAvatarVisibility(hasFocus: Boolean) {
         avatarSystem?.apply {
@@ -505,7 +497,6 @@ class XrActivity : AppSystemActivity() {
             setShowControllers(hasFocus)
         }
         isdkSystem?.active = hasFocus
-        inputSystem?.enableInput(hasFocus)
     }
 
     /**
@@ -516,15 +507,20 @@ class XrActivity : AppSystemActivity() {
     private fun horizonOsApi(): Int = runCatching { metavr.os.Build.Version.getApiVersion() }.getOrDefault(-1)
 
     private fun requestScenePermission() {
-        // Only the scene permission is requested. Hand tracking is not declared
-        // in the manifest at all: panels are grabbed with the controller's
-        // squeeze button (legacy GrabbableSystem), so a hands-only user cannot
-        // move them. Meta's app-compatibility page is explicit that shipping the
-        // hand declaration before the hand path works is a broken experience,
-        // and VRC.Quest.Tracking.2 requires every declared input modality to
-        // reach all interactions. Controllers are the declared modality.
+        // Two runtime permissions, requested together so the user answers once:
+        // scene data places the emitter ring, hand tracking drives the panels.
+        // Both are optional: denying scene keeps a 1 m ring, denying hands keeps
+        // the controllers usable, and the app changes nothing else either way
+        // (VRC.Quest.Security.2).
+        val wanted = ArrayList<String>()
         if (checkSelfPermission(PERMISSIONS.scene) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(PERMISSIONS.scene), REQUEST_USE_SCENE)
+            wanted += PERMISSIONS.scene
+        }
+        if (checkSelfPermission(PERMISSIONS.handTracking) != PackageManager.PERMISSION_GRANTED) {
+            wanted += PERMISSIONS.handTracking
+        }
+        if (wanted.isNotEmpty()) {
+            requestPermissions(wanted.toTypedArray(), REQUEST_USE_SCENE)
         } else if (!SceneBridge.granted) {
             // Already granted on an earlier run: no prompt, no callback, but the
             // ring still needs the room and Settings still needs to say so.
@@ -543,7 +539,10 @@ class XrActivity : AppSystemActivity() {
             val granted =
                 sceneIndex >= 0 &&
                     grantResults.getOrNull(sceneIndex) == PackageManager.PERMISSION_GRANTED
-            Log.i(TAG, "permissions: scene=$granted os=${horizonOsApi()}")
+            val handsIndex = permissions.indexOf(PERMISSIONS.handTracking)
+            val hands =
+                handsIndex < 0 || grantResults.getOrNull(handsIndex) == PackageManager.PERMISSION_GRANTED
+            Log.i(TAG, "permissions: scene=$granted hands=$hands os=${horizonOsApi()}")
             SceneBridge.onPermissionResult(granted, this)
         }
     }
@@ -553,13 +552,15 @@ class XrActivity : AppSystemActivity() {
         private const val RECENTER_DEBOUNCE_NS = 250_000_000L
 
         /**
-         * `com.oculus.permission.USE_SCENE` is the name the current Spatial SDK
-         * MRUK page and the Spatial Data Permission page both document. The
-         * `horizonos.permission.USE_SCENE` seen in grant logs is a system-side
-         * implicit grant, not a declared permission, so it is not substituted.
+         * Namespaces differ per permission, and each is the one the current
+         * Spatial SDK pages use: `USE_SCENE` is documented under
+         * com.oculus.permission (the horizonos.* form only shows up as a
+         * system-side implicit grant), hand tracking under
+         * horizonos.permission.
          */
         private object PERMISSIONS {
             const val scene = "com.oculus.permission.USE_SCENE"
+            const val handTracking = "horizonos.permission.HAND_TRACKING"
         }
         const val REQUEST_USE_SCENE = 1
         const val REQUEST_PICK_MODULES = 2

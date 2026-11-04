@@ -5,6 +5,10 @@ import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.Vector3
+import com.meta.spatial.isdk.IsdkGrabMovementType
+import com.meta.spatial.isdk.IsdkGrabProxy
+import com.meta.spatial.isdk.IsdkGrabbable
+import com.meta.spatial.isdk.IsdkPanelGrabHandle
 import com.meta.spatial.toolkit.Grabbable
 import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Transform
@@ -12,8 +16,8 @@ import com.meta.spatial.toolkit.Transform
 /**
  * Panel placement: a fixed arc, or free placement the user arranges by hand.
  *
- * Free mode writes a [Grabbable] and persists poses; stationary removes the
- * component again (ISDK would otherwise keep the panel grabbable) and re-applies
+ * Free mode writes a [Grabbable] and persists poses; stationary removes it again
+ * (the Interaction SDK would otherwise keep the panel grabbable) and re-applies
  * the arc. Mode switches slide via [PanelAnimator]; a reset lands instantly.
  */
 class PanelLayout(
@@ -183,27 +187,45 @@ class PanelLayout(
     }
 
     /**
-     * Stationary mode has to remove the component, not just disable it: the
-     * Interaction SDK turns a Grabbable panel into a grabbable interactable
-     * (grab handles and all), so an entity that keeps the component keeps
-     * moving in the user's hand.
+     * Stationary mode has to remove the components, not just disable them: the
+     * Interaction SDK turns a Grabbable panel into an interactable with collision
+     * volume and grab handles, so an entity that keeps them keeps moving in the
+     * user's hand. [IsdkGrabbable] and the proxy are what the SDK actually
+     * writes here, so they go too; leaving them behind would keep the panel
+     * live after "stationary" was chosen.
      */
     private fun setGrabbable(entity: Entity, enabled: Boolean) {
         if (!enabled) {
             entity.tryRemoveComponent<Grabbable>()
+            entity.tryRemoveComponent<IsdkGrabbable>()
+            entity.tryRemoveComponent<IsdkGrabProxy>()
+            entity.tryRemoveComponent<IsdkPanelGrabHandle>()
             return
         }
         // A slide in progress would fight the hand; drop it for this entity.
         animator?.cancel(entity)
-        val grabbable =
+
+        // The toolkit component is the switch the SDK watches: IsdkComponentCreationSystem
+        // derives the SDK-side collider and grab handle from it, and without it
+        // the panel is not grabbable at all. PIVOT_Y keeps the old behaviour of
+        // not letting a panel be pushed through the floor.
+        entity.setComponent(
             Grabbable(
                 enabled = true,
                 type = GrabbableType.PIVOT_Y,
                 minHeight = 0.3f,
                 maxHeight = 3.0f,
-            )
-        grabbable.enabled = true
-        entity.setComponent(grabbable)
+            ),
+        )
+        // AxialBillboard, not Direct: a grabbed panel stays upright and turns
+        // towards the viewer, so text is readable wherever the hand puts it. The
+        // toolkit path could not do that — it only ever rotated around Y.
+        entity.setComponent(
+            IsdkGrabbable(
+                enabled = true,
+                movementType = IsdkGrabMovementType.AxialBillboard,
+            ),
+        )
     }
 
     companion object {
