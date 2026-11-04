@@ -103,4 +103,13 @@
     <string name="xr_debug_stereo">Stereopfad</string>
     <string name="xr_debug_off">Spatial ist aus: im Stereopfad gibt es keine Objekte. In den Einstellungen einschalten.</string>
     <string name="xr_debug_hint">Marker im Raum: Kugel pro Objekt, Größe = Pegel, Farbe = Kanal.</string>
+    <string name="xr_details_instruments">Instrumente</string>
+    <string name="xr_details_samples">Samples</string>
+    <string name="xr_volume">Lautstärke</string>
+    <string name="xr_sample_lengths">Sample-Längen</string>
+    <string name="xr_loop_marker">Loop-Marker</string>
+    <string name="xr_mixer_unavailable">Für dieses Modul nicht verfügbar.</string>
+    <string name="xr_debug_mute_unavailable">Kanal-Stummschaltung ist für dieses Modul nicht verfügbar.</string>
+    <string name="xr_add_folder">Ordner hinzufügen</string>
+    <string name="xr_theme_note">Nur dunkles Theme: eine helle Fläche im dunklen Raum kostet Kontrast.</string>
 </resources>

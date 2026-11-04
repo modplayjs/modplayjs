@@ -18,14 +18,14 @@ lives in `com.bitti06.modplayjs.xr` and is reachable from a panel.
 | Volume | settings | **yes** — slider, engine master, persisted |
 | Channel mute / solo | `ChannelStrip`, `soloChannel` | **yes** — tap = mute, long-press = solo, both read back from the snapshot |
 | Pattern view | `ui/PatternScreen.kt` | **yes** — `getPattern` polled, playhead highlighted |
-| Track details (orders/instruments/samples/message) | `ui/PlayerScreens.kt` | **yes** — snapshot fields, message |
-| Visualizer (spectrum/waveform/both) | `ui/PlayerScreens.kt` | channel level bars; no FFT yet |
+| Track details (orders/instruments/samples/message) | `ui/PlayerScreens.kt` | **yes** — order list, instrument list, sample list (with length/loop flags), message |
+| Visualizer (spectrum/waveform/both) | `ui/PlayerScreens.kt` | **yes** — `view.visualizer` drives the bars from channel levels; no FFT yet |
 | Playback: repeat/shuffle/jam settings | `SettingsScreens.kt` | **yes** |
 | Audio: pan, interpolation, voices, tempo | `SettingsScreens.kt` | **yes** |
 | Mixer: mode, layout, A500 filter | `SettingsScreens.kt` | **yes** |
 | SID: chip, video, quality, channels | `SettingsScreens.kt` | **yes** |
-| Appearance: reduced motion, strip, dots, pattern view, follow | `SettingsScreens.kt` | **yes** (theme fixed dark) |
-| Library settings: folders, ignored | `SettingsScreens.kt` | folder counts + remove, ignored reset |
+| Appearance: reduced motion, strip, dots, pattern view, follow, sample lengths/loop, pattern colours | `SettingsScreens.kt` | **yes** — all settings the engine already carried are now read by the panels; theme is fixed dark on purpose |
+| Library settings: folders, ignored | `SettingsScreens.kt` | **yes** — add folder, per-folder remove, ignored count + reset |
 | Diagnostics: engine, rate, session | `SettingsScreens.kt` | **yes** |
 | About / licenses / language | `AboutScreens.kt` | **yes** — license section, per-app locale via `LocaleManager`, strings in `values`/`values-de` |
 | Background playback service + notification | `media/PlaybackService.kt` | **no** — out of scope for now (audio stops on focus loss) |
@@ -33,9 +33,24 @@ lives in `com.bitti06.modplayjs.xr` and is reachable from a panel.
 | System audio effects (equalizer) | `PlayerScreens.kt` | **no** — replaced by spatial settings |
 | Spatial audio (objects, layout, pan, HRTF) | — | **yes**, XR only |
 
+## Behaviour fixes from this audit
+
+Settings that existed in the panel but did nothing are now wired:
+
+- `view.showChannelStrip` hides/shows the channel row in Now Playing.
+- `view.follow` gates the pattern auto-scroll instead of always following.
+- `view.visualizer` drives the bars (off/spectrum/waveform/both) instead of a
+  static decoration.
+- `view.patternColors` feeds the pattern palette; `view.stripDots` strips dots
+  in cell text.
+- `view.sampleLengths` / `view.sampleLoopFlags` shape the sample list.
+- Engine capabilities gate the UI: no pan row when the module ignores panning,
+  a note instead of mixer options when the mixer is unavailable, no ±10 s when
+  the module is not seekable, a note when channel mute is unavailable.
+
 ## Deliberately different
 
-- Theme is dark-only; the panel is not a phone window and a light surface in a
+- Theme is dark-only (stated in the panel); the panel is not a phone window and a light surface in a
   dark room costs contrast.
 - Visualizer renders channel levels, not an FFT. The setting exists so a real
   spectrum view can be added without a schema change.
@@ -46,3 +61,10 @@ lives in `com.bitti06.modplayjs.xr` and is reachable from a panel.
 
 1. Foreground service so audio survives focus loss (deliberately postponed).
 2. Real spectrum analyser (FFT); the visualizer renders channel levels.
+3. Queue view (phone: `QueueScreen`). The XR app has the `Playlist` with the
+   same repeat/shuffle/auto-advance logic but no panel that lists what plays
+   next.
+4. Ignored-files list with per-file restore (phone: `IgnoredScreen`). XR shows
+   the count and can clear the whole list only.
+5. Pattern colour picker (phone: `PatternColorsScreen`). The palette follows
+   `view.patternColors`, but there is no panel to choose the colours.

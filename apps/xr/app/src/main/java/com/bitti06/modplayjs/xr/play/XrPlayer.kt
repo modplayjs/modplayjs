@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.core.net.toUri
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.EngineJson
+import com.bitti06.modplayjs.engine.PatternColors
 import com.bitti06.modplayjs.engine.SettingsStore
 import com.bitti06.modplayjs.engine.V8Engine
 import com.meta.spatial.core.Color4
@@ -66,6 +67,27 @@ class XrPlayer(
         val pattern: PatternData = PatternData(),
         val details: List<Pair<String, String>> = emptyList(),
         val message: String = "",
+        /** Engine capabilities: mute, pattern view, mixer, pan are optional. */
+        val canMute: Boolean = false,
+        val canPattern: Boolean = false,
+        val canMixer: Boolean = false,
+        val canPan: Boolean = false,
+        /** View settings the panels read; they live in the engine's settings. */
+        val follow: Boolean = true,
+        val visualizer: String = "off",
+        val showChannelStrip: Boolean = true,
+        val stripDots: Boolean = false,
+        val sampleLengths: Boolean = true,
+        val sampleLoopFlags: Boolean = true,
+        val patternColors: PatternColors = PatternColors(),
+        val seekable: Boolean = false,
+        val trackDetail: TrackDetail = TrackDetail(),
+    )
+
+    data class TrackDetail(
+        val instrumentList: List<String> = emptyList(),
+        val sampleList: List<String> = emptyList(),
+        val orderList: String = "",
     )
 
     data class PatternData(
@@ -686,6 +708,7 @@ class XrPlayer(
         }.getOrNull()
         val state = snap?.get("state") as? JsonObject
         val track = snap?.get("track") as? JsonObject
+        val caps = snap?.get("capabilities") as? JsonObject
         val current = _state.value
         _state.value = current.copy(
             loaded = loaded,
@@ -730,11 +753,79 @@ class XrPlayer(
                 ?.map { (k, v) -> k to v.toString().trim('"').take(80) }
                 ?: current.details,
             message = track?.get("message")?.jsonPrimitive?.content ?: current.message,
+            canMute = caps?.get("channelMute")?.jsonPrimitive?.content == "true",
+            canPattern = caps?.get("patternView")?.jsonPrimitive?.content == "true",
+            canMixer = caps?.get("mixer")?.jsonPrimitive?.content == "true",
+            canPan = caps?.get("panSeparation")?.jsonPrimitive?.content == "true",
+            seekable = caps?.get("seekable")?.jsonPrimitive?.content == "true",
+            follow = settings.view.follow,
+            visualizer = settings.view.visualizer,
+            showChannelStrip = settings.view.showChannelStrip,
+            stripDots = settings.view.stripDots,
+            sampleLengths = settings.view.sampleLengths,
+            sampleLoopFlags = settings.view.sampleLoopFlags,
+            patternColors = settings.view.patternColors,
+            trackDetail = readTrackDetail(track, settings.view),
         )
         // Only log transitions, not every tick.
         if (previous.loaded != _state.value.loaded) {
             Log.i(TAG, "state: loaded=${_state.value.loaded}")
         }
+    }
+
+    /**
+     * Details the phone app lists per instrument/sample. The engine already
+     * excludes these lists from the flat `details` map (they are big), so they
+     * are formatted here instead of shipping raw JSON to the panel.
+     */
+    private fun readTrackDetail(
+        track: JsonObject?,
+        view: com.bitti06.modplayjs.engine.ViewSettings,
+    ): TrackDetail {
+        if (track == null) return TrackDetail()
+        fun array(key: String) = track[key] as? kotlinx.serialization.json.JsonArray
+
+        val instruments =
+            array("instrumentList")
+                ?.mapNotNull { element ->
+                    val obj = element as? JsonObject ?: return@mapNotNull null
+                    val index = obj["index"]?.jsonPrimitive?.content?.toIntOrNull() ?: return@mapNotNull null
+                    val name = obj["name"]?.jsonPrimitive?.content ?: ""
+                    (index + 1).toString().padStart(2, '0') + "  " + name
+                }
+                .orEmpty()
+
+        val samples =
+            array("sampleList")
+                ?.mapNotNull { element ->
+                    val obj = element as? JsonObject ?: return@mapNotNull null
+                    val index = obj["index"]?.jsonPrimitive?.content?.toIntOrNull() ?: return@mapNotNull null
+                    val name = obj["name"]?.jsonPrimitive?.content ?: ""
+                    val length = obj["length"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                    val loop = obj["loop"]?.jsonPrimitive?.content == "true"
+                    buildString {
+                        append((index + 1).toString().padStart(2, '0'))
+                        append("  ")
+                        append(name)
+                        if (view.sampleLengths) {
+                            append("  ")
+                            append(length)
+                        }
+                        if (view.sampleLoopFlags && loop) append(" L")
+                    }
+                }
+                .orEmpty()
+
+        val orders =
+            array("orderList")
+                ?.mapNotNull { it.jsonPrimitive.content.toIntOrNull() }
+                ?.withIndex()
+                ?.joinToString(" ") { (i, pattern) ->
+                    i.toString().padStart(2, '0') + ":" + pattern.toString().padStart(2, '0')
+                }
+                .orEmpty()
+
+        return TrackDetail(instrumentList = instruments, sampleList = samples, orderList = orders)
     }
 
     private fun pushSettings() {

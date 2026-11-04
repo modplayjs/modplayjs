@@ -71,6 +71,13 @@ fun DebugPanel() {
             return@Column
         }
 
+        if (!state.canMute) {
+            Text(
+                stringResource(R.string.xr_debug_mute_unavailable),
+                fontSize = 8.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             items(count = state.channels) { ch ->
                 val level = state.levels.getOrElse(ch) { 0f }

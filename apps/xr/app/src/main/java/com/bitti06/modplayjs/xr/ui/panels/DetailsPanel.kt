@@ -48,6 +48,18 @@ fun DetailsPanel() {
             return@Column
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            // Order list as "position:pattern", the pairing the phone app and
+            // the web player both use.
+            if (state.trackDetail.orderList.isNotBlank()) {
+                item {
+                    Text(
+                        state.trackDetail.orderList,
+                        fontSize = 7.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
             items(state.details) { (key, value) ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
@@ -63,6 +75,44 @@ fun DetailsPanel() {
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.weight(2f),
+                    )
+                }
+            }
+            if (state.trackDetail.instrumentList.isNotEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.xr_details_instruments),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                items(state.trackDetail.instrumentList) { line ->
+                    Text(
+                        line,
+                        fontSize = 7.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+            if (state.trackDetail.sampleList.isNotEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.xr_details_samples),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                items(state.trackDetail.sampleList) { line ->
+                    Text(
+                        line,
+                        fontSize = 7.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }

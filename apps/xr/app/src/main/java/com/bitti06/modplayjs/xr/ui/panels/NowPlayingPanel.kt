@@ -106,7 +106,12 @@ fun NowPlayingPanel() {
             maxLines = 1,
         )
 
-        Waveform(active = state.playing)
+        Visualizer(
+            mode = state.visualizer,
+            levels = state.levels,
+            channels = state.channels,
+            active = state.playing,
+        )
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -116,14 +121,14 @@ fun NowPlayingPanel() {
             CircleButton("|◀") { XrApp.playlist?.previous() }
             CircleButton(if (state.playing) "❚❚" else "▶", primary = true) { player?.togglePlay() }
             CircleButton("▶|") { XrApp.playlist?.next() }
-            Text(
+            if (state.seekable) Text(
                 "−10s",
                 fontSize = 9.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.clickable { player?.seek((state.positionMs - 10_000L).coerceAtLeast(0L)) }
                     .padding(horizontal = 4.dp, vertical = 2.dp),
             )
-            Text(
+            if (state.seekable) Text(
                 "+10s",
                 fontSize = 9.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -205,7 +210,7 @@ fun NowPlayingPanel() {
             )
         }
 
-        if (state.channels in 1..16) {
+        if (state.showChannelStrip && state.channels in 1..16) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 for (i in 0 until state.channels) {
                     val muted = state.muted.contains(i)
@@ -234,19 +239,39 @@ fun NowPlayingPanel() {
     }
 }
 
+/**
+ * The phone app's visualizer setting, rendered as channel levels: the engine
+ * reports one level per channel, so "spectrum" and "waveform" both draw the
+ * same data - a real FFT would need new engine output, not new UI.
+ */
 @Composable
-private fun Waveform(active: Boolean) {
+private fun Visualizer(
+    mode: String,
+    levels: List<Float>,
+    channels: Int,
+    active: Boolean,
+) {
+    if (mode == "off") return
     Row(
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.Bottom,
         modifier = Modifier.height(26.dp),
     ) {
-        repeat(16) { i ->
-            val h = listOf(8, 16, 24, 12, 20, 7, 22, 11, 17, 6, 19, 13, 9, 15, 21, 10)[i]
+        // "waveform" keeps a thin bar per channel so the row does not jump,
+        // "spectrum"/"both" scale the same bar with the live level.
+        val bars = maxOf(channels, 1).coerceAtMost(16)
+        repeat(bars) { i ->
+            val level = levels.getOrElse(i) { 0f }.coerceIn(0f, 1f)
+            val fallback = listOf(8, 16, 24, 12, 20, 7, 22, 11, 17, 6, 19, 13, 9, 15, 21, 10)[i % 16]
+            val height =
+                when {
+                    mode == "waveform" -> if (active) fallback else fallback / 3
+                    else -> 2 + (level * 24f).toInt()
+                }
             Column(
                 Modifier
                     .width(4.dp)
-                    .height(if (active) h.dp else (h / 3).dp)
+                    .height(height.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(
                         if (i % 3 == 0) MaterialTheme.colorScheme.primary

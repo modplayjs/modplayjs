@@ -103,4 +103,13 @@
     <string name="xr_debug_stereo">stereo path</string>
     <string name="xr_debug_off">Spatial is off: the stereo path has no objects. Enable it in Settings.</string>
     <string name="xr_debug_hint">Markers in the room: one sphere per object, size = level, colour = channel.</string>
+    <string name="xr_details_instruments">Instruments</string>
+    <string name="xr_details_samples">Samples</string>
+    <string name="xr_volume">Volume</string>
+    <string name="xr_sample_lengths">Sample lengths</string>
+    <string name="xr_loop_marker">Loop marker</string>
+    <string name="xr_mixer_unavailable">Not available for this module.</string>
+    <string name="xr_debug_mute_unavailable">Channel mute is not available for this module.</string>
+    <string name="xr_add_folder">Add folder</string>
+    <string name="xr_theme_note">Dark theme only: a light panel in a dark room costs contrast.</string>
 </resources>

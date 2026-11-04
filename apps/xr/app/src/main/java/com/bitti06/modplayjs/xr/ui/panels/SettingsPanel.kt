@@ -186,7 +186,7 @@ fun SettingsPanel() {
 
             item {
                 Section(stringResource(R.string.xr_section_audio)) {
-                    StepperRow(stringResource(R.string.xr_pan), "${settings.transport.panSeparation}") { step ->
+                    if (state.canPan) StepperRow(stringResource(R.string.xr_pan), "${settings.transport.panSeparation}") { step ->
                         set { s ->
                             s.copy(
                                 transport = s.transport.copy(
@@ -219,6 +219,13 @@ fun SettingsPanel() {
 
             item {
                 Section(stringResource(R.string.xr_section_mixer)) {
+                    if (!state.canMixer) {
+                        Text(
+                            stringResource(R.string.xr_mixer_unavailable),
+                            fontSize = 8.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Options(
                         stringResource(R.string.xr_mode),
                         listOf("libxmp" to "libxmp", "Paula" to "paula"),
@@ -254,11 +261,19 @@ fun SettingsPanel() {
                         listOf(stringResource(R.string.xr_mono) to "0", stringResource(R.string.xr_stereo) to "1", stringResource(R.string.xr_narrow) to "3"),
                         settings.sid.stereo.toString(),
                     ) { set { s -> s.copy(sid = s.sid.copy(stereo = it.toInt())) } }
+                    StepperRow(stringResource(R.string.xr_volume), "${settings.sid.volume}") { step ->
+                        set { s -> s.copy(sid = s.sid.copy(volume = (s.sid.volume + step * 16).coerceIn(0, 255))) }
+                    }
                 }
             }
 
             item {
                 Section(stringResource(R.string.xr_section_appearance)) {
+                    Text(
+                        stringResource(R.string.xr_theme_note),
+                        fontSize = 8.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     ToggleRow(stringResource(R.string.xr_reduced_motion), if (settings.view.reducedMotion) onLabel else offLabel, settings.view.reducedMotion) {
                         set { s -> s.copy(view = s.view.copy(reducedMotion = !s.view.reducedMotion)) }
                     }
@@ -273,6 +288,12 @@ fun SettingsPanel() {
                     }
                     ToggleRow(stringResource(R.string.xr_strip_dots), if (settings.view.stripDots) onLabel else offLabel, settings.view.stripDots) {
                         set { s -> s.copy(view = s.view.copy(stripDots = !s.view.stripDots)) }
+                    }
+                    ToggleRow(stringResource(R.string.xr_sample_lengths), if (settings.view.sampleLengths) onLabel else offLabel, settings.view.sampleLengths) {
+                        set { s -> s.copy(view = s.view.copy(sampleLengths = !s.view.sampleLengths)) }
+                    }
+                    ToggleRow(stringResource(R.string.xr_loop_marker), if (settings.view.sampleLoopFlags) onLabel else offLabel, settings.view.sampleLoopFlags) {
+                        set { s -> s.copy(view = s.view.copy(sampleLoopFlags = !s.view.sampleLoopFlags)) }
                     }
                     Options(
                         stringResource(R.string.xr_visualizer),
@@ -295,19 +316,58 @@ fun SettingsPanel() {
                         fontSize = 8.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(
-                        stringResource(R.string.xr_clear_ignored),
-                        fontSize = 9.sp,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.surfaceContainer)
-                            .clickable {
-                                library.clearIgnored()
-                                XrApp.libraryChanged()
-                            }
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            stringResource(R.string.xr_add_folder),
+                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.surfaceContainer)
+                                .clickable { XrApp.requestFolder() }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                        Text(
+                            stringResource(R.string.xr_clear_ignored),
+                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.surfaceContainer)
+                                .clickable {
+                                    library.clearIgnored()
+                                    XrApp.libraryChanged()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                    }
+                    // Every indexed folder with a remove action, like the
+                    // phone app's Library settings page.
+                    for (tree in library.treeUris()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                tree.lastPathSegment ?: tree.toString(),
+                                fontSize = 8.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                "✕",
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .clickable {
+                                        library.removeTree(tree)
+                                        XrApp.libraryChanged()
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
                 }
             }
 

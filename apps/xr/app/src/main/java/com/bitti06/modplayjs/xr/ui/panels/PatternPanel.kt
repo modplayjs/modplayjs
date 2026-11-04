@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bitti06.modplayjs.engine.PatternColors
 import com.bitti06.modplayjs.xr.R
 import com.bitti06.modplayjs.xr.XrApp
 import com.bitti06.modplayjs.xr.play.XrPlayer
@@ -68,12 +69,13 @@ fun PatternPanel() {
     val pattern = state.pattern
     val listState = rememberLazyListState()
     val scrollState = rememberScrollState()
-    val palette = patternPalette()
+    val palette = patternPalette(state.patternColors)
 
     // Follow the playhead three rows down from the top edge instead of pinned
     // to it, and only scroll when the row left the window: the state emits at
     // 2 Hz, and a scrollToItem on every tick would fight the user's own drag.
-    LaunchedEffect(pattern.row, pattern.pattern, pattern.rows) {
+    LaunchedEffect(pattern.row, pattern.pattern, pattern.rows, state.follow) {
+        if (!state.follow) return@LaunchedEffect
         if (pattern.rows <= 0 || pattern.row !in 0 until pattern.rows) return@LaunchedEffect
         val visible = listState.layoutInfo.visibleItemsInfo
         if (visible.isEmpty()) return@LaunchedEffect
@@ -137,6 +139,7 @@ fun PatternPanel() {
                             channels = pattern.channels,
                             active = row == pattern.row,
                             palette = palette,
+                            stripDots = state.stripDots,
                         )
                     }
                 }
@@ -194,6 +197,7 @@ private fun PatternRow(
     channels: Int,
     active: Boolean,
     palette: PatternPalette,
+    stripDots: Boolean,
 ) {
     val scheme = MaterialTheme.colorScheme
     Row(
@@ -215,7 +219,8 @@ private fun PatternRow(
             modifier = Modifier.width(ROW_NUM_WIDTH),
         )
         for (ch in 0 until channels) {
-            val cell = cells.getOrElse(row * channels + ch) { EMPTY_CELL }
+            val raw = cells.getOrElse(row * channels + ch) { EMPTY_CELL }
+            val cell = if (stripDots) raw.replace(Regex("\\.+"), "...") else raw
             val text =
                 remember(cell, palette) {
                     annotatedCell(cell, palette)
@@ -243,14 +248,14 @@ private data class PatternPalette(
 )
 
 @Composable
-private fun patternPalette(): PatternPalette {
+private fun patternPalette(colors: PatternColors): PatternPalette {
     val scheme = MaterialTheme.colorScheme
-    return remember(scheme) {
+    return remember(scheme, colors) {
         PatternPalette(
-            note = scheme.onSurface,
-            instrument = scheme.secondary,
-            volume = scheme.tertiary,
-            effect = scheme.primary,
+            note = colors.note?.let { Color(it) } ?: scheme.onSurface,
+            instrument = colors.instrument?.let { Color(it) } ?: scheme.secondary,
+            volume = colors.volume?.let { Color(it) } ?: scheme.tertiary,
+            effect = colors.effect?.let { Color(it) } ?: scheme.primary,
             empty = scheme.onSurfaceVariant.copy(alpha = 0.40f),
             line = scheme.outlineVariant.copy(alpha = 0.55f),
         )
