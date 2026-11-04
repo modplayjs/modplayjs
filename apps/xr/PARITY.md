@@ -38,6 +38,21 @@ lives in `com.bitti06.modplayjs.xr` and is reachable from a panel.
 
 ## Panel placement: free vs stationary
 
+## Details panel
+
+Registered wider than the rest (2.2 x 0.95 m) so the three module text blocks —
+message, instruments, samples — sit side by side, each its own tinted card with
+an independent scroll and a drawn scrollbar. Tapping a card expands it over the
+whole panel: the panel is registered with `enableTransparent = true`, and the
+expanded state paints no background, so the room behind the panel is the
+backdrop. The text then uses 11 sp monospace with a blurred black shadow
+(`TextStyle.shadow`) instead of a plate, which keeps it legible without hiding
+the environment.
+
+The facts (orders, key/value rows) move below the three cards and keep their own
+`LazyColumn`. The card tint is `lerp(surfaceContainer, accent, 0.18f)`, the same
+blend the phone app uses in `InfoBox`.
+
 ## Panel animation
 
 Switching modes slides the panels into place (320 ms, smoothstep, position +

@@ -50,7 +50,9 @@ class PanelLayout(
             PANEL_LIBRARY -> Pose(Vector3(-1.75f, 1.45f, 1.75f), facingUser)
             PANEL_SETTINGS -> Pose(Vector3(1.75f, 1.45f, 1.75f), facingUser)
             PANEL_PATTERN -> Pose(Vector3(-1.75f, 0.45f, 1.75f), facingUser)
-            PANEL_DETAILS -> Pose(Vector3(0f, 0.45f, 1.85f), facingUser)
+            // Wider panel: further out so its edges clear the neighbours and
+            // higher, because three text columns need vertical room.
+            PANEL_DETAILS -> Pose(Vector3(0f, 1.05f, 2.15f), facingUser)
             PANEL_DEBUG -> Pose(Vector3(1.75f, 0.45f, 1.75f), facingUser)
             // Second row, further out: these two open from Settings.
             PANEL_QUEUE -> Pose(Vector3(-0.95f, 1.45f, 2.4f), facingUser)

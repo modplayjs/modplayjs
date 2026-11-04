@@ -125,4 +125,6 @@
     <string name="xr_spatial_objects">%1$d objects · layout %2$s · positions from the channel pan</string>
     <string name="xr_free_hint">Grab a panel by its frame to move it; positions are kept between sessions.</string>
     <string name="xr_stationary_hint">Panels sit in a fixed arc. Switching to free restores where you left them.</string>
+    <string name="xr_details_message">Message</string>
+    <string name="xr_details_empty">empty</string>
 </resources>

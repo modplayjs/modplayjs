@@ -93,15 +93,24 @@ class XrActivity : AppSystemActivity() {
             panel(R.id.panel_settings, 1.4f, 0.95f) { SettingsPanel() },
             panel(R.id.panel_debug, 1.4f, 0.85f) { DebugPanel() },
             panel(R.id.panel_pattern, 1.4f, 0.85f) { PatternPanel() },
-            panel(R.id.panel_details, 1.4f, 0.70f) { DetailsPanel() },
+            // Wider than the rest on purpose: the three text blocks (message,
+            // instruments, samples) sit side by side, so the panel needs the
+            // width to give each of them a readable column.
+            panel(R.id.panel_details, 2.2f, 0.95f, transparent = true) { DetailsPanel() },
             panel(R.id.panel_queue, 1.2f, 0.85f) { QueuePanel() },
             panel(R.id.panel_ignored, 1.2f, 0.85f) { IgnoredPanel() },
         )
 
+    /**
+     * @param transparent let the panel's own pixels be see-through, so an
+     *   expanded text block can float on the room instead of on a card. The
+     *   panel still paints a background when it needs one.
+     */
     private fun panel(
         id: Int,
         width: Float,
         height: Float,
+        transparent: Boolean = false,
         content: @androidx.compose.runtime.Composable () -> Unit,
     ): PanelRegistration =
         ComposeViewPanelRegistration(
@@ -113,7 +122,8 @@ class XrActivity : AppSystemActivity() {
                 }
             },
             settingsCreator = {
-                UIPanelSettings(
+                val base =
+                    UIPanelSettings(
                     shape = QuadShapeOptions(width = width, height = height),
                     style = PanelStyleOptions(themeResourceId = R.style.PanelAppThemeTransparent),
                     display = DpPerMeterDisplayOptions(dpPerMeter = 500f, resolutionScale = 1.2f),
@@ -127,6 +137,7 @@ class XrActivity : AppSystemActivity() {
                         ),
                     ),
                 )
+                if (transparent) TransparentPanelSettings(base) else base
             },
         )
 
