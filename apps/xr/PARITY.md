@@ -124,6 +124,25 @@ Every panel header carries the same Home chip (⌂), which closes the three
 on-demand panels; the library is always in the arc, so returning home needs no
 camera or layout change. The gear next to it still opens Settings.
 
+## Debug markers
+
+The source-marker switch puts one small sphere per spatial channel on the ring,
+in the same colour the channel has in the pattern view and the debug panel, sized
+by the channel's peak level. Three things matter there:
+
+- `mesh://sphere` is parameterised, not a fixed primitive. Meta's 3D objects page
+  defines it as a "sphere mesh with a radius defined by the attached
+  `Sphere(radius: Float)` component". Without that component the toolkit's mesh
+  creator throws (`ToolkitFeature.createSphereMesh` requires the component), and
+  the entity takes the app down with it — that was the crash behind the switch.
+  Radius 0.5 m with a base `Scale` of 0.02 gives a 2 cm marker, growing to 12 cm.
+- `Scale` (documented for meshes) carries the live size, so a level change is a
+  component write instead of a mesh rebuild. Levels are refreshed at 10 Hz on
+  their own timer; the panel snapshot's 2 Hz would step visibly.
+- Entities are created, moved and destroyed on the main thread only. The audio
+  thread captures the azimuths and the object list and posts the work, because a
+  track change can rebuild the output while an update is still queued.
+
 ## Behaviour fixes from this audit
 
 Settings that existed in the panel but did nothing are now wired:

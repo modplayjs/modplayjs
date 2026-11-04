@@ -22,7 +22,9 @@ import com.meta.spatial.spatialaudio.AudioType
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
+import com.meta.spatial.toolkit.MeshCollision
 import com.meta.spatial.toolkit.Scale
+import com.meta.spatial.toolkit.Sphere
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.Visible
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -115,9 +117,15 @@ class XrPlayer(
     private val audioManager = context.getSystemService(AudioManager::class.java)
     private val outputs = ArrayList<TrackOut>()
     private val entities = ArrayList<Entity?>()
+    @Volatile
     private var outputMode: Int = 0 // 0 none, 1 stereo, 2 spatial
     private var outChannels = 0
+
+    /** Written on the audio thread, read again when a posted marker job runs. */
+    @Volatile
     private var debugVisible = false
+
+    /** Marker entities are created and mutated on the main thread only. */
     private val markers = ArrayList<Entity>()
     private var levels = FloatArray(0)
     private val prefs = context.getSharedPreferences("xr", Context.MODE_PRIVATE)
@@ -131,10 +139,11 @@ class XrPlayer(
     private var durationMs = 0L
     private var lastSnapshotAt = 0L
     private var lastPlayheadAt = 0L
+    private var lastMarkerAt = 0L
     private var spatialInfo: SpatialInfo = SpatialInfo()
     private var cachedPatternIndex = -1
     private var cachedPattern: PatternData? = null
-    private var markerSizes = FloatArray(16) { -1f }
+    private var markerSizes = FloatArray(0)
 
     private val scratchShort = ShortArray(BLOCK * 2)
 
@@ -575,14 +584,26 @@ class XrPlayer(
 
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
+    /**
+     * Move the per-channel objects and the debug markers onto the ring.
+     *
+     * Everything in here runs on the audio thread, so the positions and the
+     * object list are captured first: the output can be rebuilt, and the
+     * entities destroyed, while this job is still queued for the main thread.
+     */
     private fun applyPositions() {
+        val channels = spatialInfo.channels
+        val positions = List(channels) { i ->
+            positionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
+        }
+        val objects = List(channels) { i -> entities.getOrNull(i) }
         mainHandler.post {
-            for (i in 0 until minOf(spatialInfo.channels, entities.size)) {
-                entities[i]?.setComponent(Transform(Pose(positionFor(spatialInfo.azimuths.getOrElse(i) { 0f }))))
+            for (i in objects.indices) {
+                objects[i]?.setComponent(Transform(Pose(positions[i])))
             }
             for (i in markers.indices) {
-                val pos = positionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
-                markers[i].setComponent(Transform(Pose(Vector3(pos.x, pos.y - 0.12f, pos.z))))
+                val p = positions.getOrNull(i) ?: continue
+                markers[i].setComponent(Transform(Pose(Vector3(p.x, p.y - MARKER_DROP, p.z))))
             }
         }
     }
@@ -597,28 +618,63 @@ class XrPlayer(
         )
     }
 
+    /**
+     * (Re)create one marker sphere per spatial channel.
+     *
+     * `mesh://sphere` is parameterised, not a fixed primitive: Meta's 3D objects
+     * page defines it as a "sphere mesh with a radius defined by the attached
+     * `Sphere(radius: Float)` component". A sphere mesh without that component
+     * gives the mesh creator no radius, and the entity takes the renderer down
+     * with it - which is what the marker switch used to do. `Sphere` supplies
+     * the geometry, `Scale` (documented for meshes) the live size, so a level
+     * change does not rebuild the mesh.
+     */
     private fun rebuildMarkers() {
         destroyMarkers()
-        if (outputMode != 2) return
-        if (markerSizes.size < spatialInfo.channels) {
-            markerSizes = FloatArray(spatialInfo.channels) { -1f }
+        if (!debugVisible || outputMode != 2) return
+        val channels = spatialInfo.channels
+        if (channels <= 0) return
+        val positions = List(channels) { i ->
+            positionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
         }
-        for (i in 0 until spatialInfo.channels) {
-            val entity = Entity.create(
-                Mesh("mesh://sphere".toUri(), com.meta.spatial.toolkit.MeshCollision.NoCollision),
-                Transform(Pose(positionFor(spatialInfo.azimuths.getOrElse(i) { 0f }))),
-                Scale(Vector3(0.02f, 0.02f, 0.02f)),
-                Material().apply {
-                    baseColor = channelColor(i)
-                    unlit = true
-                },
-                Visible(true),
-            )
-            markers += entity
+        val colors = List(channels) { channelColor(it) }
+        mainHandler.post {
+            // The switch may have gone off again while this was queued.
+            if (!debugVisible || outputMode != 2) return@post
+            if (markerSizes.size < positions.size) {
+                markerSizes = FloatArray(positions.size) { -1f }
+            }
+            for (i in positions.indices) {
+                markers += Entity.create(
+                    Mesh("mesh://sphere".toUri(), MeshCollision.NoCollision),
+                    Sphere(MARKER_SPHERE_RADIUS),
+                    Transform(Pose(positions[i])),
+                    Scale(Vector3(MARKER_MIN, MARKER_MIN, MARKER_MIN)),
+                    Material().apply {
+                        baseColor = colors[i]
+                        unlit = true
+                    },
+                    Visible(true),
+                )
+            }
         }
     }
 
+    /**
+     * Always posted, even with nothing to destroy: the queued jobs run in the
+     * order they were posted, so a rebuild that was queued earlier can never
+     * outlive a destroy that came after it. Runs inline when the caller already
+     * is the main thread, which is the case on activity teardown.
+     */
     private fun destroyMarkers() {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            destroyMarkersNow()
+        } else {
+            mainHandler.post { destroyMarkersNow() }
+        }
+    }
+
+    private fun destroyMarkersNow() {
         for (m in markers) runCatching { m.destroy() }
         markers.clear()
         markerSizes.fill(-1f)
@@ -641,13 +697,17 @@ class XrPlayer(
         if (now - lastSnapshotAt >= snapshotInterval) {
             lastSnapshotAt = now
             publish(playing)
-            // Azimuths only change on load/layout switches, which already
-            // rebuild the outputs; polling spatialInfo here was one extra V8
-            // JSON round trip per tick.
-            if (debugVisible && outputMode == 2) applyMarkerLevels()
         } else if (playing && now - lastPlayheadAt >= PLAYHEAD_MS) {
             lastPlayheadAt = now
             publishPlayhead()
+        }
+
+        // Marker size does not need a state publish, so it runs on its own
+        // timer: twice per snapshot would step 500 ms at a time, which reads
+        // as a slideshow next to the audio.
+        if (debugVisible && outputMode == 2 && now - lastMarkerAt >= MARKER_MS) {
+            lastMarkerAt = now
+            applyMarkerLevels()
         }
     }
 
@@ -686,17 +746,27 @@ class XrPlayer(
             )
     }
 
-    /** Marker size follows the channel level; positions and colours stay put. */
+    /**
+     * Marker size follows the channel level; positions and colours stay put.
+     *
+     * Called from the audio thread with a copy of the levels, because the
+     * entities belong to the main thread.
+     */
     private fun applyMarkerLevels() {
-        for (i in markers.indices) {
-            val lvl = levels.getOrElse(i) { 0f }
-            val size = MARKER_MIN + lvl * MARKER_RANGE
-            // A jumping 2 cm sphere is unreadable and each setComponent
-            // dirties the entity; 5 mm of hysteresis keeps it steady.
-            val shown = if (i < markerSizes.size) markerSizes[i] else -1f
-            if (kotlin.math.abs(size - shown) < MARKER_STEP) continue
-            markers[i].setComponent(Scale(Vector3(size, size, size)))
-            markerSizes[i] = size
+        val count = minOf(levels.size, spatialInfo.channels)
+        if (count <= 0) return
+        val snapshot = FloatArray(count) { levels[it] }
+        mainHandler.post {
+            for (i in markers.indices) {
+                val lvl = snapshot.getOrElse(i) { 0f }
+                val size = MARKER_MIN + lvl * MARKER_RANGE
+                // A jumping 2 cm sphere is unreadable and each setComponent
+                // dirties the entity; 5 mm of hysteresis keeps it steady.
+                val shown = markerSizes.getOrElse(i) { -1f }
+                if (kotlin.math.abs(size - shown) < MARKER_STEP) continue
+                markers[i].setComponent(Scale(Vector3(size, size, size)))
+                if (i < markerSizes.size) markerSizes[i] = size
+            }
         }
     }
 
@@ -904,11 +974,24 @@ class XrPlayer(
          * cannot outrun the poll.
          */
         private const val PLAYHEAD_MS = 60L
+
+        /** Marker levels: fast enough to follow the music, slow enough to be cheap. */
+        private const val MARKER_MS = 100L
         private const val IDLE_POLL_MS = 50L
         private const val RING_Y = 1.4f
         private const val MARKER_MIN = 0.02f
         private const val MARKER_RANGE = 0.10f
         private const val MARKER_STEP = 0.005f
+
+        /**
+         * `Sphere` carries the radius that `mesh://sphere` builds from; the
+         * diameter on screen is the radius times twice `Scale`. With 0.5 and a
+         * base scale of MARKER_MIN the smallest marker is 2 cm across.
+         */
+        private const val MARKER_SPHERE_RADIUS = 0.5f
+
+        /** Markers sit a little below the audio objects so they do not z-fight. */
+        private const val MARKER_DROP = 0.12f
         private const val KEY_RADIUS = "radius"
         private const val KEY_RADIUS_MANUAL = "radiusManual"
         private const val KEY_SPATIAL = "spatialEnabled"
