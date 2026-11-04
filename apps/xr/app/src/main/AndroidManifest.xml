@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:horizonos="http://schemas.horizonos/sdk">
+    xmlns:metavr="http://schemas.meta.com/metavr-sdk">
 
-    <horizonos:uses-horizonos-sdk
-        horizonos:minSdkVersion="69"
-        horizonos:targetSdkVersion="81" />
+    <!-- Meta VR OS SDK versioning, not the Android API level. The older
+         uses-horizonos-sdk element still works but Meta points new work at
+         uses-metavr-sdk. minSdkVersion stays at the lowest Horizon OS the app
+         was built for; targetSdkVersion is the behaviour level we test
+         against, so raising it is a deliberate step after device testing. -->
+    <metavr:uses-metavr-sdk
+        metavr:minSdkVersion="69"
+        metavr:targetSdkVersion="81" />
 
     <uses-feature
         android:name="android.hardware.vr.headtracking"

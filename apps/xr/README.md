@@ -31,7 +31,15 @@ fails for release tasks (warns for debug) if the library still is not there.
 A build that fetched V8 in the same run still links the stub — run it once more.
 
 `local.properties` must point at the Android SDK; `compileSdk` is 34,
-`minSdk` is 34, Horizon OS manifest level 69 (target 81).
+`minSdk` is 34. The Horizon OS level is declared with the current
+`uses-metavr-sdk` element (`minSdkVersion` 69, `targetSdkVersion` 81) instead
+of the older `uses-horizonos-sdk`; both are accepted by the Store.
+
+Spatial SDK is on the newest release line, `0.15.0` (`libs.versions.toml`,
+`spatialsdk`). It is a breaking release: hierarchy scale is now the default and
+physics moved from Bullet to Jolt. This app has no scaled parents and no
+physics feature, so neither applies; keep it that way, or read the 0.15.0
+release notes before adding `Scale` to a parent entity.
 
 The Meta spatial plugin is applied from an explicit `buildscript` classpath
 instead of the `plugins {}` DSL, so its `kotlin-compiler-embeddable` can be

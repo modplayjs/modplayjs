@@ -62,6 +62,7 @@ class XrActivity : AppSystemActivity() {
     private var resumeOnMount = false
     private var avatarSystem: AvatarSystem? = null
     private var isdkSystem: IsdkSystem? = null
+    private var lastRecenterNs = 0L
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun registerFeatures(): List<SpatialFeature> {
@@ -326,6 +327,12 @@ class XrActivity : AppSystemActivity() {
      */
     override fun onRecenter(isUserInitiated: Boolean) {
         super.onRecenter(isUserInitiated)
+        // 0.15 fixed onRecenter firing more than once with a stale head pose.
+        // Re-applying the arc twice in one frame would double-write every
+        // panel Transform for no gain, so collapse repeats.
+        val now = System.nanoTime()
+        if (now - lastRecenterNs < RECENTER_DEBOUNCE_NS) return
+        lastRecenterNs = now
         if (::layout.isInitialized && !layout.free) {
             layout.apply(panels, hasTrack = lastTrackLoaded == true)
         }
@@ -408,6 +415,7 @@ class XrActivity : AppSystemActivity() {
 
     companion object {
         private const val TAG = "modplay-xr"
+        private const val RECENTER_DEBOUNCE_NS = 250_000_000L
         const val REQUEST_USE_SCENE = 1
         const val REQUEST_PICK_MODULES = 2
         const val REQUEST_PICK_TREE = 3
