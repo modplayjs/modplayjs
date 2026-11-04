@@ -58,6 +58,7 @@ class XrActivity : AppSystemActivity() {
     private var lastSettingsOpen: Boolean? = null
     private var lastDebugSources: Boolean? = null
     private var lastDetailsCount = -1
+    private var resumeOnMount = false
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun registerFeatures(): List<SpatialFeature> {
@@ -215,7 +216,7 @@ class XrActivity : AppSystemActivity() {
         player.attachScene(scene, spatialAudio)
         scene.setReferenceSpace(ReferenceSpace.LOCAL_FLOOR)
         scene.setViewOrigin(0f, 0f, 0f, 0f)
-        Skybox.install(scene, this)
+        Skybox.install(scene, this, launchedInPassthrough = scene.isSystemPassthroughEnabled())
 
         // Configure controller grab buttons to allow gripping or triggering panels
         val grabbableSystem = systemManager.findSystem<GrabbableSystem>()
@@ -297,9 +298,53 @@ class XrActivity : AppSystemActivity() {
         }
     }
 
+    /**
+     * VRC.Quest.Functional.9: with a Local tracking space the user must be able
+     * to reset their forward direction. A recenter moves the LOCAL_FLOOR
+     * origin, so the fixed arc is re-authored in front of the new forward
+     * direction. Free-layout poses are left alone on purpose: the user placed
+     * those in the world.
+     */
+    override fun onRecenter(isUserInitiated: Boolean) {
+        super.onRecenter(isUserInitiated)
+        if (::layout.isInitialized && !layout.free) {
+            layout.apply(panels, hasTrack = lastTrackLoaded == true)
+        }
+        Skybox.reapply()
+        Log.i(TAG, "recenter: userInitiated=$isUserInitiated free=${::layout.isInitialized && layout.free}")
+    }
+
+    /**
+     * VRC.Quest.Functional.2: the OS asks the app to pause when the headset is
+     * taken off. Music is the point of the app, so playback pauses with the
+     * headset and comes back when it is worn again.
+     */
+    override fun onHMDUnmounted() {
+        super.onHMDUnmounted()
+        resumeOnMount = XrApp.player?.state?.value?.playing == true
+        if (resumeOnMount) player.pause()
+    }
+
+    override fun onHMDMounted() {
+        super.onHMDMounted()
+        if (resumeOnMount) {
+            resumeOnMount = false
+            player.resume()
+        }
+    }
+
     override fun onPause() {
         if (::layout.isInitialized && layout.free) layout.save(panels)
         super.onPause()
+    }
+
+    /**
+     * VRC.Quest.Input.4: the app keeps rendering when focus is lost, but any
+     * drag in progress must not continue from stale controller input.
+     */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus && ::layout.isInitialized && layout.free) layout.save(panels)
     }
 
     override fun onResume() {

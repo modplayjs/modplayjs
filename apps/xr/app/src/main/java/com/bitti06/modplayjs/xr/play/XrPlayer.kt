@@ -237,6 +237,26 @@ class XrPlayer(
         }
     }
 
+    /** Pause without toggling. Used when the headset comes off. */
+    fun pause() {
+        submit {
+            if (!loaded || !playing) return@submit
+            engine?.command("""{"type":"pause"}""")
+            playing = false
+            publish(false)
+        }
+    }
+
+    /** Resume without toggling, only if a module is loaded and paused. */
+    fun resume() {
+        submit {
+            if (!loaded || playing) return@submit
+            engine?.command("""{"type":"play"}""")
+            playing = true
+            publish(true)
+        }
+    }
+
     fun togglePlay() {
         submit {
             if (!loaded) return@submit

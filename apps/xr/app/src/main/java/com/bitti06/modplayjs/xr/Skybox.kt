@@ -39,7 +39,12 @@ object Skybox {
     private var scene: Scene? = null
     private var prefs: SharedPreferences? = null
 
-    fun install(scene: Scene, context: Context) {
+    /**
+     * @param launchedInPassthrough scene.isSystemPassthroughEnabled(): true when
+     *   the user started the app from MR Home (VRC.Quest.Functional.14). A stored
+     *   choice wins after the first launch, so the toggle stays sticky.
+     */
+    fun install(scene: Scene, context: Context, launchedInPassthrough: Boolean = false) {
         this.scene = scene
         prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -65,8 +70,9 @@ object Skybox {
             environmentIntensity = 0.4f,
         )
 
-        // Restore the last choice, including across process restarts.
-        val on = prefs?.getBoolean(KEY_PASSTHROUGH, false) == true
+        // First launch: follow the system recommendation. Later launches use
+        // the user's own choice, which the settings toggle persists.
+        val on = prefs?.getBoolean(KEY_PASSTHROUGH, launchedInPassthrough) ?: launchedInPassthrough
         XrApp.passthrough.value = on
         applyState(on)
     }
