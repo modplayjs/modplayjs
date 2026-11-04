@@ -72,6 +72,8 @@ fun NowPlayingPanel() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.width(8.dp))
+            HomeChip()
+            Spacer(Modifier.width(4.dp))
             // Gear icon button to open/toggle Settings panel
             Box(
                 modifier = Modifier

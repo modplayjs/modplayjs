@@ -109,7 +109,9 @@ fun PatternPanel() {
                 },
                 fontSize = 8.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
             )
+            HomeChip()
         }
 
         if (pattern.rows == 0 || pattern.cells.isEmpty()) {

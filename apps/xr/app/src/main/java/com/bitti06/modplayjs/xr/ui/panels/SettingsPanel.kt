@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -78,22 +77,7 @@ fun SettingsPanel() {
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f),
             )
-            Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .clickable { XrApp.toggleSettings() }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text("⚙", fontSize = 13.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text("✕", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-            }
+            HomeChip()
         }
 
         LazyColumn(
@@ -369,7 +353,7 @@ fun SettingsPanel() {
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
+                        if ((XrApp.playlist?.tracks?.size ?: 0) > 0) Text(
                             stringResource(R.string.xr_queue),
                             fontSize = 9.sp,
                             color = MaterialTheme.colorScheme.secondary,
@@ -379,7 +363,7 @@ fun SettingsPanel() {
                                 .clickable { XrApp.toggleQueue() }
                                 .padding(horizontal = 8.dp, vertical = 3.dp),
                         )
-                        Text(
+                        if (library.ignoredUris().isNotEmpty()) Text(
                             stringResource(R.string.xr_ignored),
                             fontSize = 9.sp,
                             color = MaterialTheme.colorScheme.secondary,

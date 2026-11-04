@@ -57,6 +57,17 @@ object XrApp {
         ignoredOpen.value = !ignoredOpen.value
     }
 
+    /**
+     * Back to the library from any panel: close the three panels that open on
+     * demand. The library is always in the arc, so "home" needs no position
+     * change, only the overlays gone.
+     */
+    fun goHome() {
+        settingsOpen.value = false
+        queueOpen.value = false
+        ignoredOpen.value = false
+    }
+
     fun setPassthrough(on: Boolean) {
         passthrough.value = on
         Skybox.setPassthrough(on)

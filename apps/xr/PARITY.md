@@ -36,6 +36,23 @@ lives in `com.bitti06.modplayjs.xr` and is reachable from a panel.
 | System audio effects (equalizer) | `PlayerScreens.kt` | **no** — replaced by spatial settings |
 | Spatial audio (objects, layout, pan, HRTF) | — | **yes**, XR only |
 
+## Panel visibility per player state
+
+The activity owns one rule table (`updatePanelVisibilityAndLayout`):
+
+| Panel | Shown when |
+|---|---|
+| Library | always (it is home) |
+| Now Playing | a module is loaded |
+| Pattern | a module is loaded and the engine reports `patternView` (no SID/stream) |
+| Details | a module is loaded and the track reports details |
+| Debug | the source-marker toggle is on |
+| Settings / Queue / Ignored | only while the user opened them |
+
+Every panel header carries the same Home chip (⌂), which closes the three
+on-demand panels; the library is always in the arc, so returning home needs no
+camera or layout change. The gear next to it still opens Settings.
+
 ## Behaviour fixes from this audit
 
 Settings that existed in the panel but did nothing are now wired:

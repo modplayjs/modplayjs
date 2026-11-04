@@ -59,7 +59,9 @@ fun DebugPanel() {
                 else "  " + stringResource(R.string.xr_debug_stereo),
                 fontSize = 9.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
             )
+            HomeChip()
         }
 
         if (!state.spatialEnabled) {

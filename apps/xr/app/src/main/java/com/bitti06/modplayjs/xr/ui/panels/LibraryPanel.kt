@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -131,6 +132,10 @@ fun LibraryPanel() {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            // Home is this panel; the chip is here so every panel carries the
+            // same control in the same corner.
+            HomeChip()
+            Spacer(Modifier.width(4.dp))
             // Gear icon button to open/toggle Settings panel
             Box(
                 modifier = Modifier

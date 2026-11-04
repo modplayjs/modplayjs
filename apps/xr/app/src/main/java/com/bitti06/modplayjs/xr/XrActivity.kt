@@ -62,6 +62,7 @@ class XrActivity : AppSystemActivity() {
     private var lastDetailsCount = -1
     private var lastQueueOpen = false
     private var lastIgnoredOpen = false
+    private var lastCanPattern = false
     private var resumeOnMount = false
     private var avatarSystem: AvatarSystem? = null
     private var isdkSystem: IsdkSystem? = null
@@ -292,48 +293,63 @@ class XrActivity : AppSystemActivity() {
 
     private fun updatePanelVisibilityAndLayout(overlays: Overlays) {
         val state = overlays.state
-        val isSettingsOpen = overlays.settingsOpen
         val hasTrack = state.loaded
         val isDebug = state.debugSources
 
         val trackChanged = (lastTrackLoaded != hasTrack)
-        val settingsChanged = (lastSettingsOpen != isSettingsOpen)
+        val settingsChanged = (lastSettingsOpen != overlays.settingsOpen)
         val debugChanged = (lastDebugSources != isDebug)
         val detailsChanged = (lastDetailsCount != state.details.size)
         val queueChanged = (lastQueueOpen != overlays.queueOpen)
         val ignoredChanged = (lastIgnoredOpen != overlays.ignoredOpen)
+        // Pattern availability follows the module kind (SID/streamed: no grid),
+        // so it has to be tracked like the loaded flag.
+        val patternChanged = (lastCanPattern != state.canPattern)
 
         // The flow emits a new state on every snapshot (2 Hz while playing).
         // Six setComponent calls plus a layout pass per tick were pure waste,
         // so bail out unless something the panels care about actually changed.
         if (!trackChanged && !settingsChanged && !debugChanged && !detailsChanged &&
-            !queueChanged && !ignoredChanged
+            !queueChanged && !ignoredChanged && !patternChanged
         ) {
             return
         }
 
         lastTrackLoaded = hasTrack
-        lastSettingsOpen = isSettingsOpen
+        lastSettingsOpen = overlays.settingsOpen
         lastDebugSources = isDebug
         lastDetailsCount = state.details.size
         lastQueueOpen = overlays.queueOpen
         lastIgnoredOpen = overlays.ignoredOpen
+        lastCanPattern = state.canPattern
 
         if (trackChanged) {
             layout.apply(panels, hasTrack = hasTrack)
         }
 
+        // Only what the current player state can actually use. The rules, in
+        // one place:
+        //
+        //   nothing loaded   library (+ settings/debug when asked for)
+        //   module loaded    + now playing, + pattern when it has patterns,
+        //                    + details when the track reports any
+        //   overlays         settings, queue, ignored: only while open
+        //
+        // The library is the app's home and never hides, because every other
+        // panel's Home chip returns to it by closing the overlays.
         for ((layoutId, entity) in panels) {
             val shouldBeVisible = when (layoutId) {
-                PanelLayout.PANEL_MAIN -> hasTrack
                 PanelLayout.PANEL_LIBRARY -> true
-                PanelLayout.PANEL_SETTINGS -> isSettingsOpen
-                PanelLayout.PANEL_PATTERN -> hasTrack
+                PanelLayout.PANEL_MAIN -> hasTrack
+                // SID and streamed modules have no pattern data; showing an
+                // empty grid there is noise, so the panel stays hidden.
+                PanelLayout.PANEL_PATTERN -> hasTrack && state.canPattern
                 PanelLayout.PANEL_DETAILS -> hasTrack && state.details.isNotEmpty()
-                PanelLayout.PANEL_DEBUG -> isDebug
+                PanelLayout.PANEL_SETTINGS -> overlays.settingsOpen
                 PanelLayout.PANEL_QUEUE -> overlays.queueOpen
                 PanelLayout.PANEL_IGNORED -> overlays.ignoredOpen
-                else -> true
+                PanelLayout.PANEL_DEBUG -> isDebug
+                else -> false
             }
             entity.setComponent(Visible(shouldBeVisible))
         }
