@@ -13,11 +13,13 @@ import com.meta.spatial.compose.ComposeViewPanelRegistration
 import com.meta.spatial.core.Entity
 import com.meta.spatial.core.SpatialFeature
 import com.meta.spatial.mruk.MRUKFeature
+import com.meta.spatial.runtime.ButtonBits
 import com.meta.spatial.runtime.PanelShapeLayerBlendType
 import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
+import com.meta.spatial.toolkit.GrabbableSystem
 import com.meta.spatial.isdk.IsdkSystem
 import com.meta.spatial.toolkit.AvatarSystem
 import com.meta.spatial.toolkit.MeshCollision
@@ -31,6 +33,7 @@ import com.meta.spatial.toolkit.UIPanelRenderOptions
 import com.meta.spatial.toolkit.UIPanelSettings
 import com.meta.spatial.toolkit.Visible
 import com.meta.spatial.vr.VRFeature
+import com.meta.spatial.vr.VrInputSystemType
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.layout.PanelAnimator
 import com.bitti06.modplayjs.xr.layout.PanelLayout
@@ -75,8 +78,11 @@ class XrActivity : AppSystemActivity() {
     override fun registerFeatures(): List<SpatialFeature> {
         spatialAudio = SpatialAudioFeature()
         mrukFeature = MRUKFeature(this, systemManager)
+        // The app runs the legacy controller input on purpose: with the
+        // Interaction SDK, ISDK turns every Grabbable panel into an interactable
+        // with grab handles, which fights the arc. Panels still take clicks.
         return listOf(
-            VRFeature(this, inputSystemType = com.meta.spatial.vr.VrInputSystemType.SIMPLE_CONTROLLER),
+            VRFeature(this, inputSystemType = VrInputSystemType.SIMPLE_CONTROLLER),
             ComposeFeature(),
             spatialAudio,
             mrukFeature,
@@ -93,7 +99,11 @@ class XrActivity : AppSystemActivity() {
             // Wider than the rest on purpose: the three text blocks (message,
             // instruments, samples) sit side by side, so the panel needs the
             // width to give each of them a readable column.
-            panel(R.id.panel_details, 2.2f, 0.95f, transparent = true) { DetailsPanel() },
+            // 2.2 m wide; at 1.2 resolution scale that would be ~2376 px, wider
+            // than the 2064 px eye buffer, so this one stays at 1.0.
+            panel(R.id.panel_details, 2.2f, 0.95f, transparent = true, resolutionScale = 1.0f) {
+                DetailsPanel()
+            },
             panel(R.id.panel_queue, 1.2f, 0.85f) { QueuePanel() },
             panel(R.id.panel_ignored, 1.2f, 0.85f) { IgnoredPanel() },
         )
@@ -108,6 +118,8 @@ class XrActivity : AppSystemActivity() {
         width: Float,
         height: Float,
         transparent: Boolean = false,
+        /** Raise resolution above 1.0 only where text is small and dense. */
+        resolutionScale: Float = 1.2f,
         content: @androidx.compose.runtime.Composable () -> Unit,
     ): PanelRegistration =
         ComposeViewPanelRegistration(
@@ -123,7 +135,7 @@ class XrActivity : AppSystemActivity() {
                     UIPanelSettings(
                     shape = QuadShapeOptions(width = width, height = height),
                     style = PanelStyleOptions(themeResourceId = R.style.PanelAppThemeTransparent),
-                    display = DpPerMeterDisplayOptions(dpPerMeter = 500f, resolutionScale = 1.2f),
+                    display = DpPerMeterDisplayOptions(dpPerMeter = 500f, resolutionScale = resolutionScale),
                     // ALPHA_BLEND does not write depth, so overlapping
                     // panels can sort wrongly; the panels here never overlap,
                     // and the blend is what keeps the rounded corners clean.
@@ -268,13 +280,12 @@ class XrActivity : AppSystemActivity() {
         isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
         updateAvatarVisibility(hasFocus = true)
 
-        val grabbableSystem = runCatching { systemManager.findSystem<com.meta.spatial.toolkit.GrabbableSystem>() }.getOrNull()
-        grabbableSystem?.active = true
-        grabbableSystem?.grabButtons =
-            com.meta.spatial.runtime.ButtonBits.ButtonSqueezeR or
-                com.meta.spatial.runtime.ButtonBits.ButtonSqueezeL or
-                com.meta.spatial.runtime.ButtonBits.ButtonTriggerR or
-                com.meta.spatial.runtime.ButtonBits.ButtonTriggerL
+        // With SIMPLE_CONTROLLER the legacy GrabbableSystem is the grab path;
+        // ISDK is not registered, so nothing else handles a Grabbable panel.
+        systemManager.findSystem<GrabbableSystem>().apply {
+            active = true
+            grabButtons = ButtonBits.ButtonSqueezeR or ButtonBits.ButtonSqueezeL
+        }
 
         val ids = listOf(
             R.id.panel_main to PanelLayout.PANEL_MAIN,

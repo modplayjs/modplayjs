@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.bitti06.modplayjs.xr.R
+import com.bitti06.modplayjs.xr.ui.GradientBackdrop
 import com.bitti06.modplayjs.xr.XrApp
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.library.ScanResult
@@ -106,7 +107,7 @@ fun LibraryPanel() {
             }
         }
 
-    com.bitti06.modplayjs.xr.ui.GradientBackdrop {
+    GradientBackdrop {
         Column(
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -411,6 +412,7 @@ fun LibraryPanel() {
                 }
             }
         }
+    }
     }
 }
 

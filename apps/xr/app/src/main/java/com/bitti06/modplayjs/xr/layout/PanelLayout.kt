@@ -64,11 +64,14 @@ class PanelLayout(
         if (!prefs.contains("x$id")) return null
         return Pose(
             Vector3(prefs.getFloat("x$id", 0f), prefs.getFloat("y$id", 1.4f), prefs.getFloat("z$id", 1.5f)),
+            // Named arguments, not positional: the primary constructor is
+            // Quaternion(w, x, y, z), so passing qx,qy,qz,qw positionally
+            // rotated every panel by the wrong axis and showed its back.
             Quaternion(
-                prefs.getFloat("qx$id", 0f),
-                prefs.getFloat("qy$id", 0f),
-                prefs.getFloat("qz$id", 0f),
-                prefs.getFloat("qw$id", 1f),
+                w = prefs.getFloat("qw$id", 1f),
+                x = prefs.getFloat("qx$id", 0f),
+                y = prefs.getFloat("qy$id", 0f),
+                z = prefs.getFloat("qz$id", 0f),
             ),
         )
     }
@@ -216,6 +219,11 @@ class PanelLayout(
         private const val KEY_FREE = "free"
         private const val KEY_VERSION = "layoutVersion"
 
-        private const val LAYOUT_VERSION = 31
+        /**
+         * Bumped because poses saved while [savedPose] read the quaternion in
+         * the wrong order may themselves be upside down: they were written from
+         * a panel the user saw flipped.
+         */
+        private const val LAYOUT_VERSION = 32
     }
 }
