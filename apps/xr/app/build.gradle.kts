@@ -235,4 +235,8 @@ dependencies {
     implementation(libs.meta.spatial.sdk.mruk)
     // Interaction SDK: hands + controllers through one pointer model.
     implementation(libs.meta.spatial.sdk.isdk)
+
+    // Meta VR OS SDK (207). compileOnly: the AAR is API stubs plus docs,
+    // Horizon OS ships the implementation at runtime.
+    compileOnly(libs.metavr.os.jsdk)
 }

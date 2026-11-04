@@ -2,6 +2,7 @@ package com.bitti06.modplayjs.xr
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -11,7 +12,6 @@ import com.meta.spatial.compose.ComposeViewPanelRegistration
 import com.meta.spatial.core.Entity
 import com.meta.spatial.core.SpatialFeature
 import com.meta.spatial.mruk.MRUKFeature
-import com.meta.spatial.runtime.ButtonBits
 import com.meta.spatial.runtime.PanelShapeLayerBlendType
 import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
@@ -19,7 +19,6 @@ import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
 import com.meta.spatial.isdk.IsdkSystem
 import com.meta.spatial.toolkit.AvatarSystem
-import com.meta.spatial.toolkit.GrabbableSystem
 import com.meta.spatial.toolkit.MeshCollision
 import com.meta.spatial.toolkit.Panel
 import com.meta.spatial.toolkit.PanelRegistration
@@ -229,14 +228,6 @@ class XrActivity : AppSystemActivity() {
         scene.setViewOrigin(0f, 0f, 0f, 0f)
         Skybox.install(scene, this, launchedInPassthrough = scene.isSystemPassthroughEnabled())
 
-        // Grab with the squeeze buttons only: the trigger is the select
-        // button, and VRC.Quest.Input.2 asks for grip, not trigger, to pick
-        // objects up. Hands grab by pinching and ignore these bits.
-        systemManager.findSystem<GrabbableSystem>().apply {
-            active = true
-            grabButtons = ButtonBits.ButtonSqueezeR or ButtonBits.ButtonSqueezeL
-        }
-
         // VRC.Quest.Input.4: on focus loss the hands and controllers must be
         // hidden. AvatarSystem owns those visuals; showing them again is
         // unconditional because a headset switch may have changed the input
@@ -392,10 +383,25 @@ class XrActivity : AppSystemActivity() {
         Skybox.reapply()
     }
 
+    /**
+     * Meta VR OS SDK API level (207 on the current OS line), not the Android
+     * API level. Logged so a device log shows which Horizon OS the app is
+     * actually running on; the same value gates version-specific behaviour.
+     */
+    private fun horizonOsApi(): Int = runCatching { metavr.os.Build.Version.getApiVersion() }.getOrDefault(-1)
+
     private fun requestScenePermission() {
-        val permission = "com.oculus.permission.USE_SCENE"
-        if (checkSelfPermission(permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(permission), REQUEST_USE_SCENE)
+        val wanted = ArrayList<String>()
+        if (checkSelfPermission(PERMISSIONS.scene) != PackageManager.PERMISSION_GRANTED) {
+            wanted += PERMISSIONS.scene
+        }
+        // Hands are optional: controllers stay available if this is denied, so
+        // the prompt is only shown, never demanded (VRC.Quest.Security.2).
+        if (checkSelfPermission(PERMISSIONS.handTracking) != PackageManager.PERMISSION_GRANTED) {
+            wanted += PERMISSIONS.handTracking
+        }
+        if (wanted.isNotEmpty()) {
+            requestPermissions(wanted.toTypedArray(), REQUEST_USE_SCENE)
         }
     }
 
@@ -406,9 +412,14 @@ class XrActivity : AppSystemActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_USE_SCENE) {
+            val sceneIndex = permissions.indexOf(PERMISSIONS.scene)
             val granted =
-                grantResults.isNotEmpty() &&
-                    grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED
+                sceneIndex >= 0 &&
+                    grantResults.getOrNull(sceneIndex) == PackageManager.PERMISSION_GRANTED
+            val handsIndex = permissions.indexOf(PERMISSIONS.handTracking)
+            val hands =
+                handsIndex < 0 || grantResults.getOrNull(handsIndex) == PackageManager.PERMISSION_GRANTED
+            Log.i(TAG, "permissions: scene=$granted hands=$hands os=${horizonOsApi()}")
             SceneBridge.onPermissionResult(granted, this)
         }
     }
@@ -416,6 +427,12 @@ class XrActivity : AppSystemActivity() {
     companion object {
         private const val TAG = "modplay-xr"
         private const val RECENTER_DEBOUNCE_NS = 250_000_000L
+
+        /** Namespace-qualified names: the horizonos.* form is the current one. */
+        private object PERMISSIONS {
+            const val scene = "com.oculus.permission.USE_SCENE"
+            const val handTracking = "horizonos.permission.HAND_TRACKING"
+        }
         const val REQUEST_USE_SCENE = 1
         const val REQUEST_PICK_MODULES = 2
         const val REQUEST_PICK_TREE = 3

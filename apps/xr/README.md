@@ -82,6 +82,50 @@ That needs the amd64 runtime libs (`libc6:amd64`, `libstdc++6:amd64`,
 `zlib1g:amd64`), already installed here. CMake and Ninja from the SDK are also
 x86_64; the system `cmake`/`ninja` are arm64 if you want to point AGP at them.
 
+## Deprecations checked (Spatial SDK 0.15.0)
+
+Nothing on the removal list in `apps/xr/app/src/main/java`:
+
+| Removed in 0.15.0 | Status here |
+|---|---|
+| `com.meta.spatial.runtime.ScenePhysicsObject` | not used (no `PhysicsFeature`) |
+| `com.meta.spatial.toolkit.Color3` / `Color4` | `Color4` comes from `core` |
+| `Audio(String, …)` | not used |
+| `IsdkFeature` | not used; `VRFeature` sets up ISDK |
+| `Query.with` / `Query.registerEventListener` | not used |
+| `PanelSceneObject.getTexture()/getLayer()/…` | not used |
+| `MRUKPlane.size()` | we call `roomBounds.size()`, a different type |
+| `IsdkSystem.enableDebugTools()` | not used |
+
+Deprecated but still present, and removed from this app:
+
+- `GrabbableSystem` — the 0.15.0 reference marks it `@Deprecated`, "replaced by
+  IsdkSystem ... change the `inputSystemType` argument on `VrFeature`". We run
+  the Interaction SDK, so the system is neither active nor configured any more;
+  grabbing goes through the `Grabbable` component, which ISDK consumes.
+- `TickTransformSystem.applyScale` / `ScaleSystem` (pose-only scale) — not used;
+  the app has no scaled parents, so 0.15's hierarchy-scale default is fine.
+
+## Horizon OS version
+
+`uses-metavr-sdk` declares min 69 / target 81. The Meta VR OS SDK line is at
+**207** (`com.meta.metavr:metavr-os-jsdk:207`), and Meta's own "add Spatial SDK
+to an app" tutorial declares `minSdkVersion="207"` / `targetSdkVersion="207"`.
+Raising target to 207 changes OS behaviour, so it is a deliberate step after a
+device test rather than a version-number bump; 81 keeps the behaviour the app
+was tested against.
+
+The app depends on `com.meta.metavr:metavr-os-jsdk:207` as `compileOnly` (the
+AAR is API stubs; Horizon OS supplies the implementation), and logs the runtime
+API level on the permission result line:
+
+```kotlin
+metavr.os.Build.Version.getApiVersion()   // 207 on the current OS line
+```
+
+That is the value to branch on if a 207-only behaviour is ever added, rather
+than raising `targetSdkVersion` blindly.
+
 ## Audio path
 
 - stereo mode: one interleaved `AudioTrack`
