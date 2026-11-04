@@ -99,7 +99,25 @@ class XrPlayer(
         val row: Int = 0,
     )
 
-    private val _state = MutableStateFlow(State())
+    /**
+     * Preferences of the XR app. Read before the first state, so the spatial
+     * toggle already shows the stored value (on by default) before a module is
+     * loaded - the panels read the state, not the preference.
+     */
+    private val prefs = context.getSharedPreferences("xr", Context.MODE_PRIVATE)
+
+    /**
+     * The user's spatial choice, on by default. It is kept separately from
+     * [spatialInfo] because the engine's own default is off: every rebuild
+     * re-asserts this, so a `setSpatial` command that raced the isolate startup
+     * cannot leave the app in stereo.
+     */
+    @Volatile
+    private var spatialPreferred = prefs.getBoolean(KEY_SPATIAL, DEFAULT_SPATIAL)
+
+    private val _state = MutableStateFlow(
+        State(spatialEnabled = prefs.getBoolean(KEY_SPATIAL, DEFAULT_SPATIAL)),
+    )
     val state: StateFlow<State> = _state.asStateFlow()
 
     @Volatile
@@ -128,7 +146,6 @@ class XrPlayer(
     /** Marker entities are created and mutated on the main thread only. */
     private val markers = ArrayList<Entity>()
     private var levels = FloatArray(0)
-    private val prefs = context.getSharedPreferences("xr", Context.MODE_PRIVATE)
     private var radiusManual = prefs.getBoolean(KEY_RADIUS_MANUAL, false)
     private var ringRadius = prefs.getFloat(KEY_RADIUS, 1.0f)
     private var ringCenterX = 0f
@@ -220,7 +237,7 @@ class XrPlayer(
 
     fun start() {
         if (running.getAndSet(true)) return
-        val spatial = prefs.getBoolean(KEY_SPATIAL, DEFAULT_SPATIAL)
+        val spatial = spatialPreferred
         thread = Thread({
             // Audio priority, not MAX: MAX outranks the VR compositor and the
             // frame thread, so a long render block would drop frames.
@@ -348,6 +365,7 @@ class XrPlayer(
     fun sessionId(): Int = outputs.firstOrNull()?.sessionId ?: 0
 
     fun setSpatialEnabled(enabled: Boolean) {
+        spatialPreferred = enabled
         prefs.edit().putBoolean(KEY_SPATIAL, enabled).apply()
         submit {
             engine?.command("""{"type":"setSpatial","enabled":$enabled}""")
@@ -494,6 +512,10 @@ class XrPlayer(
         // hand the old song's levels to the new markers and to the debug bars
         // until the first render block replaces them.
         levels = FloatArray(0)
+        // The engine starts with spatial off. Pushing the choice again on every
+        // rebuild makes the default stick even if the startup command was sent
+        // before the isolate could take it.
+        engine?.command("""{"type":"setSpatial","enabled":$spatialPreferred}""")
         val info = readSpatialInfo()
         spatialInfo = info
         if (!loaded) return

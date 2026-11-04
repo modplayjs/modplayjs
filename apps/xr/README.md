@@ -146,6 +146,14 @@ Azimuth source, in `engine-entry.ts`:
 Channels ≥ 5 use their module pan. Layout is switchable at runtime in the
 Settings panel; unknown layouts fall back to `panned`.
 
+Spatial is **on by default** (`DEFAULT_SPATIAL = true` in `XrPlayer`). The
+preference, the initial panel state and the engine choice all come from the same
+key, and `rebuildOutputs()` re-asserts the choice on every output rebuild: the
+engine's own `spatialEnabled` starts `false`, so a `setSpatial` that raced the
+isolate startup would otherwise leave the app playing stereo. Stereo remains the
+fallback for modules the engine cannot split (SID, streamed audio) and for a
+stored off.
+
 ## Loading modules
 
 Two pickers, both persisted (`takePersistableUriPermission`):
