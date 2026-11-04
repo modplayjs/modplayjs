@@ -127,4 +127,6 @@
     <string name="xr_stationary_hint">Panels sit in a fixed arc. Switching to free restores where you left them.</string>
     <string name="xr_details_message">Message</string>
     <string name="xr_details_empty">empty</string>
+    <string name="xr_scene_note">Room data is read once to place the ring and never leaves the headset.</string>
+    <string name="xr_scene_denied">Room permission denied: the ring stays at 1 m around you. Music, panels and audio are unaffected.</string>
 </resources>

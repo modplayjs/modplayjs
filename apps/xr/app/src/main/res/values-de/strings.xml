@@ -127,4 +127,6 @@
     <string name="xr_stationary_hint">Panel stehen im festen Bogen. Zurück auf Frei stellt deine Anordnung wieder her.</string>
     <string name="xr_details_message">Message</string>
     <string name="xr_details_empty">leer</string>
+    <string name="xr_scene_note">Raumdaten werden einmal zum Platzieren des Rings gelesen und verlassen die Brille nie.</string>
+    <string name="xr_scene_denied">Raum-Berechtigung abgelehnt: der Ring bleibt bei 1 m um dich. Musik, Panels und Audio laufen unverändert.</string>
 </resources>

@@ -181,6 +181,8 @@ android {
     packaging { resources.excludes.add("META-INF/LICENSE") }
 
     lint {
+        // Lint stays advisory in this repo: the deliverable is reviewed by a
+        // device build, and aborting on an unrelated warning would block it.
         abortOnError = false
         checkReleaseBuilds = false
     }

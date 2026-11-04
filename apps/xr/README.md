@@ -36,8 +36,7 @@ A build that fetched V8 in the same run still links the stub — run it once mor
 `local.properties` must point at the Android SDK. `compileSdk` is 37 (platform
 37 must be installed), `minSdk` and `targetSdk` stay 34: the Horizon Store
 requires immersive apps to target 32-34. The Horizon OS level is declared with
-the current `uses-metavr-sdk` element (`minSdkVersion` 69, `targetSdkVersion`
-81); the Store still accepts the older `uses-horizonos-sdk`.
+`uses-metavr-sdk` at 207/207, the Meta VR OS SDK the app is compiled against.
 
 Versions are the newest ones the toolchain actually supports, checked against
 each artifact's `aar-metadata.properties`:
@@ -98,34 +97,41 @@ Nothing on the removal list in `apps/xr/app/src/main/java`:
 | `MRUKPlane.size()` | we call `roomBounds.size()`, a different type |
 | `IsdkSystem.enableDebugTools()` | not used |
 
-Deprecated but still present, and removed from this app:
+Deprecated but still present:
 
 - `GrabbableSystem` — the 0.15.0 reference marks it `@Deprecated`, "replaced by
-  IsdkSystem ... change the `inputSystemType` argument on `VrFeature`". We run
-  the Interaction SDK, so the system is neither active nor configured any more;
-  grabbing goes through the `Grabbable` component, which ISDK consumes.
+  IsdkSystem ... change the `inputSystemType` argument on `VrFeature`". This app
+  deliberately keeps it: it runs `VRFeature(..., inputSystemType =
+  SIMPLE_CONTROLLER)`, and with SIMPLE_CONTROLLER nothing else handles a
+  `Grabbable` panel. The ISDK path is not registered, so there is no second grab
+  implementation fighting the arc.
 - `TickTransformSystem.applyScale` / `ScaleSystem` (pose-only scale) — not used;
   the app has no scaled parents, so 0.15's hierarchy-scale default is fine.
 
 ## Horizon OS version
 
-`uses-metavr-sdk` declares min 69 / target 81. The Meta VR OS SDK line is at
-**207** (`com.meta.metavr:metavr-os-jsdk:207`), and Meta's own "add Spatial SDK
-to an app" tutorial declares `minSdkVersion="207"` / `targetSdkVersion="207"`.
-Raising target to 207 changes OS behaviour, so it is a deliberate step after a
-device test rather than a version-number bump; 81 keeps the behaviour the app
-was tested against.
+`uses-metavr-sdk` declares min 207 / target 207, matching the Meta VR OS SDK the
+app is compiled against (`com.meta.metavr:metavr-os-jsdk:207`) and Meta's own
+"add Spatial SDK to an app" tutorial, which declares `minSdkVersion="207"` /
+`targetSdkVersion="207"`.
 
-The app depends on `com.meta.metavr:metavr-os-jsdk:207` as `compileOnly` (the
-AAR is API stubs; Horizon OS supplies the implementation), and logs the runtime
-API level on the permission result line:
+The earlier 69/81 pair came from the hybrid-app floor and claimed support for OS
+releases the Spatial SDK 0.15 build does not target. Since there is no fallback
+code for older OS levels in the app, declaring 207 is the honest floor: the
+Store then hides the app from devices that would run it against APIs it assumes.
+
+There is no `horizonos:uses-horizonos-sdk` element next to it. Horizon OS still
+parses that older spelling, but carrying both is exactly the backwards
+compatibility this project does not want; `uses-metavr-sdk` is the current
+element and the only one written.
+
+The app depends on the JSDK as `compileOnly` (the AAR is API stubs; Horizon OS
+supplies the implementation), and logs the runtime API level on the permission
+result line:
 
 ```kotlin
 metavr.os.Build.Version.getApiVersion()   // 207 on the current OS line
 ```
-
-That is the value to branch on if a 207-only behaviour is ever added, rather
-than raising `targetSdkVersion` blindly.
 
 ## Audio path
 
@@ -192,10 +198,10 @@ All panel text comes from `res/values/strings.xml` (English) and
 
 Six panels hang on a fixed arc (Now Playing, Library, Settings, Pattern,
 Details, Debug). Settings › **Frei anordnen** switches to free placement: every
-panel gets a `Grabbable(PIVOT_Y, 0.6–2.4 m)` and can be grabbed with controller
-or hand. On `onPause` the poses are written to `SharedPreferences("xr.layout")`;
-the next start restores them. *Layout zurücksetzen* returns to the arc and
-drops the saved poses.
+panel gets a `Grabbable(PIVOT_Y, 0.6–2.4 m)` and can be grabbed with the
+controller's grip button. On `onPause` the poses are written to
+`SharedPreferences("xr.layout")`; the next start restores them. *Layout
+zurücksetzen* returns to the arc and drops the saved poses.
 
 ## Debug view
 

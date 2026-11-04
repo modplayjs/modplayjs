@@ -32,6 +32,7 @@ import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.UIPanelRenderOptions
 import com.meta.spatial.toolkit.UIPanelSettings
 import com.meta.spatial.toolkit.Visible
+import com.meta.spatial.vr.InputSystem
 import com.meta.spatial.vr.VRFeature
 import com.meta.spatial.vr.VrInputSystemType
 import com.bitti06.modplayjs.xr.library.Library
@@ -70,8 +71,11 @@ class XrActivity : AppSystemActivity() {
     private var lastIgnoredOpen = false
     private var lastCanPattern = false
     private var resumeOnMount = false
+    private var resumeAfterPause = false
     private var avatarSystem: AvatarSystem? = null
     private var isdkSystem: IsdkSystem? = null
+    /** The legacy controller pointer; silenced while another app has focus. */
+    private var inputSystem: InputSystem? = null
     private var lastRecenterNs = 0L
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -273,6 +277,11 @@ class XrActivity : AppSystemActivity() {
         // Documented knob: multiplies the thumbstick scroll speed on panels.
         // 1.6 lets a 32-channel pattern be crossed in a reasonable time.
         scene.setPanelControllerScrollFactor(1.6f)
+        // VRC.Quest.Performance.1: interactive apps must hold one of the allowed
+        // refresh rates. 72 Hz is the lowest one every Quest supports and is
+        // what the panel compositor layers are budgeted for here; asking for it
+        // explicitly keeps the rate from depending on the headset's default.
+        Log.i(TAG, "display rate 72 Hz accepted=${scene.setPreferredDisplayRate(72f)}")
         // No scene.enableHolePunching(true): it is a scene-wide switch, while
         // Meta's hole-punch recipe (layer page) is per panel - layerConfig,
         // blend type, feathering, alphaMode and panelShader on that panel's
@@ -287,6 +296,7 @@ class XrActivity : AppSystemActivity() {
         // absent, and a missing avatar must never take the app down.
         avatarSystem = runCatching { systemManager.findSystem<AvatarSystem>() }.getOrNull()
         isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
+        inputSystem = runCatching { systemManager.findSystem<InputSystem>() }.getOrNull()
         updateAvatarVisibility(hasFocus = true)
 
         // With SIMPLE_CONTROLLER the legacy GrabbableSystem is the grab path;
@@ -448,8 +458,23 @@ class XrActivity : AppSystemActivity() {
     }
 
     override fun onPause() {
+        // VRC.Quest.Functional.2: when Horizon OS asks the app to pause (entering
+        // passthrough from Quick Settings, display off), playback pauses and
+        // comes back on resume. Focus loss (Universal Menu) is a different
+        // event and deliberately keeps playing.
         saveFreeLayout()
+        resumeAfterPause = XrApp.player?.state?.value?.playing == true
+        if (resumeAfterPause) player.pause()
         super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Skybox.reapply()
+        if (resumeAfterPause) {
+            resumeAfterPause = false
+            player.resume()
+        }
     }
 
     /**
@@ -468,9 +493,11 @@ class XrActivity : AppSystemActivity() {
     }
 
     /**
-     * VRC.Quest.Input.4: hide the user's hands and controllers while another
-     * app has input focus. The app keeps rendering; only the input visuals and
-     * the ISDK pointer go quiet.
+     * VRC.Quest.Input.4: hide the user's hands and controllers and ignore all
+     * their input while another app has focus. The pointer is turned off
+     * explicitly: with SIMPLE_CONTROLLER nothing else does it, so an open
+     * library or settings panel would otherwise still react to a squeeze behind
+     * the Universal Menu. The app keeps rendering throughout.
      */
     private fun updateAvatarVisibility(hasFocus: Boolean) {
         avatarSystem?.apply {
@@ -478,11 +505,7 @@ class XrActivity : AppSystemActivity() {
             setShowControllers(hasFocus)
         }
         isdkSystem?.active = hasFocus
-    }
-
-    override fun onResume() {
-        super.onResume()
-        Skybox.reapply()
+        inputSystem?.enableInput(hasFocus)
     }
 
     /**
@@ -493,17 +516,19 @@ class XrActivity : AppSystemActivity() {
     private fun horizonOsApi(): Int = runCatching { metavr.os.Build.Version.getApiVersion() }.getOrDefault(-1)
 
     private fun requestScenePermission() {
-        val wanted = ArrayList<String>()
+        // Only the scene permission is requested. Hand tracking is not declared
+        // in the manifest at all: panels are grabbed with the controller's
+        // squeeze button (legacy GrabbableSystem), so a hands-only user cannot
+        // move them. Meta's app-compatibility page is explicit that shipping the
+        // hand declaration before the hand path works is a broken experience,
+        // and VRC.Quest.Tracking.2 requires every declared input modality to
+        // reach all interactions. Controllers are the declared modality.
         if (checkSelfPermission(PERMISSIONS.scene) != PackageManager.PERMISSION_GRANTED) {
-            wanted += PERMISSIONS.scene
-        }
-        // Hands are optional: controllers stay available if this is denied, so
-        // the prompt is only shown, never demanded (VRC.Quest.Security.2).
-        if (checkSelfPermission(PERMISSIONS.handTracking) != PackageManager.PERMISSION_GRANTED) {
-            wanted += PERMISSIONS.handTracking
-        }
-        if (wanted.isNotEmpty()) {
-            requestPermissions(wanted.toTypedArray(), REQUEST_USE_SCENE)
+            requestPermissions(arrayOf(PERMISSIONS.scene), REQUEST_USE_SCENE)
+        } else if (!SceneBridge.granted) {
+            // Already granted on an earlier run: no prompt, no callback, but the
+            // ring still needs the room and Settings still needs to say so.
+            SceneBridge.onPermissionResult(true, this)
         }
     }
 
@@ -518,10 +543,7 @@ class XrActivity : AppSystemActivity() {
             val granted =
                 sceneIndex >= 0 &&
                     grantResults.getOrNull(sceneIndex) == PackageManager.PERMISSION_GRANTED
-            val handsIndex = permissions.indexOf(PERMISSIONS.handTracking)
-            val hands =
-                handsIndex < 0 || grantResults.getOrNull(handsIndex) == PackageManager.PERMISSION_GRANTED
-            Log.i(TAG, "permissions: scene=$granted hands=$hands os=${horizonOsApi()}")
+            Log.i(TAG, "permissions: scene=$granted os=${horizonOsApi()}")
             SceneBridge.onPermissionResult(granted, this)
         }
     }
@@ -530,10 +552,14 @@ class XrActivity : AppSystemActivity() {
         private const val TAG = "modplay-xr"
         private const val RECENTER_DEBOUNCE_NS = 250_000_000L
 
-        /** Namespace-qualified names: the horizonos.* form is the current one. */
+        /**
+         * `com.oculus.permission.USE_SCENE` is the name the current Spatial SDK
+         * MRUK page and the Spatial Data Permission page both document. The
+         * `horizonos.permission.USE_SCENE` seen in grant logs is a system-side
+         * implicit grant, not a declared permission, so it is not substituted.
+         */
         private object PERMISSIONS {
             const val scene = "com.oculus.permission.USE_SCENE"
-            const val handTracking = "horizonos.permission.HAND_TRACKING"
         }
         const val REQUEST_USE_SCENE = 1
         const val REQUEST_PICK_MODULES = 2

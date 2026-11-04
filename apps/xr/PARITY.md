@@ -31,12 +31,25 @@ lives in `com.bitti06.modplayjs.xr` and is reachable from a panel.
 | Library settings: folders, ignored | `SettingsScreens.kt` | **yes** — add folder, per-folder remove, ignored count + reset |
 | Diagnostics: engine, rate, session | `SettingsScreens.kt` | **yes** |
 | About / licenses / language | `AboutScreens.kt` | **yes** — license section, per-app locale via `LocaleManager`, strings in `values`/`values-de` |
-| Background playback service + notification | `media/PlaybackService.kt` | **no** — out of scope for now (audio stops on focus loss) |
+| Background playback service + notification | `media/PlaybackService.kt` | **no** — deliberate: playback pauses with the app (VRC.Quest.Functional.2) instead of continuing from a service |
 | Media session / sticky notification | `media/StickyMediaNotificationProvider.kt` | **no** — Horizon OS has no notification shade |
 | System audio effects (equalizer) | `PlayerScreens.kt` | **no** — replaced by spatial settings |
 | Spatial audio (objects, layout, pan, HRTF) | — | **yes**, XR only |
 
-## Panel placement: free vs stationary
+## Store-relevant differences
+
+The compliance audit in [`STORE-COMPLIANCE.md`](STORE-COMPLIANCE.md) is the
+authoritative list, but three points shape the features above:
+
+- **Controllers only.** Hand tracking is not declared. Panel grabbing uses the
+  grip button through the legacy `GrabbableSystem`, so hands could not move a
+  panel; declaring hands would fail VRC.Quest.Tracking.2 and Meta's
+  app-compatibility rule about advertising an input modality that does not work.
+- **No background playback.** `onPause` now pauses, which is what
+  VRC.Quest.Functional.2 asks for. The phone app keeps playing from a service;
+  that row above is therefore a *deliberate* gap, not an unimplemented one.
+- **No entitlement check.** Recommended (VRC.Quest.Security.1), not required;
+  it would pull in the Platform SDK for no user-visible feature.
 
 ## Details panel
 
@@ -169,8 +182,9 @@ Settings that existed in the panel but did nothing are now wired:
 
 ## Still missing
 
-1. Background playback (foreground service): audio stops when the app loses
-   focus, which Horizon OS treats as the pause request. Left out on purpose.
+1. Background playback (foreground service): audio pauses with the app, which is
+   what VRC.Quest.Functional.2 requires of a single-player app. Continuing in
+   the background would need a service plus a functional reason to break that.
 2. Real spectrum analyser (FFT): the visualizer draws channel levels, so
    "spectrum" and "waveform" show the same data. Real bins need new engine
    output, not new UI.

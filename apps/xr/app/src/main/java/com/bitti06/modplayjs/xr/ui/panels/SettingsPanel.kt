@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.sp
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.xr.BuildConfig
 import com.bitti06.modplayjs.xr.R
+import com.bitti06.modplayjs.xr.SceneAccess
+import com.bitti06.modplayjs.xr.SceneBridge
 import com.bitti06.modplayjs.xr.XrApp
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.play.XrPlayer
@@ -115,6 +117,23 @@ fun SettingsPanel() {
                     ) { player?.setLayout(it) }
                     ToggleRow(stringResource(R.string.xr_passthrough), if (passthrough) onLabel else offLabel, passthrough) {
                         XrApp.setPassthrough(!passthrough)
+                    }
+                    // VRC.Quest.Security.2 graceful-failure wording: the scene
+                    // permission is only used to place the ring, and denying it
+                    // must read as a limited feature rather than a broken app.
+                    val sceneAccess by SceneBridge.access.collectAsState()
+                    if (sceneAccess != SceneAccess.PENDING) {
+                        Text(
+                            stringResource(
+                                if (sceneAccess == SceneAccess.GRANTED) {
+                                    R.string.xr_scene_note
+                                } else {
+                                    R.string.xr_scene_denied
+                                },
+                            ),
+                            fontSize = 8.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     StepperRow(stringResource(R.string.xr_ring), String.format("%.1f m", radius), manual = radiusManual) { step ->
                         radius = (radius + step).coerceIn(0.4f, 3.0f)

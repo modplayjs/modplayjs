@@ -1,40 +1,54 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:metavr="http://schemas.meta.com/metavr-sdk">
+    xmlns:metavr="http://schemas.meta.com/metavr-sdk"
+    android:installLocation="auto">
 
-    <!-- Meta VR OS SDK versioning, not the Android API level. The older
-         uses-horizonos-sdk element still works but Meta points new work at
-         uses-metavr-sdk. minSdkVersion stays at the lowest Horizon OS the app
-         was built for; targetSdkVersion is the behaviour level we test
-         against, so raising it is a deliberate step after device testing. -->
+    <!-- Meta VR OS SDK versioning, not the Android API level. `uses-metavr-sdk`
+         is the current element; Horizon OS still parses the older
+         `horizonos:uses-horizonos-sdk`, but Meta points new work at this one and
+         this project does not carry both. The numbers are the Meta VR OS SDK
+         API level (207 is the current line, the version of the compileOnly
+         JSDK), not the Android API level. Spatial SDK 0.15's own manifest
+         template declares 207/207, so minSdkVersion 69 (the old hybrid-app
+         floor) was claiming compatibility with OS versions the SDK does not
+         support. -->
     <metavr:uses-metavr-sdk
-        metavr:minSdkVersion="69"
-        metavr:targetSdkVersion="81" />
+        metavr:minSdkVersion="207"
+        metavr:targetSdkVersion="207" />
 
     <uses-feature
         android:name="android.hardware.vr.headtracking"
         android:required="true"
         android:version="1" />
     <uses-feature android:glEsVersion="0x00030001" />
-    <uses-feature android:name="oculus.software.handtracking" android:required="false" />
     <uses-feature android:name="com.oculus.feature.PASSTHROUGH" android:required="false" />
-    <uses-permission android:name="horizonos.permission.HAND_TRACKING" />
+    <!-- Text input (library search) uses the system keyboard in immersive mode.
+         Both optional, exactly as the Spatial SDK manifest template lists them. -->
+    <uses-feature android:name="com.oculus.feature.VIRTUAL_KEYBOARD" android:required="false" />
+    <uses-feature android:name="oculus.software.overlay_keyboard" android:required="false" />
 
-    <!-- Scene model for room geometry (walls, furniture). Both are required by MRUK. -->
+    <!-- Scene model for room geometry (walls, furniture). Both are required by
+         MRUK; the horizonos.permission.* aliases are system-granted implicitly
+         and are not documented as declarable, so the com.oculus names stay. -->
     <uses-permission android:name="com.oculus.permission.USE_SCENE" />
     <uses-permission android:name="com.oculus.permission.USE_ANCHOR_API" />
 
     <application
         android:allowBackup="false"
-        android:installLocation="auto"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher"
-        android:theme="@style/PanelAppThemeTransparent">
+        android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
 
         <meta-data android:name="com.oculus.supportedDevices" android:value="quest3" />
         <meta-data android:name="com.oculus.vr.focusaware" android:value="true" />
-        <meta-data android:name="com.oculus.handtracking.version" android:value="V2.0" />
+        <!-- VRC.Quest.Functional.14: the app can start straight into passthrough
+             (Skybox follows scene.isSystemPassthroughEnabled), so the system
+             loading screen has to keep the room visible instead of flashing black. -->
+        <meta-data
+            android:name="com.oculus.ossplash.background"
+            android:value="passthrough-contextual" />
 
         <!-- Public runtime library the Spatial SDK loads itself. required=false:
              a required entry makes the installer abort with
@@ -45,10 +59,13 @@
 
         <activity
             android:name="com.bitti06.modplayjs.xr.XrActivity"
-            android:configChanges="screenSize|screenLayout|orientation|keyboardHidden|keyboard|navigation|uiMode"
+            android:configChanges="density|keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|uiMode"
             android:excludeFromRecents="true"
             android:exported="true"
-            android:launchMode="singleTask">
+            android:launchMode="singleTask"
+            android:resizeableActivity="false"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="com.oculus.intent.category.VR" />
