@@ -37,6 +37,7 @@ import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
 import com.meta.spatial.toolkit.MeshCollision
 import com.meta.spatial.toolkit.Panel
 import com.meta.spatial.toolkit.PanelRegistration
+import com.meta.spatial.toolkit.PanelSettings
 import com.meta.spatial.toolkit.PanelRenderMode
 import com.meta.spatial.toolkit.PanelStyleOptions
 import com.meta.spatial.toolkit.QuadShapeOptions
@@ -105,7 +106,7 @@ class XrActivity : AppSystemActivity(), XrHost {
             )
         }
 
-    private fun panelSettings(spec: PanelSpec): UIPanelSettings {
+    private fun panelSettings(spec: PanelSpec): PanelSettings {
         val base =
             UIPanelSettings(
                 shape = QuadShapeOptions(width = spec.width, height = spec.height),
