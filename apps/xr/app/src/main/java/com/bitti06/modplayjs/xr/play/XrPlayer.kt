@@ -490,6 +490,10 @@ class XrPlayer(
     private fun rebuildOutputs() {
         releaseOutputs()
         destroyMarkers()
+        // The peaks belong to the module that just stopped. Keeping them would
+        // hand the old song's levels to the new markers and to the debug bars
+        // until the first render block replaces them.
+        levels = FloatArray(0)
         val info = readSpatialInfo()
         spatialInfo = info
         if (!loaded) return
