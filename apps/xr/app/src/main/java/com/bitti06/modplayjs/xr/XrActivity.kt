@@ -17,6 +17,8 @@ import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
+import com.meta.spatial.isdk.IsdkSystem
+import com.meta.spatial.toolkit.AvatarSystem
 import com.meta.spatial.toolkit.GrabbableSystem
 import com.meta.spatial.toolkit.MeshCollision
 import com.meta.spatial.toolkit.Panel
@@ -29,7 +31,6 @@ import com.meta.spatial.toolkit.UIPanelRenderOptions
 import com.meta.spatial.toolkit.UIPanelSettings
 import com.meta.spatial.toolkit.Visible
 import com.meta.spatial.vr.VRFeature
-import com.meta.spatial.vr.VrInputSystemType
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.layout.PanelLayout
 import com.bitti06.modplayjs.xr.library.Playlist
@@ -59,13 +60,19 @@ class XrActivity : AppSystemActivity() {
     private var lastDebugSources: Boolean? = null
     private var lastDetailsCount = -1
     private var resumeOnMount = false
+    private var avatarSystem: AvatarSystem? = null
+    private var isdkSystem: IsdkSystem? = null
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun registerFeatures(): List<SpatialFeature> {
         spatialAudio = SpatialAudioFeature()
         mrukFeature = MRUKFeature(this, systemManager)
+        // VRFeature defaults to VrInputSystemType.INTERACTION_SDK: hands and
+        // controllers both arrive as pointer events, so panels get poke,
+        // ray and grab from either input without a second code path
+        // (VRC.Quest.Input.5/7/8).
         return listOf(
-            VRFeature(this, inputSystemType = VrInputSystemType.SIMPLE_CONTROLLER),
+            VRFeature(this),
             ComposeFeature(),
             spatialAudio,
             mrukFeature,
@@ -101,6 +108,9 @@ class XrActivity : AppSystemActivity() {
                     shape = QuadShapeOptions(width = width, height = height),
                     style = PanelStyleOptions(themeResourceId = R.style.PanelAppThemeTransparent),
                     display = DpPerMeterDisplayOptions(dpPerMeter = 500f, resolutionScale = 1.2f),
+                    // ALPHA_BLEND does not write depth, so overlapping
+                    // panels can sort wrongly; the panels here never overlap,
+                    // and the blend is what keeps the rounded corners clean.
                     rendering = UIPanelRenderOptions(
                         renderMode = PanelRenderMode.Layer(
                             layerBlendType = PanelShapeLayerBlendType.ALPHA_BLEND,
@@ -218,14 +228,23 @@ class XrActivity : AppSystemActivity() {
         scene.setViewOrigin(0f, 0f, 0f, 0f)
         Skybox.install(scene, this, launchedInPassthrough = scene.isSystemPassthroughEnabled())
 
-        // Configure controller grab buttons to allow gripping or triggering panels
-        val grabbableSystem = systemManager.findSystem<GrabbableSystem>()
-        grabbableSystem.active = true
-        grabbableSystem.grabButtons =
-            ButtonBits.ButtonSqueezeR or
-                ButtonBits.ButtonSqueezeL or
-                ButtonBits.ButtonTriggerR or
-                ButtonBits.ButtonTriggerL
+        // Grab with the squeeze buttons only: the trigger is the select
+        // button, and VRC.Quest.Input.2 asks for grip, not trigger, to pick
+        // objects up. Hands grab by pinching and ignore these bits.
+        systemManager.findSystem<GrabbableSystem>().apply {
+            active = true
+            grabButtons = ButtonBits.ButtonSqueezeR or ButtonBits.ButtonSqueezeL
+        }
+
+        // VRC.Quest.Input.4: on focus loss the hands and controllers must be
+        // hidden. AvatarSystem owns those visuals; showing them again is
+        // unconditional because a headset switch may have changed the input
+        // device while the app was in the background.
+        // AvatarSystem ships with the SDK; findSystem throws when a system is
+        // absent, and a missing avatar must never take the app down.
+        avatarSystem = runCatching { systemManager.findSystem<AvatarSystem>() }.getOrNull()
+        isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
+        updateAvatarVisibility(hasFocus = true)
 
         val ids = listOf(
             R.id.panel_main to PanelLayout.PANEL_MAIN,
@@ -344,7 +363,21 @@ class XrActivity : AppSystemActivity() {
      */
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        updateAvatarVisibility(hasFocus)
         if (!hasFocus && ::layout.isInitialized && layout.free) layout.save(panels)
+    }
+
+    /**
+     * VRC.Quest.Input.4: hide the user's hands and controllers while another
+     * app has input focus. The app keeps rendering; only the input visuals and
+     * the ISDK pointer go quiet.
+     */
+    private fun updateAvatarVisibility(hasFocus: Boolean) {
+        avatarSystem?.apply {
+            setShowHands(hasFocus)
+            setShowControllers(hasFocus)
+        }
+        isdkSystem?.active = hasFocus
     }
 
     override fun onResume() {

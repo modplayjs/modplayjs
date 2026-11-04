@@ -228,4 +228,6 @@ dependencies {
     implementation(libs.meta.spatial.sdk.toolkit)
     implementation(libs.meta.spatial.sdk.spatialaudio)
     implementation(libs.meta.spatial.sdk.mruk)
+    // Interaction SDK: hands + controllers through one pointer model.
+    implementation(libs.meta.spatial.sdk.isdk)
 }

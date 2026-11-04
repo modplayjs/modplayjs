@@ -29,6 +29,7 @@ meta-spatial-sdk-compose = { module = "com.meta.spatial:meta-spatial-sdk-compose
 meta-spatial-sdk-toolkit = { module = "com.meta.spatial:meta-spatial-sdk-toolkit", version.ref = "spatialsdk" }
 meta-spatial-sdk-spatialaudio = { module = "com.meta.spatial:meta-spatial-sdk-spatialaudio", version.ref = "spatialsdk" }
 meta-spatial-sdk-mruk = { module = "com.meta.spatial:meta-spatial-sdk-mruk", version.ref = "spatialsdk" }
+meta-spatial-sdk-isdk = { module = "com.meta.spatial:meta-spatial-sdk-isdk", version.ref = "spatialsdk" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

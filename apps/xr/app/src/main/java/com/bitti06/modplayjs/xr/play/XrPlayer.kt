@@ -653,6 +653,7 @@ class XrPlayer(
         if (pattern < 0) return PatternData()
         // cells/rows/channels only change with the module, not with the
         // playhead: cache the last pattern instead of re-parsing every tick.
+        // `load` clears the cache, so an order index is enough as a key.
         cachedPattern?.let { if (cachedPatternIndex == pattern) return it }
         val eng = engine ?: return PatternData()
         val raw = runCatching { eng.command("""{"type":"getPattern","pattern":$pattern}""") }.getOrNull()
