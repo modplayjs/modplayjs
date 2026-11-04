@@ -33,42 +33,40 @@ bundle is kept.
 fails for release tasks (warns for debug) if the library still is not there.
 A build that fetched V8 in the same run still links the stub — run it once more.
 
-`local.properties` must point at the Android SDK. `compileSdk` is 36
-(platform 36 must be installed), `minSdk` and `targetSdk` stay 34: the Horizon
-Store requires immersive apps to target 32-34. The Horizon OS level is declared
-with the current
-`uses-metavr-sdk` element (`minSdkVersion` 69, `targetSdkVersion` 81) instead
-of the older `uses-horizonos-sdk`; both are accepted by the Store.
+`local.properties` must point at the Android SDK. `compileSdk` is 37 (platform
+37 must be installed), `minSdk` and `targetSdk` stay 34: the Horizon Store
+requires immersive apps to target 32-34. The Horizon OS level is declared with
+the current `uses-metavr-sdk` element (`minSdkVersion` 69, `targetSdkVersion`
+81); the Store still accepts the older `uses-horizonos-sdk`.
 
-Dependency versions are the newest ones that still work with AGP 8.13.2 and
-`compileSdk` 36, not simply the newest published: `core-ktx` 1.19 and
-`lifecycle` 2.11 need `compileSdk` 37 plus AGP 9.1, and Compose 1.12 needs the
-same. The ceiling is therefore:
+Versions are the newest ones the toolchain actually supports, checked against
+each artifact's `aar-metadata.properties`:
 
-| Artifact | Version | Why not newer |
+| Artifact | Version | Note |
 |---|---|---|
-| Kotlin | 2.4.21 | newest; KGP 2.4.x supports Gradle up to 9.7 and AGP up to 9.3.1 |
-| Compose BOM | 2026.06.01 (Compose UI 1.11.4) | 2026.08.00+ ships UI 1.12, needs `compileSdk` 37 |
-| core-ktx | 1.18.0 | 1.19.x needs `compileSdk` 37 + AGP 9.1 |
-| activity-compose | 1.13.0 | newest; `minCompileSdk` 36 |
-| lifecycle | 2.10.0 | 2.11.0 needs `compileSdk` 37 |
-| coroutines | 1.11.0 | newest |
-| serialization | 1.12.0 | newest |
-| AGP / Gradle | 8.13.2 / 9.4.1 | AGP 9.x is a breaking major and needs `compileSdk` 37 |
+| AGP | 9.3.1 | inside KGP 2.4.x's supported range (max 9.3.1) and supports API 37 |
+| Gradle wrapper | 9.5.0 | AGP 9.3 requires >= 9.5.0 |
+| Kotlin | 2.4.21 | newest; KGP 2.4.x supports Gradle up to 9.7.0, AGP up to 9.3.1 |
+| Compose BOM | 2026.09.00 | Compose UI 1.12.1, Material3 1.4.0 |
+| core-ktx | 1.19.1 | needs `compileSdk` 37 + AGP 9.1 |
+| activity-compose | 1.13.0 | newest stable |
+| lifecycle | 2.11.0 | needs `compileSdk` 37 |
+| coroutines | 1.11.0 | newest stable |
+| serialization | 1.12.0 | newest stable |
+| Spatial SDK | 0.15.0 | newest (29 Oct 2026), all modules incl. isdk |
+| Meta VR OS SDK | 207 | `compileOnly`, runtime supplied by Horizon OS |
 
-The wrapper is on **Gradle 9.4.1**, which is what Meta ships with the 0.15.0
-samples. AGP 8.13.2 needs Gradle >= 8.13, so 9.4.1 is fine; the reverse pairing
-(old AGP on the Gradle 9 wrapper) is what fails during native/CMake model sync.
-
-Spatial SDK is on the newest release line, `0.15.0` (`libs.versions.toml`,
-`spatialsdk`). It is a breaking release: hierarchy scale is now the default and
+Spatial SDK 0.15.0 is a breaking release: hierarchy scale is now the default and
 physics moved from Bullet to Jolt. This app has no scaled parents and no
-physics feature, so neither applies; keep it that way, or read the 0.15.0
-release notes before adding `Scale` to a parent entity.
+physics feature, so neither applies; read the 0.15.0 release notes before
+adding `Scale` to a parent entity.
+
+The wrapper is on **Gradle 9.5.0**, the minimum AGP 9.3 requires; AGP 9.x on an
+older Gradle is the pairing that fails during native/CMake model sync.
 
 The Meta spatial plugin is applied from an explicit `buildscript` classpath
 instead of the `plugins {}` DSL, so its `kotlin-compiler-embeddable` can be
-excluded — otherwise Kotlin 2.2 warns about a second compiler on the build
+excluded — otherwise KGP 2.4 warns about a second compiler on the build
 classpath. The plugin version is pinned there (`spatial-gradle-plugin-impl`),
 keep it in sync with `libs.versions.toml`.
 

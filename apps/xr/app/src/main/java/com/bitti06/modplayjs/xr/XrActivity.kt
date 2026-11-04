@@ -270,6 +270,9 @@ class XrActivity : AppSystemActivity() {
         player.attachScene(scene, spatialAudio)
         scene.setReferenceSpace(ReferenceSpace.LOCAL_FLOOR)
         scene.setViewOrigin(0f, 0f, 0f, 0f)
+        // Documented knob: multiplies the thumbstick scroll speed on panels.
+        // 1.6 lets a 32-channel pattern be crossed in a reasonable time.
+        scene.setPanelControllerScrollFactor(1.6f)
         Skybox.install(scene, this, launchedInPassthrough = scene.isSystemPassthroughEnabled())
 
         // VRC.Quest.Input.4: on focus loss the hands and controllers must be

@@ -1,6 +1,8 @@
 package com.bitti06.modplayjs.xr
 
+import com.meta.spatial.runtime.AlphaMode
 import com.meta.spatial.runtime.PanelConfigOptions
+import com.meta.spatial.runtime.SceneMaterial
 import com.meta.spatial.toolkit.PanelSettings
 import com.meta.spatial.toolkit.UIPanelSettings
 
@@ -20,5 +22,12 @@ class TransparentPanelSettings(
     private val base: UIPanelSettings,
 ) : PanelSettings {
     override fun toPanelConfigOptions(): PanelConfigOptions =
-        base.toPanelConfigOptions().apply { enableTransparent = true }
+        base.toPanelConfigOptions().apply {
+            enableTransparent = true
+            // Meta's layer page: transparent layer panels need the hole-punch
+            // alpha mode plus that shader, otherwise the alpha is only blended
+            // and the panel writes no depth.
+            alphaMode = AlphaMode.HOLE_PUNCH
+            panelShader = SceneMaterial.HOLE_PUNCH_PANEL_SHADER
+        }
 }

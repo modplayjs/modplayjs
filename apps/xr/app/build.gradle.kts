@@ -132,10 +132,10 @@ apply(plugin = "com.meta.spatial.plugin")
 
 android {
     namespace = "com.bitti06.modplayjs.xr"
-    // 36 is what the current androidx line requires (core-ktx 1.18,
-    // activity-compose 1.13 declare minCompileSdk=36). targetSdk stays 34:
-    // immersive apps on the Horizon Store must target 32-34.
-    compileSdk = 36
+    // core-ktx 1.19, lifecycle 2.11 and Compose UI 1.12 (BOM 2026.09.00) all
+    // declare minCompileSdk=37, and AGP 9.5 supports up to API 37.
+    // targetSdk stays 34: immersive apps on the Horizon Store target 32-34.
+    compileSdk = 37
     ndkVersion = "29.0.14206865"
 
     defaultConfig {
