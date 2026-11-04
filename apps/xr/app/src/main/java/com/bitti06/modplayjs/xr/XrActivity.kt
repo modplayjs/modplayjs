@@ -7,72 +7,72 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.compose.ui.platform.ComposeView
-import kotlinx.coroutines.flow.combine
+import com.bitti06.modplayjs.xr.input.ControllerInputSystem
+import com.bitti06.modplayjs.xr.library.Library
+import com.bitti06.modplayjs.xr.library.Playlist
+import com.bitti06.modplayjs.xr.layout.PanelAnimator
+import com.bitti06.modplayjs.xr.layout.PanelPlacement
+import com.bitti06.modplayjs.xr.panels.PANELS
+import com.bitti06.modplayjs.xr.panels.PanelId
+import com.bitti06.modplayjs.xr.panels.PanelSpec
+import com.bitti06.modplayjs.xr.panels.visiblePanels
+import com.bitti06.modplayjs.xr.play.XrPlayer
+import com.bitti06.modplayjs.xr.state.XrHost
+import com.bitti06.modplayjs.xr.state.XrState
+import com.bitti06.modplayjs.xr.state.XrStore
+import com.bitti06.modplayjs.xr.ui.XrTheme
 import com.meta.spatial.compose.ComposeFeature
 import com.meta.spatial.compose.ComposeViewPanelRegistration
 import com.meta.spatial.core.Entity
 import com.meta.spatial.core.SpatialFeature
+import com.meta.spatial.isdk.IsdkDefaultCursorSystem
+import com.meta.spatial.isdk.IsdkSystem
 import com.meta.spatial.mruk.MRUKFeature
 import com.meta.spatial.runtime.PanelShapeLayerBlendType
 import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.AppSystemActivity
-import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
-import com.meta.spatial.isdk.IsdkDefaultCursorSystem
-import com.meta.spatial.isdk.IsdkSystem
 import com.meta.spatial.toolkit.AvatarSystem
+import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
 import com.meta.spatial.toolkit.MeshCollision
 import com.meta.spatial.toolkit.Panel
 import com.meta.spatial.toolkit.PanelRegistration
 import com.meta.spatial.toolkit.PanelRenderMode
 import com.meta.spatial.toolkit.PanelStyleOptions
 import com.meta.spatial.toolkit.QuadShapeOptions
-import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.UIPanelRenderOptions
 import com.meta.spatial.toolkit.UIPanelSettings
 import com.meta.spatial.toolkit.Visible
 import com.meta.spatial.vr.VRFeature
-import com.bitti06.modplayjs.xr.input.ControllerInputSystem
-import com.bitti06.modplayjs.xr.library.Library
-import com.bitti06.modplayjs.xr.layout.PanelAnimator
-import com.bitti06.modplayjs.xr.layout.PanelLayout
-import com.bitti06.modplayjs.xr.library.Playlist
-import com.bitti06.modplayjs.xr.play.XrPlayer
-import com.bitti06.modplayjs.xr.ui.XrTheme
-import com.bitti06.modplayjs.xr.ui.panels.LibraryPanel
-import com.bitti06.modplayjs.xr.ui.panels.NowPlayingPanel
-import com.bitti06.modplayjs.xr.ui.panels.DebugPanel
-import com.bitti06.modplayjs.xr.ui.panels.DetailsPanel
-import com.bitti06.modplayjs.xr.ui.panels.PatternPanel
-import com.bitti06.modplayjs.xr.ui.panels.IgnoredPanel
-import com.bitti06.modplayjs.xr.ui.panels.QueuePanel
-import com.bitti06.modplayjs.xr.ui.panels.SettingsPanel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
-class XrActivity : AppSystemActivity() {
+/**
+ * The immersive host. It owns features, lifecycle and the panel entities, and
+ * nothing else: what a panel shows lives in the panels, what it does lives in
+ * [XrStore], and where it stands lives in [PanelPlacement].
+ */
+class XrActivity : AppSystemActivity(), XrHost {
 
     private lateinit var spatialAudio: SpatialAudioFeature
     private lateinit var player: XrPlayer
+    private lateinit var playlist: Playlist
+    private lateinit var library: Library
     private lateinit var mrukFeature: MRUKFeature
-    private lateinit var layout: PanelLayout
+    private lateinit var placement: PanelPlacement
+
     private val panelAnimator = PanelAnimator()
-    private val panels = LinkedHashMap<Int, Entity>()
-    private var lastTrackLoaded: Boolean? = null
-    private var lastSettingsOpen: Boolean? = null
-    private var lastDebugSources: Boolean? = null
-    private var lastDetailsCount = -1
-    private var lastQueueOpen = false
-    private var lastIgnoredOpen = false
-    private var lastCanPattern = false
+    private val panels = LinkedHashMap<PanelId, Entity>()
+
+    private var visible: Set<PanelId> = emptySet()
+    private var lastLoaded = false
     private var resumeOnMount = false
     private var resumeAfterPause = false
     private var avatarSystem: AvatarSystem? = null
     private var isdkSystem: IsdkSystem? = null
-    /** Draws the hover dot and the controller laser; silenced off-focus. */
     private var cursorSystem: IsdkDefaultCursorSystem? = null
     private var lastRecenterNs = 0L
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
@@ -81,9 +81,8 @@ class XrActivity : AppSystemActivity() {
         spatialAudio = SpatialAudioFeature()
         mrukFeature = MRUKFeature(this, systemManager)
         // Interaction SDK, the SDK default and the only system that turns hand
-        // input into the same pointer events as controllers: ray, pinch and
-        // direct touch on panels, and grabbing with either modality. The legacy
-        // InputSystem is controller-only, so hands could not drive the panels.
+        // input into the same pointer events as controllers: ray, pinch, direct
+        // touch and grabbing with either modality.
         return listOf(
             VRFeature(this),
             ComposeFeature(),
@@ -93,115 +92,140 @@ class XrActivity : AppSystemActivity() {
     }
 
     override fun registerPanels(): List<PanelRegistration> =
-        listOf(
-            panel(R.id.panel_main, 1.8f, 1.05f) { NowPlayingPanel() },
-            panel(R.id.panel_library, 1.4f, 0.95f) { LibraryPanel() },
-            panel(R.id.panel_settings, 1.4f, 0.95f) { SettingsPanel() },
-            panel(R.id.panel_debug, 1.4f, 0.85f) { DebugPanel() },
-            // Dense monospace grid: 1.6 m so 8 channels fit without sideways
-            // scrolling, at 1.3 scale -> 1872 px, under the 2064 px eye buffer.
-            panel(R.id.panel_pattern, 1.6f, 0.9f, resolutionScale = 1.3f) { PatternPanel() },
-            // Wider than the rest on purpose: the three text blocks (message,
-            // instruments, samples) sit side by side, so the panel needs the
-            // width to give each of them a readable column.
-            // 2.2 m wide; at 1.2 resolution scale that would be ~2376 px, wider
-            // than the 2064 px eye buffer, so this one stays at 1.0.
-            panel(R.id.panel_details, 2.2f, 0.95f, transparent = true, resolutionScale = 1.0f) {
-                DetailsPanel()
-            },
-            panel(R.id.panel_queue, 1.2f, 0.85f) { QueuePanel() },
-            panel(R.id.panel_ignored, 1.2f, 0.85f) { IgnoredPanel() },
-        )
-
-    /**
-     * @param transparent let the panel's own pixels be see-through, so an
-     *   expanded text block can float on the room instead of on a card. The
-     *   panel still paints a background when it needs one.
-     */
-    private fun panel(
-        id: Int,
-        width: Float,
-        height: Float,
-        transparent: Boolean = false,
-        /** Raise resolution above 1.0 only where text is small and dense. */
-        resolutionScale: Float = 1.2f,
-        content: @androidx.compose.runtime.Composable () -> Unit,
-    ): PanelRegistration =
-        ComposeViewPanelRegistration(
-            id,
-            composeViewCreator = { _, ctx ->
-                ComposeView(ctx).apply {
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    setContent { XrTheme { content() } }
-                }
-            },
-            settingsCreator = {
-                val base =
-                    UIPanelSettings(
-                    shape = QuadShapeOptions(width = width, height = height),
-                    style = PanelStyleOptions(themeResourceId = R.style.PanelAppThemeTransparent),
-                    display = DpPerMeterDisplayOptions(dpPerMeter = 500f, resolutionScale = resolutionScale),
-                    // ALPHA_BLEND does not write depth, so overlapping
-                    // panels can sort wrongly; the panels here never overlap,
-                    // and the blend is what keeps the rounded corners clean.
-                    rendering = UIPanelRenderOptions(
-                        renderMode = PanelRenderMode.Layer(
-                            layerBlendType = PanelShapeLayerBlendType.ALPHA_BLEND,
-                            enableLayerFeatheredEdge = true,
-                        ),
-                    ),
-                )
-                if (transparent) TransparentPanelSettings(base) else base
-            },
-        )
-
-    /** Called once the user grants the runtime USE_SCENE permission. */
-    fun onScenePermissionGranted() {
-        // Scene model: room bounds place the emitter ring in the real room.
-        mrukFeature.loadSceneFromDevice().whenComplete { _, _ ->
-            runOnUiThread {
-                val bounds = mrukFeature.getCurrentRoom()?.roomBounds
-                if (bounds != null) {
-                    val centre = bounds.center()
-                    val size = bounds.size()
-                    val radius = XrPlayer.autoRadius(size.x, size.z)
-                    player.setRingAuto(radius, centre.x, centre.z)
-                }
-            }
+        PANELS.map { spec ->
+            ComposeViewPanelRegistration(
+                spec.androidId,
+                composeViewCreator = { _, ctx ->
+                    ComposeView(ctx).apply {
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        setContent { XrTheme { spec.content() } }
+                    }
+                },
+                settingsCreator = { panelSettings(spec) },
+            )
         }
+
+    private fun panelSettings(spec: PanelSpec): UIPanelSettings {
+        val base =
+            UIPanelSettings(
+                shape = QuadShapeOptions(width = spec.width, height = spec.height),
+                style = PanelStyleOptions(themeResourceId = R.style.PanelAppThemeTransparent),
+                display =
+                    DpPerMeterDisplayOptions(
+                        dpPerMeter = spec.dpPerMeter,
+                        resolutionScale = spec.resolutionScale,
+                    ),
+                // ALPHA_BLEND does not write depth, so overlapping panels can
+                // sort wrongly; the arc keeps them apart, and the blend is what
+                // keeps the rounded corners clean.
+                rendering =
+                    UIPanelRenderOptions(
+                        renderMode =
+                            PanelRenderMode.Layer(
+                                layerBlendType = PanelShapeLayerBlendType.ALPHA_BLEND,
+                                enableLayerFeatheredEdge = true,
+                            ),
+                    ),
+            )
+        return if (spec.transparent) TransparentPanelSettings(base) else base
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Panel slides run as a system: the SystemManager calls execute() once
-        // per frame, which is the documented place for per-frame work.
+        // per frame, the documented place for per-frame work.
         systemManager.registerSystem(panelAnimator)
-        layout = PanelLayout(this, panelAnimator)
-        XrApp.freeLayout.value = layout.free
-        XrApp.setFreeLayout = { on ->
-            val hasTrack = XrApp.player?.state?.value?.loaded ?: false
-            // The toggle lives in the settings panel: moving that panel out
-            // from under the user's hand mid-tap is the one change they cannot
-            // follow, so it stays where it is. It gets the new grab state.
-            layout.setFree(on, panels, hasTrack, skip = setOf(PanelLayout.PANEL_SETTINGS))
-            XrApp.freeLayout.value = layout.free
-        }
-        XrApp.resetLayout = {
-            val hasTrack = XrApp.player?.state?.value?.loaded ?: false
-            layout.reset(panels, hasTrack)
-        }
+
+        placement = PanelPlacement(this, panelAnimator)
         player = XrPlayer(this)
-        XrApp.player = player
-        XrApp.playlist = Playlist(Library(this)).also { playlist ->
-            player.onEnded = { playlist.onEnded() }
-        }
-        XrApp.pickFiles = { openModulePicker() }
-        XrApp.pickFolder = { openFolderPicker() }
+        library = Library(this)
+        playlist = Playlist(library, player) { XrStore.libraryChanged() }
+        player.onEnded = { playlist.onEnded() }
+
+        XrStore.host = this
+        // The store is the panels' only source of state; it folds in the
+        // player, the playlist, the layout and the display mode.
+        XrStore.attach(
+            scope = activityScope,
+            player = player,
+            playlist = playlist,
+            library = library,
+            freeLayout = placement.freeLayout,
+            passthrough = XrScene.passthrough,
+        )
+
         player.start()
         requestScenePermission()
     }
 
-    private fun openModulePicker() {
+    override fun onSceneReady() {
+        super.onSceneReady()
+        player.attachScene(scene, spatialAudio)
+        scene.setReferenceSpace(ReferenceSpace.LOCAL_FLOOR)
+        scene.setViewOrigin(0f, 0f, 0f, 0f)
+        // Documented knob: multiplies thumbstick scroll speed on panels. 1.6
+        // lets a 32-channel pattern be crossed in a reasonable time.
+        scene.setPanelControllerScrollFactor(1.6f)
+        // VRC.Quest.Performance.1: interactive apps must hold an allowed refresh
+        // rate. 72 Hz is the lowest one every Quest supports.
+        Log.i(TAG, "display rate 72 Hz accepted=${scene.setPreferredDisplayRate(72f)}")
+        XrScene.install(scene, this, launchedInPassthrough = scene.isSystemPassthroughEnabled())
+
+        avatarSystem = runCatching { systemManager.findSystem<AvatarSystem>() }.getOrNull()
+        isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
+        cursorSystem = runCatching { systemManager.findSystem<IsdkDefaultCursorSystem>() }.getOrNull()
+        updateAvatarVisibility(hasFocus = true)
+
+        // VRC.Quest.Input.1 (menu button) and the visible laser: both are the
+        // app's job under the Interaction SDK.
+        systemManager.registerSystem(ControllerInputSystem { XrStore.toggleSettings() })
+
+        for (spec in PANELS) {
+            panels[spec.id] =
+                Entity.create(
+                    Panel(spec.androidId, MeshCollision.LineTest),
+                    Visible(true),
+                )
+        }
+        placement.apply(panels)
+
+        activityScope.launch { XrStore.state.collect { applyState(it) } }
+
+        Log.i(TAG, "panels placed: ${panels.size}, free=${placement.free}")
+    }
+
+    /**
+     * Apply one state: place the arc when the loaded track changed, then show
+     * exactly the panels [visiblePanels] names.
+     */
+    private fun applyState(state: XrState) {
+        if (state.player.loaded != lastLoaded) {
+            lastLoaded = state.player.loaded
+            placement.apply(panels)
+        }
+        val next = visiblePanels(state)
+        if (next == visible) return
+        visible = next
+        for ((id, entity) in panels) {
+            entity.setComponent(Visible(id in next))
+        }
+    }
+
+    /** Called once the user grants the runtime USE_SCENE permission. */
+    fun onScenePermissionGranted() {
+        mrukFeature.loadSceneFromDevice().whenComplete { _, _ ->
+            runOnUiThread {
+                val bounds = mrukFeature.getCurrentRoom()?.roomBounds ?: return@runOnUiThread
+                val centre = bounds.center()
+                val size = bounds.size()
+                player.setRingAuto(XrPlayer.autoRadius(size.x, size.z), centre.x, centre.z)
+            }
+        }
+    }
+
+    // ---- XrHost ----------------------------------------------------------
+
+    override fun pickFiles() {
         val intent =
             Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -212,13 +236,14 @@ class XrActivity : AppSystemActivity() {
                         Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
                 )
             }
-        val options = android.app.ActivityOptions.makeBasic().apply {
-            setLaunchBounds(android.graphics.Rect(0, 0, 1280, 800))
-        }
+        val options =
+            android.app.ActivityOptions.makeBasic().apply {
+                setLaunchBounds(android.graphics.Rect(0, 0, 1280, 800))
+            }
         startActivityForResult(intent, REQUEST_PICK_MODULES, options.toBundle())
     }
 
-    private fun openFolderPicker() {
+    override fun pickFolder() {
         val intent =
             Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
                 addFlags(
@@ -226,32 +251,46 @@ class XrActivity : AppSystemActivity() {
                         Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
                 )
             }
-        val options = android.app.ActivityOptions.makeBasic().apply {
-            setLaunchBounds(android.graphics.Rect(0, 0, 1280, 800))
-        }
+        val options =
+            android.app.ActivityOptions.makeBasic().apply {
+                setLaunchBounds(android.graphics.Rect(0, 0, 1280, 800))
+            }
         startActivityForResult(intent, REQUEST_PICK_TREE, options.toBundle())
     }
+
+    override fun setFreeLayout(on: Boolean) {
+        // The toggle lives in the settings panel: moving that panel out from
+        // under the user's hand mid-tap is the one change they cannot follow,
+        // so it stays where it is and only gets the new grab state.
+        placement.setFree(on, panels, skip = setOf(PanelId.SETTINGS))
+    }
+
+    override fun resetLayout() {
+        placement.reset(panels)
+    }
+
+    override fun setPassthrough(on: Boolean) {
+        XrScene.setPassthrough(on)
+    }
+
+    // ---- Lifecycle -------------------------------------------------------
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != Activity.RESULT_OK) return
 
         if (requestCode == REQUEST_PICK_TREE) {
-            val tree = data?.data ?: return
-            Library(this).addTree(tree)
-            XrApp.libraryChanged()
+            data?.data?.let { XrStore.addTree(it) }
             return
         }
-
         if (requestCode != REQUEST_PICK_MODULES) return
+
         val uris = ArrayList<Uri>()
         data?.clipData?.let { clip ->
             for (i in 0 until clip.itemCount) uris += clip.getItemAt(i).uri
         }
         data?.data?.let { if (uris.isEmpty()) uris += it }
-        if (uris.isEmpty()) return
-        Library(this).addUris(uris)
-        XrApp.libraryChanged()
+        if (uris.isNotEmpty()) XrStore.addUris(uris)
     }
 
     override fun onSpatialShutdown() {
@@ -264,178 +303,25 @@ class XrActivity : AppSystemActivity() {
     override fun onDestroy() {
         activityScope.cancel()
         player.stop()
-        XrApp.player = null
+        XrStore.host = null
         super.onDestroy()
     }
 
-    override fun onSceneReady() {
-        super.onSceneReady()
-        player.attachScene(scene, spatialAudio)
-        scene.setReferenceSpace(ReferenceSpace.LOCAL_FLOOR)
-        scene.setViewOrigin(0f, 0f, 0f, 0f)
-        // Documented knob: multiplies the thumbstick scroll speed on panels.
-        // 1.6 lets a 32-channel pattern be crossed in a reasonable time.
-        scene.setPanelControllerScrollFactor(1.6f)
-        // VRC.Quest.Performance.1: interactive apps must hold one of the allowed
-        // refresh rates. 72 Hz is the lowest one every Quest supports and is
-        // what the panel compositor layers are budgeted for here; asking for it
-        // explicitly keeps the rate from depending on the headset's default.
-        Log.i(TAG, "display rate 72 Hz accepted=${scene.setPreferredDisplayRate(72f)}")
-        // No scene.enableHolePunching(true): it is a scene-wide switch, while
-        // Meta's hole-punch recipe (layer page) is per panel - layerConfig,
-        // blend type, feathering, alphaMode and panelShader on that panel's
-        // PanelConfigOptions, all of it in TransparentPanelSettings.
-        Skybox.install(scene, this, launchedInPassthrough = scene.isSystemPassthroughEnabled())
-
-        // VRC.Quest.Input.4: on focus loss the hands and controllers must be
-        // hidden. AvatarSystem owns those visuals; showing them again is
-        // unconditional because a headset switch may have changed the input
-        // device while the app was in the background.
-        // AvatarSystem ships with the SDK; findSystem throws when a system is
-        // absent, and a missing avatar must never take the app down.
-        avatarSystem = runCatching { systemManager.findSystem<AvatarSystem>() }.getOrNull()
-        isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
-        cursorSystem =
-            runCatching { systemManager.findSystem<IsdkDefaultCursorSystem>() }.getOrNull()
-        updateAvatarVisibility(hasFocus = true)
-
-        // VRC.Quest.Input.1 (menu button) and the visible laser, both of which
-        // the Interaction SDK leaves to the app.
-        systemManager.registerSystem(ControllerInputSystem { XrApp.toggleSettings() })
-
-        val ids = listOf(
-            R.id.panel_main to PanelLayout.PANEL_MAIN,
-            R.id.panel_library to PanelLayout.PANEL_LIBRARY,
-            R.id.panel_settings to PanelLayout.PANEL_SETTINGS,
-            R.id.panel_debug to PanelLayout.PANEL_DEBUG,
-            R.id.panel_pattern to PanelLayout.PANEL_PATTERN,
-            R.id.panel_details to PanelLayout.PANEL_DETAILS,
-            R.id.panel_queue to PanelLayout.PANEL_QUEUE,
-            R.id.panel_ignored to PanelLayout.PANEL_IGNORED,
-        )
-        for ((panelId, layoutId) in ids) {
-            val entity = Entity.create(
-                Panel(panelId, MeshCollision.LineTest),
-                Visible(true),
-            )
-            panels[layoutId] = entity
-        }
-
-        layout.apply(panels, hasTrack = false)
-
-        // Dynamically adjust panel visibility and positions as tracks are
-        // loaded/unloaded or a panel is toggled.
-        activityScope.launch {
-            kotlinx.coroutines.flow
-                .combine(player.state, XrApp.settingsOpen) { state, open -> state to open }
-                .combine(XrApp.queueOpen) { (state, settings), queue -> Triple(state, settings, queue) }
-                .combine(XrApp.ignoredOpen) { (state, settings, queue), ignored ->
-                    Overlays(state, settings, queue, ignored)
-                }
-                .collect { overlays -> updatePanelVisibilityAndLayout(overlays) }
-        }
-
-        Log.i(TAG, "panels placed: ${panels.size}, free=${layout.free}")
-        for ((id, entity) in panels) {
-            val pose = runCatching { entity.getComponent<Transform>().transform }.getOrNull()
-            Log.i(TAG, "  panel $id at ${pose?.t} rot ${pose?.q}")
-        }
-    }
-
-    private data class Overlays(
-        val state: XrPlayer.State,
-        val settingsOpen: Boolean,
-        val queueOpen: Boolean,
-        val ignoredOpen: Boolean,
-    )
-
-    private fun updatePanelVisibilityAndLayout(overlays: Overlays) {
-        val state = overlays.state
-        val hasTrack = state.loaded
-        val isDebug = state.debugSources
-
-        val trackChanged = (lastTrackLoaded != hasTrack)
-        val settingsChanged = (lastSettingsOpen != overlays.settingsOpen)
-        val debugChanged = (lastDebugSources != isDebug)
-        val detailsChanged = (lastDetailsCount != state.details.size)
-        val queueChanged = (lastQueueOpen != overlays.queueOpen)
-        val ignoredChanged = (lastIgnoredOpen != overlays.ignoredOpen)
-        // Pattern availability follows the module kind (SID/streamed: no grid),
-        // so it has to be tracked like the loaded flag.
-        val patternChanged = (lastCanPattern != state.canPattern)
-
-        // The flow emits a new state on every snapshot (2 Hz while playing).
-        // Six setComponent calls plus a layout pass per tick were pure waste,
-        // so bail out unless something the panels care about actually changed.
-        if (!trackChanged && !settingsChanged && !debugChanged && !detailsChanged &&
-            !queueChanged && !ignoredChanged && !patternChanged
-        ) {
-            return
-        }
-
-        lastTrackLoaded = hasTrack
-        lastSettingsOpen = overlays.settingsOpen
-        lastDebugSources = isDebug
-        lastDetailsCount = state.details.size
-        lastQueueOpen = overlays.queueOpen
-        lastIgnoredOpen = overlays.ignoredOpen
-        lastCanPattern = state.canPattern
-
-        if (trackChanged) {
-            layout.apply(panels, hasTrack = hasTrack)
-        }
-
-        // Only what the current player state can actually use. The rules, in
-        // one place:
-        //
-        //   nothing loaded   library + now playing (+ settings/debug when asked)
-        //   module loaded    + now playing, + pattern when it has patterns,
-        //                    + details when the track reports any
-        //   overlays         settings, queue, ignored: only while open
-        //
-        // The library is the app's home and never hides, because every other
-        // panel's Home chip returns to it by closing the overlays.
-        for ((layoutId, entity) in panels) {
-            val shouldBeVisible = when (layoutId) {
-                PanelLayout.PANEL_LIBRARY -> true
-                // Always on: with nothing loaded it shows the "no track" state
-                // and the push hint, so the app never opens as a single panel
-                // off to the left of an empty room.
-                PanelLayout.PANEL_MAIN -> true
-                // SID and streamed modules have no pattern data; showing an
-                // empty grid there is noise, so the panel stays hidden.
-                PanelLayout.PANEL_PATTERN -> hasTrack && state.canPattern
-                PanelLayout.PANEL_DETAILS -> hasTrack && state.details.isNotEmpty()
-                PanelLayout.PANEL_SETTINGS -> overlays.settingsOpen
-                PanelLayout.PANEL_QUEUE -> overlays.queueOpen
-                PanelLayout.PANEL_IGNORED -> overlays.ignoredOpen
-                PanelLayout.PANEL_DEBUG -> isDebug
-                else -> false
-            }
-            entity.setComponent(Visible(shouldBeVisible))
-        }
-    }
-
     /**
-     * VRC.Quest.Functional.9: with a Local tracking space the user must be able
-     * to reset their forward direction. A recenter moves the LOCAL_FLOOR
-     * origin, so the fixed arc is re-authored in front of the new forward
-     * direction. Free-layout poses are left alone on purpose: the user placed
-     * those in the world.
+     * VRC.Quest.Functional.9: a recenter moves the LOCAL_FLOOR origin, so the
+     * fixed arc is re-authored in front of the new forward direction. Free
+     * layouts are left alone on purpose: the user placed those in the world.
      */
     override fun onRecenter(isUserInitiated: Boolean) {
         super.onRecenter(isUserInitiated)
-        // 0.15 fixed onRecenter firing more than once with a stale head pose.
-        // Re-applying the arc twice in one frame would double-write every
-        // panel Transform for no gain, so collapse repeats.
+        // onRecenter fires more than once with a stale head pose; collapsing
+        // repeats avoids double-writing every Transform in one frame.
         val now = System.nanoTime()
         if (now - lastRecenterNs < RECENTER_DEBOUNCE_NS) return
         lastRecenterNs = now
-        if (::layout.isInitialized && !layout.free) {
-            layout.apply(panels, hasTrack = lastTrackLoaded == true)
-        }
-        Skybox.reapply()
-        Log.i(TAG, "recenter: userInitiated=$isUserInitiated free=${::layout.isInitialized && layout.free}")
+        if (::placement.isInitialized && !placement.free) placement.apply(panels)
+        XrScene.reapply()
+        Log.i(TAG, "recenter: userInitiated=$isUserInitiated free=${::placement.isInitialized && placement.free}")
     }
 
     /**
@@ -445,7 +331,7 @@ class XrActivity : AppSystemActivity() {
      */
     override fun onHMDUnmounted() {
         super.onHMDUnmounted()
-        resumeOnMount = XrApp.player?.state?.value?.playing == true
+        resumeOnMount = player.state.value.playing
         if (resumeOnMount) player.pause()
     }
 
@@ -458,19 +344,17 @@ class XrActivity : AppSystemActivity() {
     }
 
     override fun onPause() {
-        // VRC.Quest.Functional.2: when Horizon OS asks the app to pause (entering
-        // passthrough from Quick Settings, display off), playback pauses and
-        // comes back on resume. Focus loss (Universal Menu) is a different
-        // event and deliberately keeps playing.
+        // VRC.Quest.Functional.2: pausing the app pauses playback. Focus loss
+        // (Universal Menu) is a different event and deliberately keeps playing.
         saveFreeLayout()
-        resumeAfterPause = XrApp.player?.state?.value?.playing == true
+        resumeAfterPause = player.state.value.playing
         if (resumeAfterPause) player.pause()
         super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
-        Skybox.reapply()
+        XrScene.reapply()
         if (resumeAfterPause) {
             resumeAfterPause = false
             player.resume()
@@ -478,8 +362,8 @@ class XrActivity : AppSystemActivity() {
     }
 
     /**
-     * VRC.Quest.Input.4: the app keeps rendering when focus is lost, but any
-     * drag in progress must not continue from stale controller input.
+     * VRC.Quest.Input.4: the app keeps rendering when focus is lost, but no
+     * drag may continue from stale controller input.
      */
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
@@ -487,16 +371,15 @@ class XrActivity : AppSystemActivity() {
         if (!hasFocus) saveFreeLayout()
     }
 
-    /** Persist where the user left the panels, if free placement is active. */
     private fun saveFreeLayout() {
-        if (::layout.isInitialized && layout.free) layout.save(panels)
+        if (::placement.isInitialized && placement.free) placement.save(panels)
     }
 
     /**
-     * VRC.Quest.Input.4: hide the user's hands and controllers and ignore all
-     * their input while another app has focus. IsdkSystem stops ticking, which
-     * is where every pointer event is generated, so nothing can be clicked
-     * behind the Universal Menu. The app keeps rendering throughout.
+     * VRC.Quest.Input.4: hide hands and controllers and ignore all input while
+     * another app has focus. IsdkSystem stops ticking, which is where every
+     * pointer event is generated; the cursor system's own switch also empties
+     * the cursor and laser pools so no beam is left hanging.
      */
     private fun updateAvatarVisibility(hasFocus: Boolean) {
         avatarSystem?.apply {
@@ -504,15 +387,12 @@ class XrActivity : AppSystemActivity() {
             setShowControllers(hasFocus)
         }
         isdkSystem?.active = hasFocus
-        // Stops the pointer and empties the cursor and laser pools, so no beam
-        // is left hanging in the air over the Universal Menu.
         cursorSystem?.enableInput(hasFocus)
     }
 
     /**
      * Meta VR OS SDK API level (207 on the current OS line), not the Android
-     * API level. Logged so a device log shows which Horizon OS the app is
-     * actually running on; the same value gates version-specific behaviour.
+     * API level. Logged so a device log shows which Horizon OS the app runs on.
      */
     private fun horizonOsApi(): Int = runCatching { metavr.os.Build.Version.getApiVersion() }.getOrDefault(-1)
 
@@ -520,8 +400,7 @@ class XrActivity : AppSystemActivity() {
         // Two runtime permissions, requested together so the user answers once:
         // scene data places the emitter ring, hand tracking drives the panels.
         // Both are optional: denying scene keeps a 1 m ring, denying hands keeps
-        // the controllers usable, and the app changes nothing else either way
-        // (VRC.Quest.Security.2).
+        // the controllers usable (VRC.Quest.Security.2).
         val wanted = ArrayList<String>()
         if (checkSelfPermission(PERMISSIONS.scene) != PackageManager.PERMISSION_GRANTED) {
             wanted += PERMISSIONS.scene
@@ -544,17 +423,15 @@ class XrActivity : AppSystemActivity() {
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_USE_SCENE) {
-            val sceneIndex = permissions.indexOf(PERMISSIONS.scene)
-            val granted =
-                sceneIndex >= 0 &&
-                    grantResults.getOrNull(sceneIndex) == PackageManager.PERMISSION_GRANTED
-            val handsIndex = permissions.indexOf(PERMISSIONS.handTracking)
-            val hands =
-                handsIndex < 0 || grantResults.getOrNull(handsIndex) == PackageManager.PERMISSION_GRANTED
-            Log.i(TAG, "permissions: scene=$granted hands=$hands os=${horizonOsApi()}")
-            SceneBridge.onPermissionResult(granted, this)
-        }
+        if (requestCode != REQUEST_USE_SCENE) return
+        val sceneIndex = permissions.indexOf(PERMISSIONS.scene)
+        val granted =
+            sceneIndex >= 0 && grantResults.getOrNull(sceneIndex) == PackageManager.PERMISSION_GRANTED
+        val handsIndex = permissions.indexOf(PERMISSIONS.handTracking)
+        val hands =
+            handsIndex < 0 || grantResults.getOrNull(handsIndex) == PackageManager.PERMISSION_GRANTED
+        Log.i(TAG, "permissions: scene=$granted hands=$hands os=${horizonOsApi()}")
+        SceneBridge.onPermissionResult(granted, this)
     }
 
     companion object {
@@ -563,10 +440,9 @@ class XrActivity : AppSystemActivity() {
 
         /**
          * Namespaces differ per permission, and each is the one the current
-         * Spatial SDK pages use: `USE_SCENE` is documented under
-         * com.oculus.permission (the horizonos.* form only shows up as a
-         * system-side implicit grant), hand tracking under
-         * horizonos.permission.
+         * Spatial SDK pages use: `USE_SCENE` under com.oculus.permission (the
+         * horizonos.* form only shows up as a system-side implicit grant), hand
+         * tracking under horizonos.permission.
          */
         private object PERMISSIONS {
             const val scene = "com.oculus.permission.USE_SCENE"

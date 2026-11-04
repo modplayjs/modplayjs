@@ -1,17 +1,21 @@
 package com.bitti06.modplayjs.xr.ui.panels
 
+import androidx.compose.foundation.ScrollIndicatorState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -22,16 +26,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.bitti06.modplayjs.xr.R
-import com.bitti06.modplayjs.xr.XrApp
-import com.bitti06.modplayjs.xr.play.XrPlayer
+import com.bitti06.modplayjs.xr.state.XrStore
+import com.bitti06.modplayjs.xr.ui.panel.EmptyNote
+import com.bitti06.modplayjs.xr.ui.panel.HomeButton
+import com.bitti06.modplayjs.xr.ui.panel.PanelScaffold
+import com.bitti06.modplayjs.xr.ui.panel.PanelTokens
+import com.bitti06.modplayjs.xr.ui.panel.Scrollbar
 
 /** Which block, if any, currently covers the panel. */
 private enum class Expanded { None, Message, Instruments, Samples }
@@ -42,204 +52,238 @@ private enum class Expanded { None, Message, Instruments, Samples }
  * registered wider than the others for exactly that reason.
  *
  * Tapping a block expands it over the whole panel. In that state the panel
- * paints no background at all: the room behind the panel is the backdrop, and
- * the text gets a shadow and a larger size so it stays readable while floating
- * in space. A scrollbar is drawn in both states.
+ * paints no background at all: the room behind it is the backdrop, and the text
+ * carries a shadow so it stays readable while floating.
  */
 @Composable
 fun DetailsPanel() {
-    val state by (XrApp.player?.state ?: kotlinx.coroutines.flow.MutableStateFlow(XrPlayer.State()))
-        .collectAsState()
+    val state by XrStore.state.collectAsState()
+    val playback = state.player
     var expanded by remember { mutableStateOf(Expanded.None) }
 
     val message =
-        remember(state.message) {
-            state.message.replace("\r", "").takeIf { it.isNotBlank() }?.lines().orEmpty()
+        remember(playback.message) {
+            playback.message.replace("\r", "").takeIf { it.isNotBlank() }?.lines().orEmpty()
         }
-    val instruments = remember(state.trackDetail.instrumentList) { state.trackDetail.instrumentList }
-    val samples = remember(state.trackDetail.sampleList) { state.trackDetail.sampleList }
+    val instruments = remember(playback.trackDetail.instrumentList) { playback.trackDetail.instrumentList }
+    val samples = remember(playback.trackDetail.sampleList) { playback.trackDetail.sampleList }
 
-    // Expanded blocks float on the room: no panel background, no card.
-    val floating = expanded != Expanded.None
-
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .then(
-                    if (floating) Modifier else Modifier.background(MaterialTheme.colorScheme.background),
-                )
-                .padding(
-                    horizontal = if (floating) 14.dp else 10.dp,
-                    vertical = if (floating) 10.dp else 8.dp,
-                ),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Header(floating = floating, onHome = { expanded = Expanded.None })
-        if (state.details.isEmpty()) {
-            Text(
-                stringResource(R.string.xr_no_module),
-                fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            return@Column
-        }
-
-        when (expanded) {
-            Expanded.None -> Collapsed(
-                state = state,
-                message = message,
-                instruments = instruments,
-                samples = samples,
-                onExpand = { expanded = it },
-            )
-
-            Expanded.Message ->
-                InfoCard(
-                    title = stringResource(R.string.xr_details_message),
-                    accent = MaterialTheme.colorScheme.tertiary,
-                    lines = message.ifEmpty { listOf(stringResource(R.string.xr_details_empty)) },
-                    expanded = true,
-                    onToggle = { expanded = Expanded.None },
-                    modifier = Modifier.fillMaxSize(),
-                )
-
-            Expanded.Instruments ->
-                InfoCard(
-                    title = stringResource(R.string.xr_details_instruments),
-                    accent = MaterialTheme.colorScheme.primary,
-                    lines = instruments,
-                    expanded = true,
-                    onToggle = { expanded = Expanded.None },
-                    modifier = Modifier.fillMaxSize(),
-                )
-
-            Expanded.Samples ->
-                InfoCard(
-                    title = stringResource(R.string.xr_details_samples),
-                    accent = MaterialTheme.colorScheme.secondary,
-                    lines = samples,
-                    expanded = true,
-                    onToggle = { expanded = Expanded.None },
-                    modifier = Modifier.fillMaxSize(),
-                )
-        }
-    }
-}
-
-@Composable
-private fun Header(
-    floating: Boolean,
-    onHome: () -> Unit,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            stringResource(R.string.xr_details),
-            fontSize = if (floating) 13.sp else 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            style =
-                if (floating) {
-                    TextStyle(
-                        shadow = Shadow(color = androidx.compose.ui.graphics.Color.Black, blurRadius = 8f),
+    if (expanded != Expanded.None) {
+        val block =
+            when (expanded) {
+                Expanded.Message ->
+                    Triple(
+                        stringResource(R.string.xr_details_message),
+                        PanelTokens.AccentWarm,
+                        message.ifEmpty { listOf(stringResource(R.string.xr_details_empty)) },
                     )
-                } else {
-                    TextStyle.Default
-                },
-            modifier = Modifier.weight(1f),
-        )
-        HomeChip()
+                Expanded.Instruments ->
+                    Triple(
+                        stringResource(R.string.xr_details_instruments),
+                        PanelTokens.Accent,
+                        instruments,
+                    )
+                else ->
+                    Triple(
+                        stringResource(R.string.xr_details_samples),
+                        PanelTokens.AccentAlt,
+                        samples,
+                    )
+            }
+        Column(
+            modifier = Modifier.fillMaxSize().padding(PanelTokens.GapLg),
+            verticalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.xr_details),
+                    fontSize = PanelTokens.Heading,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PanelTokens.Text,
+                    style = TextStyle(shadow = Shadow(color = Color.Black, blurRadius = 10f)),
+                    modifier = Modifier.weight(1f),
+                )
+                HomeButton()
+            }
+            TextBlock(
+                title = block.first,
+                accent = block.second,
+                lines = block.third,
+                expanded = true,
+                onToggle = { expanded = Expanded.None },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        return
     }
-}
 
-/**
- * The three blocks plus the module facts. The facts are the only part that
- * scrolls as a whole; the blocks scroll inside themselves.
- */
-@Composable
-private fun Collapsed(
-    state: XrPlayer.State,
-    message: List<String>,
-    instruments: List<String>,
-    samples: List<String>,
-    onExpand: (Expanded) -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+    PanelScaffold(
+        title = stringResource(R.string.xr_details),
+        subtitle = playback.title.ifBlank { null },
     ) {
-        // Order list first: it is the one line that identifies the module.
-        if (state.trackDetail.orderList.isNotBlank()) {
+        if (playback.details.isEmpty()) {
+            EmptyNote(stringResource(R.string.xr_no_module))
+            return@PanelScaffold
+        }
+
+        if (playback.trackDetail.orderList.isNotBlank()) {
             Text(
-                state.trackDetail.orderList,
-                fontSize = 9.sp,
+                playback.trackDetail.orderList,
+                fontSize = PanelTokens.Mono,
                 fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = PanelTokens.TextDim,
                 maxLines = 2,
             )
         }
 
-        // The three text blocks, side by side, sharing the width evenly and
-        // the remaining height evenly.
         Row(
             modifier = Modifier.fillMaxWidth().weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
         ) {
-            InfoCard(
+            TextBlock(
                 title = stringResource(R.string.xr_details_message),
-                accent = MaterialTheme.colorScheme.tertiary,
+                accent = PanelTokens.AccentWarm,
                 lines = message,
                 expanded = false,
-                onToggle = { onExpand(Expanded.Message) },
+                onToggle = { expanded = Expanded.Message },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
-            InfoCard(
+            TextBlock(
                 title = stringResource(R.string.xr_details_instruments),
-                accent = MaterialTheme.colorScheme.primary,
+                accent = PanelTokens.Accent,
                 lines = instruments,
                 expanded = false,
-                onToggle = { onExpand(Expanded.Instruments) },
+                onToggle = { expanded = Expanded.Instruments },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
-            InfoCard(
+            TextBlock(
                 title = stringResource(R.string.xr_details_samples),
-                accent = MaterialTheme.colorScheme.secondary,
+                accent = PanelTokens.AccentAlt,
                 lines = samples,
                 expanded = false,
-                onToggle = { onExpand(Expanded.Samples) },
+                onToggle = { expanded = Expanded.Samples },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
         }
 
-        // Facts: key/value rows, compact, at the bottom where they do not
-        // compete with the text blocks.
         LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(0.7f),
             verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
-            items(state.details) { (key, value) ->
+            items(playback.details) { (key, value) ->
                 Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(2.dp)),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)),
+                    horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
                 ) {
                     Text(
                         key,
-                        fontSize = 9.sp,
+                        fontSize = PanelTokens.Mono,
                         fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = PanelTokens.TextDim,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         value,
-                        fontSize = 9.sp,
+                        fontSize = PanelTokens.Mono,
                         fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = PanelTokens.Text,
                         modifier = Modifier.weight(2f),
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * A scrollable block of module text. Collapsed, three of these sit side by side
+ * in a tinted card; expanded, one fills the panel and the panel stops painting
+ * a background, so the room shows through and the text carries its own contrast
+ * with a shadow. A scrollbar is drawn either way.
+ */
+@Composable
+private fun TextBlock(
+    title: String,
+    accent: Color,
+    lines: List<String>,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scroll = rememberScrollState()
+    val empty = lines.isEmpty()
+    val bodyStyle =
+        if (expanded) {
+            TextStyle(
+                fontFamily = FontFamily.Monospace,
+                fontSize = PanelTokens.Body,
+                lineHeight = PanelTokens.Body * 1.35f,
+                shadow = Shadow(color = Color.Black, offset = Offset(0f, 0f), blurRadius = 10f),
+            )
+        } else {
+            TextStyle(fontFamily = FontFamily.Monospace, fontSize = PanelTokens.Meta)
+        }
+
+    Column(
+        modifier =
+            modifier.then(
+                if (expanded) {
+                    Modifier.fillMaxSize()
+                } else {
+                    Modifier
+                        .clip(RoundedCornerShape(PanelTokens.Radius))
+                        .background(lerp(PanelTokens.SurfaceRaised, accent, 0.16f))
+                },
+            ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !empty, onClick = onToggle)
+                .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
+        ) {
+            Text(
+                title.uppercase(),
+                fontSize = PanelTokens.Meta,
+                fontWeight = FontWeight.SemiBold,
+                color = accent,
+                modifier = Modifier.weight(1f),
+            )
+            if (!empty) {
+                Text(
+                    if (expanded) "✕" else lines.size.toString(),
+                    fontSize = PanelTokens.Meta,
+                    fontFamily = FontFamily.Monospace,
+                    color = accent,
+                )
+            }
+        }
+
+        if (empty) {
+            Text(
+                "—",
+                fontSize = PanelTokens.Meta,
+                color = PanelTokens.TextFaint,
+                modifier = Modifier.padding(horizontal = PanelTokens.GapSm, vertical = 2.dp),
+            )
+            return@Column
+        }
+
+        Row(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(start = PanelTokens.GapSm, end = PanelTokens.GapXs, bottom = PanelTokens.GapSm)
+                    .verticalScroll(scroll),
+            ) {
+                lines.forEach { line ->
+                    Text(line, style = bodyStyle, color = PanelTokens.Text)
+                }
+            }
+            Scrollbar(indicator = scroll.scrollIndicatorState, color = accent, wide = expanded)
         }
     }
 }

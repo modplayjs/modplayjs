@@ -5,6 +5,7 @@
     <string name="stat_tracks">Tracks</string>
     <string name="stat_folders">Folders</string>
     <string name="stat_favorites">Favorites</string>
+    <string name="xr_now_playing">Now Playing</string>
     <string name="xr_settings">Settings</string>
     <string name="xr_details">Details</string>
     <string name="xr_sources">Sources</string>

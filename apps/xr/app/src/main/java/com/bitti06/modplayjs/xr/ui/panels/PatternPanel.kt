@@ -7,19 +7,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -39,15 +36,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bitti06.modplayjs.engine.PatternColors
 import com.bitti06.modplayjs.xr.R
-import com.bitti06.modplayjs.xr.XrApp
-import com.bitti06.modplayjs.xr.play.XrPlayer
+import com.bitti06.modplayjs.xr.state.XrStore
+import com.bitti06.modplayjs.xr.ui.panel.EmptyNote
+import com.bitti06.modplayjs.xr.ui.panel.PanelScaffold
+import com.bitti06.modplayjs.xr.ui.panel.PanelTokens
 
-// Same proportions as the phone app's PatternScreen (10 sp in a 15 dp row),
-// scaled to a panel you read from ~2 m instead of ~30 cm.
-private val ROW_NUM_WIDTH = 26.dp
-private val CELL_WIDTH = 88.dp
-private val ROW_HEIGHT = 20.dp
-private val HEADER_HEIGHT = 22.dp
+private val ROW_NUM_WIDTH = 30.dp
+private val CELL_WIDTH = 96.dp
+private val ROW_HEIGHT = 22.dp
+private val HEADER_HEIGHT = 24.dp
+private val CELL_TEXT = 10.sp
 
 /** "C-4 01 40 A0F": note, instrument, volume, effect at fixed widths. */
 private const val CELL_CHARS = 13
@@ -60,91 +58,62 @@ private val DOT_RUN = Regex("\\.+")
 
 /**
  * The playing pattern the way a tracker shows it: one row per line, one column
- * per channel, cells in four colours (note, instrument, volume, effect) so the
- * eye can follow a single column through the matrix.
+ * per channel, cells in four colours so the eye can follow a single column
+ * through the matrix.
  *
- * The grid is a LazyColumn so a 64-row, 32-channel pattern never builds more
- * than the visible window; the channel header sits outside the list, which
- * keeps it pinned vertically while it still scrolls sideways with the columns.
+ * The grid is a LazyColumn, so a 64-row, 32-channel pattern never builds more
+ * than the visible window; the channel header sits outside the list so it stays
+ * pinned while still scrolling sideways with the columns.
  */
 @Composable
 fun PatternPanel() {
-    val state by (XrApp.player?.state ?: kotlinx.coroutines.flow.MutableStateFlow(XrPlayer.State()))
-        .collectAsState()
-    val pattern = state.pattern
+    val state by XrStore.state.collectAsState()
+    val pattern = state.player.pattern
     val listState = rememberLazyListState()
     val scrollState = rememberScrollState()
-    val palette = patternPalette(state.patternColors)
+    val palette = patternPalette(state.player.patternColors)
 
     // Follow the playhead three rows down from the top edge instead of pinned
-    // to it, and only scroll when the row left the window. The playhead now
-    // arrives ~8x/s (see XrPlayer.publishPlayhead), so scrolling on every emit
-    // would fight the user's own drag and jitter the whole grid.
-    LaunchedEffect(pattern.row, pattern.pattern, pattern.rows, state.follow) {
-        if (!state.follow) return@LaunchedEffect
+    // to it, and only scroll when the row left the window: the playhead arrives
+    // many times a second, and scrolling on every emit would fight the user.
+    LaunchedEffect(pattern.row, pattern.pattern, pattern.rows, state.player.follow) {
+        if (!state.player.follow) return@LaunchedEffect
         if (pattern.rows <= 0 || pattern.row !in 0 until pattern.rows) return@LaunchedEffect
         val visible = listState.layoutInfo.visibleItemsInfo
         if (visible.isEmpty()) return@LaunchedEffect
         val first = visible.first().index
         val last = visible.last().index
         if (pattern.row < first || pattern.row > last - 2) {
-            val target = (pattern.row - 3).coerceIn(0, (pattern.rows - 1).coerceAtLeast(0))
-            listState.scrollToItem(target)
+            listState.scrollToItem((pattern.row - 3).coerceIn(0, (pattern.rows - 1).coerceAtLeast(0)))
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    PanelScaffold(
+        title = stringResource(R.string.xr_pattern, pattern.pattern.toString().padStart(2, '0')),
+        subtitle =
+            if (pattern.rows > 0) {
+                stringResource(R.string.xr_pattern_meta, pattern.channels, pattern.row)
+            } else {
+                "—"
+            },
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.xr_pattern, pattern.pattern.toString().padStart(2, '0')),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            Text(
-                if (pattern.rows > 0) {
-                    "  " + stringResource(R.string.xr_pattern_meta, pattern.channels, pattern.row)
-                } else {
-                    "  —"
-                },
-                fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            HomeChip()
-        }
-
         if (pattern.rows == 0 || pattern.cells.isEmpty()) {
-            Text(
-                if (state.loaded) stringResource(R.string.xr_pattern_empty) else stringResource(R.string.xr_no_module),
-                fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            EmptyNote(
+                if (state.player.loaded) {
+                    stringResource(R.string.xr_pattern_empty)
+                } else {
+                    stringResource(R.string.xr_no_module)
+                },
             )
-            return
+            return@PanelScaffold
         }
 
         val gridWidth = ROW_NUM_WIDTH + CELL_WIDTH * pattern.channels
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .horizontalScroll(scrollState),
-        ) {
+        Box(modifier = Modifier.weight(1f).horizontalScroll(scrollState)) {
             Column(modifier = Modifier.width(gridWidth).fillMaxHeight()) {
                 PatternHeader(channels = pattern.channels, line = palette.line)
-
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxHeight(),
-                    // No animateItem here: the playhead moves 8x/s, and an item
-                    // animation would start a new transition per step.
-                ) {
+                LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
                     items(count = pattern.rows, key = { row -> row }) { row ->
                         PatternRow(
                             row = row,
@@ -152,7 +121,7 @@ fun PatternPanel() {
                             channels = pattern.channels,
                             active = row == pattern.row,
                             palette = palette,
-                            stripDots = state.stripDots,
+                            stripDots = state.player.stripDots,
                         )
                     }
                 }
@@ -161,22 +130,21 @@ fun PatternPanel() {
     }
 }
 
-/** Channel numbers over their columns, with the same grid lines as the rows. */
 @Composable
 private fun PatternHeader(channels: Int, line: Color) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(HEADER_HEIGHT)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(PanelTokens.SurfaceRaised)
             .channelGrid(channels, line),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             "#",
-            fontSize = 9.sp,
+            fontSize = CELL_TEXT,
             fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = PanelTokens.TextFaint,
             textAlign = TextAlign.Center,
             maxLines = 1,
             softWrap = false,
@@ -185,10 +153,10 @@ private fun PatternHeader(channels: Int, line: Color) {
         repeat(channels) { ch ->
             Text(
                 "C${(ch + 1).toString().padStart(2, '0')}",
-                fontSize = 9.sp,
+                fontSize = CELL_TEXT,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
+                color = PanelTokens.Accent,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 softWrap = false,
@@ -212,20 +180,19 @@ private fun PatternRow(
     palette: PatternPalette,
     stripDots: Boolean,
 ) {
-    val scheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(ROW_HEIGHT)
-            .background(if (active) scheme.primaryContainer else Color.Transparent)
+            .background(if (active) PanelTokens.Highlight else Color.Transparent)
             .channelGrid(channels, palette.line),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             row.toString().padStart(2, '0'),
-            fontSize = 9.sp,
+            fontSize = CELL_TEXT,
             fontFamily = FontFamily.Monospace,
-            color = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
+            color = if (active) PanelTokens.Accent else PanelTokens.TextFaint,
             textAlign = TextAlign.Center,
             maxLines = 1,
             softWrap = false,
@@ -233,19 +200,11 @@ private fun PatternRow(
         )
         for (ch in 0 until channels) {
             val raw = cells.getOrElse(row * channels + ch) { EMPTY_CELL }
-            // A top-level Regex, not one per cell: building a Regex for every
-            // cell of every row was allocation churn on the frame path.
             val cell = if (stripDots) DOT_RUN.replace(raw, "...") else raw
-            val text =
-                remember(cell, palette) {
-                    annotatedCell(cell, palette)
-                }
-            // No `color =` here: the AnnotatedString carries one per field, and
-            // a Text-level colour would override them. The phone app does the
-            // same; only the row background marks the playhead.
+            val text = remember(cell, palette) { annotatedCell(cell, palette) }
             Text(
                 text,
-                fontSize = 9.sp,
+                fontSize = CELL_TEXT,
                 fontFamily = FontFamily.Monospace,
                 maxLines = 1,
                 softWrap = false,
@@ -265,24 +224,22 @@ private data class PatternPalette(
 )
 
 @Composable
-private fun patternPalette(colors: PatternColors): PatternPalette {
-    val scheme = MaterialTheme.colorScheme
-    return remember(scheme, colors) {
+private fun patternPalette(colors: PatternColors): PatternPalette =
+    remember(colors) {
         PatternPalette(
-            note = colors.note?.let { Color(it) } ?: scheme.onSurface,
-            instrument = colors.instrument?.let { Color(it) } ?: scheme.secondary,
-            volume = colors.volume?.let { Color(it) } ?: scheme.tertiary,
-            effect = colors.effect?.let { Color(it) } ?: scheme.primary,
-            empty = scheme.onSurfaceVariant.copy(alpha = 0.40f),
-            line = scheme.outlineVariant.copy(alpha = 0.55f),
+            note = colors.note?.let { Color(it) } ?: PanelTokens.Text,
+            instrument = colors.instrument?.let { Color(it) } ?: PanelTokens.AccentAlt,
+            volume = colors.volume?.let { Color(it) } ?: PanelTokens.AccentWarm,
+            effect = colors.effect?.let { Color(it) } ?: PanelTokens.Accent,
+            empty = PanelTokens.TextFaint.copy(alpha = 0.55f),
+            line = PanelTokens.Outline.copy(alpha = 0.7f),
         )
     }
-}
 
 /**
  * Splits one engine cell into its four fields. The engine writes them at fixed
- * widths (3 / 2 / 2 / 3), which is what keeps the columns aligned; a short or
- * unexpected string is shown dimmed instead of mis-sliced.
+ * widths (3 / 2 / 2 / 3); a short or unexpected string is shown dimmed instead
+ * of mis-sliced.
  */
 private fun annotatedCell(cell: String, palette: PatternPalette): AnnotatedString =
     buildAnnotatedString {

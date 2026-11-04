@@ -10,15 +10,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -37,203 +34,168 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.bitti06.modplayjs.xr.R
-import com.bitti06.modplayjs.xr.XrApp
-import com.bitti06.modplayjs.xr.play.XrPlayer
+import com.bitti06.modplayjs.xr.state.XrStore
+import com.bitti06.modplayjs.xr.ui.panel.MetaText
+import com.bitti06.modplayjs.xr.ui.panel.PanelScaffold
+import com.bitti06.modplayjs.xr.ui.panel.PanelTokens
+import com.bitti06.modplayjs.xr.ui.panel.SettingsButton
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NowPlayingPanel() {
-    val state by (XrApp.player?.state ?: kotlinx.coroutines.flow.MutableStateFlow(XrPlayer.State()))
-        .collectAsState()
-    val player = XrApp.player
-    var volume by remember { mutableFloatStateOf((XrApp.player?.state?.value?.volume ?: 100).toFloat()) }
+    val state by XrStore.state.collectAsState()
+    val playback = state.player
+    var volume by remember { mutableFloatStateOf(playback.volume.toFloat()) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
+    PanelScaffold(
+        title = stringResource(R.string.xr_now_playing),
+        subtitle = if (playback.loaded) playback.format else null,
+        headerActions = { SettingsButton() },
     ) {
-        // Top Header
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Tag(if (state.format.isBlank()) "—" else state.format)
-            Spacer(Modifier.width(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapXs)) {
             Tag(
-                if (state.spatialEnabled) "SPATIAL · ${state.channels}" else "STEREO",
-                accent = state.spatialEnabled,
+                if (playback.spatialEnabled) "SPATIAL · ${playback.channels}" else "STEREO",
+                accent = playback.spatialEnabled,
             )
-            Spacer(Modifier.weight(1f))
-            Text(
-                if (state.spatialEnabled) state.layout else "48 kHz",
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.width(8.dp))
-            HomeChip()
-            Spacer(Modifier.width(4.dp))
-            // Gear icon button to open/toggle Settings panel
-            Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .clickable { XrApp.toggleSettings() }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("⚙", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+            if (playback.layout.isNotBlank() && playback.spatialEnabled) {
+                Tag(playback.layout)
             }
+            Spacer(Modifier.weight(1f))
+            MetaText(
+                if (playback.loaded) {
+                    "${playback.channels} ch · ${formatTime(playback.positionMs)} / ${formatTime(playback.durationMs)}"
+                } else {
+                    stringResource(R.string.xr_push_hint, "…/files/modules")
+                },
+                color = PanelTokens.TextFaint,
+            )
         }
 
         Text(
-            state.title.ifBlank { stringResource(R.string.xr_no_track) },
-            fontSize = 19.sp,
+            playback.title.ifBlank { stringResource(R.string.xr_no_track) },
+            fontSize = PanelTokens.Title,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-        )
-        Text(
-            if (state.loaded) {
-                "${state.channels} ch · ${formatTime(state.positionMs)} / ${formatTime(state.durationMs)}"
-            } else {
-                stringResource(
-                    R.string.xr_push_hint,
-                    "Android/data/com.bitti06.modplayjs.xr/files/modules",
-                )
-            },
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = PanelTokens.Text,
             maxLines = 1,
         )
 
         Visualizer(
-            mode = state.visualizer,
-            levels = state.levels,
-            channels = state.channels,
-            active = state.playing,
+            mode = playback.visualizer,
+            levels = playback.levels,
+            channels = playback.channels,
+            active = playback.playing,
         )
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(PanelTokens.Gap),
         ) {
-            CircleButton("■") { player?.stopPlayback() }
-            CircleButton("|◀") { XrApp.playlist?.previous() }
-            CircleButton(if (state.playing) "❚❚" else "▶", primary = true) { player?.togglePlay() }
-            CircleButton("▶|") { XrApp.playlist?.next() }
-            if (state.seekable) Text(
-                "−10s",
-                fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.clickable { player?.seek((state.positionMs - 10_000L).coerceAtLeast(0L)) }
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-            )
-            if (state.seekable) Text(
-                "+10s",
-                fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.clickable { player?.seek(state.positionMs + 10_000) }
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-            )
+            CircleButton("■") { XrStore.stop() }
+            CircleButton("|◀") { XrStore.previous() }
+            CircleButton(if (playback.playing) "❚❚" else "▶", primary = true) { XrStore.playPause() }
+            CircleButton("▶|") { XrStore.next() }
+            if (playback.seekable) {
+                CircleButton("−10") { XrStore.seek(playback.positionMs - 10_000L) }
+                CircleButton("+10") { XrStore.seek(playback.positionMs + 10_000L) }
+            }
+            Spacer(Modifier.weight(1f))
+            MetaText(formatTime(playback.positionMs), color = PanelTokens.TextFaint)
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(formatTime(state.positionMs), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            val progress =
-                if (state.durationMs > 0) {
-                    (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
-                } else {
-                    0f
-                }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm)) {
             Column(
                 Modifier
                     .weight(1f)
-                    .height(14.dp)
-                    .pointerInput(state.durationMs) {
+                    .height(16.dp)
+                    .pointerInput(playback.durationMs) {
                         detectTapGestures { offset ->
-                            if (state.durationMs > 0 && size.width > 0) {
+                            if (playback.durationMs > 0 && size.width > 0) {
                                 val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                                player?.seek((fraction * state.durationMs).toLong())
+                                XrStore.seek((fraction * playback.durationMs).toLong())
                             }
                         }
                     },
             ) {
+                val progress =
+                    if (playback.durationMs > 0) {
+                        (playback.positionMs.toFloat() / playback.durationMs).coerceIn(0f, 1f)
+                    } else {
+                        0f
+                    }
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .height(5.dp)
+                        .height(6.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .background(PanelTokens.SurfaceSunken),
                 ) {
                     Column(
                         Modifier
                             .fillMaxWidth(progress)
-                            .height(5.dp)
+                            .height(6.dp)
                             .clip(RoundedCornerShape(3.dp))
                             .background(
                                 Brush.horizontalGradient(
-                                    listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary),
+                                    listOf(PanelTokens.Accent, PanelTokens.AccentAlt),
                                 ),
                             ),
                     ) {}
                 }
             }
-            Text(formatTime(state.durationMs), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            MetaText(formatTime(playback.durationMs), color = PanelTokens.TextFaint)
         }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
         ) {
-            Text("🔊", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("🔊", fontSize = PanelTokens.Body, color = PanelTokens.TextDim)
             Slider(
                 value = volume,
-                // Dragging only moves the thumb; the release sends the one
-                // command. Committing per pixel re-serialised the settings and
-                // published a full state on every drag step.
                 onValueChange = { volume = it },
-                onValueChangeFinished = { player?.setVolume(volume.toInt()) },
+                onValueChangeFinished = { XrStore.setVolume(volume.toInt()) },
                 valueRange = 0f..100f,
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
-                modifier = Modifier.weight(1f).height(24.dp),
+                colors =
+                    SliderDefaults.colors(
+                        thumbColor = PanelTokens.Accent,
+                        activeTrackColor = PanelTokens.Accent,
+                        inactiveTrackColor = PanelTokens.SurfaceSunken,
+                    ),
+                modifier = Modifier.weight(1f).height(26.dp),
             )
             Text(
                 "${volume.toInt()}",
-                fontSize = 9.sp,
+                fontSize = PanelTokens.Mono,
                 fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.width(22.dp),
+                color = PanelTokens.TextDim,
+                modifier = Modifier.width(26.dp),
             )
         }
 
-        if (state.showChannelStrip && state.channels in 1..16) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                for (i in 0 until state.channels) {
-                    val muted = state.muted.contains(i)
+        if (playback.showChannelStrip && playback.channels in 1..16) {
+            Row(horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapXs)) {
+                for (i in 0 until playback.channels) {
+                    val muted = playback.muted.contains(i)
                     Text(
                         (i + 1).toString().padStart(2, '0'),
-                        fontSize = 9.sp,
+                        fontSize = PanelTokens.Mono,
                         fontFamily = FontFamily.Monospace,
-                        color = when {
-                            state.solo == i -> MaterialTheme.colorScheme.secondary
-                            muted -> MaterialTheme.colorScheme.outline
-                            state.spatialEnabled && i < state.azimuths.size -> MaterialTheme.colorScheme.tertiary
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
+                        color =
+                            when {
+                                playback.solo == i -> PanelTokens.AccentAlt
+                                muted -> PanelTokens.TextFaint
+                                playback.spatialEnabled && i < playback.azimuths.size -> PanelTokens.AccentWarm
+                                else -> PanelTokens.TextDim
+                            },
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                            .background(PanelTokens.SurfaceRaised)
                             .combinedClickable(
-                                onClick = { player?.toggleMute(i) },
-                                onLongClick = { player?.toggleSolo(i) },
+                                onClick = { XrStore.toggleMute(i) },
+                                onLongClick = { XrStore.toggleSolo(i) },
                             )
-                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                            .padding(horizontal = PanelTokens.GapXs, vertical = 2.dp),
                     )
                 }
             }
@@ -242,9 +204,8 @@ fun NowPlayingPanel() {
 }
 
 /**
- * The phone app's visualizer setting, rendered as channel levels: the engine
- * reports one level per channel, so "spectrum" and "waveform" both draw the
- * same data - a real FFT would need new engine output, not new UI.
+ * Channel levels. The engine reports one level per channel, so "spectrum" and
+ * "waveform" both draw the same data; a real FFT would be new engine output.
  */
 @Composable
 private fun Visualizer(
@@ -255,34 +216,26 @@ private fun Visualizer(
 ) {
     if (mode == "off") return
     Row(
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapXs),
         verticalAlignment = Alignment.Bottom,
-        modifier = Modifier.height(26.dp),
+        modifier = Modifier.height(28.dp),
     ) {
-        // "waveform" keeps a thin bar per channel so the row does not jump,
-        // "spectrum"/"both" scale the same bar with the live level.
         val bars = maxOf(channels, 1).coerceAtMost(16)
         repeat(bars) { i ->
             val level = levels.getOrElse(i) { 0f }.coerceIn(0f, 1f)
             val fallback = listOf(8, 16, 24, 12, 20, 7, 22, 11, 17, 6, 19, 13, 9, 15, 21, 10)[i % 16]
-            // The engine only reports levels for the spatial path (one per
-            // channel stem). On the stereo path the bars fall back to the
-            // decorative shape instead of sitting dead at zero.
-            val height =
+            val barHeight =
                 when {
                     mode == "waveform" -> if (active) fallback else fallback / 3
                     levels.isEmpty() -> if (active) fallback / 2 else fallback / 4
-                    else -> 2 + (level * 24f).toInt()
+                    else -> 2 + (level * 26f).toInt()
                 }
             Column(
                 Modifier
-                    .width(4.dp)
-                    .height(height.dp)
+                    .width(5.dp)
+                    .height(barHeight.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(
-                        if (i % 3 == 0) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.secondary,
-                    ),
+                    .background(if (i % 3 == 0) PanelTokens.Accent else PanelTokens.AccentAlt),
             ) {}
         }
     }
@@ -300,17 +253,13 @@ private fun Tag(
 ) {
     Text(
         text,
-        fontSize = 9.sp,
+        fontSize = PanelTokens.Meta,
         fontWeight = FontWeight.Bold,
-        color = if (accent) MaterialTheme.colorScheme.onSecondaryContainer
-        else MaterialTheme.colorScheme.onPrimaryContainer,
+        color = if (accent) PanelTokens.OnAccent else PanelTokens.Text,
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(
-                if (accent) MaterialTheme.colorScheme.secondaryContainer
-                else MaterialTheme.colorScheme.primaryContainer,
-            )
-            .padding(horizontal = 6.dp, vertical = 3.dp),
+            .background(if (accent) PanelTokens.AccentAlt else PanelTokens.Highlight)
+            .padding(horizontal = PanelTokens.GapSm, vertical = 2.dp),
     )
 }
 
@@ -322,19 +271,16 @@ private fun CircleButton(
 ) {
     Box(
         Modifier
-            .size(if (primary) 38.dp else 32.dp)
+            .size(if (primary) 42.dp else 34.dp)
             .clip(CircleShape)
-            .background(
-                if (primary) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.surfaceContainer,
-            )
+            .background(if (primary) PanelTokens.Accent else PanelTokens.SurfaceRaised)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
-            fontSize = if (primary) 13.sp else 11.sp,
-            color = if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+            fontSize = if (primary) PanelTokens.Heading else PanelTokens.Meta,
+            color = if (primary) PanelTokens.OnAccent else PanelTokens.Text,
         )
     }
 }

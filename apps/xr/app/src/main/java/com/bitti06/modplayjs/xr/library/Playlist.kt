@@ -1,6 +1,6 @@
 package com.bitti06.modplayjs.xr.library
 
-import com.bitti06.modplayjs.xr.XrApp
+import com.bitti06.modplayjs.xr.play.XrPlayer
 import kotlin.random.Random
 
 /**
@@ -8,7 +8,11 @@ import kotlin.random.Random
  * shuffle, auto-advance and jam mode. The player reports end-of-module, this
  * class decides what plays next.
  */
-class Playlist(private val library: Library) {
+class Playlist(
+    private val library: Library,
+    private val player: XrPlayer,
+    private val onChanged: () -> Unit = {},
+) {
 
     /** Bumped on every queue/index change so the queue panel recomposes. */
     val version = kotlinx.coroutines.flow.MutableStateFlow(0)
@@ -42,7 +46,7 @@ class Playlist(private val library: Library) {
     /** Called by the player when the module ends. */
     fun onEnded() {
         version.value += 1
-        XrApp.player?.settingsSnapshot()?.playback?.let {
+        player.settingsSnapshot().playback.let {
             repeat = it.repeat
             shuffle = it.shuffle
             autoAdvance = it.autoAdvance
@@ -51,7 +55,7 @@ class Playlist(private val library: Library) {
         when (repeat) {
             "one" -> load()
             "all" -> next()
-            else -> if (autoAdvance && index < tracks.size - 1) next() else XrApp.player?.stopPlayback()
+            else -> if (autoAdvance && index < tracks.size - 1) next() else player.stopPlayback()
         }
     }
 
@@ -78,13 +82,12 @@ class Playlist(private val library: Library) {
 
     private fun load() {
         val track = tracks.getOrNull(index) ?: return
-        val player = XrApp.player ?: return
         try {
             val bytes = library.read(track)
             player.load(bytes, track.filename, track.format, autoPlay = true)
             player.setJamMode(jamMode)
             library.recordPlay(track.uri)
-            XrApp.libraryChanged()
+            onChanged()
         } catch (e: Exception) {
             android.util.Log.e("modplay-xr", "Failed to load track '${track.title}' (${track.uri})", e)
         }
