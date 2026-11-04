@@ -150,7 +150,10 @@ class XrActivity : AppSystemActivity() {
         XrApp.freeLayout.value = layout.free
         XrApp.setFreeLayout = { on ->
             val hasTrack = XrApp.player?.state?.value?.loaded ?: false
-            layout.setFree(on, panels, hasTrack)
+            // The toggle lives in the settings panel: moving that panel out
+            // from under the user's hand mid-tap is the one change they cannot
+            // follow, so it stays where it is. It gets the new grab state.
+            layout.setFree(on, panels, hasTrack, skip = setOf(PanelLayout.PANEL_SETTINGS))
             XrApp.freeLayout.value = layout.free
         }
         XrApp.resetLayout = {

@@ -95,11 +95,21 @@ class PanelLayout(context: Context) {
      * arc back, but the saved poses stay: switching back to free restores the
      * arrangement instead of starting over.
      */
-    fun setFree(on: Boolean, entities: Map<Int, Entity>, hasTrack: Boolean = false) {
+    fun setFree(
+        on: Boolean,
+        entities: Map<Int, Entity>,
+        hasTrack: Boolean = false,
+        /** Panels to leave untouched, e.g. the settings panel being used. */
+        skip: Set<Int> = emptySet(),
+    ) {
         if (!on) save(entities)
         free = on
         prefs.edit().putBoolean(KEY_FREE, on).apply()
         for ((id, entity) in entities) {
+            if (id in skip) {
+                setGrabbable(entity, on)
+                continue
+            }
             val pose =
                 if (on) {
                     savedPose(id) ?: defaultPose(id, hasTrack)

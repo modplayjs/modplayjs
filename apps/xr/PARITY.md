@@ -50,6 +50,10 @@ Free poses are written to `xr.layout` on input-focus loss, on pause and in
 `onSpatialShutdown`, so a grab survives both a restart and an OS kill.
 Free mode is the default (`free = true` in the panel prefs).
 
+The settings panel is excluded from the switch: it hosts the toggle, so moving
+it out from under the user's hand mid-tap would be the one jump they cannot
+follow. Only its grab state changes.
+
 ## Panel visibility per player state
 
 The activity owns one rule table (`updatePanelVisibilityAndLayout`):
