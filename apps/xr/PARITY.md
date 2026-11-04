@@ -13,6 +13,9 @@ lives in `com.bitti06.modplayjs.xr` and is reachable from a panel.
 | Recents | Room query | **yes** — 24-entry ring, Recent tab |
 | Search / filters / sort | `LibraryScreen` | **yes** — text search (BasicTextField), tabs, sort by Name/Format/Größe/Ordner |
 | Queue, repeat, shuffle, auto-advance | `PlaybackSession` | **yes** — `Playlist` (off/all/one, shuffle, auto-advance, jam) |
+| Queue view (`QueueScreen`) | `ui/LibraryScreen.kt` | **yes** — queue panel, tap a row to jump |
+| Ignored files per file restore (`IgnoredScreen`) | `ui/LibraryScreen.kt` | **yes** — ignored panel, restore per file |
+| Pattern colour picker (`PatternColorsScreen`) | `ui/SettingsScreens.kt` | **yes** — swatch cycles the phone app's palette |
 | Next / previous | transport | **yes** — transport row |
 | Seek | transport | **yes** — ±10 s and tap-to-seek on the bar |
 | Volume | settings | **yes** — slider, engine master, persisted |
@@ -59,12 +62,8 @@ Settings that existed in the panel but did nothing are now wired:
 
 ## Still missing
 
-1. Foreground service so audio survives focus loss (deliberately postponed).
-2. Real spectrum analyser (FFT); the visualizer renders channel levels.
-3. Queue view (phone: `QueueScreen`). The XR app has the `Playlist` with the
-   same repeat/shuffle/auto-advance logic but no panel that lists what plays
-   next.
-4. Ignored-files list with per-file restore (phone: `IgnoredScreen`). XR shows
-   the count and can clear the whole list only.
-5. Pattern colour picker (phone: `PatternColorsScreen`). The palette follows
-   `view.patternColors`, but there is no panel to choose the colours.
+1. Background playback (foreground service): audio stops when the app loses
+   focus, which Horizon OS treats as the pause request. Left out on purpose.
+2. Real spectrum analyser (FFT): the visualizer draws channel levels, so
+   "spectrum" and "waveform" show the same data. Real bins need new engine
+   output, not new UI.

@@ -158,6 +158,10 @@ class XrPlayer(
         this.spatialAudio = spatialAudio
     }
 
+    /**
+     * Ring/radius change. The marker sizes are reset because a rebuild after a
+     * layout switch starts at the neutral size, not the last level.
+     */
     fun setRing(radius: Float, centerX: Float, centerZ: Float) {
         submit {
             val clamped = radius.coerceIn(0.4f, 3.0f)
@@ -208,11 +212,16 @@ class XrPlayer(
 
     fun start() {
         if (running.getAndSet(true)) return
+        val spatial = prefs.getBoolean(KEY_SPATIAL, DEFAULT_SPATIAL)
         thread = Thread({
             // Audio priority, not MAX: MAX outranks the VR compositor and the
             // frame thread, so a long render block would drop frames.
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO)
             engine = V8Engine(context)
+            // Push the stored spatial choice before anything can render, so a
+            // module loaded later opens its output in the right mode.
+            engine?.command("""{"type":"setSpatial","enabled":$spatial}""")
+            spatialInfo = spatialInfo.copy(enabled = spatial)
             loop()
         }, "modplay-xr-audio").apply { start() }
     }
@@ -331,6 +340,7 @@ class XrPlayer(
     fun sessionId(): Int = outputs.firstOrNull()?.sessionId ?: 0
 
     fun setSpatialEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SPATIAL, enabled).apply()
         submit {
             engine?.command("""{"type":"setSpatial","enabled":$enabled}""")
             spatialInfo = spatialInfo.copy(enabled = enabled)
@@ -571,15 +581,6 @@ class XrPlayer(
         for (i in markers.indices) {
             val pos = positionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
             markers[i].setComponent(Transform(Pose(Vector3(pos.x, pos.y - 0.12f, pos.z))))
-            val lvl = levels.getOrElse(i) { 0f }
-            val size = 0.02f + lvl * 0.10f
-            markers[i].setComponent(Scale(Vector3(size, size, size)))
-            markers[i].setComponent(
-                Material().apply {
-                    baseColor = channelColor(i)
-                    unlit = true
-                },
-            )
         }
     }
 
@@ -854,6 +855,10 @@ class XrPlayer(
         private const val MARKER_STEP = 0.005f
         private const val KEY_RADIUS = "radius"
         private const val KEY_RADIUS_MANUAL = "radiusManual"
+        private const val KEY_SPATIAL = "spatialEnabled"
+
+        /** Spatial is the point of the XR app; stereo is the fallback. */
+        const val DEFAULT_SPATIAL = true
 
         fun autoRadius(roomWidth: Float, roomDepth: Float): Float =
             ((minOf(roomWidth, roomDepth) / 2f) - 0.6f).coerceIn(0.5f, 2.5f)

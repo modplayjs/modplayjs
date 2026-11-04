@@ -263,9 +263,13 @@ private fun Visualizer(
         repeat(bars) { i ->
             val level = levels.getOrElse(i) { 0f }.coerceIn(0f, 1f)
             val fallback = listOf(8, 16, 24, 12, 20, 7, 22, 11, 17, 6, 19, 13, 9, 15, 21, 10)[i % 16]
+            // The engine only reports levels for the spatial path (one per
+            // channel stem). On the stereo path the bars fall back to the
+            // decorative shape instead of sitting dead at zero.
             val height =
                 when {
                     mode == "waveform" -> if (active) fallback else fallback / 3
+                    levels.isEmpty() -> if (active) fallback / 2 else fallback / 4
                     else -> 2 + (level * 24f).toInt()
                 }
             Column(

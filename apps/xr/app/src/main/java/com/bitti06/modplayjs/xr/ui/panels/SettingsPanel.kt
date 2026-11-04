@@ -109,6 +109,21 @@ fun SettingsPanel() {
                         if (state.spatialEnabled) onLabel else offLabel,
                         state.spatialEnabled,
                     ) { player?.setSpatialEnabled(!state.spatialEnabled) }
+                    // Why the toggle may do nothing: the module can't be split
+                    // (SID or streamed audio) or spatial mode is off.
+                    if (!state.spatialAvailable) {
+                        Text(
+                            stringResource(R.string.xr_spatial_unavailable),
+                            fontSize = 8.sp,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                    } else if (state.layout.isNotBlank()) {
+                        Text(
+                            stringResource(R.string.xr_spatial_objects, state.channels, state.layout),
+                            fontSize = 8.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Options(
                         stringResource(R.string.xr_layout),
                         listOf(stringResource(R.string.xr_pan) to "panned", "LR·LR" to "lrlr", "LR·RL" to "lrrl"),
@@ -295,6 +310,18 @@ fun SettingsPanel() {
                     ToggleRow(stringResource(R.string.xr_loop_marker), if (settings.view.sampleLoopFlags) onLabel else offLabel, settings.view.sampleLoopFlags) {
                         set { s -> s.copy(view = s.view.copy(sampleLoopFlags = !s.view.sampleLoopFlags)) }
                     }
+                    PatternColorRow(stringResource(R.string.xr_color_note), settings.view.patternColors.note) { argb ->
+                        set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(note = argb))) }
+                    }
+                    PatternColorRow(stringResource(R.string.xr_color_instrument), settings.view.patternColors.instrument) { argb ->
+                        set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(instrument = argb))) }
+                    }
+                    PatternColorRow(stringResource(R.string.xr_color_volume), settings.view.patternColors.volume) { argb ->
+                        set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(volume = argb))) }
+                    }
+                    PatternColorRow(stringResource(R.string.xr_color_effect), settings.view.patternColors.effect) { argb ->
+                        set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(effect = argb))) }
+                    }
                     Options(
                         stringResource(R.string.xr_visualizer),
                         listOf(stringResource(R.string.xr_vis_off) to "off", stringResource(R.string.xr_vis_levels) to "spectrum", stringResource(R.string.xr_vis_wave) to "waveform", stringResource(R.string.xr_vis_both) to "both"),
@@ -338,6 +365,28 @@ fun SettingsPanel() {
                                     library.clearIgnored()
                                     XrApp.libraryChanged()
                                 }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            stringResource(R.string.xr_queue),
+                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.surfaceContainer)
+                                .clickable { XrApp.toggleQueue() }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                        Text(
+                            stringResource(R.string.xr_ignored),
+                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.surfaceContainer)
+                                .clickable { XrApp.toggleIgnored() }
                                 .padding(horizontal = 8.dp, vertical = 3.dp),
                         )
                     }
@@ -546,3 +595,68 @@ private fun StepChip(
             .padding(horizontal = 7.dp, vertical = 1.dp),
     )
 }
+
+/**
+ * One pattern colour: a swatch that cycles the phone app's palette and wraps
+ * back to "theme colour", the same list `PATTERN_SWATCHES` uses there. Cycling
+ * avoids a colour dialog, which is awkward with a controller ray.
+ */
+@Composable
+private fun PatternColorRow(
+    label: String,
+    value: Int?,
+    onPick: (Int?) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            label,
+            fontSize = 9.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        val swatch = value?.let { androidx.compose.ui.graphics.Color(it) } ?: MaterialTheme.colorScheme.surfaceVariant
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(swatch)
+                .clickable {
+                    val next =
+                        if (value == null) {
+                            PATTERN_SWATCHES.first()
+                        } else {
+                            val i = PATTERN_SWATCHES.indexOf(value)
+                            if (i < 0 || i == PATTERN_SWATCHES.lastIndex) null else PATTERN_SWATCHES[i + 1]
+                        }
+                    onPick(next)
+                }
+                .padding(horizontal = 10.dp, vertical = 3.dp),
+        ) {
+            Text(
+                if (value == null) {
+                    stringResource(R.string.xr_color_default)
+                } else {
+                    String.format("#%06X", value and 0xFFFFFF)
+                },
+                fontSize = 8.sp,
+                color = if (value == null) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    androidx.compose.ui.graphics.Color.Black
+                },
+            )
+        }
+    }
+}
+
+/** Same palette as the phone app's PatternColorsScreen. */
+private val PATTERN_SWATCHES =
+    listOf(
+        0xFFFFFFFF, 0xFFF1EDFB, 0xFFB9B0D4, 0xFF9E9E9E,
+        0xFFB49BFF, 0xFF8EA2FF, 0xFF64B5F6, 0xFF4DD0E1,
+        0xFF5FE3C0, 0xFF7BD88F, 0xFFFFD166, 0xFFFFB74D,
+        0xFFFF9BC2, 0xFFE57373, 0xFFBA68C8, 0xFF6B7FA8,
+    ).map { it.toInt() }

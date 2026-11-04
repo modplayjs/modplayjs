@@ -46,6 +46,9 @@ class PanelLayout(context: Context) {
             PANEL_PATTERN -> Pose(Vector3(-1.75f, 0.45f, 1.75f), facingUser)
             PANEL_DETAILS -> Pose(Vector3(0f, 0.45f, 1.85f), facingUser)
             PANEL_DEBUG -> Pose(Vector3(1.75f, 0.45f, 1.75f), facingUser)
+            // Second row, further out: these two open from Settings.
+            PANEL_QUEUE -> Pose(Vector3(-0.95f, 1.45f, 2.4f), facingUser)
+            PANEL_IGNORED -> Pose(Vector3(0.95f, 1.45f, 2.4f), facingUser)
             else -> Pose(Vector3(0f, 1.45f, 1.95f), facingUser)
         }
 
@@ -137,6 +140,8 @@ class PanelLayout(context: Context) {
         const val PANEL_DEBUG = 4
         const val PANEL_PATTERN = 5
         const val PANEL_DETAILS = 6
+        const val PANEL_QUEUE = 7
+        const val PANEL_IGNORED = 8
 
         private const val KEY_FREE = "free"
         private const val KEY_VERSION = "layoutVersion"

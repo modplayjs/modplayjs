@@ -40,6 +40,8 @@ import com.bitti06.modplayjs.xr.ui.panels.NowPlayingPanel
 import com.bitti06.modplayjs.xr.ui.panels.DebugPanel
 import com.bitti06.modplayjs.xr.ui.panels.DetailsPanel
 import com.bitti06.modplayjs.xr.ui.panels.PatternPanel
+import com.bitti06.modplayjs.xr.ui.panels.IgnoredPanel
+import com.bitti06.modplayjs.xr.ui.panels.QueuePanel
 import com.bitti06.modplayjs.xr.ui.panels.SettingsPanel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +60,8 @@ class XrActivity : AppSystemActivity() {
     private var lastSettingsOpen: Boolean? = null
     private var lastDebugSources: Boolean? = null
     private var lastDetailsCount = -1
+    private var lastQueueOpen = false
+    private var lastIgnoredOpen = false
     private var resumeOnMount = false
     private var avatarSystem: AvatarSystem? = null
     private var isdkSystem: IsdkSystem? = null
@@ -87,6 +91,8 @@ class XrActivity : AppSystemActivity() {
             panel(R.id.panel_debug, 1.4f, 0.85f) { DebugPanel() },
             panel(R.id.panel_pattern, 1.4f, 0.85f) { PatternPanel() },
             panel(R.id.panel_details, 1.4f, 0.70f) { DetailsPanel() },
+            panel(R.id.panel_queue, 1.2f, 0.85f) { QueuePanel() },
+            panel(R.id.panel_ignored, 1.2f, 0.85f) { IgnoredPanel() },
         )
 
     private fun panel(
@@ -245,6 +251,8 @@ class XrActivity : AppSystemActivity() {
             R.id.panel_debug to PanelLayout.PANEL_DEBUG,
             R.id.panel_pattern to PanelLayout.PANEL_PATTERN,
             R.id.panel_details to PanelLayout.PANEL_DETAILS,
+            R.id.panel_queue to PanelLayout.PANEL_QUEUE,
+            R.id.panel_ignored to PanelLayout.PANEL_IGNORED,
         )
         for ((panelId, layoutId) in ids) {
             val entity = Entity.create(
@@ -256,13 +264,16 @@ class XrActivity : AppSystemActivity() {
 
         layout.apply(panels, hasTrack = false)
 
-        // Dynamically adjust panel visibility and positions as tracks are loaded/unloaded or settings is toggled
+        // Dynamically adjust panel visibility and positions as tracks are
+        // loaded/unloaded or a panel is toggled.
         activityScope.launch {
-            kotlinx.coroutines.flow.combine(player.state, XrApp.settingsOpen) { state, isSettingsOpen ->
-                Pair(state, isSettingsOpen)
-            }.collect { (state, isSettingsOpen) ->
-                updatePanelVisibilityAndLayout(state, isSettingsOpen)
-            }
+            kotlinx.coroutines.flow
+                .combine(player.state, XrApp.settingsOpen) { state, open -> state to open }
+                .combine(XrApp.queueOpen) { (state, settings), queue -> Triple(state, settings, queue) }
+                .combine(XrApp.ignoredOpen) { (state, settings, queue), ignored ->
+                    Overlays(state, settings, queue, ignored)
+                }
+                .collect { overlays -> updatePanelVisibilityAndLayout(overlays) }
         }
 
         Log.i(TAG, "panels placed: ${panels.size}, free=${layout.free}")
@@ -272,7 +283,16 @@ class XrActivity : AppSystemActivity() {
         }
     }
 
-    private fun updatePanelVisibilityAndLayout(state: XrPlayer.State, isSettingsOpen: Boolean) {
+    private data class Overlays(
+        val state: XrPlayer.State,
+        val settingsOpen: Boolean,
+        val queueOpen: Boolean,
+        val ignoredOpen: Boolean,
+    )
+
+    private fun updatePanelVisibilityAndLayout(overlays: Overlays) {
+        val state = overlays.state
+        val isSettingsOpen = overlays.settingsOpen
         val hasTrack = state.loaded
         val isDebug = state.debugSources
 
@@ -280,16 +300,24 @@ class XrActivity : AppSystemActivity() {
         val settingsChanged = (lastSettingsOpen != isSettingsOpen)
         val debugChanged = (lastDebugSources != isDebug)
         val detailsChanged = (lastDetailsCount != state.details.size)
+        val queueChanged = (lastQueueOpen != overlays.queueOpen)
+        val ignoredChanged = (lastIgnoredOpen != overlays.ignoredOpen)
 
         // The flow emits a new state on every snapshot (2 Hz while playing).
         // Six setComponent calls plus a layout pass per tick were pure waste,
         // so bail out unless something the panels care about actually changed.
-        if (!trackChanged && !settingsChanged && !debugChanged && !detailsChanged) return
+        if (!trackChanged && !settingsChanged && !debugChanged && !detailsChanged &&
+            !queueChanged && !ignoredChanged
+        ) {
+            return
+        }
 
         lastTrackLoaded = hasTrack
         lastSettingsOpen = isSettingsOpen
         lastDebugSources = isDebug
         lastDetailsCount = state.details.size
+        lastQueueOpen = overlays.queueOpen
+        lastIgnoredOpen = overlays.ignoredOpen
 
         if (trackChanged) {
             layout.apply(panels, hasTrack = hasTrack)
@@ -303,6 +331,8 @@ class XrActivity : AppSystemActivity() {
                 PanelLayout.PANEL_PATTERN -> hasTrack
                 PanelLayout.PANEL_DETAILS -> hasTrack && state.details.isNotEmpty()
                 PanelLayout.PANEL_DEBUG -> isDebug
+                PanelLayout.PANEL_QUEUE -> overlays.queueOpen
+                PanelLayout.PANEL_IGNORED -> overlays.ignoredOpen
                 else -> true
             }
             entity.setComponent(Visible(shouldBeVisible))

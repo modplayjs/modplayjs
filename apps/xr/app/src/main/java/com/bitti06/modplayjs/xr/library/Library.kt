@@ -95,6 +95,17 @@ class Library(private val context: Context) {
 
     fun ignoredUris(): Set<String> = prefs.getStringSet(KEY_IGNORED, emptySet()).orEmpty()
 
+    /** Undo a single ignore, so an ignored file can come back without a wipe. */
+    fun restore(uri: Uri) {
+        val current = ignoredUris().toMutableSet()
+        current -= uri.toString()
+        prefs.edit().putStringSet(KEY_IGNORED, current).apply()
+    }
+
+    /** Display name for an ignored URI, for the restore list. */
+    fun nameOf(uri: Uri): String =
+        displayName(uri) ?: uri.lastPathSegment?.substringAfterLast('/') ?: uri.toString()
+
     fun ignore(uri: Uri) {
         val current = ignoredUris().toMutableSet()
         current += uri.toString()

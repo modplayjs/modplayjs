@@ -112,4 +112,17 @@
     <string name="xr_debug_mute_unavailable">Kanal-Stummschaltung ist für dieses Modul nicht verfügbar.</string>
     <string name="xr_add_folder">Ordner hinzufügen</string>
     <string name="xr_theme_note">Nur dunkles Theme: eine helle Fläche im dunklen Raum kostet Kontrast.</string>
+    <string name="xr_queue">Warteschlange</string>
+    <string name="xr_queue_meta">%1$d Titel</string>
+    <string name="xr_queue_empty">Die Warteschlange ist leer: spiele etwas aus der Bibliothek.</string>
+    <string name="xr_ignored">Ignoriert</string>
+    <string name="xr_ignored_empty">Nichts ist ignoriert.</string>
+    <string name="xr_restore">Wiederherstellen</string>
+    <string name="xr_color_note">Noten-Farbe</string>
+    <string name="xr_color_instrument">Instrument-Farbe</string>
+    <string name="xr_color_volume">Volume-Farbe</string>
+    <string name="xr_color_effect">Effekt-Farbe</string>
+    <string name="xr_color_default">Theme</string>
+    <string name="xr_spatial_unavailable">Dieses Modul lässt sich nicht in Objekte trennen (SID/Stream): es läuft über Stereo.</string>
+    <string name="xr_spatial_objects">%1$d Objekte · Layout %2$s · Positionen aus dem Kanal-Pan</string>
 </resources>

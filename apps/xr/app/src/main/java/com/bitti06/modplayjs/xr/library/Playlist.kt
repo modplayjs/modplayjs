@@ -10,6 +10,9 @@ import kotlin.random.Random
  */
 class Playlist(private val library: Library) {
 
+    /** Bumped on every queue/index change so the queue panel recomposes. */
+    val version = kotlinx.coroutines.flow.MutableStateFlow(0)
+
     var tracks: List<TrackFile> = emptyList()
         private set
 
@@ -24,11 +27,21 @@ class Playlist(private val library: Library) {
     fun playAt(list: List<TrackFile>, position: Int) {
         tracks = list
         index = position.coerceIn(0, (list.size - 1).coerceAtLeast(0))
+        version.value += 1
+        load()
+    }
+
+    /** Play an entry of the current queue, from the queue panel. */
+    fun playIndex(position: Int) {
+        if (tracks.isEmpty()) return
+        index = position.coerceIn(0, tracks.size - 1)
+        version.value += 1
         load()
     }
 
     /** Called by the player when the module ends. */
     fun onEnded() {
+        version.value += 1
         XrApp.player?.settingsSnapshot()?.playback?.let {
             repeat = it.repeat
             shuffle = it.shuffle
@@ -52,12 +65,14 @@ class Playlist(private val library: Library) {
             } else {
                 (index + 1) % tracks.size
             }
+        version.value += 1
         load()
     }
 
     fun previous() {
         if (tracks.isEmpty()) return
         index = if (index <= 0) tracks.size - 1 else index - 1
+        version.value += 1
         load()
     }
 

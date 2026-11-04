@@ -33,6 +33,12 @@ object XrApp {
     /** Settings panel visibility state toggled via gear icon (hidden on start). */
     val settingsOpen = MutableStateFlow(false)
 
+    /** Queue panel visibility, opened from the settings panel. */
+    val queueOpen = MutableStateFlow(false)
+
+    /** Ignored-files panel visibility, opened from the settings panel. */
+    val ignoredOpen = MutableStateFlow(false)
+
     @Volatile
     var setFreeLayout: ((Boolean) -> Unit)? = null
 
@@ -41,6 +47,14 @@ object XrApp {
 
     fun toggleSettings() {
         settingsOpen.value = !settingsOpen.value
+    }
+
+    fun toggleQueue() {
+        queueOpen.value = !queueOpen.value
+    }
+
+    fun toggleIgnored() {
+        ignoredOpen.value = !ignoredOpen.value
     }
 
     fun setPassthrough(on: Boolean) {

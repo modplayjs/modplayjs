@@ -6,4 +6,6 @@
     <item name="panel_debug" type="id" />
     <item name="panel_pattern" type="id" />
     <item name="panel_details" type="id" />
+    <item name="panel_queue" type="id" />
+    <item name="panel_ignored" type="id" />
 </resources>
