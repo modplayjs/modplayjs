@@ -28,18 +28,25 @@ class PanelLayout(context: Context) {
     }
 
     /**
-     * Default spatial poses in ReferenceSpace.LOCAL_FLOOR.
-     * All quads use Quaternion.fromEuler(0f, 0f, 180f) for 100% upright ComposeView surfaces.
+     * Panels face the viewer, upright: 180 degrees of YAW, 0 pitch, 0 roll.
+     * This is the Euler (pitch, yaw, roll) form Meta's panel tutorial uses.
+     */
+    private val facingUser = Quaternion(0f, 180f, 0f)
+
+    /**
+     * Default spatial poses in ReferenceSpace.LOCAL_FLOOR, arc at +Z (the SDK is
+     * left-handed, +Z is forward). Passing the 180 degrees as ROLL instead of
+     * yaw stands every panel on its head, so the poses go through [facingUser].
      */
     fun defaultPose(id: Int, @Suppress("UNUSED_PARAMETER") hasTrack: Boolean = false): Pose =
         when (id) {
-            PANEL_MAIN -> Pose(Vector3(0f, 1.45f, 1.95f), Quaternion.fromEuler(0f, 0f, 180f))
-            PANEL_LIBRARY -> Pose(Vector3(-1.75f, 1.45f, 1.75f), Quaternion.fromEuler(0f, 0f, 180f))
-            PANEL_SETTINGS -> Pose(Vector3(1.75f, 1.45f, 1.75f), Quaternion.fromEuler(0f, 0f, 180f))
-            PANEL_PATTERN -> Pose(Vector3(-1.75f, 0.45f, 1.75f), Quaternion.fromEuler(0f, 0f, 180f))
-            PANEL_DETAILS -> Pose(Vector3(0f, 0.45f, 1.85f), Quaternion.fromEuler(0f, 0f, 180f))
-            PANEL_DEBUG -> Pose(Vector3(1.75f, 0.45f, 1.75f), Quaternion.fromEuler(0f, 0f, 180f))
-            else -> Pose(Vector3(0f, 1.45f, 1.95f), Quaternion.fromEuler(0f, 0f, 180f))
+            PANEL_MAIN -> Pose(Vector3(0f, 1.45f, 1.95f), facingUser)
+            PANEL_LIBRARY -> Pose(Vector3(-1.75f, 1.45f, 1.75f), facingUser)
+            PANEL_SETTINGS -> Pose(Vector3(1.75f, 1.45f, 1.75f), facingUser)
+            PANEL_PATTERN -> Pose(Vector3(-1.75f, 0.45f, 1.75f), facingUser)
+            PANEL_DETAILS -> Pose(Vector3(0f, 0.45f, 1.85f), facingUser)
+            PANEL_DEBUG -> Pose(Vector3(1.75f, 0.45f, 1.75f), facingUser)
+            else -> Pose(Vector3(0f, 1.45f, 1.95f), facingUser)
         }
 
     fun savedPose(id: Int): Pose? {
@@ -134,6 +141,6 @@ class PanelLayout(context: Context) {
         private const val KEY_FREE = "free"
         private const val KEY_VERSION = "layoutVersion"
 
-        private const val LAYOUT_VERSION = 30
+        private const val LAYOUT_VERSION = 31
     }
 }
