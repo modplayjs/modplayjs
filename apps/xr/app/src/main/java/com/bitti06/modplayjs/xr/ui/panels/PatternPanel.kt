@@ -53,6 +53,9 @@ private const val NOTE_EMPTY = "..."
 private const val FIELD_EMPTY = ".."
 private const val EMPTY_CELL = "... .. .. ..."
 
+/** Compiled once: the dot-run test runs for every cell of every visible row. */
+private val DOT_RUN = Regex("\\.+")
+
 /**
  * The playing pattern the way a tracker shows it: one row per line, one column
  * per channel, cells in four colours (note, instrument, volume, effect) so the
@@ -72,8 +75,9 @@ fun PatternPanel() {
     val palette = patternPalette(state.patternColors)
 
     // Follow the playhead three rows down from the top edge instead of pinned
-    // to it, and only scroll when the row left the window: the state emits at
-    // 2 Hz, and a scrollToItem on every tick would fight the user's own drag.
+    // to it, and only scroll when the row left the window. The playhead now
+    // arrives ~8x/s (see XrPlayer.publishPlayhead), so scrolling on every emit
+    // would fight the user's own drag and jitter the whole grid.
     LaunchedEffect(pattern.row, pattern.pattern, pattern.rows, state.follow) {
         if (!state.follow) return@LaunchedEffect
         if (pattern.rows <= 0 || pattern.row !in 0 until pattern.rows) return@LaunchedEffect
@@ -133,7 +137,12 @@ fun PatternPanel() {
             Column(modifier = Modifier.width(gridWidth).fillMaxHeight()) {
                 PatternHeader(channels = pattern.channels, line = palette.line)
 
-                LazyColumn(state = listState, modifier = Modifier.fillMaxHeight()) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxHeight(),
+                    // No animateItem here: the playhead moves 8x/s, and an item
+                    // animation would start a new transition per step.
+                ) {
                     items(count = pattern.rows, key = { row -> row }) { row ->
                         PatternRow(
                             row = row,
@@ -222,7 +231,9 @@ private fun PatternRow(
         )
         for (ch in 0 until channels) {
             val raw = cells.getOrElse(row * channels + ch) { EMPTY_CELL }
-            val cell = if (stripDots) raw.replace(Regex("\\.+"), "...") else raw
+            // A top-level Regex, not one per cell: building a Regex for every
+            // cell of every row was allocation churn on the frame path.
+            val cell = if (stripDots) DOT_RUN.replace(raw, "...") else raw
             val text =
                 remember(cell, palette) {
                     annotatedCell(cell, palette)

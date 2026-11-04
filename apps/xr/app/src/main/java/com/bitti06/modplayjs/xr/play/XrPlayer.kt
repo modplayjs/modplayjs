@@ -130,6 +130,7 @@ class XrPlayer(
     private var loaded = false
     private var durationMs = 0L
     private var lastSnapshotAt = 0L
+    private var lastPlayheadAt = 0L
     private var spatialInfo: SpatialInfo = SpatialInfo()
     private var cachedPatternIndex = -1
     private var cachedPattern: PatternData? = null
@@ -627,17 +628,49 @@ class XrPlayer(
 
     private fun maybeRefreshState() {
         val now = System.currentTimeMillis()
-        // Playing: 2 Hz is enough - the position label has second resolution
-        // and every publish makes all six Compose panels recompose. Paused:
-        // nothing moves, so 1 Hz keeps solo/mute/pattern edits visible.
-        val interval = if (playing) SNAPSHOT_ACTIVE_MS else SNAPSHOT_IDLE_MS
-        if (now - lastSnapshotAt < interval) return
-        lastSnapshotAt = now
-        publish(playing)
-        // Azimuths only change on load/layout switches, which already rebuild
-        // the outputs; polling spatialInfo here was one extra V8 JSON round
-        // trip per tick. All that is left is the level-driven marker size.
-        if (debugVisible && outputMode == 2) applyMarkerLevels()
+        // Two rates on purpose.
+        //
+        // The full snapshot() rebuilds the track object (instrument and sample
+        // lists included) and every panel recomposes on it, so it stays at
+        // 2 Hz playing / 1 Hz paused. The playhead is a handful of numbers and
+        // changes every ~120 ms at 125 BPM speed 6, so it is polled at
+        // PLAYHEAD_MS and only updates the row/pattern fields of the state:
+        // the pattern grid then follows the music instead of jumping four rows
+        // every half second.
+        val snapshotInterval = if (playing) SNAPSHOT_ACTIVE_MS else SNAPSHOT_IDLE_MS
+        if (now - lastSnapshotAt >= snapshotInterval) {
+            lastSnapshotAt = now
+            publish(playing)
+            // Azimuths only change on load/layout switches, which already
+            // rebuild the outputs; polling spatialInfo here was one extra V8
+            // JSON round trip per tick.
+            if (debugVisible && outputMode == 2) applyMarkerLevels()
+        } else if (playing && now - lastPlayheadAt >= PLAYHEAD_MS) {
+            lastPlayheadAt = now
+            publishPlayhead()
+        }
+    }
+
+    /**
+     * Cheap update of just the playhead. Deliberately does not touch anything
+     * else: the panels read the same StateFlow, and an unchanged field does not
+     * change the value, so Compose only recomposes what reads row/pattern.
+     */
+    private fun publishPlayhead() {
+        if (!loaded) return
+        val eng = engine ?: return
+        val raw = runCatching { eng.playhead() }.getOrNull() ?: return
+        val obj = runCatching { Json.parseToJsonElement(raw) as? JsonObject }.getOrNull() ?: return
+        val row = obj["row"]?.jsonPrimitive?.content?.toIntOrNull() ?: return
+        val pattern = obj["pattern"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+        val current = _state.value
+        if (current.pattern.row == row && current.pattern.pattern == pattern) return
+        _state.value =
+            current.copy(
+                pattern = current.pattern.copy(row = row, pattern = pattern),
+                positionMs = obj["positionMs"]?.jsonPrimitive?.content?.toLongOrNull()
+                    ?.let { it / 1000L * 1000L } ?: current.positionMs,
+            )
     }
 
     /** Marker size follows the channel level; positions and colours stay put. */
@@ -850,6 +883,9 @@ class XrPlayer(
         private const val REGISTER_BASE = 1000
         private const val SNAPSHOT_ACTIVE_MS = 500L
         private const val SNAPSHOT_IDLE_MS = 1000L
+
+        /** ~8 polls per second: one row per poll at a typical 120 ms per row. */
+        private const val PLAYHEAD_MS = 120L
         private const val IDLE_POLL_MS = 50L
         private const val RING_Y = 1.4f
         private const val MARKER_MIN = 0.02f

@@ -69,6 +69,13 @@ class V8Engine(
     fun renderSpatial(frames: Int): FloatArray =
         if (handle == 0L) FloatArray(0) else nativeRenderSpatial(handle, frames)
 
+    /**
+     * JSON: {playing, paused, ended, positionMs, ord, row, pattern}.
+     * Cheaper than [snapshot]: no track object, no instrument/sample lists, so
+     * it is safe to poll at the rate a pattern view needs.
+     */
+    fun playhead(): String = command("{\"type\":\"playhead\"}")
+
     /** JSON: {enabled, available, layout, channels, azimuths[]}. */
     fun spatialInfo(): String = command("{\"type\":\"spatialInfo\"}")
 

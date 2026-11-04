@@ -190,6 +190,7 @@ export interface AndroidCommand {
     | 'setShowChannelStrip'
     | 'loadSidSongLengths'
     | 'getPattern'
+    | 'playhead'
     | 'setSpatial'
     | 'spatialInfo'
     | 'setSettings';

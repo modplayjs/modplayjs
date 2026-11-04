@@ -547,6 +547,27 @@ function patternObject(order: number): AndroidPattern {
   return { pattern: orderIndex, rows: pat.rows, channels, cells };
 }
 
+/**
+ * Cheap playhead poll: ord/row/pattern/position only.
+ *
+ * The full snapshot() rebuilds the track object (instrument and sample lists
+ * included) and is meant for 2 Hz. A pattern view needs a new row every ~120 ms
+ * at 125 BPM speed 6, so it polls this instead — a few numbers, no arrays.
+ */
+function playhead(): string {
+  const mod = core.module;
+  const ps = core.playState;
+  return JSON.stringify({
+    playing: playing && !paused && !ended,
+    paused,
+    ended,
+    positionMs: modulePosition(),
+    ord: streamed ? 0 : ps.ord,
+    row: streamed ? 0 : ps.row,
+    pattern: streamed || !mod ? 0 : (mod.xxo[ps.ord] ?? 0),
+  });
+}
+
 function command(json: string): string {
   let c: AndroidCommand;
   try {
@@ -559,6 +580,8 @@ function command(json: string): string {
   switch (c.type) {
     case 'getPattern':
       return JSON.stringify(patternObject(typeof c.pattern === 'number' ? c.pattern : -1));
+    case 'playhead':
+      return playhead();
     case 'play':
       play();
       break;

@@ -95,7 +95,9 @@ class XrActivity : AppSystemActivity() {
             panel(R.id.panel_library, 1.4f, 0.95f) { LibraryPanel() },
             panel(R.id.panel_settings, 1.4f, 0.95f) { SettingsPanel() },
             panel(R.id.panel_debug, 1.4f, 0.85f) { DebugPanel() },
-            panel(R.id.panel_pattern, 1.4f, 0.85f) { PatternPanel() },
+            // Dense monospace grid: keep the texture under the 2064 px eye
+            // buffer but above the default, so 7 sp cells stay readable.
+            panel(R.id.panel_pattern, 1.4f, 0.85f, resolutionScale = 1.4f) { PatternPanel() },
             // Wider than the rest on purpose: the three text blocks (message,
             // instruments, samples) sit side by side, so the panel needs the
             // width to give each of them a readable column.
