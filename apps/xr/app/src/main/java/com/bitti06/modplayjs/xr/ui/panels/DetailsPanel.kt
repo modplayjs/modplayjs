@@ -49,6 +49,11 @@ private enum class Expanded { None, Message, Instruments, Samples }
  * shows — message, instruments, samples — side by side, because this panel is
  * registered wider than the others for exactly that reason.
  *
+ * The three blocks share the width by how much text they hold, not in equal
+ * thirds: the body is monospace, so the longest line is the block's natural
+ * width, and a two-line message does not need the same room as a twenty-entry
+ * sample list.
+ *
  * Tapping a block expands it over the whole panel. In that state the panel
  * paints no background at all: the room behind it is the backdrop, and the text
  * carries a shadow so it stays readable while floating.
@@ -134,6 +139,15 @@ fun DetailsPanel() {
             )
         }
 
+        // One reference width for all three, so the shares stay relative:
+        // the widest block takes the most room, the others keep a usable card.
+        val widest =
+            maxOf(
+                message.widestLine(),
+                instruments.widestLine(),
+                samples.widestLine(),
+            )
+
         Row(
             modifier = Modifier.fillMaxWidth().weight(1f),
             horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
@@ -144,7 +158,7 @@ fun DetailsPanel() {
                 lines = message,
                 expanded = false,
                 onToggle = { expanded = Expanded.Message },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(shareOf(message, widest)).fillMaxHeight(),
             )
             TextBlock(
                 title = stringResource(R.string.xr_details_instruments),
@@ -152,7 +166,7 @@ fun DetailsPanel() {
                 lines = instruments,
                 expanded = false,
                 onToggle = { expanded = Expanded.Instruments },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(shareOf(instruments, widest)).fillMaxHeight(),
             )
             TextBlock(
                 title = stringResource(R.string.xr_details_samples),
@@ -160,7 +174,7 @@ fun DetailsPanel() {
                 lines = samples,
                 expanded = false,
                 onToggle = { expanded = Expanded.Samples },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(shareOf(samples, widest)).fillMaxHeight(),
             )
         }
 
@@ -192,6 +206,23 @@ fun DetailsPanel() {
         }
     }
 }
+
+/** Character count of the longest line; the body is monospace, so it is width. */
+private fun List<String>.widestLine(): Int = maxOfOrNull { it.length } ?: 0
+
+/**
+ * Width share of one block, relative to the widest of the three.
+ *
+ * [MIN_SHARE] keeps a short block from collapsing to a sliver: its header and
+ * a few lines still have to be readable and tappable. With no text at all the
+ * three split evenly, which is the old behaviour.
+ */
+private fun shareOf(lines: List<String>, widest: Int): Float {
+    if (widest <= 0) return 1f
+    return (lines.widestLine().toFloat() / widest).coerceIn(MIN_SHARE, 1f)
+}
+
+private const val MIN_SHARE = 0.45f
 
 /**
  * A scrollable block of module text. Collapsed, three of these sit side by side
