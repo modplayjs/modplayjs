@@ -32,6 +32,7 @@ import com.meta.spatial.runtime.PanelShapeLayerBlendType
 import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.AppSystemActivity
+import com.meta.spatial.toolkit.CylinderShapeOptions
 import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
 import com.meta.spatial.toolkit.MeshCollision
 import com.meta.spatial.toolkit.Panel
@@ -39,7 +40,6 @@ import com.meta.spatial.toolkit.PanelRegistration
 import com.meta.spatial.toolkit.PanelSettings
 import com.meta.spatial.toolkit.PanelRenderMode
 import com.meta.spatial.toolkit.PanelStyleOptions
-import com.meta.spatial.toolkit.QuadShapeOptions
 import com.meta.spatial.toolkit.UIPanelRenderOptions
 import com.meta.spatial.toolkit.UIPanelSettings
 import com.meta.spatial.toolkit.Visible
@@ -109,7 +109,17 @@ class XrActivity : AppSystemActivity(), XrHost {
     private fun panelSettings(spec: PanelSpec): PanelSettings {
         val base =
             UIPanelSettings(
-                shape = QuadShapeOptions(width = spec.width, height = spec.height),
+                // Slightly curved: a cylinder radius of 1.9x the panel width
+                // gives a gentle bend (~9 cm sag over a 1.4 m panel) without
+                // making the edges hard to read. IsdkComponentCreationSystem
+                // reads the shape and gives the panel the matching
+                // IsdkCurvedPanel, so touch and grab hit the curve too.
+                shape =
+                    CylinderShapeOptions(
+                        radius = spec.width * 1.9f,
+                        width = spec.width,
+                        height = spec.height,
+                    ),
                 style = PanelStyleOptions(themeResourceId = R.style.PanelAppThemeTransparent),
                 display =
                     DpPerMeterDisplayOptions(
@@ -163,7 +173,12 @@ class XrActivity : AppSystemActivity(), XrHost {
         super.onSceneReady()
         player.attachScene(scene, spatialAudio)
         scene.setReferenceSpace(ReferenceSpace.LOCAL_FLOOR)
-        scene.setViewOrigin(0f, 0f, 0f, 0f)
+        // No setViewOrigin here. It positions the *viewer*, not the world: the
+        // documented example calls setViewOrigin(0, 0, 2, 180) to stand the
+        // viewer two metres forward. Passing zeros put the eye at the floor
+        // origin, so panels authored at 1.45 m looked a metre and a half above
+        // the user. Leaving it alone keeps the eye at head height in the floor
+        // space.
         // Documented knob: multiplies thumbstick scroll speed on panels. 1.6
         // lets a 32-channel pattern be crossed in a reasonable time.
         scene.setPanelControllerScrollFactor(1.6f)
