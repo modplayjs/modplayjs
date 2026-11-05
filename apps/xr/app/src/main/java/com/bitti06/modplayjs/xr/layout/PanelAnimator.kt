@@ -34,14 +34,26 @@ class PanelAnimator : SystemBase() {
         target: Pose,
         durationMs: Long = DEFAULT_DURATION_MS,
     ) {
-        val current =
-            runCatching { entity.getComponent<Transform>().transform }.getOrNull()
-                ?: return
-        moves[entity] = Move(current, target, System.currentTimeMillis(), durationMs)
+        moves[entity] =
+            Move(readPose(entity) ?: return, target, System.currentTimeMillis(), durationMs)
     }
 
     fun cancel(entity: Entity) {
         moves.remove(entity)
+    }
+
+    /** Copy the pose out and hand the borrowed component back to its pool. */
+    private fun readPose(entity: Entity): Pose? {
+        val transform = runCatching { entity.getComponent<Transform>() }.getOrNull() ?: return null
+        return try {
+            val pose = transform.transform
+            Pose(
+                Vector3(pose.t.x, pose.t.y, pose.t.z),
+                com.meta.spatial.core.Quaternion(w = pose.q.w, x = pose.q.x, y = pose.q.y, z = pose.q.z),
+            )
+        } finally {
+            runCatching { transform.recycle() }
+        }
     }
 
     override fun execute() {
