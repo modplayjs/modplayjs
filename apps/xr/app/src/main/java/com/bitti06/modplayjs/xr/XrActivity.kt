@@ -197,6 +197,11 @@ class XrActivity : AppSystemActivity(), XrHost {
             panels[spec.id] =
                 Entity.create(
                     Panel(spec.androidId, MeshCollision.LineTest),
+                    // A panel must have a Transform from the first frame: the
+                    // ISDK reads it on its first tick and a missing component
+                    // is a native assert, not a nullable read. This is a
+                    // placeholder until the anchored placement below runs.
+                    Transform(spec.pose),
                     Visible(false),
                 )
         }
@@ -220,7 +225,9 @@ class XrActivity : AppSystemActivity(), XrHost {
             val head = readHeadPose()
             if (head == null && placementAttempts++ < 300) return
             placement.setAnchor(head)
-            placement.apply(panels)
+            // force: the placeholder Transform above must be replaced even in
+            // free mode, where apply otherwise leaves placed panels alone.
+            placement.apply(panels, force = true)
             panelsPlaced = true
         }
         if (state.player.loaded != lastLoaded) {

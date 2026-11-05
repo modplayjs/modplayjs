@@ -84,11 +84,11 @@ class PanelPlacement(
      * In free mode a panel that already has a Transform is left alone: the user
      * put it there, and a track change must not yank it back into the arc.
      */
-    fun apply(entities: Map<PanelId, Entity>) {
+    fun apply(entities: Map<PanelId, Entity>, force: Boolean = false) {
         for ((id, entity) in entities) {
             val spec = specs[id] ?: continue
             val placed = hasTransform(entity)
-            if (!free || !placed) {
+            if (force || !free || !placed) {
                 val pose = if (free) savedPose(id) ?: anchored(spec.pose) else anchored(spec.pose)
                 place(entity, pose, animate = false)
             }
@@ -256,9 +256,9 @@ class PanelPlacement(
 
         /**
          * Cleared on every change to the arc or to what a saved pose means.
-         * 39: the arc is anchored to the head at first placement, so poses
-         * saved under 38 hold the old world-origin position.
+         * 40: panels are created with a placeholder Transform and then placed
+         * at the head anchor, so poses saved under 39 hold the old position.
          */
-        const val LAYOUT_VERSION = 39
+        const val LAYOUT_VERSION = 40
     }
 }
