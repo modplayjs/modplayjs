@@ -24,6 +24,9 @@ import com.bitti06.modplayjs.xr.ui.XrTheme
 import com.meta.spatial.compose.ComposeFeature
 import com.meta.spatial.compose.ComposeViewPanelRegistration
 import com.meta.spatial.core.Entity
+import com.meta.spatial.core.Pose
+import com.meta.spatial.core.Quaternion
+import com.meta.spatial.core.Vector3
 import com.meta.spatial.core.SpatialFeature
 import com.meta.spatial.isdk.IsdkDefaultCursorSystem
 import com.meta.spatial.isdk.IsdkSystem
@@ -32,11 +35,12 @@ import com.meta.spatial.runtime.PanelShapeLayerBlendType
 import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.AppSystemActivity
-import com.meta.spatial.toolkit.CylinderShapeOptions
 import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
 import com.meta.spatial.toolkit.MeshCollision
 import com.meta.spatial.toolkit.Panel
 import com.meta.spatial.toolkit.PanelRegistration
+import com.meta.spatial.toolkit.PlayerBodyAttachmentSystem
+import com.meta.spatial.toolkit.QuadShapeOptions
 import com.meta.spatial.toolkit.PanelSettings
 import com.meta.spatial.toolkit.PanelRenderMode
 import com.meta.spatial.toolkit.PanelStyleOptions
@@ -76,6 +80,9 @@ class XrActivity : AppSystemActivity(), XrHost {
     /** What the input systems were last told; re-asserted after a reload. */
     private var iskdInputActive = false
     private var lastRecenterNs = 0L
+    /** The arc is placed once, anchored to the head position. */
+    private var panelsPlaced = false
+    private var placementAttempts = 0
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun registerFeatures(): List<SpatialFeature> {
@@ -109,17 +116,7 @@ class XrActivity : AppSystemActivity(), XrHost {
     private fun panelSettings(spec: PanelSpec): PanelSettings {
         val base =
             UIPanelSettings(
-                // Slightly curved: a cylinder radius of 1.9x the panel width
-                // gives a gentle bend (~9 cm sag over a 1.4 m panel) without
-                // making the edges hard to read. IsdkComponentCreationSystem
-                // reads the shape and gives the panel the matching
-                // IsdkCurvedPanel, so touch and grab hit the curve too.
-                shape =
-                    CylinderShapeOptions(
-                        radius = spec.width * 1.9f,
-                        width = spec.width,
-                        height = spec.height,
-                    ),
+                shape = QuadShapeOptions(width = spec.width, height = spec.height),
                 style = PanelStyleOptions(themeResourceId = R.style.PanelAppThemeTransparent),
                 display =
                     DpPerMeterDisplayOptions(
@@ -199,10 +196,9 @@ class XrActivity : AppSystemActivity(), XrHost {
             panels[spec.id] =
                 Entity.create(
                     Panel(spec.androidId, MeshCollision.LineTest),
-                    Visible(true),
+                    Visible(false),
                 )
         }
-        placement.apply(panels)
 
         activityScope.launch { XrStore.state.collect { applyState(it) } }
 
@@ -214,6 +210,18 @@ class XrActivity : AppSystemActivity(), XrHost {
      * exactly the panels [visiblePanels] names.
      */
     private fun applyState(state: XrState) {
+        if (!panelsPlaced) {
+            // The authored arc assumes an eye at 1.6 m on the world origin. The
+            // head entity gives the real position, so the first placement puts
+            // the arc in front of the user instead of wherever the reference
+            // space happens to start. The body appears a moment after the
+            // scene, hence the retry; after ~5 s the authored poses are used.
+            val head = readHeadPose()
+            if (head == null && placementAttempts++ < 300) return
+            placement.setAnchor(head)
+            placement.apply(panels)
+            panelsPlaced = true
+        }
         if (state.player.loaded != lastLoaded) {
             lastLoaded = state.player.loaded
             placement.apply(panels)
@@ -402,6 +410,32 @@ class XrActivity : AppSystemActivity(), XrHost {
     override fun onVRPause() {
         super.onVRPause()
         setInputActive(false)
+    }
+
+    /**
+     * Head pose of the local player, copied out of the borrowed Transform.
+     * `null` until the avatar body exists.
+     */
+    private fun readHeadPose(): Pose? {
+        val body =
+            runCatching {
+                systemManager.tryFindSystem<PlayerBodyAttachmentSystem>()?.tryGetLocalPlayerAvatarBody()
+            }.getOrNull() ?: return null
+        return try {
+            val transform =
+                runCatching { body.head.getComponent<Transform>() }.getOrNull() ?: return null
+            try {
+                val pose = transform.transform
+                Pose(
+                    Vector3(pose.t.x, pose.t.y, pose.t.z),
+                    Quaternion(w = pose.q.w, x = pose.q.x, y = pose.q.y, z = pose.q.z),
+                )
+            } finally {
+                runCatching { transform.recycle() }
+            }
+        } finally {
+            runCatching { body.recycle() }
+        }
     }
 
     private fun saveFreeLayout() {

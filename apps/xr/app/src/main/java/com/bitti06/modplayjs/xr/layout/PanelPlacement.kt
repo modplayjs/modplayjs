@@ -31,6 +31,15 @@ class PanelPlacement(
     private val prefs = context.getSharedPreferences("xr.layout", Context.MODE_PRIVATE)
     private val specs = PANELS.associateBy { it.id }
 
+    /**
+     * Where the user's head was when the arc was first placed. The authored
+     * poses assume the eye sits at [DEFAULT_EYE_HEIGHT] on the world origin;
+     * this offset moves the whole arc to the real head position, so the panels
+     * appear in front of the user at eye height whether the runtime reports
+     * poses floor-relative (head y ~ 1.6) or eye-relative (head y ~ 0).
+     */
+    private var anchor = Vector3(0f, 0f, 0f)
+
     private val _free: MutableStateFlow<Boolean>
 
     init {
@@ -49,6 +58,27 @@ class PanelPlacement(
         get() = _free.value
 
     /**
+     * Anchor the arc to the head position read once at startup.
+     *
+     * `null` keeps the authored poses, which assume an eye at
+     * [DEFAULT_EYE_HEIGHT] on the world origin.
+     */
+    fun setAnchor(head: Pose?) {
+        anchor =
+            if (head == null) {
+                Vector3(0f, 0f, 0f)
+            } else {
+                Vector3(head.t.x, head.t.y - DEFAULT_EYE_HEIGHT, head.t.z)
+            }
+    }
+
+    /** Move an authored pose to the anchored head position. */
+    private fun anchored(pose: Pose): Pose {
+        val p = pose.t
+        return Pose(Vector3(p.x + anchor.x, p.y + anchor.y, p.z + anchor.z), pose.q)
+    }
+
+    /**
      * Place every panel and set its grab state.
      *
      * In free mode a panel that already has a Transform is left alone: the user
@@ -59,7 +89,7 @@ class PanelPlacement(
             val spec = specs[id] ?: continue
             val placed = hasTransform(entity)
             if (!free || !placed) {
-                val pose = if (free) savedPose(id) ?: spec.pose else spec.pose
+                val pose = if (free) savedPose(id) ?: anchored(spec.pose) else anchored(spec.pose)
                 place(entity, pose, animate = false)
             }
             setGrabbable(entity, free)
@@ -87,7 +117,7 @@ class PanelPlacement(
                 setGrabbable(entity, on)
                 continue
             }
-            val pose = if (on) savedPose(id) ?: spec.pose else spec.pose
+            val pose = if (on) savedPose(id) ?: anchored(spec.pose) else anchored(spec.pose)
             place(entity, pose, animate = true)
             setGrabbable(entity, on)
         }
@@ -97,7 +127,7 @@ class PanelPlacement(
     fun reset(entities: Map<PanelId, Entity>) {
         for ((id, entity) in entities) {
             val spec = specs[id] ?: continue
-            place(entity, spec.pose, animate = false)
+            place(entity, anchored(spec.pose), animate = false)
             setGrabbable(entity, free)
         }
         val edit = prefs.edit()
@@ -219,14 +249,16 @@ class PanelPlacement(
     }
 
     private companion object {
+        /** Eye height the authored poses assume, in metres above the floor. */
+        const val DEFAULT_EYE_HEIGHT = 1.6f
         const val KEY_FREE = "free"
         const val KEY_VERSION = "layoutVersion"
 
         /**
          * Cleared on every change to the arc or to what a saved pose means.
-         * 38: every panel is turned towards the origin instead of all facing
-         * straight ahead, so poses saved under 37 hold the old flat wall.
+         * 39: the arc is anchored to the head at first placement, so poses
+         * saved under 38 hold the old world-origin position.
          */
-        const val LAYOUT_VERSION = 38
+        const val LAYOUT_VERSION = 39
     }
 }
