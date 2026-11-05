@@ -28,6 +28,7 @@ import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.Vector3
 import com.meta.spatial.core.SpatialFeature
+import com.meta.spatial.core.SystemBase
 import com.meta.spatial.isdk.IsdkDefaultCursorSystem
 import com.meta.spatial.isdk.IsdkSystem
 import com.meta.spatial.mruk.MRUKFeature
@@ -83,7 +84,7 @@ class XrActivity : AppSystemActivity(), XrHost {
     private var lastRecenterNs = 0L
     /** The arc is placed once, anchored to the head position. */
     private var panelsPlaced = false
-    private var placementAttempts = 0
+    private var anchoredToHead = false
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun registerFeatures(): List<SpatialFeature> {
@@ -206,6 +207,7 @@ class XrActivity : AppSystemActivity(), XrHost {
                 )
         }
 
+        registerArcAnchor()
         activityScope.launch { XrStore.state.collect { applyState(it) } }
 
         Log.i(TAG, "panels placed: ${panels.size}, free=${placement.free}")
@@ -217,18 +219,17 @@ class XrActivity : AppSystemActivity(), XrHost {
      */
     private fun applyState(state: XrState) {
         if (!panelsPlaced) {
-            // The authored arc assumes an eye at 1.6 m on the world origin. The
-            // head entity gives the real position, so the first placement puts
-            // the arc in front of the user instead of wherever the reference
-            // space happens to start. The body appears a moment after the
-            // scene, hence the retry; after ~5 s the authored poses are used.
-            val head = readHeadPose()
-            if (head == null && placementAttempts++ < 300) return
-            placement.setAnchor(head)
-            // force: the placeholder Transform above must be replaced even in
-            // free mode, where apply otherwise leaves placed panels alone.
+            // Show the arc in this very emission. Panels are created hidden so
+            // the placeholder Transform is never on screen; waiting for the
+            // avatar body before revealing them left the room empty, because
+            // the body arrives well after the scene and the state flow only
+            // emits when something changes. The authored poses are the
+            // fallback; the head anchor moves the arc once it is readable.
             placement.apply(panels, force = true)
             panelsPlaced = true
+            // The head may already be readable in this first emission; the
+            // per-frame system is only the retry.
+            anchorArcToHead()
         }
         if (state.player.loaded != lastLoaded) {
             lastLoaded = state.player.loaded
@@ -240,6 +241,53 @@ class XrActivity : AppSystemActivity(), XrHost {
         for ((id, entity) in panels) {
             entity.setComponent(Visible(id in next))
         }
+    }
+
+    /**
+     * Retry the head anchor once per frame until it succeeds.
+     *
+     * The state flow only emits when something changes, so it cannot be the
+     * retry clock: without an emission there was no retry, and the arc stayed
+     * where the authored poses put it. `SystemBase.execute` is the documented
+     * place for per-frame work. The race is bounded to a few seconds so a panel
+     * grabbed early is never pulled out of a hand by a late anchor.
+     */
+    private fun registerArcAnchor() {
+        systemManager.registerSystem(
+            object : SystemBase() {
+                /** ~5 s at 72 Hz; enough for the avatar, and bounded. */
+                private var frames = 0
+
+                override fun execute() {
+                    if (anchoredToHead || !panelsPlaced) return
+                    if (frames++ > 360) {
+                        anchoredToHead = true
+                        Log.w(TAG, "arc not anchored: no head pose within 5 s")
+                        return
+                    }
+                    anchorArcToHead()
+                }
+            },
+        )
+    }
+
+    /**
+     * Move the arc from the world origin to the user's head, once.
+     *
+     * `PANELS` authors the arc around an eye at 1.6 m on the origin. The real
+     * eye is wherever the runtime put the reference space, which in this room
+     * was metres away, so the same poses showed the panels far ahead. The head
+     * entity only exists after the avatar is attached; [placement] keeps the
+     * authored poses until then, so this corrects the arc, it never gates it.
+     */
+    private fun anchorArcToHead() {
+        val head = readHeadPose() ?: return
+        placement.setAnchor(head)
+        // force: a panel already holds the placeholder Transform from creation,
+        // which apply() would otherwise leave alone in free mode.
+        placement.apply(panels, force = true)
+        anchoredToHead = true
+        Log.i(TAG, "arc anchored to head at (${head.t.x}, ${head.t.y}, ${head.t.z})")
     }
 
     /** Called once the user grants the runtime USE_SCENE permission. */
