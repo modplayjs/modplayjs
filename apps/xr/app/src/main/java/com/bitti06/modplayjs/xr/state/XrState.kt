@@ -17,7 +17,7 @@ data class Overlays(
     val settings: Boolean = false,
     val queue: Boolean = false,
     val ignored: Boolean = false,
-    val details: Boolean = false,
+    val details: Boolean = true,
 )
 
 /**

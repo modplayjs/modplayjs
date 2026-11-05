@@ -302,9 +302,20 @@ class XrActivity : AppSystemActivity(), XrHost {
         mrukFeature.loadSceneFromDevice().whenComplete { _, _ ->
             runOnUiThread {
                 val bounds = mrukFeature.getCurrentRoom()?.roomBounds ?: return@runOnUiThread
-                val centre = bounds.center()
                 val size = bounds.size()
-                player.setRingAuto(XrPlayer.autoRadius(size.x, size.z), centre.x, centre.z)
+                // Centre the ring on the listener, not on the room. MRUK
+                // reports its bounds in its own coordinate space - the runtime
+                // logs a scene origin offset of about -1.3 / -1.0 m and a
+                // rotation - while the audio objects live in the app's
+                // reference space. A room centre taken from MRUK therefore put
+                // the whole ring metres away, and every channel bunched up in
+                // front of the user. The radius still follows the room size.
+                val head = readHeadPose()
+                player.setRingAuto(
+                    XrPlayer.autoRadius(size.x, size.z),
+                    head?.t?.x ?: 0f,
+                    head?.t?.z ?: 0f,
+                )
             }
         }
     }

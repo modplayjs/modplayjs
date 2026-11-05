@@ -51,6 +51,8 @@ object XrStore {
     private var player: XrPlayer? = null
     /** Last playback state, so the library only moves on a transition. */
     private var wasPlaying = false
+    /** Last load state, so a dismissed details shelf returns with the next module. */
+    private var wasLoaded = false
     private var playlist: Playlist? = null
     private var library: Library? = null
     private val overlays = MutableStateFlow(Overlays())
@@ -94,6 +96,11 @@ object XrStore {
             wasPlaying = playing
             overlays.value = overlays.value.copy(library = !playing)
         }
+        val loaded = p?.state?.value?.loaded == true
+        if (loaded && !wasLoaded) {
+            overlays.value = overlays.value.copy(details = true)
+        }
+        wasLoaded = loaded
         _state.value =
             XrState(
                 player = p?.state?.value ?: XrState().player,

@@ -258,7 +258,9 @@ class PanelPlacement(
          * Cleared on every change to the arc or to what a saved pose means.
          * 40: panels are created with a placeholder Transform and then placed
          * at the head anchor, so poses saved under 39 hold the old position.
+         * 41: details moved below now playing, so poses saved under 40 hold
+         * the old overlap.
          */
-        const val LAYOUT_VERSION = 40
+        const val LAYOUT_VERSION = 41
     }
 }

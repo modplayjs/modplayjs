@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.xr.R
 import com.bitti06.modplayjs.xr.state.XrStore
+import com.bitti06.modplayjs.xr.ui.panel.DetailsButton
 import com.bitti06.modplayjs.xr.ui.panel.MetaText
 import com.bitti06.modplayjs.xr.ui.panel.PanelScaffold
 import com.bitti06.modplayjs.xr.ui.panel.PanelTokens
@@ -52,7 +53,10 @@ fun NowPlayingPanel() {
     PanelScaffold(
         title = stringResource(R.string.xr_now_playing),
         subtitle = if (playback.loaded) playback.format else null,
-        headerActions = { SettingsButton() },
+        headerActions = {
+            DetailsButton()
+            SettingsButton()
+        },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapXs)) {
             Tag(

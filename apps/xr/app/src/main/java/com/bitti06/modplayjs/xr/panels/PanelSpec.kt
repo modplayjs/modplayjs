@@ -105,15 +105,18 @@ val PANELS: List<PanelSpec> =
             width = 1.6f,
             height = 0.9f,
             resolutionScale = 0.9f,
-            pose = at(-1.75f, 0.45f, 1.75f),
+            pose = at(-2.0f, 0.52f, 1.70f),
         ) { PatternPanel() },
+        // The details shelf sits below now playing, not behind it: at 2.2 m it
+        // is wider than the transport, and at eye height it covered the main
+        // panel completely.
         PanelSpec(
             id = PanelId.DETAILS,
             androidId = R.id.panel_details,
             width = 2.2f,
             height = 0.95f,
             transparent = true,
-            pose = at(0f, 1.05f, 2.15f),
+            pose = at(0f, 0.52f, 1.95f),
         ) { DetailsPanel() },
         PanelSpec(
             id = PanelId.DEBUG,

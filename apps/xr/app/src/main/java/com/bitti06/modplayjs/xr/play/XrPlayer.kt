@@ -666,10 +666,14 @@ class XrPlayer(
     private fun rebuildMarkers() {
         destroyMarkers()
         if (!debugVisible || outputMode != 2) return
-        val channels = spatialInfo.channels
+        // Read the engine again instead of trusting the snapshot from the last
+        // output rebuild: a layout switch or a fresh module can change every
+        // azimuth, and a stale list would drop all markers on one spot.
+        val info = readSpatialInfo().takeIf { it.channels > 0 } ?: spatialInfo
+        val channels = info.channels
         if (channels <= 0) return
         val positions = List(channels) { i ->
-            positionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
+            positionFor(info.azimuths.getOrElse(i) { 0f })
         }
         val colors = List(channels) { channelColor(it) }
         mainHandler.post {

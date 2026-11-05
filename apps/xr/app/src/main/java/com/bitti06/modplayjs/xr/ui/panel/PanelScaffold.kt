@@ -95,6 +95,25 @@ fun HomeButton() {
     )
 }
 
+/**
+ * Shows or hides the details shelf. It opens with every loaded module, so this
+ * is the way to get it out of the view during playback and back again.
+ */
+@Composable
+fun DetailsButton() {
+    Text(
+        "ⓘ",
+        fontSize = PanelTokens.ChipText,
+        color = PanelTokens.Text,
+        modifier = Modifier
+            .padding(start = PanelTokens.GapSm)
+            .clip(RoundedCornerShape(50))
+            .background(PanelTokens.SurfaceSunken)
+            .clickable { XrStore.toggleDetails() }
+            .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
+    )
+}
+
 /** Opens the settings panel; there is exactly one of these per panel. */
 @Composable
 fun SettingsButton() {
