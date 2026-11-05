@@ -7,6 +7,8 @@ import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.Vector3
+import com.meta.spatial.toolkit.Grabbable
+import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Transform
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,11 +19,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * hand.
  *
  * Poses come from [PANELS], so a size and its position are never written twice.
- * Free placement persists the pose per panel; stationary restores the arc.
- * Grabbing is not touched here: `IsdkComponentCreationSystem` gives every panel
- * its grabbable and its grab handle, and writing those components from Kotlin
- * corrupts their attribute layout in the native data model. Mode switches slide
- * through [PanelAnimator]; a reset lands instantly, because a reset should.
+ * Free placement persists the pose per panel; stationary restores the arc and
+ * removes the grab component. Mode switches slide through [PanelAnimator]; a
+ * reset lands instantly, because a reset should.
  */
 class PanelPlacement(
     context: Context,
@@ -62,6 +62,7 @@ class PanelPlacement(
                 val pose = if (free) savedPose(id) ?: spec.pose else spec.pose
                 place(entity, pose, animate = false)
             }
+            setGrabbable(entity, free)
         }
     }
 
@@ -82,9 +83,13 @@ class PanelPlacement(
         prefs.edit().putBoolean(KEY_FREE, on).apply()
         for ((id, entity) in entities) {
             val spec = specs[id] ?: continue
-            if (id in skip) continue
+            if (id in skip) {
+                setGrabbable(entity, on)
+                continue
+            }
             val pose = if (on) savedPose(id) ?: spec.pose else spec.pose
             place(entity, pose, animate = true)
+            setGrabbable(entity, on)
         }
     }
 
@@ -93,6 +98,7 @@ class PanelPlacement(
         for ((id, entity) in entities) {
             val spec = specs[id] ?: continue
             place(entity, spec.pose, animate = false)
+            setGrabbable(entity, free)
         }
         val edit = prefs.edit()
         for (id in entities.keys) {
@@ -173,18 +179,44 @@ class PanelPlacement(
         }
     }
 
-    /*
-     * No grab components are written here.
+    /**
+     * Free mode writes the toolkit [Grabbable]; `IsdkToolkitBridgeSystem` turns
+     * it into the Interaction SDK grabbable and asks
+     * `IsdkComponentCreationSystem` for the panel's grab handle, which is the
+     * white outline drawn on hover.
      *
-     * `IsdkComponentCreationSystem` inspects the scene and creates the panel's
-     * `IsdkPanelDimensions`, `IsdkPanelGrabHandle` and `IsdkGrabbable` itself,
-     * and its log confirms it: "ISDK: Creating panel … / Creating grabbable …"
-     * for every panel. Writing `IsdkGrabbable` from Kotlin corrupted the native
-     * attribute layout - the entity stored the component with the wrong data
-     * type, and the first read from `IsdkPanelHandleCoordinator` crashed the
-     * main thread with "attempted to get int, wrong data type found". Grabbing
-     * therefore stays entirely on the SDK side; this class only moves panels.
+     * The Interaction SDK's own components are never written from here. Doing
+     * that crashed the main thread: the entity stored `IsdkGrabbable` with an
+     * attribute layout the native side did not expect, and the first read from
+     * `IsdkPanelHandleCoordinator` failed with "attempted to get int, wrong data
+     * type found". The bridge component is the documented input, and it is the
+     * only one this class touches.
      */
+    private fun setGrabbable(entity: Entity, enabled: Boolean) {
+        if (!enabled) {
+            entity.tryRemoveComponent<Grabbable>()
+            return
+        }
+        // A slide in progress would fight the hand; drop it for this entity.
+        animator?.cancel(entity)
+
+        // Re-writing resets the grab state, so it is only written when it is
+        // missing: this runs on every track change, which must not drop a panel
+        // mid-grab.
+        val current = runCatching { entity.tryGetComponent<Grabbable>() }.getOrNull()
+        if (current != null) {
+            runCatching { current.recycle() }
+            return
+        }
+        entity.setComponent(
+            Grabbable(
+                enabled = true,
+                type = GrabbableType.PIVOT_Y,
+                minHeight = 0.3f,
+                maxHeight = 3.0f,
+            ),
+        )
+    }
 
     private companion object {
         const val KEY_FREE = "free"
@@ -192,8 +224,8 @@ class PanelPlacement(
 
         /**
          * Cleared on every change to the arc or to what a saved pose means.
-         * 37: the layout choice is read after the wipe, and the arc is the same
-         * as 36.
+         * 37: the layout choice is read after the wipe, and grabbing is the
+         * bridge path again.
          */
         const val LAYOUT_VERSION = 37
     }
