@@ -224,9 +224,9 @@ class PanelPlacement(
 
         /**
          * Cleared on every change to the arc or to what a saved pose means.
-         * 37: the layout choice is read after the wipe, and grabbing is the
-         * bridge path again.
+         * 38: every panel is turned towards the origin instead of all facing
+         * straight ahead, so poses saved under 37 hold the old flat wall.
          */
-        const val LAYOUT_VERSION = 37
+        const val LAYOUT_VERSION = 38
     }
 }

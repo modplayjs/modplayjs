@@ -45,18 +45,21 @@ data class PanelSpec(
 )
 
 /**
- * Identity rotation: a panel already faces the viewer.
+ * Put a panel at [x], [y], [z] and turn it towards the user standing at the
+ * origin, so the arc reads as a semicircle instead of a row of parallel panels.
  *
- * Meta's spawn page places a panel with
- * `Transform(Pose(Vector3(0f, 1.8f, 5f), Quaternion(0f, 0f, 0f)))` — in front
- * at +Z with no rotation — and `Pose.forward()` rotates (0, 0, 1). The 180
- * degrees of yaw this table used before turned every panel around: the user saw
- * the back, the content was the back's, and a ray through the back found
- * nothing to hit.
+ * The yaw follows from the geometry, not from a guess. A panel's front is its
+ * local -Z; the Euler constructor builds
+ * `W = cp·cy·cr + sp·sy·sr`, `X = sp·cy·cr - cp·sy·sr`,
+ * `Y = cp·sy·cr + sp·cy·sr`, `Z = cp·cy·sr - sp·sy·cr` (verified in the
+ * 0.15.0 jar), so yaw alone gives `q = (cos θ/2, 0, sin θ/2, 0)`. Rotating the
+ * front `(0, 0, -1)` by that leaves `(-sin θ, 0, -cos θ)`, and pointing that at
+ * the origin needs `sin θ = x/r`, `cos θ = z/r`, i.e. `θ = atan2(x, z)`.
  */
-private val FACING_USER = Quaternion(0f, 0f, 0f)
-
-private fun at(x: Float, y: Float, z: Float) = Pose(Vector3(x, y, z), FACING_USER)
+private fun at(x: Float, y: Float, z: Float): Pose {
+    val yaw = Math.toDegrees(kotlin.math.atan2(x.toDouble(), z.toDouble())).toFloat()
+    return Pose(Vector3(x, y, z), Quaternion(0f, yaw, 0f))
+}
 
 /**
  * The arc, and the one place a panel's size is written.
