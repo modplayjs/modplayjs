@@ -213,9 +213,9 @@ class PanelPlacement(
 
         /**
          * Cleared on every change to the arc or to what a saved pose means.
-         * 34: the panel table moved into `PanelSpecs` and the tool made the
-         * pose part of it; poses from 33 were saved by the old layout class.
+         * 35: the arc no longer turns every panel 180 degrees, so every pose
+         * saved under 34 has the user looking at a back.
          */
-        const val LAYOUT_VERSION = 34
+        const val LAYOUT_VERSION = 35
     }
 }

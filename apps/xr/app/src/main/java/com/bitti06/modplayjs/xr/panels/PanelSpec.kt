@@ -45,11 +45,16 @@ data class PanelSpec(
 )
 
 /**
- * Panel front faces local -Z, so a panel at +Z turns 180 degrees of yaw to look
- * at the user. `Pose.forward()` rotates (0, 0, 1), which is the +Z the arc is
- * authored in.
+ * Identity rotation: a panel already faces the viewer.
+ *
+ * Meta's spawn page places a panel with
+ * `Transform(Pose(Vector3(0f, 1.8f, 5f), Quaternion(0f, 0f, 0f)))` — in front
+ * at +Z with no rotation — and `Pose.forward()` rotates (0, 0, 1). The 180
+ * degrees of yaw this table used before turned every panel around: the user saw
+ * the back, the content was the back's, and a ray through the back found
+ * nothing to hit.
  */
-private val FACING_USER = Quaternion(0f, 180f, 0f)
+private val FACING_USER = Quaternion(0f, 0f, 0f)
 
 private fun at(x: Float, y: Float, z: Float) = Pose(Vector3(x, y, z), FACING_USER)
 
