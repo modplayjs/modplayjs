@@ -38,7 +38,13 @@ data class PanelSpec(
     val width: Float,
     val height: Float,
     val dpPerMeter: Float = 500f,
-    val resolutionScale: Float = 1.2f,
+    /**
+     * Pixels per dp: the panel texture is `dp * 288 * resolutionScale / 160`
+     * wide. 0.8 gives 720 px/m, which is still above the Quest 3 eye buffer's
+     * ~630 px/m at the arc distance, and cuts panel texture memory to 44% of
+     * the old 1.2 (memory scales with the square of the scale).
+     */
+    val resolutionScale: Float = 0.8f,
     val transparent: Boolean = false,
     val pose: Pose,
     val content: @Composable () -> Unit,
@@ -98,7 +104,7 @@ val PANELS: List<PanelSpec> =
             androidId = R.id.panel_pattern,
             width = 1.6f,
             height = 0.9f,
-            resolutionScale = 1.3f,
+            resolutionScale = 0.9f,
             pose = at(-1.75f, 0.45f, 1.75f),
         ) { PatternPanel() },
         PanelSpec(
@@ -106,7 +112,6 @@ val PANELS: List<PanelSpec> =
             androidId = R.id.panel_details,
             width = 2.2f,
             height = 0.95f,
-            resolutionScale = 1.0f,
             transparent = true,
             pose = at(0f, 1.05f, 2.15f),
         ) { DetailsPanel() },
@@ -136,18 +141,19 @@ val PANELS: List<PanelSpec> =
 /**
  * The visibility rules, as one pure function.
  *
- * The library and now playing are the app's face and never hide. Pattern and
- * details appear only when the module actually has that data (SID and streamed
- * modules have no grid, and an empty grid reads as broken). Settings, queue,
- * ignored and debug are demand-only.
+ * Now playing never hides. The pattern appears only when the module has a grid
+ * (SID and streamed modules have none, and an empty grid reads as broken), and
+ * it replaces the library while the transport runs: two panels in view is the
+ * playback view, four is a wall. Details, settings, queue, ignored and debug
+ * are demand-only.
  */
 fun visiblePanels(state: XrState): Set<PanelId> {
     val playing = state.player
     return buildSet {
-        add(PanelId.LIBRARY)
         add(PanelId.MAIN)
+        if (state.overlays.library) add(PanelId.LIBRARY)
         if (playing.loaded && playing.canPattern) add(PanelId.PATTERN)
-        if (playing.loaded && playing.details.isNotEmpty()) add(PanelId.DETAILS)
+        if (playing.loaded && state.overlays.details) add(PanelId.DETAILS)
         if (state.overlays.settings) add(PanelId.SETTINGS)
         if (state.overlays.queue) add(PanelId.QUEUE)
         if (state.overlays.ignored) add(PanelId.IGNORED)

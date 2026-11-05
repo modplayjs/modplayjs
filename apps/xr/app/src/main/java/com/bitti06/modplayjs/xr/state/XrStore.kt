@@ -40,11 +40,17 @@ object XrStore {
     private val _state = MutableStateFlow(XrState())
     val state: StateFlow<XrState> = _state.asStateFlow()
 
+    /** The playhead alone; only the pattern panel reads it. */
+    private val _playhead = MutableStateFlow(Playhead())
+    val playhead: StateFlow<Playhead> = _playhead.asStateFlow()
+
     /** Bumped when the library changes from outside a panel (SAF picker). */
     private val _libraryVersion = MutableStateFlow(0)
     val libraryVersion: StateFlow<Int> = _libraryVersion.asStateFlow()
 
     private var player: XrPlayer? = null
+    /** Last playback state, so the library only moves on a transition. */
+    private var wasPlaying = false
     private var playlist: Playlist? = null
     private var library: Library? = null
     private val overlays = MutableStateFlow(Overlays())
@@ -65,6 +71,7 @@ object XrStore {
         refresh(freeLayout.value, passthrough.value)
 
         scope.launch { player.state.collect { refresh(freeLayout.value, passthrough.value) } }
+        scope.launch { player.playhead.collect { _playhead.value = it } }
         scope.launch { playlist.version.collect { refresh(freeLayout.value, passthrough.value) } }
         scope.launch { _libraryVersion.collect { refresh(freeLayout.value, passthrough.value) } }
         scope.launch { overlays.collect { refresh(freeLayout.value, passthrough.value) } }
@@ -80,6 +87,13 @@ object XrStore {
 
     private fun refresh(free: Boolean, passthrough: Boolean) {
         val p = player
+        // Playback owns the view: the library steps aside for the pattern and
+        // comes back when the transport stops. Home reopens it at any time.
+        val playing = p?.state?.value?.playing == true
+        if (playing != wasPlaying) {
+            wasPlaying = playing
+            overlays.value = overlays.value.copy(library = !playing)
+        }
         _state.value =
             XrState(
                 player = p?.state?.value ?: XrState().player,
@@ -197,7 +211,11 @@ object XrStore {
         toggle(overlays.value.copy(ignored = !overlays.value.ignored))
     }
 
-    /** Back to the library: close the three panels that open on demand. */
+    fun toggleDetails() {
+        toggle(overlays.value.copy(details = !overlays.value.details))
+    }
+
+    /** Back to the library: close every panel that opens on demand. */
     fun goHome() {
         toggle(Overlays())
     }

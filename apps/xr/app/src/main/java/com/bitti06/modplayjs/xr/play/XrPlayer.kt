@@ -8,6 +8,7 @@ import android.media.AudioTrack
 import android.util.Log
 import androidx.core.net.toUri
 import com.bitti06.modplayjs.engine.AndroidSettings
+import com.bitti06.modplayjs.xr.state.Playhead
 import com.bitti06.modplayjs.engine.EngineJson
 import com.bitti06.modplayjs.engine.PatternColors
 import com.bitti06.modplayjs.engine.SettingsStore
@@ -119,6 +120,13 @@ class XrPlayer(
         State(spatialEnabled = prefs.getBoolean(KEY_SPATIAL, DEFAULT_SPATIAL)),
     )
     val state: StateFlow<State> = _state.asStateFlow()
+
+    /**
+     * The playhead on its own flow. See [Playhead]: carrying the row in [State]
+     * made every panel recompose on every row.
+     */
+    private val _playhead = MutableStateFlow(Playhead())
+    val playhead: StateFlow<Playhead> = _playhead.asStateFlow()
 
     @Volatile
     private var engine: V8Engine? = null
@@ -738,9 +746,11 @@ class XrPlayer(
     }
 
     /**
-     * Cheap update of just the playhead. Deliberately does not touch anything
-     * else: the panels read the same StateFlow, and an unchanged field does not
-     * change the value, so Compose only recomposes what reads row/pattern.
+     * Cheap update of just the playhead.
+     *
+     * A row change publishes on [playhead] only. The shared [State] is touched
+     * when the order moves to another pattern, because that is when the cells
+     * change too.
      */
     private fun publishPlayhead() {
         if (!loaded) return
@@ -749,27 +759,23 @@ class XrPlayer(
         val obj = runCatching { Json.parseToJsonElement(raw) as? JsonObject }.getOrNull() ?: return
         val row = obj["row"]?.jsonPrimitive?.content?.toIntOrNull() ?: return
         val pattern = obj["pattern"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-        val current = _state.value
-        if (current.pattern.row == row && current.pattern.pattern == pattern) return
+        if (_playhead.value.row == row && _playhead.value.pattern == pattern) return
 
         // The order moved on: the cells belong to the old pattern, so fetch the
         // new one now instead of showing the previous grid for up to a snapshot
         // interval. readPattern caches by index, so this costs one V8 call per
-        // pattern change, not per poll.
-        val data =
-            if (current.pattern.pattern != pattern) {
-                // Keep the old grid if the fetch came back empty: a blank panel
-                // mid-song reads as a crash.
-                readPattern(pattern).takeIf { it.cells.isNotEmpty() } ?: current.pattern
-            } else {
-                current.pattern
+        // pattern change, not per poll, and only a pattern change touches the
+        // shared state.
+        val current = _state.value
+        if (current.pattern.pattern != pattern) {
+            // Keep the old grid if the fetch came back empty: a blank panel
+            // mid-song reads as a crash.
+            val data = readPattern(pattern).takeIf { it.cells.isNotEmpty() } ?: current.pattern
+            if (data.pattern != current.pattern.pattern) {
+                _state.value = current.copy(pattern = data)
             }
-        _state.value =
-            current.copy(
-                pattern = data.copy(row = row.coerceIn(0, (data.rows - 1).coerceAtLeast(0))),
-                positionMs = obj["positionMs"]?.jsonPrimitive?.content?.toLongOrNull()
-                    ?.let { it / 1000L * 1000L } ?: current.positionMs,
-            )
+        }
+        _playhead.value = Playhead(row = row, pattern = pattern)
     }
 
     /**
@@ -912,6 +918,11 @@ class XrPlayer(
             patternColors = settings.view.patternColors,
             trackDetail = readTrackDetail(track, settings.view),
         )
+        // A snapshot is the cheap truth: keep the row in step after a seek or a
+        // track change without a second poll.
+        _playhead.value =
+            Playhead(row = _state.value.pattern.row, pattern = _state.value.pattern.pattern)
+
         // Only log transitions, not every tick.
         if (previous.loaded != _state.value.loaded) {
             Log.i(TAG, "state: loaded=${_state.value.loaded}")

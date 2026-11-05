@@ -6,6 +6,9 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import com.bitti06.modplayjs.xr.input.ControllerInputSystem
 import com.bitti06.modplayjs.xr.library.Library
@@ -108,7 +111,7 @@ class XrActivity : AppSystemActivity(), XrHost {
                 composeViewCreator = { _, ctx ->
                     ComposeView(ctx).apply {
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                        setContent { XrTheme { spec.content() } }
+                        setContent { XrTheme { PanelContent(spec) } }
                     }
                 },
                 settingsCreator = { panelSettings(spec) },
@@ -125,14 +128,18 @@ class XrActivity : AppSystemActivity(), XrHost {
                         dpPerMeter = spec.dpPerMeter,
                         resolutionScale = spec.resolutionScale,
                     ),
-                // ALPHA_BLEND does not write depth, so overlapping panels can
-                // sort wrongly; the arc keeps them apart, and the blend is what
-                // keeps the rounded corners clean.
+                // OPAQUE, not ALPHA_BLEND: every panel surface is a full
+                // rectangle (PanelScaffold paints it edge to edge), so there is
+                // no interior alpha to blend. ALPHA_BLEND makes the compositor
+                // analyse the alpha of the whole texture every frame, and it
+                // does not write depth. The only transparent panel - details -
+                // overrides this with the hole-punch recipe in
+                // TransparentPanelSettings.
                 rendering =
                     UIPanelRenderOptions(
                         renderMode =
                             PanelRenderMode.Layer(
-                                layerBlendType = PanelShapeLayerBlendType.ALPHA_BLEND,
+                                layerBlendType = PanelShapeLayerBlendType.OPAQUE,
                                 enableLayerFeatheredEdge = true,
                             ),
                     ),
@@ -591,4 +598,19 @@ class XrActivity : AppSystemActivity(), XrHost {
         const val REQUEST_PICK_MODULES = 2
         const val REQUEST_PICK_TREE = 3
     }
+}
+
+/**
+ * Compose a panel only while it is on screen.
+ *
+ * All eight panels exist as windows from the start, so all eight used to keep
+ * their whole composition alive and recompose on every state change - eight
+ * Compose trees for the two or three panels anyone can see. Returning before
+ * `spec.content()` releases the hidden ones; they compose again when they
+ * become visible.
+ */
+@Composable
+private fun PanelContent(spec: PanelSpec) {
+    val state by XrStore.state.collectAsState()
+    if (spec.id in visiblePanels(state)) spec.content()
 }

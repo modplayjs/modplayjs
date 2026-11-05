@@ -4,11 +4,32 @@ import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.xr.library.TrackFile
 import com.bitti06.modplayjs.xr.play.XrPlayer
 
-/** Which on-demand panels are open. The library and now playing are always on. */
+/**
+ * Which on-demand panels are open.
+ *
+ * Now playing is always on. The library counts as on demand because playback
+ * hides it: three panels plus the pattern was more than a playback view needs,
+ * and the pattern is the one that belongs next to the transport. Home brings
+ * the library back, playback only closes it.
+ */
 data class Overlays(
+    val library: Boolean = true,
     val settings: Boolean = false,
     val queue: Boolean = false,
     val ignored: Boolean = false,
+    val details: Boolean = false,
+)
+
+/**
+ * Where the music is right now: one row in one pattern.
+ *
+ * Deliberately not part of [XrState]. The row advances about twelve times a
+ * second, and every panel reads [XrState], so carrying the row there
+ * recomposed all of them at that rate. Only the pattern panel reads this.
+ */
+data class Playhead(
+    val row: Int = 0,
+    val pattern: Int = 0,
 )
 
 /** The queue as the queue panel draws it. Owned by `Playlist`, copied here. */

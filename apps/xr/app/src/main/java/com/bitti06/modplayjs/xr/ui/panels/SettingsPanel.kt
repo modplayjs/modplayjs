@@ -330,6 +330,9 @@ fun SettingsPanel() {
                         Chip(stringResource(R.string.xr_clear_ignored)) { XrStore.clearIgnored() }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm)) {
+                        if (state.player.loaded) {
+                            Chip(stringResource(R.string.xr_details)) { XrStore.toggleDetails() }
+                        }
                         if (state.queue.tracks.isNotEmpty()) {
                             Chip(stringResource(R.string.xr_queue)) { XrStore.toggleQueue() }
                         }

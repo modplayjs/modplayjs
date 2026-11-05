@@ -67,6 +67,9 @@ private val DOT_RUN = Regex("\\.+")
 @Composable
 fun PatternPanel() {
     val state by XrStore.state.collectAsState()
+    // The row has its own flow: it moves about twelve times a second, and the
+    // other panels must not recompose at that rate.
+    val playhead by XrStore.playhead.collectAsState()
     val pattern = state.player.pattern
     val listState = rememberLazyListState()
     val scrollState = rememberScrollState()
@@ -75,15 +78,15 @@ fun PatternPanel() {
     // Follow the playhead three rows down from the top edge instead of pinned
     // to it, and only scroll when the row left the window: the playhead arrives
     // many times a second, and scrolling on every emit would fight the user.
-    LaunchedEffect(pattern.row, pattern.pattern, pattern.rows, state.player.follow) {
+    LaunchedEffect(playhead.row, pattern.pattern, pattern.rows, state.player.follow) {
         if (!state.player.follow) return@LaunchedEffect
-        if (pattern.rows <= 0 || pattern.row !in 0 until pattern.rows) return@LaunchedEffect
+        if (pattern.rows <= 0 || playhead.row !in 0 until pattern.rows) return@LaunchedEffect
         val visible = listState.layoutInfo.visibleItemsInfo
         if (visible.isEmpty()) return@LaunchedEffect
         val first = visible.first().index
         val last = visible.last().index
-        if (pattern.row < first || pattern.row > last - 2) {
-            listState.scrollToItem((pattern.row - 3).coerceIn(0, (pattern.rows - 1).coerceAtLeast(0)))
+        if (playhead.row < first || playhead.row > last - 2) {
+            listState.scrollToItem((playhead.row - 3).coerceIn(0, (pattern.rows - 1).coerceAtLeast(0)))
         }
     }
 
@@ -91,7 +94,7 @@ fun PatternPanel() {
         title = stringResource(R.string.xr_pattern, pattern.pattern.toString().padStart(2, '0')),
         subtitle =
             if (pattern.rows > 0) {
-                stringResource(R.string.xr_pattern_meta, pattern.channels, pattern.row)
+                stringResource(R.string.xr_pattern_meta, pattern.channels, playhead.row)
             } else {
                 "—"
             },
@@ -118,7 +121,7 @@ fun PatternPanel() {
                             row = row,
                             cells = pattern.cells,
                             channels = pattern.channels,
-                            active = row == pattern.row,
+                            active = row == playhead.row,
                             palette = palette,
                             stripDots = state.player.stripDots,
                         )
