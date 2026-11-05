@@ -16,10 +16,11 @@ import com.meta.spatial.toolkit.PlayerBodyAttachmentSystem
  * SDK's LocomotionSystem reads; `Controller` sits on the body's left and right
  * hand and VRFeature keeps it current for both modalities.
  *
- * The laser: `IsdkDefaultCursorSystem` reads `Controller.laserEnabled` before it
- * draws a beam, and the component default is false, so controllers would only
- * get a hover dot. The flag is written back once per controller; the write is
- * guarded, because a failed write must cost the beam and nothing else.
+ * The `Controller` component is read, never written. It is owned by the input
+ * pipeline: `buttonState`, `changedButtons` and `isActive` drive the pointer,
+ * the grab state machine and the avatar visuals, so writing a copy back can
+ * reset them. That is why the laser flag is left alone here; a beam is worth
+ * less than a pointer that keeps working.
  *
  * The menu button (VRC.Quest.Input.1): edge-detected, so holding it does not
  * toggle the panel at frame rate. Hands carry no menu button; with hands active
@@ -31,8 +32,8 @@ class ControllerInputSystem(
 
     private var wasPressed = false
 
-    /** One log line per process: device logs must show whether the write stuck. */
-    private var laserReported = false
+    /** One log line per process. */
+    private var reported = false
 
     override fun execute() {
         val body =
@@ -69,7 +70,7 @@ class ControllerInputSystem(
             if (controller.type != ControllerType.CONTROLLER) {
                 false
             } else {
-                enableLaser(entity, controller)
+                report(controller)
                 controller.isPressed(ButtonBits.ButtonMenu)
             }
         } finally {
@@ -77,26 +78,14 @@ class ControllerInputSystem(
         }
     }
 
-    /**
-     * Writes the flag back with the values just read, so nothing else in the
-     * component changes. Failure is logged once and otherwise ignored: a missing
-     * beam must never take the pointer down.
-     */
-    private fun enableLaser(entity: Entity, controller: Controller) {
-        if (controller.laserEnabled) return
-        runCatching {
-            controller.laserEnabled = true
-            entity.setComponent(controller)
-            if (!laserReported) {
-                laserReported = true
-                Log.i(TAG, "laser enabled on ${controller.type}")
-            }
-        }.onFailure {
-            if (!laserReported) {
-                laserReported = true
-                Log.w(TAG, "laser enable failed", it)
-            }
-        }
+    /** One read-only line, so the log shows which controller the SDK reports. */
+    private fun report(controller: Controller) {
+        if (reported) return
+        reported = true
+        Log.i(
+            TAG,
+            "controller: type=${controller.type} laser=${controller.laserEnabled} active=${controller.isActive}",
+        )
     }
 
     private companion object {

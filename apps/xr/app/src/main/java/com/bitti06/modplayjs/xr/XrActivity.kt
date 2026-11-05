@@ -369,6 +369,7 @@ class XrActivity : AppSystemActivity(), XrHost {
      */
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        Log.i(TAG, "focus=$hasFocus")
         updateAvatarVisibility(hasFocus)
         if (!hasFocus) saveFreeLayout()
     }
