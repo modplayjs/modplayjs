@@ -114,9 +114,12 @@ val PANELS: List<PanelSpec> =
             id = PanelId.DETAILS,
             androidId = R.id.panel_details,
             width = 2.2f,
-            height = 0.95f,
+            height = 0.75f,
             transparent = true,
-            pose = at(0f, 0.52f, 1.95f),
+            // 0.75 m tall so its top edge stays below the transport's bottom
+            // edge in the view: at 0.95 m and this distance the shelf slid
+            // behind now playing and lost its header.
+            pose = at(0f, 0.40f, 1.95f),
         ) { DetailsPanel() },
         PanelSpec(
             id = PanelId.DEBUG,
