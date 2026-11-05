@@ -7,11 +7,7 @@ import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.Vector3
-import com.meta.spatial.isdk.IsdkGrabProxy
 import com.meta.spatial.isdk.IsdkGrabbable
-import com.meta.spatial.isdk.IsdkPanelGrabHandle
-import com.meta.spatial.toolkit.Grabbable
-import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Transform
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -162,64 +158,40 @@ class PanelPlacement(
     }
 
     /**
-     * Free mode writes the toolkit [Grabbable], which is the switch the
-     * Interaction SDK documents for panels: "Panels that have a `Grabbable`
-     * component will also receive Grab events", and `IsdkComponentCreationSystem`
-     * derives the collider and the grab handle from it.
+     * Panel grabbing, exactly as the Interaction SDK documents it:
      *
-     * The manual-conversion path (`IsdkGrabbable` + `IsdkPanelGrabHandle` by
-     * hand) is for when that system is disabled; written by hand next to the
-     * toolkit component it produced panels whose handle had no collider behind
-     * it, and a select on them took the pointer down.
+     * - Panels are not `Grabbable` entities. The "Listen to input events" page
+     *   states that grabbable entities get no `onClick` for controller trigger
+     *   presses, and every control in this app is a click on a panel. A toolkit
+     *   `Grabbable` here would make the whole UI unclickable.
+     * - `IsdkComponentCreationSystem` gives every `Panel` its
+     *   `IsdkPanelDimensions` and its `IsdkPanelGrabHandle`, and
+     *   `IsdkPanelPaddingRenderSystem` outlines that grab region on hover. The
+     *   app never writes or removes those: the creation system only rebuilds
+     *   them when the `Panel` component changes, so a hand-written handle would
+     *   not be tracked.
+     * - The switch is `IsdkGrabbable`. The panel page lists `IsdkGrabbable` and
+     *   `IsdkPanelGrabHandle` as the pair that turns grabbing on; the handle
+     *   already exists, so free mode sets the flag and stationary clears it.
      *
-     * Stationary removes the components instead of disabling them: the SDK keeps
-     * treating a grabbable panel as grabbable, so the panel would keep following
-     * the hand after the user pinned it down.
+     * Movement type, responsiveness and constraints stay at their SDK defaults:
+     * nothing here is guessed.
      */
     private fun setGrabbable(entity: Entity, enabled: Boolean) {
-        if (!enabled) {
-            entity.tryRemoveComponent<Grabbable>()
-            entity.tryRemoveComponent<IsdkGrabbable>()
-            entity.tryRemoveComponent<IsdkGrabProxy>()
-            entity.tryRemoveComponent<IsdkPanelGrabHandle>()
-            return
-        }
-        // A slide in progress would fight the hand; drop it for this entity.
-        animator?.cancel(entity)
-
-        // Re-writing resets the grab state, so the component is only written
-        // when it is missing or disabled: this runs on every track change, and
-        // that must not drop a panel mid-grab.
-        val current = runCatching { entity.tryGetComponent<Grabbable>() }.getOrNull()
-        val usable =
-            if (current == null) {
-                false
-            } else {
-                val ok = current.enabled
+        if (enabled) {
+            val current = runCatching { entity.tryGetComponent<IsdkGrabbable>() }.getOrNull()
+            if (current != null) {
                 runCatching { current.recycle() }
-                ok
+                return
             }
-        if (!usable) {
-            // PIVOT_Y keeps the old behaviour of not letting a panel be pushed
-            // through the floor.
-            entity.setComponent(
-                Grabbable(
-                    enabled = true,
-                    type = GrabbableType.PIVOT_Y,
-                    minHeight = 0.3f,
-                    maxHeight = 3.0f,
-                ),
-            )
-        }
-
-        // The creation system only adds the handle when the Panel or Grabbable
-        // component changes, so a panel that was stationary once needs it back.
-        // All-defaults is exactly what the creation system writes.
-        val handle = runCatching { entity.tryGetComponent<IsdkPanelGrabHandle>() }.getOrNull()
-        if (handle == null) {
-            entity.setComponent(IsdkPanelGrabHandle())
+            // A slide in progress would fight the hand; drop it for this entity.
+            animator?.cancel(entity)
+            entity.setComponent(IsdkGrabbable(enabled = true))
         } else {
-            runCatching { handle.recycle() }
+            // Presence is the switch: removing the component is what the panel
+            // page's manual path replaces `Grabbable` with, so its absence is
+            // "not grabbable".
+            entity.tryRemoveComponent<IsdkGrabbable>()
         }
     }
 
@@ -229,10 +201,9 @@ class PanelPlacement(
 
         /**
          * Cleared on every change to the arc or to what a saved pose means.
-         * 36: the grabbable path changed from hand-written ISDK components to
-         * the documented toolkit Grabbable, and the layout choice is re-read
-         * after the wipe.
+         * 37: grabbing is the panel's own ISDK grab region with `IsdkGrabbable`
+         * as the switch, and the layout choice is read after the wipe.
          */
-        const val LAYOUT_VERSION = 36
+        const val LAYOUT_VERSION = 37
     }
 }
