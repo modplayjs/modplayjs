@@ -3,41 +3,45 @@ package com.bitti06.modplayjs.xr.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
+import com.bitti06.modplayjs.xr.ui.panel.PanelTokens
 
 /**
- * Same palette as the phone app (ui/Theme.kt): deep indigo backdrop, violet
- * primary, mint secondary, pink tertiary. The XR panels use the dark scheme
- * only; a light panel in a dark room costs contrast and battery.
+ * Material roles for the few Material components the panels use (the volume
+ * slider), filled from the same palette as everything else.
+ *
+ * This is not a second design system: every colour below is a [PanelTokens]
+ * value, so a panel that uses `MaterialTheme.colorScheme` and one that uses
+ * tokens cannot drift apart.
  */
 private val Dark =
     darkColorScheme(
-        primary = Color(0xFFB49BFF),
-        onPrimary = Color(0xFF1B0F3A),
-        primaryContainer = Color(0xFF3B2C6E),
-        onPrimaryContainer = Color(0xFFE7DEFF),
-        secondary = Color(0xFF5FE3C0),
-        onSecondary = Color(0xFF00382C),
-        secondaryContainer = Color(0xFF17513F),
-        onSecondaryContainer = Color(0xFFB8F5E2),
-        tertiary = Color(0xFFFF9BC2),
-        onTertiary = Color(0xFF3D0A22),
-        background = Color(0xFF0C0A18),
-        onBackground = Color(0xFFF1EDFB),
-        surface = Color(0xFF130F22),
-        onSurface = Color(0xFFF1EDFB),
-        surfaceVariant = Color(0xFF241E3A),
-        onSurfaceVariant = Color(0xFFB9B0D4),
-        surfaceContainerLowest = Color(0xFF090713),
-        surfaceContainerLow = Color(0xFF171228),
-        surfaceContainer = Color(0xFF1D1733),
-        surfaceContainerHigh = Color(0xFF251D40),
-        surfaceContainerHighest = Color(0xFF2E2450),
-        outline = Color(0xFF4A3F70),
-        outlineVariant = Color(0xFF2F2750),
-        error = Color(0xFFFF8FA8),
+        primary = PanelTokens.Accent,
+        onPrimary = PanelTokens.OnAccent,
+        primaryContainer = PanelTokens.Highlight,
+        onPrimaryContainer = PanelTokens.Text,
+        secondary = PanelTokens.AccentAlt,
+        onSecondary = PanelTokens.OnAccent,
+        secondaryContainer = PanelTokens.Highlight,
+        onSecondaryContainer = PanelTokens.Text,
+        tertiary = PanelTokens.AccentWarm,
+        onTertiary = PanelTokens.OnAccent,
+        background = PanelTokens.SurfaceSunken,
+        onBackground = PanelTokens.Text,
+        surface = PanelTokens.Surface,
+        onSurface = PanelTokens.Text,
+        surfaceVariant = PanelTokens.SurfaceRaised,
+        onSurfaceVariant = PanelTokens.TextDim,
+        surfaceContainerLowest = PanelTokens.SurfaceSunken,
+        surfaceContainerLow = PanelTokens.Surface,
+        surfaceContainer = PanelTokens.SurfaceRaised,
+        surfaceContainerHigh = PanelTokens.SurfaceRaised,
+        surfaceContainerHighest = PanelTokens.SurfaceRaised,
+        outline = PanelTokens.Outline,
+        outlineVariant = PanelTokens.Outline,
+        error = PanelTokens.Error,
     )
 
+/** The app runs the dark scheme only: a light panel in a dark room is glare. */
 @Composable
 fun XrTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = Dark, content = content)

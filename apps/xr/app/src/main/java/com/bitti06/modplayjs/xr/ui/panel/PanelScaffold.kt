@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,26 +32,14 @@ import com.bitti06.modplayjs.xr.state.XrStore
  * The one panel surface: an opaque plate, a header with the panel title and the
  * way home, then whatever the panel draws.
  *
- * [bare] drops both the plate and the header. Only the details panel uses it,
- * and only while a text block is expanded onto the room.
  */
 @Composable
 fun PanelScaffold(
     title: String,
     subtitle: String? = null,
-    bare: Boolean = false,
     headerActions: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    if (bare) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(PanelTokens.GapLg),
-            verticalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
-            content = content,
-        )
-        return
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -260,11 +247,6 @@ fun Chip(
             .clickable(onClick = onClick)
             .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
     )
-}
-
-@Composable
-fun BodyText(text: String, color: Color = PanelTokens.Text) {
-    Text(text, fontSize = PanelTokens.Body, color = color)
 }
 
 @Composable

@@ -72,6 +72,12 @@ object XrStore {
         scope.launch { passthrough.collect { refresh(freeLayout.value, it) } }
     }
 
+    /** Re-read every source with the values the state already carries. */
+    private fun refresh() {
+        val current = _state.value
+        refresh(current.freeLayout, current.passthrough)
+    }
+
     private fun refresh(free: Boolean, passthrough: Boolean) {
         val p = player
         _state.value =
@@ -143,10 +149,12 @@ object XrStore {
 
     fun setRadius(radius: Float) {
         player?.setRadius(radius)
+        refresh()
     }
 
     fun resetRadiusAuto() {
         player?.resetRadiusAuto()
+        refresh()
     }
 
     fun setDebugSources(on: Boolean) {
@@ -155,6 +163,8 @@ object XrStore {
 
     fun setJamMode(on: Boolean) {
         player?.setJamMode(on)
+        // setJamMode stores the setting without publishing engine state.
+        refresh()
     }
 
     fun updateSettings(transform: (AndroidSettings) -> AndroidSettings) {
