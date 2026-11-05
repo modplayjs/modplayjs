@@ -6879,7 +6879,7 @@
       info_pitchbend: 0,
       info_position: 0,
       info_finalvol: 0,
-      info_finalpan: 0,
+      info_finalpan: 128,
       info_notepan: 0
     };
   }

@@ -117,7 +117,7 @@ function makeChannelState(): ChannelState {
     delayed_ins: 0,
     key_memory: 0,
     info_period: 0, info_pitchbend: 0, info_position: 0,
-    info_finalvol: 0, info_finalpan: 0, info_notepan: 0,
+    info_finalvol: 0, info_finalpan: 0x80, info_notepan: 0,
   };
 }
 

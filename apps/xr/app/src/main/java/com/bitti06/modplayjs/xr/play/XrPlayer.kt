@@ -166,6 +166,9 @@ class XrPlayer(
     private var lastPlayheadAt = 0L
     private var lastMarkerAt = 0L
     private var spatialInfo: SpatialInfo = SpatialInfo()
+    /** False until the azimuths have been read once after a rebuild. */
+    private var spatialSettled = false
+    private var lastSpatialAt = 0L
     private var cachedPatternIndex = -1
     private var cachedPattern: PatternData? = null
     private var markerSizes = FloatArray(0)
@@ -516,6 +519,9 @@ class XrPlayer(
     private fun rebuildOutputs() {
         releaseOutputs()
         destroyMarkers()
+        // The first read happens before the mixer has run, so the azimuths are
+        // not final yet; a settle pass follows as soon as audio has ticked.
+        spatialSettled = false
         // The peaks belong to the module that just stopped. Keeping them would
         // hand the old song's levels to the new markers and to the debug bars
         // until the first render block replaces them.
@@ -747,6 +753,44 @@ class XrPlayer(
             lastMarkerAt = now
             applyMarkerLevels()
         }
+
+        // Spatial placement heals itself. `rebuildOutputs` runs inside `load`,
+        // before the mixer has processed a single tick, so every channel still
+        // reports its preset pan and all objects land on one spot; a module
+        // that pans channels while it plays drifts the same way. The first
+        // pass runs as soon as audio renders, then once a second.
+        if (outputMode == 2 && (!spatialSettled || now - lastSpatialAt >= SPATIAL_MS)) {
+            lastSpatialAt = now
+            val settle = !spatialSettled
+            spatialSettled = true
+            runCatching { refreshSpatial(rebuild = settle) }
+        }
+    }
+
+    /**
+     * Re-read the azimuths and move (or rebuild) the objects accordingly.
+     *
+     * [rebuild] also recreates the debug markers, which is what a track change
+     * needs: they were built from the pre-tick azimuths and sit in one place
+     * until something rebuilds them.
+     */
+    private fun refreshSpatial(rebuild: Boolean) {
+        val info = readSpatialInfo()
+        if (!info.available || info.channels <= 0) return
+        if (info.channels != spatialInfo.channels) {
+            // A different module with a different channel count: the objects
+            // and the marker count have to be rebuilt from scratch.
+            spatialInfo = info
+            rebuildOutputs()
+            return
+        }
+        val changed =
+            info.azimuths != spatialInfo.azimuths || info.layout != spatialInfo.layout
+        if (!rebuild && !changed) return
+        spatialInfo = info
+        applyPositions()
+        if (rebuild && debugVisible) rebuildMarkers()
+        publish(playing)
     }
 
     /**
@@ -1018,6 +1062,8 @@ class XrPlayer(
 
         /** Marker levels: fast enough to follow the music, slow enough to be cheap. */
         private const val MARKER_MS = 100L
+        /** How often the channel azimuths are re-read while playing. */
+        private const val SPATIAL_MS = 1000L
         private const val IDLE_POLL_MS = 50L
         private const val RING_Y = 1.4f
         private const val MARKER_MIN = 0.02f
