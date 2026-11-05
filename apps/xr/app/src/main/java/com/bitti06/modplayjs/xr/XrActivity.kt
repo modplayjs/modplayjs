@@ -32,7 +32,6 @@ import com.meta.spatial.runtime.PanelShapeLayerBlendType
 import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.AppSystemActivity
-import com.meta.spatial.toolkit.AvatarSystem
 import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
 import com.meta.spatial.toolkit.MeshCollision
 import com.meta.spatial.toolkit.Panel
@@ -72,7 +71,6 @@ class XrActivity : AppSystemActivity(), XrHost {
     private var lastLoaded = false
     private var resumeOnMount = false
     private var resumeAfterPause = false
-    private var avatarSystem: AvatarSystem? = null
     private var isdkSystem: IsdkSystem? = null
     private var cursorSystem: IsdkDefaultCursorSystem? = null
     private var lastRecenterNs = 0L
@@ -172,10 +170,9 @@ class XrActivity : AppSystemActivity(), XrHost {
         Log.i(TAG, "display rate 72 Hz accepted=${scene.setPreferredDisplayRate(72f)}")
         XrScene.install(scene, this, launchedInPassthrough = scene.isSystemPassthroughEnabled())
 
-        avatarSystem = runCatching { systemManager.findSystem<AvatarSystem>() }.getOrNull()
         isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
         cursorSystem = runCatching { systemManager.findSystem<IsdkDefaultCursorSystem>() }.getOrNull()
-        updateAvatarVisibility(hasFocus = true)
+        updateInputFocus(hasFocus = true)
 
         // VRC.Quest.Input.1 (menu button) and the visible laser: both are the
         // app's job under the Interaction SDK.
@@ -370,7 +367,7 @@ class XrActivity : AppSystemActivity(), XrHost {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         Log.i(TAG, "focus=$hasFocus")
-        updateAvatarVisibility(hasFocus)
+        updateInputFocus(hasFocus)
         if (!hasFocus) saveFreeLayout()
     }
 
@@ -379,16 +376,16 @@ class XrActivity : AppSystemActivity(), XrHost {
     }
 
     /**
-     * VRC.Quest.Input.4: hide hands and controllers and ignore all input while
-     * another app has focus. IsdkSystem stops ticking, which is where every
-     * pointer event is generated; the cursor system's own switch also empties
-     * the cursor and laser pools so no beam is left hanging.
+     * VRC.Quest.Input.4: ignore input while another app has focus.
+     *
+     * `IsdkSystem` stops ticking, which is where every pointer event is
+     * generated, and the cursor system's own switch empties the cursor and laser
+     * pools so no beam is left hanging. The avatar models are deliberately left
+     * alone: the runtime takes focus for system UI (menu, screenshots) and hands
+     * it back, and hiding the hands and controllers on every flap made the app
+     * look dead while it was still rendering.
      */
-    private fun updateAvatarVisibility(hasFocus: Boolean) {
-        avatarSystem?.apply {
-            setShowHands(hasFocus)
-            setShowControllers(hasFocus)
-        }
+    private fun updateInputFocus(hasFocus: Boolean) {
         isdkSystem?.active = hasFocus
         cursorSystem?.enableInput(hasFocus)
     }
