@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.xr.R
 import com.bitti06.modplayjs.xr.state.XrStore
 import com.bitti06.modplayjs.xr.ui.panel.EmptyNote
