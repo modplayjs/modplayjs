@@ -174,6 +174,7 @@ class XrActivity : AppSystemActivity(), XrHost {
 
         isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
         cursorSystem = runCatching { systemManager.findSystem<IsdkDefaultCursorSystem>() }.getOrNull()
+        applyInputState()
         // VRC.Quest.Input.1 (menu button) and the visible laser: both are the
         // app's job under the Interaction SDK.
         systemManager.registerSystem(ControllerInputSystem { XrStore.toggleSettings() })
@@ -408,9 +409,19 @@ class XrActivity : AppSystemActivity(), XrHost {
     private fun setInputActive(active: Boolean) {
         if (iskdInputActive == active) return
         iskdInputActive = active
-        isdkSystem?.active = active
-        if (active) cursorSystem?.enableInput(true)
+        applyInputState()
         Log.i(TAG, "input active=$active")
+    }
+
+    /**
+     * Push the current switch into the systems. Separate from
+     * [setInputActive] because the systems are found later than the first
+     * `onVRReady`: the scene becomes ready after the session, so the state has
+     * to be applied again once they exist.
+     */
+    private fun applyInputState() {
+        isdkSystem?.active = iskdInputActive
+        if (iskdInputActive) cursorSystem?.enableInput(true)
     }
 
     /**
