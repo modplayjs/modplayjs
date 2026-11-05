@@ -7,10 +7,11 @@ import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.Vector3
-import com.meta.spatial.isdk.IsdkGrabMovementType
 import com.meta.spatial.isdk.IsdkGrabProxy
 import com.meta.spatial.isdk.IsdkGrabbable
 import com.meta.spatial.isdk.IsdkPanelGrabHandle
+import com.meta.spatial.toolkit.Grabbable
+import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Transform
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,17 +34,22 @@ class PanelPlacement(
     private val prefs = context.getSharedPreferences("xr.layout", Context.MODE_PRIVATE)
     private val specs = PANELS.associateBy { it.id }
 
-    private val _free = MutableStateFlow(prefs.getBoolean(KEY_FREE, true))
+    private val _free: MutableStateFlow<Boolean>
+
+    init {
+        // Clear first, read after: a version bump wipes the stored layout,
+        // including the free/stationary choice, so a stale "stationary" must
+        // not survive the wipe for this session.
+        if (prefs.getInt(KEY_VERSION, 1) < LAYOUT_VERSION) {
+            prefs.edit().clear().putInt(KEY_VERSION, LAYOUT_VERSION).apply()
+        }
+        _free = MutableStateFlow(prefs.getBoolean(KEY_FREE, true))
+    }
+
     val freeLayout: StateFlow<Boolean> = _free.asStateFlow()
 
     val free: Boolean
         get() = _free.value
-
-    init {
-        if (prefs.getInt(KEY_VERSION, 1) < LAYOUT_VERSION) {
-            prefs.edit().clear().putInt(KEY_VERSION, LAYOUT_VERSION).apply()
-        }
-    }
 
     /**
      * Place every panel and set its grab state.
@@ -156,18 +162,23 @@ class PanelPlacement(
     }
 
     /**
-     * Free mode is the Interaction SDK's own path: [IsdkGrabbable] plus the
-     * panel grab handle. For panels the SDK derives collision and handles from
-     * the `Panel` component (`IsdkComponentCreationSystem.ensurePanelComponents`),
-     * so no toolkit `Grabbable` is involved; the manual-conversion page lists
-     * exactly these two components.
+     * Free mode writes the toolkit [Grabbable], which is the switch the
+     * Interaction SDK documents for panels: "Panels that have a `Grabbable`
+     * component will also receive Grab events", and `IsdkComponentCreationSystem`
+     * derives the collider and the grab handle from it.
      *
-     * Stationary removes them: the handle reads [IsdkGrabbable] to start a grab,
-     * and leaving the handle in place would keep the bars drawn around a panel
-     * the user pinned down.
+     * The manual-conversion path (`IsdkGrabbable` + `IsdkPanelGrabHandle` by
+     * hand) is for when that system is disabled; written by hand next to the
+     * toolkit component it produced panels whose handle had no collider behind
+     * it, and a select on them took the pointer down.
+     *
+     * Stationary removes the components instead of disabling them: the SDK keeps
+     * treating a grabbable panel as grabbable, so the panel would keep following
+     * the hand after the user pinned it down.
      */
     private fun setGrabbable(entity: Entity, enabled: Boolean) {
         if (!enabled) {
+            entity.tryRemoveComponent<Grabbable>()
             entity.tryRemoveComponent<IsdkGrabbable>()
             entity.tryRemoveComponent<IsdkGrabProxy>()
             entity.tryRemoveComponent<IsdkPanelGrabHandle>()
@@ -176,29 +187,34 @@ class PanelPlacement(
         // A slide in progress would fight the hand; drop it for this entity.
         animator?.cancel(entity)
 
-        // Re-writing the component resets its grab state, so it is only written
-        // when it is missing or still says something else: this runs on every
-        // track change, which must not drop a panel mid-grab.
-        val current = runCatching { entity.tryGetComponent<IsdkGrabbable>() }.getOrNull()
+        // Re-writing resets the grab state, so the component is only written
+        // when it is missing or disabled: this runs on every track change, and
+        // that must not drop a panel mid-grab.
+        val current = runCatching { entity.tryGetComponent<Grabbable>() }.getOrNull()
         val usable =
             if (current == null) {
                 false
             } else {
-                val ok = current.enabled && current.movementType == IsdkGrabMovementType.AxialBillboard
+                val ok = current.enabled
                 runCatching { current.recycle() }
                 ok
             }
         if (!usable) {
-            // AxialBillboard, not Direct: a grabbed panel stays upright and
-            // turns towards the viewer, so text stays readable in the hand.
+            // PIVOT_Y keeps the old behaviour of not letting a panel be pushed
+            // through the floor.
             entity.setComponent(
-                IsdkGrabbable(enabled = true, movementType = IsdkGrabMovementType.AxialBillboard),
+                Grabbable(
+                    enabled = true,
+                    type = GrabbableType.PIVOT_Y,
+                    minHeight = 0.3f,
+                    maxHeight = 3.0f,
+                ),
             )
         }
 
-        // The creation system only adds the handle when the Panel component
-        // changes, so a panel that was stationary once needs it back. These are
-        // the same all-defaults values the creation system writes.
+        // The creation system only adds the handle when the Panel or Grabbable
+        // component changes, so a panel that was stationary once needs it back.
+        // All-defaults is exactly what the creation system writes.
         val handle = runCatching { entity.tryGetComponent<IsdkPanelGrabHandle>() }.getOrNull()
         if (handle == null) {
             entity.setComponent(IsdkPanelGrabHandle())
@@ -213,9 +229,10 @@ class PanelPlacement(
 
         /**
          * Cleared on every change to the arc or to what a saved pose means.
-         * 35: the arc no longer turns every panel 180 degrees, so every pose
-         * saved under 34 has the user looking at a back.
+         * 36: the grabbable path changed from hand-written ISDK components to
+         * the documented toolkit Grabbable, and the layout choice is re-read
+         * after the wipe.
          */
-        const val LAYOUT_VERSION = 35
+        const val LAYOUT_VERSION = 36
     }
 }
