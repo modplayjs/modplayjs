@@ -180,6 +180,7 @@ class XrActivity : AppSystemActivity(), XrHost {
         // VRC.Quest.Input.1 (menu button) and the visible laser: both are the
         // app's job under the Interaction SDK.
         systemManager.registerSystem(ControllerInputSystem { XrStore.toggleSettings() })
+        Log.i(TAG, "input: isdk=${isdkSystem?.active} cursor=${cursorSystem != null}")
 
         for (spec in PANELS) {
             panels[spec.id] =
