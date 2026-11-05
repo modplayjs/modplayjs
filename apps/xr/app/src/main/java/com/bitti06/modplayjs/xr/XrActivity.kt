@@ -189,8 +189,21 @@ class XrActivity : AppSystemActivity(), XrHost {
         // lets a 32-channel pattern be crossed in a reasonable time.
         scene.setPanelControllerScrollFactor(1.6f)
         // VRC.Quest.Performance.1: interactive apps must hold an allowed refresh
-        // rate. 72 Hz is the lowest one every Quest supports.
-        Log.i(TAG, "display rate 72 Hz accepted=${scene.setPreferredDisplayRate(72f)}")
+        // rate, not necessarily the lowest one. 72 Hz is what every Quest
+        // supports, but on Quest 3 it is below the 90 Hz the system runs at,
+        // and tracked hands and the pointer are sampled and displayed once per
+        // frame: at 72 Hz the pose prediction horizon is ~23 ms against ~18 ms
+        // at 90, and hand motion updates 72 instead of 90 times a second. The
+        // app renders in about 2.5 ms of GPU time, so 90 Hz stays far inside
+        // the 11 ms frame budget. If the device rejects it, 72 remains.
+        val displayRate =
+            if (scene.setPreferredDisplayRate(90f)) {
+                90
+            } else {
+                scene.setPreferredDisplayRate(72f)
+                72
+            }
+        Log.i(TAG, "display rate $displayRate Hz")
         XrScene.install(scene, this, launchedInPassthrough = scene.isSystemPassthroughEnabled())
 
         isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
