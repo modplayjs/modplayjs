@@ -73,6 +73,8 @@ class XrActivity : AppSystemActivity(), XrHost {
     private var resumeAfterPause = false
     private var isdkSystem: IsdkSystem? = null
     private var cursorSystem: IsdkDefaultCursorSystem? = null
+    /** What the input systems were last told; re-asserted after a reload. */
+    private var iskdInputActive = false
     private var lastRecenterNs = 0L
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -172,8 +174,6 @@ class XrActivity : AppSystemActivity(), XrHost {
 
         isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
         cursorSystem = runCatching { systemManager.findSystem<IsdkDefaultCursorSystem>() }.getOrNull()
-        updateInputFocus(hasFocus = true)
-
         // VRC.Quest.Input.1 (menu button) and the visible laser: both are the
         // app's job under the Interaction SDK.
         systemManager.registerSystem(ControllerInputSystem { XrStore.toggleSettings() })
@@ -336,6 +336,7 @@ class XrActivity : AppSystemActivity(), XrHost {
 
     override fun onHMDMounted() {
         super.onHMDMounted()
+        setInputActive(true)
         if (resumeOnMount) {
             resumeOnMount = false
             player.resume()
@@ -361,14 +362,30 @@ class XrActivity : AppSystemActivity(), XrHost {
     }
 
     /**
-     * VRC.Quest.Input.4: the app keeps rendering when focus is lost, but no
-     * drag may continue from stale controller input.
+     * Window focus is not app focus.
+     *
+     * Every Compose panel is its own Android activity, so aiming at a panel and
+     * pressing a button moves window focus to that panel and this callback
+     * reports `false` for the immersive activity. Gating input on it switched the
+     * pointer off on the first panel click. VR focus is handled by
+     * [onVRReady] / [onVRPause]; here only the layout is saved.
      */
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        Log.i(TAG, "focus=$hasFocus")
-        updateInputFocus(hasFocus)
+        Log.i(TAG, "window focus=$hasFocus")
         if (!hasFocus) saveFreeLayout()
+    }
+
+    /** The VR session is active again: the pointer may run. */
+    override fun onVRReady() {
+        super.onVRReady()
+        setInputActive(true)
+    }
+
+    /** The session is paused (system UI, passthrough, headset off). */
+    override fun onVRPause() {
+        super.onVRPause()
+        setInputActive(false)
     }
 
     private fun saveFreeLayout() {
@@ -379,15 +396,21 @@ class XrActivity : AppSystemActivity(), XrHost {
      * VRC.Quest.Input.4: ignore input while another app has focus.
      *
      * `IsdkSystem` stops ticking, which is where every pointer event is
-     * generated, and the cursor system's own switch empties the cursor and laser
-     * pools so no beam is left hanging. The avatar models are deliberately left
-     * alone: the runtime takes focus for system UI (menu, screenshots) and hands
-     * it back, and hiding the hands and controllers on every flap made the app
-     * look dead while it was still rendering.
+     * generated. The cursor system is only ever switched on, never off: its
+     * `enableInput(false)` empties the cursor and laser pools, and after a
+     * headset off/on cycle the pools were not rebuilt, which is why the pointer
+     * stayed dead once focus came back.
+     *
+     * It is driven by the VR session callbacks (`onVRReady` / `onVRPause`) and
+     * re-asserted on HMD mount, so a session restart cannot leave the pointer
+     * switched off.
      */
-    private fun updateInputFocus(hasFocus: Boolean) {
-        isdkSystem?.active = hasFocus
-        cursorSystem?.enableInput(hasFocus)
+    private fun setInputActive(active: Boolean) {
+        if (iskdInputActive == active) return
+        iskdInputActive = active
+        isdkSystem?.active = active
+        if (active) cursorSystem?.enableInput(true)
+        Log.i(TAG, "input active=$active")
     }
 
     /**
