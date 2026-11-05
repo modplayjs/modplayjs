@@ -7,7 +7,6 @@ import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.Vector3
-import com.meta.spatial.isdk.IsdkGrabbable
 import com.meta.spatial.toolkit.Transform
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,9 +17,11 @@ import kotlinx.coroutines.flow.asStateFlow
  * hand.
  *
  * Poses come from [PANELS], so a size and its position are never written twice.
- * Free placement persists the pose per panel; stationary restores the arc and
- * removes the grab components. Mode switches slide through [PanelAnimator]; a
- * reset lands instantly, because a reset should.
+ * Free placement persists the pose per panel; stationary restores the arc.
+ * Grabbing is not touched here: `IsdkComponentCreationSystem` gives every panel
+ * its grabbable and its grab handle, and writing those components from Kotlin
+ * corrupts their attribute layout in the native data model. Mode switches slide
+ * through [PanelAnimator]; a reset lands instantly, because a reset should.
  */
 class PanelPlacement(
     context: Context,
@@ -56,12 +57,11 @@ class PanelPlacement(
     fun apply(entities: Map<PanelId, Entity>) {
         for ((id, entity) in entities) {
             val spec = specs[id] ?: continue
-            val placed = entity.tryGetComponent<Transform>() != null
+            val placed = hasTransform(entity)
             if (!free || !placed) {
                 val pose = if (free) savedPose(id) ?: spec.pose else spec.pose
                 place(entity, pose, animate = false)
             }
-            setGrabbable(entity, free)
         }
     }
 
@@ -82,13 +82,9 @@ class PanelPlacement(
         prefs.edit().putBoolean(KEY_FREE, on).apply()
         for ((id, entity) in entities) {
             val spec = specs[id] ?: continue
-            if (id in skip) {
-                setGrabbable(entity, on)
-                continue
-            }
+            if (id in skip) continue
             val pose = if (on) savedPose(id) ?: spec.pose else spec.pose
             place(entity, pose, animate = true)
-            setGrabbable(entity, on)
         }
     }
 
@@ -97,7 +93,6 @@ class PanelPlacement(
         for ((id, entity) in entities) {
             val spec = specs[id] ?: continue
             place(entity, spec.pose, animate = false)
-            setGrabbable(entity, free)
         }
         val edit = prefs.edit()
         for (id in entities.keys) {
@@ -116,7 +111,7 @@ class PanelPlacement(
     fun save(entities: Map<PanelId, Entity>) {
         val edit = prefs.edit()
         for ((id, entity) in entities) {
-            val pose = runCatching { entity.getComponent<Transform>().transform }.getOrNull() ?: continue
+            val pose = readPose(entity) ?: continue
             edit.putFloat("x${id.name}", pose.t.x)
             edit.putFloat("y${id.name}", pose.t.y)
             edit.putFloat("z${id.name}", pose.t.z)
@@ -148,6 +143,27 @@ class PanelPlacement(
         )
     }
 
+    /**
+     * Component reads borrow from a pool and must be recycled. Without this the
+     * pool drains over a session and reads start returning stale data.
+     */
+    private fun hasTransform(entity: Entity): Boolean {
+        val transform = runCatching { entity.tryGetComponent<Transform>() }.getOrNull() ?: return false
+        runCatching { transform.recycle() }
+        return true
+    }
+
+    /** Copy the pose out before the borrowed component goes back to the pool. */
+    private fun readPose(entity: Entity): Pose? {
+        val transform = runCatching { entity.getComponent<Transform>() }.getOrNull() ?: return null
+        return try {
+            val pose = transform.transform
+            Pose(Vector3(pose.t.x, pose.t.y, pose.t.z), Quaternion(w = pose.q.w, x = pose.q.x, y = pose.q.y, z = pose.q.z))
+        } finally {
+            runCatching { transform.recycle() }
+        }
+    }
+
     private fun place(entity: Entity, pose: Pose, animate: Boolean) {
         if (animate && animator != null) {
             animator.moveTo(entity, pose)
@@ -157,43 +173,18 @@ class PanelPlacement(
         }
     }
 
-    /**
-     * Panel grabbing, exactly as the Interaction SDK documents it:
+    /*
+     * No grab components are written here.
      *
-     * - Panels are not `Grabbable` entities. The "Listen to input events" page
-     *   states that grabbable entities get no `onClick` for controller trigger
-     *   presses, and every control in this app is a click on a panel. A toolkit
-     *   `Grabbable` here would make the whole UI unclickable.
-     * - `IsdkComponentCreationSystem` gives every `Panel` its
-     *   `IsdkPanelDimensions` and its `IsdkPanelGrabHandle`, and
-     *   `IsdkPanelPaddingRenderSystem` outlines that grab region on hover. The
-     *   app never writes or removes those: the creation system only rebuilds
-     *   them when the `Panel` component changes, so a hand-written handle would
-     *   not be tracked.
-     * - The switch is `IsdkGrabbable`. The panel page lists `IsdkGrabbable` and
-     *   `IsdkPanelGrabHandle` as the pair that turns grabbing on; the handle
-     *   already exists, so free mode sets the flag and stationary clears it.
-     *
-     * Movement type, responsiveness and constraints stay at their SDK defaults:
-     * nothing here is guessed.
+     * `IsdkComponentCreationSystem` inspects the scene and creates the panel's
+     * `IsdkPanelDimensions`, `IsdkPanelGrabHandle` and `IsdkGrabbable` itself,
+     * and its log confirms it: "ISDK: Creating panel … / Creating grabbable …"
+     * for every panel. Writing `IsdkGrabbable` from Kotlin corrupted the native
+     * attribute layout - the entity stored the component with the wrong data
+     * type, and the first read from `IsdkPanelHandleCoordinator` crashed the
+     * main thread with "attempted to get int, wrong data type found". Grabbing
+     * therefore stays entirely on the SDK side; this class only moves panels.
      */
-    private fun setGrabbable(entity: Entity, enabled: Boolean) {
-        if (enabled) {
-            val current = runCatching { entity.tryGetComponent<IsdkGrabbable>() }.getOrNull()
-            if (current != null) {
-                runCatching { current.recycle() }
-                return
-            }
-            // A slide in progress would fight the hand; drop it for this entity.
-            animator?.cancel(entity)
-            entity.setComponent(IsdkGrabbable(enabled = true))
-        } else {
-            // Presence is the switch: removing the component is what the panel
-            // page's manual path replaces `Grabbable` with, so its absence is
-            // "not grabbable".
-            entity.tryRemoveComponent<IsdkGrabbable>()
-        }
-    }
 
     private companion object {
         const val KEY_FREE = "free"
@@ -201,8 +192,8 @@ class PanelPlacement(
 
         /**
          * Cleared on every change to the arc or to what a saved pose means.
-         * 37: grabbing is the panel's own ISDK grab region with `IsdkGrabbable`
-         * as the switch, and the layout choice is read after the wipe.
+         * 37: the layout choice is read after the wipe, and the arc is the same
+         * as 36.
          */
         const val LAYOUT_VERSION = 37
     }
