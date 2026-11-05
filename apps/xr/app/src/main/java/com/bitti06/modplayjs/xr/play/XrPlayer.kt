@@ -144,7 +144,17 @@ class XrPlayer(
 
     private val audioManager = context.getSystemService(AudioManager::class.java)
     private val outputs = ArrayList<TrackOut>()
-    private val entities = ArrayList<Entity?>()
+    /**
+     * The audio objects. Main thread only: every ECS read or write has to
+     * happen there. Doing it from the audio thread made
+     * `AudioSessionManagerSystem` throw ConcurrentModificationException while
+     * it walked its cached query - a hard crash on the next track change.
+     */
+    private val entities = ArrayList<Entity>()
+
+    /** Invalidates a pending create when the outputs are rebuilt again. */
+    @Volatile
+    private var audioGeneration = 0
     @Volatile
     private var outputMode: Int = 0 // 0 none, 1 stereo, 2 spatial
     private var outChannels = 0
@@ -188,6 +198,13 @@ class XrPlayer(
     )
 
     private val scratchShort = ShortArray(BLOCK * 2)
+
+    /** One spatial object to create on the main thread. */
+    private data class AudioObject(
+        val registerId: Int,
+        val sessionId: Int,
+        val position: Vector3,
+    )
 
     private data class TrackOut(
         val index: Int,
@@ -580,25 +597,30 @@ class XrPlayer(
         }
         outChannels = info.channels
         outputMode = 2
-        val positions = List(info.channels) { i ->
-            positionFor(info.azimuths.getOrElse(i) { 0f })
-        }
+        // The tracks are created here, the ECS objects on the main thread.
+        val generation = ++audioGeneration
+        val objects = ArrayList<AudioObject>(info.channels)
         for (i in 0 until info.channels) {
             val sessionId = audioManager?.generateAudioSessionId() ?: 0
             val track = newTrack(AudioFormat.CHANNEL_OUT_MONO, sessionId)
-            val registerId = REGISTER_BASE + i
-            feature.registerAudioSessionId(registerId, track.audioSessionId)
+            objects +=
+                AudioObject(
+                    registerId = REGISTER_BASE + i,
+                    sessionId = track.audioSessionId,
+                    position = positionFor(info.azimuths.getOrElse(i) { 0f }),
+                )
             outputs += TrackOut(i, track.audioSessionId, track)
             track.play()
         }
         mainHandler.post {
-            for (i in 0 until info.channels) {
-                val registerId = REGISTER_BASE + i
-                val p = positions.getOrElse(i) { Vector3(0f, RING_Y, 0f) }
-                entities += Entity.create(
-                    Transform(Pose(p)),
-                    AudioSessionId(registerId, AudioType.MONO),
-                )
+            if (generation != audioGeneration) return@post
+            for (obj in objects) {
+                feature.registerAudioSessionId(obj.registerId, obj.sessionId)
+                entities +=
+                    Entity.create(
+                        Transform(Pose(obj.position)),
+                        AudioSessionId(obj.registerId, AudioType.MONO),
+                    )
             }
         }
         if (debugVisible) rebuildMarkers()
@@ -629,19 +651,16 @@ class XrPlayer(
     }
 
     private fun releaseOutputs() {
+        // Any create that is still queued must not run after this.
+        audioGeneration++
         for (out in outputs) {
             runCatching { out.track.stop() }
             runCatching { out.track.release() }
         }
         outputs.clear()
-        val toDestroy = ArrayList(entities)
-        entities.clear()
-        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
-            for (e in toDestroy) runCatching { e?.destroy() }
-        } else {
-            mainHandler.post {
-                for (e in toDestroy) runCatching { e?.destroy() }
-            }
+        onMain {
+            for (e in entities) runCatching { e.destroy() }
+            entities.clear()
         }
         destroyMarkers()
         outputMode = 0
@@ -661,25 +680,36 @@ class XrPlayer(
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     /**
+     * Run an ECS job on the main thread. Inline when already there, so a call
+     * from the UI (layout reset, stop) does not reorder it behind a later post.
+     */
+    private fun onMain(block: () -> Unit) {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            block()
+        } else {
+            mainHandler.post(block)
+        }
+    }
+
+    /**
      * Move the per-channel objects and the debug markers onto the ring.
      *
-     * Everything in here runs on the audio thread, so the positions and the
-     * object list are captured first: the output can be rebuilt, and the
-     * entities destroyed, while this job is still queued for the main thread.
+     * The positions are computed on the audio thread; the ECS writes happen on
+     * the main thread, because that is the only place the data model may be
+     * touched.
      */
     private fun applyPositions() {
         val channels = spatialInfo.channels
         val positions = List(channels) { i ->
             positionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
         }
-        val objects = List(channels) { i -> entities.getOrNull(i) }
         mainHandler.post {
-            for (i in objects.indices) {
-                objects[i]?.setComponent(Transform(Pose(positions[i])))
-            }
-            for (i in markers.indices) {
-                val p = positions.getOrNull(i) ?: continue
-                markers[i].setComponent(Transform(Pose(Vector3(p.x, p.y - MARKER_DROP, p.z))))
+            for (i in positions.indices) {
+                entities.getOrNull(i)?.setComponent(Transform(Pose(positions[i])))
+                val p = positions[i]
+                markers.getOrNull(i)?.setComponent(
+                    Transform(Pose(Vector3(p.x, p.y - MARKER_DROP, p.z))),
+                )
             }
         }
     }
