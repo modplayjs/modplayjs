@@ -245,7 +245,7 @@ object XrStore {
         _libraryVersion.value += 1
     }
 
-    fun scan(): ScanResult? = library?.scan()
+    fun scan(onProgress: ((Int, String) -> Unit)? = null): ScanResult? = library?.scan(onProgress)
 
     fun favorites(): Set<String> = library?.favorites().orEmpty()
 

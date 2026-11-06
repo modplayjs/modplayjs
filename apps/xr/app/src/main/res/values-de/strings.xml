@@ -46,6 +46,10 @@
 
     <string name="xr_spatial_audio">Spatial-Audio</string>
     <string name="xr_layout">Layout</string>
+    <string name="xr_layout_pan">Pan (Dynamisch)</string>
+    <string name="xr_layout_full360">360° Surround</string>
+    <string name="xr_layout_lrlr">Amiga (L-R-L-R)</string>
+    <string name="xr_layout_lrrl">Amiga (L-R-R-L)</string>
     <string name="xr_pan">Panorama</string>
     <string name="xr_passthrough">Passthrough</string>
     <string name="xr_ring">Ring</string>
@@ -62,14 +66,23 @@
     <string name="xr_auto_advance">Automatisch weiter</string>
     <string name="xr_jam">Jam (Titel stumm)</string>
     <string name="xr_interpolation">Interpolation</string>
+    <string name="xr_interp_none">Keine (Schnell)</string>
+    <string name="xr_interp_linear">Linear</string>
+    <string name="xr_interp_sinc">Sinc (HQ)</string>
     <string name="xr_voices">Stimmen</string>
     <string name="xr_tempo">Tempo</string>
     <string name="xr_mode">Modus</string>
+    <string name="xr_mixer_xmp">LibXMP (Modern)</string>
+    <string name="xr_mixer_paula">Paula (Amiga HW)</string>
     <string name="xr_filter">Filter</string>
     <string name="xr_led_off">LED aus</string>
     <string name="xr_led_on">LED an</string>
     <string name="xr_chip">Chip</string>
+    <string name="xr_chip_6581">6581 (Alt)</string>
+    <string name="xr_chip_8580">8580 (Neu)</string>
     <string name="xr_video">Video</string>
+    <string name="xr_video_pal">PAL (50Hz)</string>
+    <string name="xr_video_ntsc">NTSC (60Hz)</string>
     <string name="xr_quality">Qualität</string>
     <string name="xr_channels">Kanäle</string>
     <string name="xr_mono">Mono</string>

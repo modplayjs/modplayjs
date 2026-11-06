@@ -73,8 +73,22 @@ fun LibraryPanel() {
     var favoritesVersion by remember { mutableIntStateOf(0) }
     val favorites = remember(version, favoritesVersion) { XrStore.favorites() }
 
+    var isScanning by remember { mutableStateOf(false) }
+    var scanCount by remember { mutableIntStateOf(0) }
+    var scanCurrentItem by remember { mutableStateOf("") }
+
     LaunchedEffect(scanId, version) {
-        result = withContext(Dispatchers.IO) { XrStore.scan() } ?: result
+        isScanning = true
+        scanCount = 0
+        scanCurrentItem = ""
+        val res = withContext(Dispatchers.IO) {
+            XrStore.scan { count, item ->
+                scanCount = count
+                scanCurrentItem = item
+            }
+        }
+        if (res != null) result = res
+        isScanning = false
     }
 
     val foldersList = remember(result.tracks) {
@@ -263,7 +277,45 @@ fun LibraryPanel() {
                     Chip(stringResource(R.string.xr_sort, stringResource(sort.label))) {
                         sort = Sort.entries[(sort.ordinal + 1) % Sort.entries.size]
                     }
-                    Chip(stringResource(R.string.xr_rescan)) { scanId++ }
+                    Chip(
+                        if (isScanning) "⚡ ($scanCount)" else stringResource(R.string.xr_rescan),
+                    ) {
+                        if (!isScanning) scanId++
+                    }
+                }
+
+                if (isScanning) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(PanelTokens.RadiusSmall))
+                            .background(PanelTokens.SurfaceRaised)
+                            .padding(horizontal = PanelTokens.Gap, vertical = PanelTokens.GapXs),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
+                    ) {
+                        Text(
+                            "⚡ Scanning...",
+                            fontSize = PanelTokens.Body,
+                            fontWeight = FontWeight.Bold,
+                            color = PanelTokens.Accent,
+                        )
+                        Text(
+                            "$scanCount tracks",
+                            fontSize = PanelTokens.Mono,
+                            fontFamily = FontFamily.Monospace,
+                            color = PanelTokens.AccentAlt,
+                        )
+                        if (scanCurrentItem.isNotBlank()) {
+                            Text(
+                                scanCurrentItem,
+                                fontSize = PanelTokens.Meta,
+                                color = PanelTokens.TextFaint,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                 }
 
                 if (shown.isEmpty()) {

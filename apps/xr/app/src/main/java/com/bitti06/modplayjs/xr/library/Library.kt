@@ -146,7 +146,7 @@ class Library(private val context: Context) {
 
     // --------------------------------------------------------------- scan
 
-    fun scan(): ScanResult {
+    fun scan(onProgress: ((count: Int, item: String) -> Unit)? = null): ScanResult {
         val ignored = ignoredUris()
         val out = LinkedHashMap<String, TrackFile>()
         var skipped = 0
@@ -159,7 +159,7 @@ class Library(private val context: Context) {
             if (!isSupported(name)) return
             val format = formatOf(name)
             val title = if (name.contains('.')) name.substringBeforeLast('.') else name
-            out[uri.toString()] = TrackFile(
+            val track = TrackFile(
                 uri = uri,
                 filename = name,
                 title = title.ifBlank { name },
@@ -167,6 +167,8 @@ class Library(private val context: Context) {
                 size = size,
                 folder = folder,
             )
+            out[uri.toString()] = track
+            onProgress?.invoke(out.size, name)
         }
 
         for (root in roots()) {

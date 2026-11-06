@@ -86,10 +86,10 @@ fun SettingsPanel() {
                     OptionRow(
                         stringResource(R.string.xr_layout),
                         listOf(
-                            Option(stringResource(R.string.xr_pan), "panned"),
-                            Option("360°", "full360"),
-                            Option("LR·LR", "lrlr"),
-                            Option("LR·RL", "lrrl"),
+                            Option(stringResource(R.string.xr_layout_pan), "panned"),
+                            Option(stringResource(R.string.xr_layout_full360), "full360"),
+                            Option(stringResource(R.string.xr_layout_lrlr), "lrlr"),
+                            Option(stringResource(R.string.xr_layout_lrrl), "lrrl"),
                         ),
                         settings.mixer.layout,
                     ) { XrStore.setLayout(it) }
@@ -181,7 +181,11 @@ fun SettingsPanel() {
                     }
                     OptionRow(
                         stringResource(R.string.xr_interpolation),
-                        listOf(Option("N", "0"), Option("L", "1"), Option("S", "2")),
+                        listOf(
+                            Option(stringResource(R.string.xr_interp_none), "0"),
+                            Option(stringResource(R.string.xr_interp_linear), "1"),
+                            Option(stringResource(R.string.xr_interp_sinc), "2"),
+                        ),
                         settings.transport.interpolation.toString(),
                     ) { set { s -> s.copy(transport = s.transport.copy(interpolation = it.toInt())) } }
                     StepperRow(stringResource(R.string.xr_voices), "${settings.transport.numVoices}") { step ->
@@ -212,7 +216,10 @@ fun SettingsPanel() {
                     }
                     OptionRow(
                         stringResource(R.string.xr_mode),
-                        listOf(Option("libxmp", "libxmp"), Option("Paula", "paula")),
+                        listOf(
+                            Option(stringResource(R.string.xr_mixer_xmp), "libxmp"),
+                            Option(stringResource(R.string.xr_mixer_paula), "paula"),
+                        ),
                         settings.mixer.mode,
                     ) { set { s -> s.copy(mixer = s.mixer.copy(mode = it)) } }
                     OptionRow(
@@ -230,12 +237,18 @@ fun SettingsPanel() {
                 Section(stringResource(R.string.xr_section_sid)) {
                     OptionRow(
                         stringResource(R.string.xr_chip),
-                        listOf(Option("6581", "6581"), Option("8580", "8580")),
+                        listOf(
+                            Option(stringResource(R.string.xr_chip_6581), "6581"),
+                            Option(stringResource(R.string.xr_chip_8580), "8580"),
+                        ),
                         settings.sid.model.toString(),
                     ) { set { s -> s.copy(sid = s.sid.copy(model = it.toInt())) } }
                     OptionRow(
                         stringResource(R.string.xr_video),
-                        listOf(Option("PAL", "1"), Option("NTSC", "0")),
+                        listOf(
+                            Option(stringResource(R.string.xr_video_pal), "1"),
+                            Option(stringResource(R.string.xr_video_ntsc), "0"),
+                        ),
                         (settings.sid.videoStandard ?: 1).toString(),
                     ) { set { s -> s.copy(sid = s.sid.copy(videoStandard = it.toInt())) } }
                     OptionRow(
