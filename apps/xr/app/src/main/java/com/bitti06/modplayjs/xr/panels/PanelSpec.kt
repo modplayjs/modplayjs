@@ -113,7 +113,13 @@ val PANELS: List<PanelSpec> =
             width = 2.2f,
             height = 0.75f,
             transparent = true,
-            pose = at(0f, 0.72f, 1.95f),
+            // 0.75 m tall so its top edge stays below the transport's bottom
+            // edge in the view. The arc is anchored to the head, so the eye is
+            // at 1.60 m in its own space; the transport's bottom rim (1.075 m
+            // at 1.70 m) cuts this shelf's plane (1.95 m) at y = 0.998 m. The
+            // shelf top here is 0.925 m, so header and all stay clear instead
+            // of sliding behind now playing.
+            pose = at(0f, 0.55f, 1.95f),
         ) { DetailsPanel() },
         PanelSpec(
             id = PanelId.DEBUG,

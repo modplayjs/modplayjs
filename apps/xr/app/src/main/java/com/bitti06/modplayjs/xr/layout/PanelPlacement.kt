@@ -143,17 +143,22 @@ class PanelPlacement(
         edit.apply()
     }
 
-    /** Persist the current poses, clamping coordinates to bounded space. */
+    /**
+     * Persist the current poses exactly as they are.
+     *
+     * No clamping here: the user may deliberately put a panel behind them or
+     * close to the floor, and the previous save-time clamp rewrote those
+     * positions on the next start. [savedPose] still rejects absurd values on
+     * load, which is where a bound belongs - it guards the reader, it does not
+     * overrule the writer.
+     */
     fun save(entities: Map<PanelId, Entity>) {
         val edit = prefs.edit()
         for ((id, entity) in entities) {
             val pose = readPose(entity) ?: continue
-            val cx = pose.t.x.coerceIn(-3.5f, 3.5f)
-            val cy = pose.t.y.coerceIn(0.4f, 2.5f)
-            val cz = pose.t.z.coerceIn(0.8f, 3.5f)
-            edit.putFloat("x${id.name}", cx)
-            edit.putFloat("y${id.name}", cy)
-            edit.putFloat("z${id.name}", cz)
+            edit.putFloat("x${id.name}", pose.t.x)
+            edit.putFloat("y${id.name}", pose.t.y)
+            edit.putFloat("z${id.name}", pose.t.z)
             edit.putFloat("qx${id.name}", pose.q.x)
             edit.putFloat("qy${id.name}", pose.q.y)
             edit.putFloat("qz${id.name}", pose.q.z)
@@ -263,7 +268,8 @@ class PanelPlacement(
          * the old overlap.
          * 42: details panel elevated higher (y=0.58m).
          * 43: default height updated to eye-level (y=1.60m) and pose clamping added.
+         * 44: eye-level arc kept, details back below the transport (y=0.55m).
          */
-        const val LAYOUT_VERSION = 43
+        const val LAYOUT_VERSION = 44
     }
 }
