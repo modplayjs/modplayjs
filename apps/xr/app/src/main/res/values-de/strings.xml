@@ -63,6 +63,8 @@
     <string name="xr_pan">Panorama</string>
     <string name="xr_passthrough">Passthrough</string>
     <string name="xr_ring">Ring</string>
+    <string name="xr_room_wet">Raumhall</string>
+    <string name="xr_source_width">Quellenbreite</string>
     <string name="xr_auto">Auto</string>
     <string name="xr_free_layout">Frei anordnen</string>
     <string name="xr_layout_reset">Layout zurücksetzen</string>

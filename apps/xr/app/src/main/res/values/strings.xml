@@ -63,6 +63,8 @@
     <string name="xr_pan">Pan</string>
     <string name="xr_passthrough">Passthrough</string>
     <string name="xr_ring">Ring</string>
+    <string name="xr_room_wet">Room reverb</string>
+    <string name="xr_source_width">Source width</string>
     <string name="xr_auto">Auto</string>
     <string name="xr_free_layout">Free placement</string>
     <string name="xr_layout_reset">Reset layout</string>

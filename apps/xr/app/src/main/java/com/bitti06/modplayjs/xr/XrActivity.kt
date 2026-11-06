@@ -90,6 +90,8 @@ class XrActivity : AppSystemActivity(), XrHost {
     private var lastRecenterNs = 0L
     /** The arc is placed once, anchored to the head position. */
     private var panelsPlaced = false
+    /** Last listener/occluder push to the mixer. */
+    private var lastSpatialFeedNs = 0L
     private var anchoredToHead = false
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -282,17 +284,75 @@ class XrActivity : AppSystemActivity(), XrHost {
                 private var frames = 0
 
                 override fun execute() {
-                    if (anchoredToHead || !panelsPlaced) return
-                    if (frames++ > 360) {
-                        anchoredToHead = true
-                        Log.w(TAG, "arc not anchored: no head pose within 5 s")
-                        return
+                    if (!panelsPlaced) return
+                    if (!anchoredToHead) {
+                        if (frames++ > 360) {
+                            anchoredToHead = true
+                            Log.w(TAG, "arc not anchored: no head pose within 5 s")
+                        } else {
+                            anchorArcToHead()
+                        }
                     }
-                    anchorArcToHead()
+                    // The mixer needs the ear position for distance and the
+                    // panels for occlusion. Both are ECS reads, so they belong
+                    // here on the main thread; 10 Hz is enough, the mixer
+                    // smooths the gains.
+                    val now = System.nanoTime()
+                    if (now - lastSpatialFeedNs < SPATIAL_FEED_NS) return
+                    lastSpatialFeedNs = now
+                    feedSpatialInputs()
                 }
             },
         )
     }
+
+    /**
+     * Publish the listener pose and the opaque panel boxes to the player.
+     *
+     * Seven floats per panel: centre, yaw, half extents. The details shelf is
+     * transparent and therefore not an occluder; a 4 cm depth keeps a ray from
+     * slipping through a panel that is nearly edge-on.
+     */
+    private fun feedSpatialInputs() {
+        // Occluders do not depend on the head, so they are published even
+        // before the avatar exists and the pose is still unreadable.
+        readHeadPose()?.let { player.setListener(it.t.x, it.t.y, it.t.z) }
+
+        val boxes = ArrayList<Float>(PANELS.size * 7)
+        for (spec in PANELS) {
+            if (spec.transparent) continue
+            val entity = panels[spec.id] ?: continue
+            val pose = readEntityPose(entity) ?: continue
+            boxes.add(pose.t.x)
+            boxes.add(pose.t.y)
+            boxes.add(pose.t.z)
+            boxes.add(yawOf(pose.q))
+            boxes.add(spec.width / 2f)
+            boxes.add(spec.height / 2f)
+            boxes.add(PANEL_HALF_THICKNESS)
+        }
+        player.setOccluders(boxes.toFloatArray())
+    }
+
+    private fun readEntityPose(entity: Entity): Pose? {
+        val transform = runCatching { entity.getComponent<Transform>() }.getOrNull() ?: return null
+        return try {
+            val pose = transform.transform
+            Pose(
+                Vector3(pose.t.x, pose.t.y, pose.t.z),
+                Quaternion(w = pose.q.w, x = pose.q.x, y = pose.q.y, z = pose.q.z),
+            )
+        } finally {
+            runCatching { transform.recycle() }
+        }
+    }
+
+    /** Yaw of a quaternion that only carries a rotation around Y. */
+    private fun yawOf(q: Quaternion): Float =
+        kotlin.math.atan2(
+            2f * (q.w * q.y + q.x * q.z),
+            1f - 2f * (q.y * q.y + q.z * q.z),
+        )
 
     /**
      * Move the arc from the world origin to the user's head, once.
@@ -332,6 +392,8 @@ class XrActivity : AppSystemActivity(), XrHost {
                     head?.t?.x ?: 0f,
                     head?.t?.z ?: 0f,
                 )
+                // Sabine estimate for the room reverb, from the same bounds.
+                player.setRoomSize(size.x, size.y, size.z)
             }
         }
     }
@@ -610,6 +672,9 @@ class XrActivity : AppSystemActivity(), XrHost {
     companion object {
         private const val TAG = "modplay-xr"
         private const val RECENTER_DEBOUNCE_NS = 250_000_000L
+        private const val SPATIAL_FEED_NS = 100_000_000L
+        /** Half thickness of a panel used as an acoustic occluder. */
+        private const val PANEL_HALF_THICKNESS = 0.02f
 
         /**
          * Namespaces differ per permission, and each is the one the current

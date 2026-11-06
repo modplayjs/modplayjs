@@ -120,6 +120,18 @@ fun SettingsPanel() {
                             radiusManual = false
                         }
                     }
+                    StepperRow(
+                        stringResource(R.string.xr_room_wet),
+                        "${state.reverbWet} %",
+                    ) { step ->
+                        XrStore.setSpatialWet(state.reverbWet + if (step > 0) 5 else -5)
+                    }
+                    StepperRow(
+                        stringResource(R.string.xr_source_width),
+                        "${state.sourceSpread.toInt()}°",
+                    ) { step ->
+                        XrStore.setSpatialSpread(state.sourceSpread + if (step > 0) 5f else -5f)
+                    }
                     ToggleRow(stringResource(R.string.xr_free_layout), state.freeLayout) {
                         XrStore.setFreeLayout(!state.freeLayout)
                     }

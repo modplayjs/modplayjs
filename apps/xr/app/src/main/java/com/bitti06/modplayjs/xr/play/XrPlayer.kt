@@ -21,6 +21,8 @@ import com.meta.spatial.core.Vector3
 import com.meta.spatial.runtime.Scene
 import com.meta.spatial.spatialaudio.AudioSessionId
 import com.meta.spatial.spatialaudio.AudioType
+import com.meta.spatial.spatialaudio.SoundfieldOrientation
+import com.meta.spatial.spatialaudio.SoundfieldOrientationType
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
@@ -37,6 +39,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -145,12 +149,47 @@ class XrPlayer(
     private val audioManager = context.getSystemService(AudioManager::class.java)
     private val outputs = ArrayList<TrackOut>()
     /**
-     * The audio objects. Main thread only: every ECS read or write has to
-     * happen there. Doing it from the audio thread made
-     * `AudioSessionManagerSystem` throw ConcurrentModificationException while
-     * it walked its cached query - a hard crash on the next track change.
+     * The 32 bus entities and the ambisonic reverb entity. Main thread only:
+     * every ECS read or write has to happen there. The graph is created once
+     * per playback session and never rebuilt for a track change, which is what
+     * removed the per-channel entity churn from the old design.
      */
-    private val entities = ArrayList<Entity>()
+    private val busEntities = ArrayList<Entity>()
+    private var reverbEntity: Entity? = null
+
+    /** The fixed output graph: one mono track per bus, one ambisonic reverb. */
+    private var busTracks: Array<AudioTrack> = emptyArray()
+    private var busBuffers: Array<ByteBuffer> = emptyArray()
+    private var reverbTrack: AudioTrack? = null
+    private var reverbBuffer: ByteBuffer? = null
+
+    /** Sessions registered and entities created. Written on the main thread. */
+    @Volatile private var busGraphReady = false
+
+    /** The bus tracks are playing and the native mixer may write into them. */
+    @Volatile private var busesReady = false
+
+    /** Only a teardown changes this, so a track change cannot orphan entities. */
+    @Volatile private var busGraphGeneration = 0
+
+    /** Last ring geometry written to the bus entities. */
+    private var placedRadius = -1f
+    private var placedX = Float.NaN
+    private var placedZ = Float.NaN
+
+    /** Listener and panel boxes arrive from the activity, read by the mixer. */
+    @Volatile private var listenerPos = Vector3(0f, RING_Y, 0f)
+    @Volatile private var occluders = FloatArray(0)
+
+    @Volatile private var roomWidth = 4f
+    @Volatile private var roomDepth = 5f
+    @Volatile private var roomHeight = 2.6f
+    @Volatile private var wetPercent = prefs.getInt(KEY_WET, 25)
+    @Volatile private var spreadDeg = prefs.getFloat(KEY_SPREAD, 0f)
+
+    /** Reused every push; 5 floats per source (azimuth, distance, gain, spread, occlusion). */
+    private val sourceParams = FloatArray(MAX_SOURCES * 5)
+    private var lastSourceAt = 0L
 
     /** Invalidates a pending create when the outputs are rebuilt again. */
     @Volatile
@@ -199,13 +238,6 @@ class XrPlayer(
     )
 
     private val scratchShort = ShortArray(BLOCK * 2)
-
-    /** One spatial object to create on the main thread. */
-    private data class AudioObject(
-        val registerId: Int,
-        val sessionId: Int,
-        val position: Vector3,
-    )
 
     private data class TrackOut(
         val index: Int,
@@ -309,7 +341,7 @@ class XrPlayer(
         if (::thread.isInitialized && Thread.currentThread() !== thread) {
             runCatching { thread.join(STOP_JOIN_MS) }
         }
-        releaseOutputs()
+        releaseAll()
     }
 
     fun load(bytes: ByteArray, name: String, format: String, autoPlay: Boolean = true) {
@@ -427,7 +459,8 @@ class XrPlayer(
 
     fun settingsSnapshot(): AndroidSettings = settings
 
-    fun sessionId(): Int = outputs.firstOrNull()?.sessionId ?: 0
+    fun sessionId(): Int =
+        outputs.firstOrNull()?.sessionId ?: busTracks.firstOrNull()?.audioSessionId ?: 0
 
     fun setSpatialEnabled(enabled: Boolean) {
         spatialPreferred = enabled
@@ -509,18 +542,28 @@ class XrPlayer(
     private fun renderBlock() {
         val eng = engine ?: return
         if (outputMode == 2) {
-            val stems = eng.renderSpatial(BLOCK)
-            if (stems.size >= outChannels * BLOCK) {
-                writeSpatial(stems)
+            if (!busesReady) {
+                // The fixed graph is being registered on the main thread.
+                // If that already finished while this thread was still opening
+                // the outputs, start it here; otherwise wait, because rendering
+                // now would only produce blocks we have to drop.
+                if (busGraphReady) startBuses()
+                if (!busesReady) runCatching { Thread.sleep(4) }
                 return
             }
+            val stems = eng.renderSpatial(BLOCK)
+            if (stems.size >= outChannels * BLOCK) {
+                writeBuses(stems)
+                return
+            }
+            // A short block is the tail of a module: drop it and let the next
+            // pass report the end. Switching to stereo here used to tear down
+            // the spatial path for the rest of the session.
             if (stems.isEmpty()) {
                 playing = false
                 publish(false)
                 onEnded?.invoke()
-                return
             }
-            openStereo()
             return
         }
         val frames = eng.render(BLOCK)
@@ -547,25 +590,44 @@ class XrPlayer(
         out.write(scratchShort, 0, n, AudioTrack.WRITE_BLOCKING)
     }
 
-    private fun writeSpatial(stems: FloatArray) {
+    /**
+     * Mix the stems into the fixed buses and write every bus track.
+     *
+     * The native side does distance, air absorption, occlusion, the bass split
+     * and the pan; Kotlin only reads the peak levels for the debug view and
+     * hands the direct buffers to the tracks. No per-channel track exists any
+     * more, so the write cost is 32 buffers regardless of the module size.
+     */
+    private fun writeBuses(stems: FloatArray) {
         val channels = outChannels
-        if (channels <= 0) return
-        if (levels.size != channels) levels = FloatArray(channels)
-        for (ch in 0 until channels) {
-            val out = outputs.getOrNull(ch) ?: continue
-            if (out.track.playState != AudioTrack.PLAYSTATE_PLAYING) out.track.play()
-            var peak = 0f
-            val base = ch * BLOCK
-            for (i in 0 until BLOCK) {
-                val v = stems[base + i]
-                val c = if (v > 1f) 1f else if (v < -1f) -1f else v
-                val a = if (c < 0f) -c else c
-                if (a > peak) peak = a
-                scratchShort[i] = (c * 32767f).toInt().toShort()
+        val eng = engine ?: return
+        if (channels <= 0 || !busesReady || busTracks.isEmpty()) return
+
+        if (debugVisible) {
+            if (levels.size != channels) levels = FloatArray(channels)
+            for (ch in 0 until channels) {
+                var peak = 0f
+                val base = ch * BLOCK
+                for (i in 0 until BLOCK) {
+                    val v = stems[base + i]
+                    val a = if (v < 0f) -v else v
+                    if (a > peak) peak = a
+                }
+                levels[ch] = (levels[ch] * 0.7f) + (peak * 0.3f)
             }
-            levels[ch] = (levels[ch] * 0.7f) + (peak * 0.3f)
-            out.track.write(scratchShort, 0, BLOCK, AudioTrack.WRITE_BLOCKING)
         }
+
+        if (eng.mixSpatial(stems, channels, BLOCK) != 0) return
+
+        for (b in busTracks.indices) {
+            val buf = busBuffers[b]
+            buf.clear()
+            busTracks[b].write(buf, BLOCK * BYTES_PER_SAMPLE, AudioTrack.WRITE_BLOCKING)
+        }
+        val reverb = reverbTrack ?: return
+        val reverbBuf = reverbBuffer ?: return
+        reverbBuf.clear()
+        reverb.write(reverbBuf, BLOCK * 4 * BYTES_PER_SAMPLE, AudioTrack.WRITE_BLOCKING)
     }
 
     // --------------------------------------------------------------- outputs
@@ -596,7 +658,7 @@ class XrPlayer(
     }
 
     private fun openStereo() {
-        val track = newTrack(AudioFormat.CHANNEL_OUT_STEREO, null)
+        val track = newTrack(AudioFormat.CHANNEL_OUT_STEREO, null, 2)
         outputs += TrackOut(0, track.audioSessionId, track)
         outputMode = 1
         outChannels = 1
@@ -604,43 +666,125 @@ class XrPlayer(
     }
 
     private fun openSpatial(info: SpatialInfo) {
-        val feature = spatialAudio
-        val scene = scene
-        if (feature == null || scene == null) {
+        if (spatialAudio == null || scene == null) {
+            openStereo()
+            return
+        }
+        ensureBuses()
+        if (busTracks.isEmpty()) {
+            // The native mixer refused its buffers: stereo is better than silence.
             openStereo()
             return
         }
         outChannels = info.channels
         outputMode = 2
-        // The tracks are created here, the ECS objects on the main thread.
-        val generation = ++audioGeneration
-        val objects = ArrayList<AudioObject>(info.channels)
-        for (i in 0 until info.channels) {
-            val sessionId = audioManager?.generateAudioSessionId() ?: 0
-            val track = newTrack(AudioFormat.CHANNEL_OUT_MONO, sessionId)
-            objects +=
-                AudioObject(
-                    registerId = REGISTER_BASE + i,
-                    sessionId = track.audioSessionId,
-                    position = positionFor(info.azimuths.getOrElse(i) { 0f }),
+        if (busGraphReady) startBuses()
+        pushSources()
+        if (debugVisible) rebuildMarkers()
+        Log.i(
+            TAG,
+            "spatial buses ${busTracks.size}, sources ${info.channels}, layout ${info.layout}",
+        )
+    }
+
+    /**
+     * Build the fixed output graph once per playback session.
+     *
+     * 32 mono tracks and one 4-channel ambisonic track, each with its own
+     * session id. Sessions and entities are created on the main thread; the
+     * native mixer gets the direct buffer addresses. Nothing here is rebuilt
+     * for a track change - only the source parameters are pushed afterwards.
+     */
+    private fun ensureBuses() {
+        if (busTracks.isNotEmpty()) return
+        val feature = spatialAudio ?: return
+
+        val tracks =
+            Array(BUS_COUNT) {
+                newTrack(
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    audioManager?.generateAudioSessionId() ?: 0,
+                    1,
                 )
-            outputs += TrackOut(i, track.audioSessionId, track)
-            track.play()
+            }
+        val buffers =
+            Array(BUS_COUNT) {
+                ByteBuffer.allocateDirect(BLOCK * BYTES_PER_SAMPLE)
+                    .order(ByteOrder.nativeOrder())
+            }
+        val reverb = newTrack(AudioFormat.CHANNEL_OUT_QUAD, audioManager?.generateAudioSessionId() ?: 0, 4)
+        val reverbBuf =
+            ByteBuffer.allocateDirect(BLOCK * 4 * BYTES_PER_SAMPLE)
+                .order(ByteOrder.nativeOrder())
+
+        val ok = engine?.startSpatialBuses(buffers, reverbBuf, SAMPLE_RATE, BLOCK, BUS_COUNT) == true
+        if (!ok) {
+            tracks.forEach { runCatching { it.release() } }
+            runCatching { reverb.release() }
+            Log.e(TAG, "native bus mixer unavailable")
+            return
         }
+        busTracks = tracks
+        busBuffers = buffers
+        reverbTrack = reverb
+        reverbBuffer = reverbBuf
+        engine?.setSpatialWet(wetPercent)
+        engine?.setSpatialRoom(roomWidth, roomDepth, roomHeight, ROOM_ABSORPTION)
+
+        val generation = busGraphGeneration
         mainHandler.post {
-            if (generation != audioGeneration) return@post
-            for (obj in objects) {
-                feature.registerAudioSessionId(obj.registerId, obj.sessionId)
-                entities +=
+            if (generation != busGraphGeneration) return@post
+            for (i in tracks.indices) {
+                feature.registerAudioSessionId(BUS_BASE + i, tracks[i].audioSessionId)
+                busEntities +=
                     Entity.create(
-                        Transform(Pose(obj.position)),
-                        AudioSessionId(obj.registerId, AudioType.MONO),
+                        Transform(Pose(busPosition(i))),
+                        AudioSessionId(BUS_BASE + i, AudioType.MONO),
                     )
             }
+            feature.registerAudioSessionId(REVERB_ID, reverb.audioSessionId)
+            reverbEntity =
+                Entity.create(
+                    Transform(Pose(Vector3(ringCenterX, RING_Y, ringCenterZ))),
+                    AudioSessionId(REVERB_ID, AudioType.AMBISONIC_ORDER_1),
+                    SoundfieldOrientation(SoundfieldOrientationType.POSITION_Y_LOCKED),
+                )
+            placedRadius = ringRadius
+            placedX = ringCenterX
+            placedZ = ringCenterZ
+            busGraphReady = true
+            if (outputMode == 2) startBuses()
         }
-        if (debugVisible) rebuildMarkers()
-        Log.i(TAG, "spatial output: ${info.channels} objects, layout ${info.layout}")
     }
+
+    /** Start (or resume) the fixed graph. Main thread: the tracks are shared. */
+    private fun startBuses() {
+        for (track in busTracks) {
+            if (track.playState != AudioTrack.PLAYSTATE_PLAYING) track.play()
+        }
+        reverbTrack?.let { if (it.playState != AudioTrack.PLAYSTATE_PLAYING) it.play() }
+        busesReady = true
+    }
+
+    /** Put the buses on the ring again after a radius or centre change. */
+    private fun placeBuses() {
+        if (busEntities.isEmpty()) return
+        if (placedRadius == ringRadius && placedX == ringCenterX && placedZ == ringCenterZ) return
+        placedRadius = ringRadius
+        placedX = ringCenterX
+        placedZ = ringCenterZ
+        onMain {
+            for (i in busEntities.indices) {
+                busEntities[i].setComponent(Transform(Pose(busPosition(i))))
+            }
+            reverbEntity?.setComponent(
+                Transform(Pose(Vector3(ringCenterX, RING_Y, ringCenterZ))),
+            )
+        }
+    }
+
+    private fun busPosition(index: Int): Vector3 =
+        positionFor(-180f + 360f * index / BUS_COUNT)
 
     /**
      * One streaming track.
@@ -658,12 +802,11 @@ class XrPlayer(
      * `AUDIO_SESSION_ID_GENERATE` (0) and the positive range. Passing -1 threw
      * and took the whole output rebuild down with it.
      */
-    private fun newTrack(channelMask: Int, sessionId: Int?): AudioTrack {
+    private fun newTrack(channelMask: Int, sessionId: Int?, channels: Int = 1): AudioTrack {
         val minBuf =
             AudioTrack.getMinBufferSize(SAMPLE_RATE, channelMask, AudioFormat.ENCODING_PCM_16BIT)
                 .takeIf { it > 0 } ?: 0
-        val frames = BLOCK * 2
-        val twoBlocks = frames * BYTES_PER_SAMPLE
+        val twoBlocks = BLOCK * 2 * channels * BYTES_PER_SAMPLE
         val builder = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -693,9 +836,53 @@ class XrPlayer(
             runCatching { out.track.release() }
         }
         outputs.clear()
+        // The bus graph survives a track change; only its audio stops. Pausing
+        // and flushing drops the queued blocks so the next module starts clean.
+        if (busesReady) {
+            for (track in busTracks) {
+                runCatching { track.pause() }
+                runCatching { track.flush() }
+            }
+            reverbTrack?.let {
+                runCatching { it.pause() }
+                runCatching { it.flush() }
+            }
+            busesReady = false
+        }
+        destroyMarkers()
+        outputMode = 0
+        outChannels = 0
+    }
+
+    /** Tear the fixed graph down: only stop() and the activity teardown. */
+    private fun releaseAll() {
+        audioGeneration++
+        busGraphGeneration++
+        for (out in outputs) {
+            runCatching { out.track.stop() }
+            runCatching { out.track.release() }
+        }
+        outputs.clear()
+        runCatching { engine?.stopSpatialBuses() }
+        for (track in busTracks) {
+            runCatching { track.stop() }
+            runCatching { track.release() }
+        }
+        busTracks = emptyArray()
+        busBuffers = emptyArray()
+        reverbTrack?.let {
+            runCatching { it.stop() }
+            runCatching { it.release() }
+        }
+        reverbTrack = null
+        reverbBuffer = null
+        busesReady = false
+        busGraphReady = false
         onMain {
-            for (e in entities) runCatching { e.destroy() }
-            entities.clear()
+            for (e in busEntities) runCatching { e.destroy() }
+            busEntities.clear()
+            reverbEntity?.let { runCatching { it.destroy() } }
+            reverbEntity = null
         }
         destroyMarkers()
         outputMode = 0
@@ -748,19 +935,161 @@ class XrPlayer(
         return Vector3(p.x, p.y - MARKER_DROP, p.z)
     }
 
+    /**
+     * Push new azimuths to the markers, the buses and the native mixer.
+     *
+     * There are no per-channel audio entities any more: the sound comes from
+     * the fixed bus ring, so only the debug spheres still follow a channel.
+     */
     private fun applyPositions() {
+        placeBuses()
         val channels = spatialInfo.channels
-        val positions = List(channels) { i ->
-            positionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
-        }
-        val markerPositions = positions.map { Vector3(it.x, it.y - MARKER_DROP, it.z) }
-        mainHandler.post {
-            for (i in positions.indices) {
-                entities.getOrNull(i)?.setComponent(Transform(Pose(positions[i])))
+        val markerPositions =
+            List(channels) { i ->
+                markerPositionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
+            }
+        onMain {
+            for (i in markerPositions.indices) {
                 markers.getOrNull(i)?.setComponent(Transform(Pose(markerPositions[i])))
             }
         }
+        pushSources()
     }
+
+    /**
+     * Hand the mixer one parameter row per channel.
+     *
+     * Azimuth comes from the layout mapping (panned, front180, full360, lrlr,
+     * lrrl all end up as an angle in -180..180), distance from the listener to
+     * the channel's ring position, occlusion from the panel boxes the activity
+     * publishes. All five values are already computed here; the native side
+     * only turns them into gains, filters and bus taps.
+     */
+    private fun pushSources() {
+        val eng = engine ?: return
+        if (outputMode != 2) return
+        val channels = minOf(spatialInfo.channels, MAX_SOURCES)
+        if (channels <= 0) return
+
+        val listener = listenerPos
+        val boxes = occluders
+        val params = sourceParams
+        for (i in 0 until channels) {
+            val azimuth = spatialInfo.azimuths.getOrElse(i) { 0f }
+            val position = positionFor(azimuth)
+            val dx = position.x - listener.x
+            val dy = position.y - listener.y
+            val dz = position.z - listener.z
+            val distance = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+            val base = i * 5
+            params[base] = azimuth
+            params[base + 1] = distance
+            params[base + 2] = 1f
+            params[base + 3] = spreadDeg
+            params[base + 4] = occlusion(listener, position, boxes)
+        }
+        eng.setSpatialSources(params, channels)
+    }
+
+    /**
+     * One ray from the ear to the source against the panel boxes.
+     *
+     * The boxes arrive as seven floats each: centre, yaw, half extents. A hit
+     * means the panel is between the listener and the channel, which the mixer
+     * turns into a gain reduction and a low-pass. The binary result is fine
+     * because the mixer smooths the gain over ~30 ms.
+     */
+    private fun occlusion(origin: Vector3, target: Vector3, boxes: FloatArray): Float {
+        if (boxes.isEmpty()) return 0f
+        val dx = target.x - origin.x
+        val dy = target.y - origin.y
+        val dz = target.z - origin.z
+        val length = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+        if (length < 1e-3f) return 0f
+        val ux = dx / length
+        val uy = dy / length
+        val uz = dz / length
+
+        var i = 0
+        while (i + 7 <= boxes.size) {
+            val cx = boxes[i]
+            val cy = boxes[i + 1]
+            val cz = boxes[i + 2]
+            val yaw = boxes[i + 3]
+            val hx = boxes[i + 4]
+            val hy = boxes[i + 5]
+            val hz = boxes[i + 6]
+            val c = kotlin.math.cos(yaw)
+            val s = kotlin.math.sin(yaw)
+
+            // World -> panel space (yaw only, the panels are upright).
+            val ox = c * (origin.x - cx) - s * (origin.z - cz)
+            val oz = s * (origin.x - cx) + c * (origin.z - cz)
+            val oy = origin.y - cy
+            val vx = c * ux - s * uz
+            val vz = s * ux + c * uz
+
+            var tMin = 0f
+            var tMax = length
+            var hit = true
+            for (axis in 0 until 3) {
+                val o = when (axis) { 0 -> ox; 1 -> oy; else -> oz }
+                val d = when (axis) { 0 -> vx; 1 -> uy; else -> vz }
+                val h = when (axis) { 0 -> hx; 1 -> hy; else -> hz }
+                if (kotlin.math.abs(d) < 1e-6f) {
+                    if (o < -h || o > h) { hit = false; break }
+                } else {
+                    var t1 = (-h - o) / d
+                    var t2 = (h - o) / d
+                    if (t1 > t2) { val tmp = t1; t1 = t2; t2 = tmp }
+                    if (t1 > tMin) tMin = t1
+                    if (t2 < tMax) tMax = t2
+                    if (tMin > tMax) { hit = false; break }
+                }
+            }
+            if (hit && tMin in 0f..length) return 1f
+            i += 7
+        }
+        return 0f
+    }
+
+    // ---- listener, occluders, room (from the activity) -------------------
+
+    fun setListener(x: Float, y: Float, z: Float) {
+        listenerPos = Vector3(x, y, z)
+    }
+
+    /** Seven floats per occluding panel: centre, yaw, half extents. */
+    fun setOccluders(boxes: FloatArray) {
+        occluders = boxes
+    }
+
+    fun setRoomSize(width: Float, depth: Float, height: Float) {
+        if (width <= 0f || depth <= 0f || height <= 0f) return
+        roomWidth = width
+        roomDepth = depth
+        roomHeight = height
+        submit { engine?.setSpatialRoom(width, depth, height, ROOM_ABSORPTION) }
+    }
+
+    fun setSpatialWet(percent: Int) {
+        val v = percent.coerceIn(0, 100)
+        wetPercent = v
+        prefs.edit { putInt(KEY_WET, v) }
+        submit { engine?.setSpatialWet(v) }
+    }
+
+    fun spatialWet(): Int = wetPercent
+
+    /** Point width in degrees; 0 is a point source, 30 a wide pad. */
+    fun setSpatialSpread(degrees: Float) {
+        val v = degrees.coerceIn(0f, 90f)
+        spreadDeg = v
+        prefs.edit { putFloat(KEY_SPREAD, v) }
+        submit { runCatching { pushSources() } }
+    }
+
+    fun spatialSpread(): Float = spreadDeg
 
     private fun channelColor(index: Int): Color4 {
         val rgb = colorArgb(index)
@@ -884,6 +1213,14 @@ class XrPlayer(
             val settle = !spatialSettled
             spatialSettled = true
             runCatching { refreshSpatial(rebuild = settle) }
+        }
+
+        // Distance, occlusion and spread change with the listener and the
+        // panels, not with the module. 10 Hz is enough for both: the mixer
+        // smooths the resulting gains over ~30 ms.
+        if (outputMode == 2 && now - lastSourceAt >= SOURCE_MS) {
+            lastSourceAt = now
+            runCatching { pushSources() }
         }
     }
 
@@ -1262,6 +1599,20 @@ class XrPlayer(
         /** PCM 16-bit: the only encoding this player creates. */
         private const val BYTES_PER_SAMPLE = 2
         private const val REGISTER_BASE = 1000
+
+        /** Fixed spatial bus ring. 32 buses = 11.25 degrees between neighbours. */
+        const val BUS_COUNT = 32
+        private const val BUS_BASE = 2000
+        private const val REVERB_ID = 2100
+
+        /** Matches SpatialBusMixer::kMaxSources. */
+        private const val MAX_SOURCES = 128
+
+        /** Average absorption of a furnished room, for the Sabine estimate. */
+        private const val ROOM_ABSORPTION = 0.25f
+
+        /** How often listener distance, occlusion and spread are pushed. */
+        private const val SOURCE_MS = 100L
         private const val SNAPSHOT_ACTIVE_MS = 500L
         private const val SNAPSHOT_IDLE_MS = 1000L
 
@@ -1304,6 +1655,8 @@ class XrPlayer(
         private const val KEY_RADIUS = "radius"
         private const val KEY_RADIUS_MANUAL = "radiusManual"
         private const val KEY_SPATIAL = "spatialEnabled"
+        private const val KEY_WET = "reverbWet"
+        private const val KEY_SPREAD = "sourceSpread"
 
         /** Spatial is the point of the XR app; stereo is the fallback. */
         const val DEFAULT_SPATIAL = true

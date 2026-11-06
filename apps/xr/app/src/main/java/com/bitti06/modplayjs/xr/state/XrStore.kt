@@ -175,6 +175,8 @@ object XrStore {
                 radiusManual = p?.isRadiusManual() ?: false,
                 engineAvailable = p?.engineAvailable() == true,
                 sessionId = p?.sessionId() ?: 0,
+                reverbWet = p?.spatialWet() ?: 25,
+                sourceSpread = p?.spatialSpread() ?: 0f,
             )
     }
 
@@ -237,6 +239,16 @@ object XrStore {
 
     fun resetRadiusAuto() {
         player?.resetRadiusAuto()
+        refresh()
+    }
+
+    fun setSpatialWet(percent: Int) {
+        player?.setSpatialWet(percent)
+        refresh()
+    }
+
+    fun setSpatialSpread(degrees: Float) {
+        player?.setSpatialSpread(degrees)
         refresh()
     }
 
