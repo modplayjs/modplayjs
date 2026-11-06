@@ -33,16 +33,21 @@ val v8Dir: String? = (project.findProperty("v8Dir") as String?)
     ?: defaultV8.takeIf { File(it, "lib/libv8_monolith.a").isFile }?.absolutePath
 val v8Path = v8Dir?.replace('\\', '/')
 
-// Store signing: keystore.properties at the project root, or the four
-// MODPLAY_XR_* environment variables. Unsigned when neither exists.
+// Store signing: keystore.properties in app/ module, apps/xr root, or project root,
+// or the four MODPLAY_XR_* environment variables.
 val keystoreProperties =
     Properties().apply {
-        val file = rootProject.file("keystore.properties")
-        if (file.isFile) file.inputStream().use { load(it) }
+        listOf(
+            file("keystore.properties"),
+            projectDir.parentFile.resolve("keystore.properties"),
+            rootProject.file("keystore.properties"),
+        ).firstOrNull { it.isFile }?.inputStream()?.use { load(it) }
     }
 
-fun signingValue(property: String, environment: String): String? =
-    keystoreProperties.getProperty(property) ?: System.getenv(environment)
+fun signingValue(property: String, altProperty: String, environment: String): String? =
+    keystoreProperties.getProperty(property)
+        ?: keystoreProperties.getProperty(altProperty)
+        ?: System.getenv(environment)
 
 // The engine is TypeScript. Bundle it before every build so the APK can never
 // ship a stale engine.js. Skips (with a warning) when npm is not on PATH.
@@ -192,10 +197,10 @@ android {
     }
 
     signingConfigs {
-        val storePath = signingValue("storeFile", "MODPLAY_XR_STORE_FILE")
-        val storePass = signingValue("storePassword", "MODPLAY_XR_STORE_PASSWORD")
-        val keyAliasValue = signingValue("keyAlias", "MODPLAY_XR_KEY_ALIAS")
-        val keyPass = signingValue("keyPassword", "MODPLAY_XR_KEY_PASSWORD")
+        val storePath = signingValue("RELEASE_STORE_FILE", "storeFile", "MODPLAY_XR_STORE_FILE")
+        val storePass = signingValue("RELEASE_STORE_PASSWORD", "storePassword", "MODPLAY_XR_STORE_PASSWORD")
+        val keyAliasValue = signingValue("RELEASE_KEY_ALIAS", "keyAlias", "MODPLAY_XR_KEY_ALIAS")
+        val keyPass = signingValue("RELEASE_KEY_PASSWORD", "keyPassword", "MODPLAY_XR_KEY_PASSWORD")
         if (storePath != null && storePass != null && keyAliasValue != null && keyPass != null) {
             create("release") {
                 storeFile = file(storePath)

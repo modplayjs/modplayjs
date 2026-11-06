@@ -34,6 +34,7 @@
          interaction: Interaction SDK gives hands a ray, direct touch on panels
          and grabbing, exactly like the controllers. -->
     <uses-feature android:name="oculus.software.handtracking" android:required="false" />
+    <uses-permission android:name="com.oculus.permission.HAND_TRACKING" />
     <uses-permission android:name="horizonos.permission.HAND_TRACKING" />
     <!-- Scene model for room geometry (walls, furniture). Both are required by
          MRUK; the horizonos.permission.* aliases are system-granted implicitly
