@@ -387,7 +387,19 @@ function writeCatalog(manifest, packages, total) {
   }
 
   writeFileSync(join(publishRoot, 'catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
-  cpSync(outRoot, join(publishRoot, 'modules'), { recursive: true });
+
+  // Copy only what the catalog lists. The APK assets keep every package (they
+  // are cheap in context); the upload tree should not carry 27 directories when
+  // 23 are reachable, or the size of a release stops matching the catalog.
+  const published = new Set(Object.values(catalog.packages).map((info) => info.asset));
+  for (const info of Object.values(catalog.formats)) published.add(info.install);
+  published.add(catalog.engine.asset);
+  for (const asset of published) {
+    const from = join(outRoot, asset);
+    const to = join(publishRoot, 'modules', asset);
+    mkdirSync(dirname(to), { recursive: true });
+    cpSync(from, to);
+  }
 
   // Self-check: every file the catalog promises must exist in the publish tree
   // with the hash it advertises. A catalog that lies is worse than no catalog,

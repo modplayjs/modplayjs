@@ -91,6 +91,21 @@ adb push catalog-url.txt /sdcard/Android/data/com.bitti06.modplayjs.xr/files/
 `INTERNET` is the only network permission and it exists for this catalog.
 Songs are never downloaded.
 
+To try it locally, serve the publish tree and point the app at it - no signing
+or CDN needed, plain HTTP is enough for a debug build on the same network:
+
+```bash
+npm run build:modules            # writes build/engine-catalog/
+npx serve apps/xr/build/engine-catalog -l 8080
+echo 'http://<your-ip>:8080/catalog.json' > catalog-url.txt
+adb push catalog-url.txt /sdcard/Android/data/com.bitti06.modplayjs.xr/files/
+```
+
+The catalog is refused when it is older than the app's own manifest, when its
+`schema` or `apiLevel` is newer than the app understands, or when any file
+fails its hash - the last of which is why the build script re-hashes the tree
+it just wrote.
+
 ## Build
 
 ```bash
