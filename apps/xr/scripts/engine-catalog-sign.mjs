@@ -35,6 +35,7 @@
 // it serves must still match the signed SHA-256 values, so a redirect can cause
 // a failed update at worst - never a different engine.
 
+import { execFileSync } from 'node:child_process';
 import { createPrivateKey, createPublicKey, generateKeyPairSync, sign } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -100,11 +101,37 @@ function keygen(force) {
   console.log('or set MODPLAY_ENGINE_CATALOG_PUBKEY to the same string.');
 }
 
+/**
+ * A key that git would commit is an incident, not a warning.
+ *
+ * The default lives under build/engine-keys (ignored), but
+ * MODPLAY_ENGINE_SIGNING_KEY can point anywhere - including into a tracked
+ * directory, which would publish the key that signs engine code for every
+ * install.
+ */
+function assertNotTracked(keyPath) {
+  try {
+    execFileSync('git', ['rev-parse', '--is-inside-work-tree'], { stdio: 'ignore' });
+    // stdio: 'ignore' returns null, so the output has to be captured; a
+    // successful call means the file is in the index.
+    const tracked = execFileSync('git', ['ls-files', '--error-unmatch', keyPath], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    if (String(tracked).trim().length > 0) {
+      throw new Error(`signing key ${keyPath} is tracked by git`);
+    }
+  } catch (error) {
+    if (String(error.message ?? error).includes('is tracked by git')) throw error;
+    // Not a git work tree, or the file is untracked: both are fine.
+  }
+}
+
 function signCatalog() {
   const keyPath = process.env.MODPLAY_ENGINE_SIGNING_KEY ?? defaultKey;
   if (!existsSync(keyPath)) {
     throw new Error(`no signing key at ${keyPath}; run "keygen" first`);
   }
+  assertNotTracked(keyPath);
   if (!existsSync(catalogPath)) {
     throw new Error(`no catalog at ${catalogPath}; run build-modules first`);
   }

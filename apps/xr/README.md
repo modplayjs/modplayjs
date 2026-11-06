@@ -87,9 +87,14 @@ node scripts/engine-catalog-sign.mjs keygen
 # prints: -PengineCatalogPubKey=MCowBQYDK2VwAyEA...
 ```
 
-The private key lands in `build/engine-keys/private.pem` (gitignored) and never
-leaves the build machine. `build-modules.mjs` signs automatically when that file
-exists. Pass the public key to the app build (`-PengineCatalogPubKey=…` or
+The private key lands in `build/engine-keys/private.pem` and never leaves the
+build machine. The repository ignores `*.pem`, `*.key`, `*.p12`, `*.pfx`,
+`*.jks` and any `engine-keys/` directory by explicit pattern - not only via
+`apps/xr/build/` - because `MODPLAY_ENGINE_SIGNING_KEY` can point anywhere. The
+signer also refuses to run with a key that is tracked by git.
+
+`build-modules.mjs` signs automatically when that file exists. Pass the public
+key to the app build (`-PengineCatalogPubKey=…` or
 `MODPLAY_ENGINE_CATALOG_PUBKEY`); a release build that sets a catalog URL but no
 public key fails at assembly time, and a release build without a key refuses
 every catalog at runtime. Debug builds without a key log a warning instead, so a

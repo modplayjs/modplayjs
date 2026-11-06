@@ -22,3 +22,16 @@ apps/xr/release.keystore
 apps/xr/*.keystore
 apps/xr/keystore.properties
 apps/xr/app/keystore.properties
+
+# Engine catalog signing (Ed25519). The private key may sign engine code for
+# every install, so it never enters the repository. Explicit patterns, because
+# the key path is configurable with MODPLAY_ENGINE_SIGNING_KEY and can point
+# outside apps/xr/build/, which is the only other rule that would catch it.
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+engine-keys/
+# Local test helper: URL of a catalog served from the dev machine.
+catalog-url.txt
