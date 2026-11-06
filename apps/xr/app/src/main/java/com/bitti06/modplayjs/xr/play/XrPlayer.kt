@@ -733,18 +733,31 @@ class XrPlayer(
      * the main thread, because that is the only place the data model may be
      * touched.
      */
+    /**
+     * Where the debug sphere for one channel sits.
+     *
+     * The sphere is the *object's* position dropped by [MARKER_DROP] so the two
+     * never z-fight. Both the first build and the per-tick update go through
+     * here: the first build used to place the sphere at exactly the object's
+     * height, and with a static layout it then kept that height, because
+     * [refreshSpatial] returns early when no azimuth changed. The markers were
+     * 12 cm above the sound for the rest of the session after every rebuild.
+     */
+    private fun markerPositionFor(degrees: Float): Vector3 {
+        val p = positionFor(degrees)
+        return Vector3(p.x, p.y - MARKER_DROP, p.z)
+    }
+
     private fun applyPositions() {
         val channels = spatialInfo.channels
         val positions = List(channels) { i ->
             positionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
         }
+        val markerPositions = positions.map { Vector3(it.x, it.y - MARKER_DROP, it.z) }
         mainHandler.post {
             for (i in positions.indices) {
                 entities.getOrNull(i)?.setComponent(Transform(Pose(positions[i])))
-                val p = positions[i]
-                markers.getOrNull(i)?.setComponent(
-                    Transform(Pose(Vector3(p.x, p.y - MARKER_DROP, p.z))),
-                )
+                markers.getOrNull(i)?.setComponent(Transform(Pose(markerPositions[i])))
             }
         }
     }
@@ -773,14 +786,15 @@ class XrPlayer(
     private fun rebuildMarkers() {
         destroyMarkers()
         if (!debugVisible || outputMode != 2) return
-        // Read the engine again instead of trusting the snapshot from the last
-        // output rebuild: a layout switch or a fresh module can change every
-        // azimuth, and a stale list would drop all markers on one spot.
-        val info = readSpatialInfo().takeIf { it.channels > 0 } ?: spatialInfo
-        val channels = info.channels
+        // `spatialInfo` is refreshed before every caller runs (rebuildOutputs,
+        // refreshSpatial, setDebugSources), so it is the same list the audio
+        // objects were placed from. Re-reading the engine here used to cost a
+        // second command and could hand the markers a newer list than the
+        // objects had - two positions for the same channel.
+        val channels = spatialInfo.channels
         if (channels <= 0) return
         val positions = List(channels) { i ->
-            positionFor(info.azimuths.getOrElse(i) { 0f })
+            markerPositionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
         }
         val colors = List(channels) { channelColor(it) }
         mainHandler.post {
@@ -855,12 +869,17 @@ class XrPlayer(
             applyMarkerLevels()
         }
 
-        // Spatial placement heals itself. `rebuildOutputs` runs inside `load`,
-        // before the mixer has processed a single tick, so every channel still
-        // reports its preset pan and all objects land on one spot; a module
-        // that pans channels while it plays drifts the same way. The first
-        // pass runs as soon as audio renders, then once a second.
-        if (outputMode == 2 && (!spatialSettled || now - lastSpatialAt >= SPATIAL_MS)) {
+        // Spatial placement follows the mix. `rebuildOutputs` runs inside
+        // `load`, before the mixer has processed a single tick, so every
+        // channel still reports its preset pan and all objects land on one
+        // spot; a module that pans channels while it plays drifts the same way.
+        // The first pass runs as soon as audio renders, then on the mixer's
+        // rhythm while playing. A paused module cannot move its channels, so
+        // the poll sleeps until the next rebuild.
+        if (outputMode == 2 &&
+            (playing || !spatialSettled) &&
+            (!spatialSettled || now - lastSpatialAt >= SPATIAL_MS)
+        ) {
             lastSpatialAt = now
             val settle = !spatialSettled
             spatialSettled = true
@@ -891,7 +910,11 @@ class XrPlayer(
         spatialInfo = info
         applyPositions()
         if (rebuild && debugVisible) rebuildMarkers()
-        publish(playing)
+        // The panels read the azimuths from [publish] on the snapshot clock
+        // (2 Hz while playing). Publishing them here too would put a new
+        // XrState through XrStore seven times a second, and every visible
+        // panel recomposes on that - the same reason the playhead has its own
+        // flow. The ECS objects and the markers are updated above regardless.
     }
 
     /** Reads `row` and `pattern` out of the cheap playhead JSON. */
@@ -1250,8 +1273,17 @@ class XrPlayer(
 
         /** Marker levels: fast enough to follow the music, slow enough to be cheap. */
         private const val MARKER_MS = 100L
-        /** How often the channel azimuths are re-read while playing. */
-        private const val SPATIAL_MS = 1000L
+        /**
+         * How often the channel azimuths are re-read while playing.
+         *
+         * A row at 125 BPM speed 6 is about 120 ms, and the dynamic pan mode
+         * re-places a channel on every row. At the old 1 s the objects and
+         * their markers stepped a whole second behind the pan - a visible and
+         * audible staircase once the panned layout started using the engine's
+         * azimuths again. 150 ms is one row at typical speed and one small
+         * `spatialInfo` command plus at most one Transform per channel.
+         */
+        private const val SPATIAL_MS = 150L
         private const val IDLE_POLL_MS = 50L
         /** Waits out one idle poll plus one blocking write at most. */
         private const val STOP_JOIN_MS = 250L
