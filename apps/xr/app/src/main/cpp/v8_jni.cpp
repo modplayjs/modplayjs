@@ -281,9 +281,15 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeStartSpatialBuses(
     g_busFloat = nullptr;
     g_reverbFloat = nullptr;
     g_reverbPcm = nullptr;
+    for (auto& p : g_busPcm) p = nullptr;
 
     if (!buffers || frames <= 0 || buses <= 0) return JNI_FALSE;
-    g_busCount = std::min<int>(buses, SpatialBusMixer::kMaxBuses);
+    // Never index past the array Kotlin actually passed. One local reference
+    // is alive at a time here and is deleted immediately - the table has a
+    // hard limit (512 on ART), so this loop must not accumulate them.
+    const jsize available = env->GetArrayLength(buffers);
+    g_busCount = std::min({buses, SpatialBusMixer::kMaxBuses, int(available)});
+    if (g_busCount <= 0) return JNI_FALSE;
     g_busFrames = frames;
 
     g_busMixer = new SpatialBusMixer();
