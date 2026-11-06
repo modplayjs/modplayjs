@@ -112,21 +112,22 @@ private fun rememberCellSpacing(): TextUnit {
 @Composable
 fun PatternPanel() {
     val state by XrStore.state.collectAsState()
+    val viewSettings = state.settings.view
     // The row has its own flow: it moves about twelve times a second, and the
     // other panels must not recompose at that rate.
     val playhead by XrStore.playhead.collectAsState()
     val pattern = state.player.pattern
     val listState = rememberLazyListState()
     val scrollState = rememberScrollState()
-    val palette = patternPalette(state.player.patternColors)
+    val palette = patternPalette(viewSettings.patternColors)
     val cellSpacing = rememberCellSpacing()
 
     // Follow the playhead three rows down from the top edge instead of pinned
     // to it, and only scroll when the row left the window: collecting the flow
     // in a single long-lived effect avoids cancelling and restarting coroutines
     // on every rapid row tick at high BPM.
-    LaunchedEffect(pattern.pattern, pattern.rows, state.player.follow) {
-        if (!state.player.follow || pattern.rows <= 0) return@LaunchedEffect
+    LaunchedEffect(pattern.pattern, pattern.rows, viewSettings.follow) {
+        if (!viewSettings.follow || pattern.rows <= 0) return@LaunchedEffect
         XrStore.playhead.collect { ph ->
             val row = ph.row
             if (row !in 0 until pattern.rows) return@collect
@@ -178,7 +179,7 @@ fun PatternPanel() {
                             channels = pattern.channels,
                             active = row == playhead.row,
                             palette = palette,
-                            stripDots = state.player.stripDots,
+                            stripDots = viewSettings.stripDots,
                             cellSpacing = cellSpacing,
                         )
                     }

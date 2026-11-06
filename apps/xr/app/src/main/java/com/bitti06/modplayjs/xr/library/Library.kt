@@ -14,6 +14,7 @@ data class TrackFile(
     val format: String,
     val size: Long,
     val folder: String,
+    val uriString: String = uri.toString(),
 )
 
 data class FolderEntry(

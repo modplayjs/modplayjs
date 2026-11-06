@@ -87,9 +87,9 @@ fun LibraryPanel() {
                             result.tracks
                         }
                     }
-                    Filter.Favorites -> result.tracks.filter { it.uri.toString() in favorites }
+                    Filter.Favorites -> result.tracks.filter { it.uriString in favorites }
                     Filter.Recent -> {
-                        val byUri = result.tracks.associateBy { it.uri.toString() }
+                        val byUri = result.tracks.associateBy { it.uriString }
                         XrStore.recents().mapNotNull { byUri[it] }
                     }
                 }.filter { query.isBlank() || it.title.contains(query, ignoreCase = true) }
@@ -324,10 +324,11 @@ fun LibraryPanel() {
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        items(shown, key = { it.uri.toString() }) { track ->
+                        items(shown, key = { it.uriString }) { track ->
+                            val isFav = remember(favorites, track.uriString) { track.uriString in favorites }
                             TrackRow(
                                 track = track,
-                                favorite = track.uri.toString() in favorites,
+                                favorite = isFav,
                                 onPlay = { XrStore.playAt(shown, shown.indexOf(track)) },
                                 onIgnore = { XrStore.ignore(track.uri) },
                                 onFavorite = {

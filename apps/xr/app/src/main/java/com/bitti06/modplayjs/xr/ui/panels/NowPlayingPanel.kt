@@ -91,7 +91,7 @@ fun NowPlayingPanel() {
         )
 
         Visualizer(
-            mode = playback.visualizer,
+            mode = state.settings.view.visualizer,
             levels = playback.levels,
             channels = playback.channels,
             active = playback.playing,
@@ -106,6 +106,26 @@ fun NowPlayingPanel() {
             CircleButton("|◀") { XrStore.previous() }
             CircleButton(if (playback.playing) "❚❚" else "▶", primary = true) { XrStore.playPause() }
             CircleButton("▶|") { XrStore.next() }
+            // 3-state Loop / Repeat button
+            val repeatMode = state.settings.playback.repeat
+            val repeatLabel = when (repeatMode) {
+                "all" -> "🔁"
+                "one" -> "🔂"
+                else -> "↳"
+            }
+            CircleButton(repeatLabel) {
+                val nextMode = when (repeatMode) {
+                    "off" -> "all"
+                    "all" -> "one"
+                    else -> "off"
+                }
+                XrStore.updateSettings { s -> s.copy(playback = s.playback.copy(repeat = nextMode)) }
+            }
+            // Auto-advance toggle button
+            val autoAdvance = state.settings.playback.autoAdvance
+            CircleButton(if (autoAdvance) "⏭" else "⏯") {
+                XrStore.updateSettings { s -> s.copy(playback = s.playback.copy(autoAdvance = !autoAdvance)) }
+            }
             if (playback.seekable) {
                 CircleButton("−10") { XrStore.seek(playback.positionMs - 10_000L) }
                 CircleButton("+10") { XrStore.seek(playback.positionMs + 10_000L) }
@@ -184,7 +204,7 @@ fun NowPlayingPanel() {
             )
         }
 
-        if (playback.showChannelStrip && playback.channels in 1..16) {
+        if (state.settings.view.showChannelStrip && playback.channels in 1..16) {
             Row(horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapXs)) {
                 for (i in 0 until playback.channels) {
                     val muted = playback.muted.contains(i)

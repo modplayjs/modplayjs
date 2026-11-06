@@ -472,6 +472,8 @@ class XrPlayer(
         submit {
             try {
                 val eng = engine ?: error("V8 engine unavailable")
+                eng.command("{\"type\":\"pause\"}")
+                playing = false
                 // The format's bridge has to be installed before the engine can
                 // probe the bytes: an unregistered plugin means every test()
                 // fails and loadModule throws "module did not load".
