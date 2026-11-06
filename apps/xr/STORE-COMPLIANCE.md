@@ -47,8 +47,19 @@ Four defects, all fixed in the same commit as this file.
    controller squeeze button. VRC.Quest.Tracking.2 requires every declared input
    modality to reach all interactions from launch, and Meta's app-compatibility
    page states plainly that "declaring hands on an app that cannot be driven by
-   hands produces a broken experience". All three declarations are gone, and the
-   runtime request for the permission went with them.
+   hands produces a broken experience". The declarations were dropped with that
+   pass; `0128464` brought hands back together with the Interaction SDK, so both
+   modalities now reach every interaction.
+
+   The permission name was wrong for longer than that. `horizonos.permission.
+   HAND_TRACKING` is not a permission Meta defines anywhere - it appears zero
+   times in the native, android-apps, spatial-sdk and resources documentation
+   corpora, while `com.oculus.permission.HAND_TRACKING` is what the native
+   hand-tracking page, the Spatial SDK manifest template and all thirteen
+   Spatial SDK samples declare. Requesting a permission the platform does not
+   define returns DENIED, so the process never held the grant and the runtime
+   refused the tracker: `MemoryBrokerClient: Hands: failed to remap
+   HAND_TRACKER (missing runtime permission(s))`. Fixed in `6958a6b`.
 3. **VRC.Quest.Functional.2 was not met.** `onPause` saved the layout but let
    playback continue; only `onHMDUnmounted` paused. Playback now pauses in
    `onPause` and resumes in `onResume`.
@@ -121,21 +132,21 @@ absent — file access goes through SAF (`ACTION_OPEN_DOCUMENT`,
 | Input.2 grip button for picking up objects (recommended) | pass | `GrabbableSystem.grabButtons = ButtonSqueezeR or ButtonSqueezeL`, i.e. the grip/squeeze button, not the trigger |
 | Input.3 hands/controllers line up with reality (recommended) | pass | `AvatarSystem` renders the runtime's own poses; the app never re-parents or offsets them |
 | Input.4 focus aware | pass | keeps rendering, hides hands and controllers via `AvatarSystem.setShow*`, and now also ignores input via `InputSystem.enableInput(false)` |
-| Input.5 hands animate correctly (recommended) | n/a | no hand input declared |
-| Input.7 respects switching hands ↔ controllers | n/a | hands are not declared, so no hand devices are enumerated |
-| Input.8 system gesture reserved | n/a | same |
+| Input.5 hands animate correctly (recommended) | **device** | hands are declared (`oculus.software.handtracking` + `com.oculus.permission.HAND_TRACKING`); the runtime animates them, the app never re-parents or offsets a hand pose |
+| Input.7 respects switching hands ↔ controllers | **device** | both modalities are declared and both drive the same Interaction SDK interactions; switching is the runtime's, not the app's |
+| Input.8 system gesture reserved | pass | no app gesture is bound to the system gesture |
 
-Consequence of dropping the hand declaration, and intended: a person who has
-only hands active gets Horizon OS's "Switch to Controllers" dialog at launch.
-That is the documented behaviour for controller-only immersive apps, and correct
-here because panel grabbing is on the grip button, which hands do not have.
+Hands and controllers are both declared, and both reach every interaction:
+panel ray, direct touch, clicking and grabbing. `required=false` on the feature
+means "controllers and hands", so a headset with controllers only still gets
+the controller path.
 
 ## Tracking
 
 | VRC | Status | Evidence |
 |---|---|---|
 | Tracking.1 play modes | **manual + device** | the app is usable seated (panels in an arc at 1.45 m, ring adjustable) and standing. The dashboard must declare **Sitting** and **Standing**, not Roomscale: nothing requires walking or turning 360° |
-| Tracking.2 declared input modalities | **manual + device** | declare **Controllers only**. Hands must not be advertised, matching the manifest |
+| Tracking.2 declared input modalities | **manual + device** | declare **Controllers and hands**. The manifest advertises both and both reach every interaction through the Interaction SDK |
 
 ## Audio
 

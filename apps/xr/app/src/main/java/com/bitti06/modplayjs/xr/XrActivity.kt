@@ -752,14 +752,19 @@ class XrActivity : AppSystemActivity(), XrHost {
         private const val PANEL_HALF_THICKNESS = 0.02f
 
         /**
-         * Namespaces differ per permission, and each is the one the current
-         * Spatial SDK pages use: `USE_SCENE` under com.oculus.permission (the
-         * horizonos.* form only shows up as a system-side implicit grant), hand
-         * tracking under horizonos.permission.
+         * Namespaces differ per permission, and each is the one current Meta
+         * documentation uses: `USE_SCENE` under com.oculus.permission (the
+         * horizonos.* form only shows up as a system-side implicit grant), and
+         * hand tracking under com.oculus.permission as well - that is the name
+         * on the hand-tracking page, in the Spatial SDK manifest template and
+         * in every Spatial SDK sample. `horizonos.permission.HAND_TRACKING`
+         * does not exist in any Meta document; requesting it returns DENIED
+         * and leaves the process without the grant, which is what makes the
+         * runtime refuse the hand tracker.
          */
         private object PERMISSIONS {
             const val scene = "com.oculus.permission.USE_SCENE"
-            const val handTracking = "horizonos.permission.HAND_TRACKING"
+            const val handTracking = "com.oculus.permission.HAND_TRACKING"
         }
         const val REQUEST_USE_SCENE = 1
         const val REQUEST_PICK_MODULES = 2

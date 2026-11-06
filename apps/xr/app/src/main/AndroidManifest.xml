@@ -27,16 +27,27 @@
     <uses-feature android:name="com.oculus.feature.VIRTUAL_KEYBOARD" android:required="false" />
     <uses-feature android:name="oculus.software.overlay_keyboard" android:required="false" />
 
-    <!-- Hands and controllers. Meta's Spatial SDK gaze page declares exactly
-         this pair: the horizonos.* permission and the oculus.software.*
-         feature, which has no horizonos spelling. The deprecated
-         com.oculus.permission.HAND_TRACKING is not declared - Horizon OS logs
-         it as deprecated and the horizonos name is the one that is granted.
-         required=false = "controllers and hands", and both modalities reach every
-         interaction: Interaction SDK gives hands a ray, direct touch on panels
-         and grabbing, exactly like the controllers. -->
+    <!-- Hands and controllers. The permission is the one Meta actually defines:
+         `com.oculus.permission.HAND_TRACKING`. The native hand-tracking page
+         ("Add Flag to Android Manifest"), the Spatial SDK manifest template in
+         "Add Spatial SDK to an existing 2D app", and every Spatial SDK sample
+         (Starter, Object3D-ISDK, BodyTracking, MixedReality, Hybrid) declare
+         exactly this pair with `oculus.software.handtracking` required=false.
+
+         `horizonos.permission.HAND_TRACKING` is not it. It appears nowhere in
+         Meta's documentation - 0 occurrences across the native, android-apps,
+         spatial-sdk and resources corpora - and a device proves it: declaring
+         and requesting it leaves the process without the grant, so the runtime
+         refuses the hand tracker and logcat shows
+         `MemoryBrokerClient: Hands: failed to remap HAND_TRACKER (missing
+         runtime permission(s))`. Declaring the documented name is what turns
+         hands on.
+
+         required=false = "controllers and hands", and both modalities reach
+         every interaction: Interaction SDK gives hands a ray, direct touch on
+         panels and grabbing, exactly like the controllers. -->
     <uses-feature android:name="oculus.software.handtracking" android:required="false" />
-    <uses-permission android:name="horizonos.permission.HAND_TRACKING" />
+    <uses-permission android:name="com.oculus.permission.HAND_TRACKING" />
     <!-- Engine module updates: one JSON catalog plus the files it lists.
          Songs are never downloaded; this is the decoder/mixer layer only. -->
     <uses-permission android:name="android.permission.INTERNET" />
