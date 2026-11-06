@@ -87,6 +87,7 @@ fun SettingsPanel() {
                         stringResource(R.string.xr_layout),
                         listOf(
                             Option(stringResource(R.string.xr_layout_pan), "panned"),
+                            Option(stringResource(R.string.xr_layout_front180), "front180"),
                             Option(stringResource(R.string.xr_layout_full360), "full360"),
                             Option(stringResource(R.string.xr_layout_lrlr), "lrlr"),
                             Option(stringResource(R.string.xr_layout_lrrl), "lrrl"),

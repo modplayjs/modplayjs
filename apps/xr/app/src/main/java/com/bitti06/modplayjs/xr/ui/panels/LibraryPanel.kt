@@ -77,7 +77,7 @@ fun LibraryPanel() {
     var scanCount by remember { mutableIntStateOf(0) }
     var scanCurrentItem by remember { mutableStateOf("") }
 
-    LaunchedEffect(scanId, version) {
+    LaunchedEffect(scanId) {
         isScanning = true
         scanCount = 0
         scanCurrentItem = ""

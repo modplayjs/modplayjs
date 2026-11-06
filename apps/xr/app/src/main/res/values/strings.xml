@@ -47,6 +47,7 @@
     <string name="xr_spatial_audio">Spatial audio</string>
     <string name="xr_layout">Layout</string>
     <string name="xr_layout_pan">Pan (Dynamic)</string>
+    <string name="xr_layout_front180">180° Front</string>
     <string name="xr_layout_full360">360° Surround</string>
     <string name="xr_layout_lrlr">Amiga (L-R-L-R)</string>
     <string name="xr_layout_lrrl">Amiga (L-R-R-L)</string>
