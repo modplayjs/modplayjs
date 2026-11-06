@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import androidx.compose.ui.platform.ComposeView
+import com.bitti06.modplayjs.engine.ModuleCatalog
 import com.bitti06.modplayjs.xr.input.ControllerInputSystem
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.library.Playlist
@@ -161,6 +162,8 @@ class XrActivity : AppSystemActivity(), XrHost {
         systemManager.registerSystem(panelAnimator)
 
         placement = PanelPlacement(this, panelAnimator)
+        // The extension -> format bridge table comes from the asset manifest.
+        ModuleCatalog.load(this)
         player = XrPlayer(this)
         library = Library(this)
         playlist = Playlist(library, player) { XrStore.recentsChanged() }

@@ -37,6 +37,9 @@
          and grabbing, exactly like the controllers. -->
     <uses-feature android:name="oculus.software.handtracking" android:required="false" />
     <uses-permission android:name="horizonos.permission.HAND_TRACKING" />
+    <!-- Engine module updates: one JSON catalog plus the files it lists.
+         Songs are never downloaded; this is the decoder/mixer layer only. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Scene model for room geometry (walls, furniture). Both are required by
          MRUK; the horizonos.permission.* aliases are system-granted implicitly
          and are not documented as declarable, so the com.oculus names stay. -->

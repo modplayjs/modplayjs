@@ -19,25 +19,82 @@ class V8Engine(
     @Volatile var initError: String? = null
         private set
 
+    /** Formats whose install bridge ran on this isolate. */
+    private val installed = HashSet<String>()
+
     init {
         handle =
             try {
                 System.loadLibrary("modplay_v8")
-                val script =
-                    context.assets
-                        .open("engine/engine.js")
-                        .bufferedReader()
-                        .use { it.readText() }
-                nativeCreate(script, context.cacheDir.absolutePath)
+                // The modular engine is an ES module that imports @modplayjs/*
+                // from the asset tree; the native loader resolves and caches
+                // those. Passing null for the script selects that path. The
+                // bundled engine.js is only used when the modular assets are
+                // missing (a build without node, or an older APK).
+                // Prefer the modular engine. The bundled script stays as a
+                // fallback and is only read when the modular start failed, so
+                // a successful start never pays for the 1.3 MB read.
+                val overlay = EngineModules.overlayRoot(context)
+                if (hasModularAssets(context) || overlay != null) {
+                    nativeCreate(null, context.assets, overlay)
+                } else {
+                    nativeCreate(bundledScript(context), context.assets, null)
+                }.let { modularHandle ->
+                    if (modularHandle != 0L) {
+                        modularHandle
+                    } else {
+                        if (overlay != null) {
+                            // A downloaded engine that does not start must not
+                            // brick the app: fall back one generation, then to
+                            // the APK assets.
+                            Log.w(TAG, "modular engine failed with overlay")
+                            val recovered = EngineModules.recover(context)
+                            val nextOverlay = if (recovered) EngineModules.overlayRoot(context) else null
+                            nativeCreate(null, context.assets, nextOverlay)
+                        } else {
+                            Log.w(TAG, "modular engine failed, retrying with the bundle")
+                            nativeCreate(bundledScript(context), context.assets, null)
+                        }
+                    }
+                }
             } catch (t: Throwable) {
                 initError = "${t.javaClass.simpleName}: ${t.message}"
                 Log.e(TAG, "V8 unavailable: $initError")
                 0L
             }
         if (handle == 0L && initError == null) {
-            initError = "engine.js failed to compile or run (see modplay-v8 log)"
+            initError = "engine failed to compile or run (see modplay-v8 log)"
             Log.e(TAG, "V8 unavailable: $initError")
         }
+    }
+
+    private fun bundledScript(context: Context): String? =
+        runCatching {
+            context.assets
+                .open("engine/engine.js")
+                .bufferedReader()
+                .use { it.readText() }
+        }.getOrNull()
+
+    private fun hasModularAssets(context: Context): Boolean =
+        runCatching {
+            context.assets.open("modules/manifest.json").close()
+            context.assets.open("modules/engine-core/index.js").close()
+            true
+        }.getOrDefault(false)
+
+    /**
+     * Install one format bridge. Idempotent; runs on the V8 thread.
+     *
+     * Returns false when the bridge is missing or its module threw, which the
+     * caller treats as "this format cannot play" rather than crashing.
+     */
+    fun installFormat(format: String): Boolean {
+        if (handle == 0L) return false
+        if (format in installed) return true
+        val ok = nativeInstallFormat(handle, format)
+        if (ok) installed += format
+        return ok
     }
 
     fun load(
@@ -117,8 +174,9 @@ class V8Engine(
     }
 
     private external fun nativeCreate(
-        script: String,
-        cacheDir: String,
+        script: String?,
+        assets: android.content.res.AssetManager,
+        overlayRoot: String?,
     ): Long
 
     private external fun nativeLoad(
@@ -166,6 +224,8 @@ class V8Engine(
     private external fun nativeMixSpatial(stems: FloatArray, sources: Int, frames: Int): Int
 
     private external fun nativeStopSpatialBuses()
+
+    private external fun nativeInstallFormat(handle: Long, format: String): Boolean
 
     companion object {
         private const val TAG = "V8Engine"

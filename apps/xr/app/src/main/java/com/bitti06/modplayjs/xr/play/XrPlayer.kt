@@ -7,6 +7,7 @@ import android.media.AudioManager
 import android.media.AudioTrack
 import android.util.Log
 import androidx.core.content.edit
+import com.bitti06.modplayjs.engine.ModuleCatalog
 import androidx.core.net.toUri
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.xr.state.Playhead
@@ -471,6 +472,13 @@ class XrPlayer(
         submit {
             try {
                 val eng = engine ?: error("V8 engine unavailable")
+                // The format's bridge has to be installed before the engine can
+                // probe the bytes: an unregistered plugin means every test()
+                // fails and loadModule throws "module did not load".
+                val bridge = ModuleCatalog.formatFor(name)
+                if (bridge != null && !eng.installFormat(bridge)) {
+                    error("format '$bridge' could not be installed")
+                }
                 cachedPatternIndex = -1
                 cachedPattern = null
                 cachedTrackDetail = null

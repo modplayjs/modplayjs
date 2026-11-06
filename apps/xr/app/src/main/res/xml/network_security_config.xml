@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   VRC.Quest.Packaging.4 asks for a valid network security configuration in the
-  manifest. The app has no network component at all (no INTERNET permission, no
-  remote assets, engine bundled in the APK), so the config is the closed default:
-  no cleartext, no user-installed CAs, no debug override. That is also what
-  targetSdk 34 already enforces implicitly; stating it keeps the upload check and
-  the code in agreement.
+  manifest. The only network use is the engine-module catalog: one HTTPS JSON
+  document plus the module files it lists, no cleartext, no user-installed CAs,
+  no debug override. Songs are never fetched. That is also what targetSdk 34
+  enforces implicitly; stating it keeps the upload check and the code in
+  agreement.
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">

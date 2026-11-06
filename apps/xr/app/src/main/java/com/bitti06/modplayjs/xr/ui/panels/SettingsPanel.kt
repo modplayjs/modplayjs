@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +31,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.engine.AndroidSettings
+import com.bitti06.modplayjs.engine.EngineUpdater
+import com.bitti06.modplayjs.engine.ModuleCatalog
 import com.bitti06.modplayjs.xr.BuildConfig
 import com.bitti06.modplayjs.xr.R
 import com.bitti06.modplayjs.xr.SceneAccess
@@ -423,6 +426,44 @@ fun SettingsPanel() {
                             playback.channels,
                         ),
                     )
+                }
+            }
+
+            item {
+                // Engine modules: the decoder/mixer layer, not songs. The
+                // catalog is checked on demand; nothing downloads by itself.
+                Section(stringResource(R.string.xr_section_engine)) {
+                    val engineContext = LocalContext.current
+                    val updateStatus by EngineUpdater.status.collectAsState()
+                    val installed = remember(updateStatus) { EngineUpdater.installedVersion(engineContext) }
+                    val configured = remember(updateStatus) { EngineUpdater.configured(engineContext) }
+
+                    MetaText(
+                        when (val status = updateStatus) {
+                            is EngineUpdater.Status.Idle ->
+                                stringResource(
+                                    R.string.xr_engine_modules_line,
+                                    ModuleCatalog.formats().size,
+                                    installed ?: stringResource(R.string.xr_engine_bundled),
+                                )
+                            is EngineUpdater.Status.Checking -> stringResource(R.string.xr_engine_checking)
+                            is EngineUpdater.Status.Downloading ->
+                                stringResource(R.string.xr_engine_downloading, status.done, status.total)
+                            is EngineUpdater.Status.UpToDate ->
+                                stringResource(R.string.xr_engine_uptodate, EngineUpdater.installedVersion(engineContext) ?: "—")
+                            is EngineUpdater.Status.Installed ->
+                                stringResource(R.string.xr_engine_installed, status.files, status.version)
+                            is EngineUpdater.Status.Failed ->
+                                stringResource(R.string.xr_engine_failed, status.message)
+                        },
+                    )
+                    if (!configured) {
+                        MetaText(stringResource(R.string.xr_engine_no_catalog), PanelTokens.AccentWarm)
+                    } else {
+                        Chip(stringResource(R.string.xr_engine_check)) {
+                            EngineUpdater.check(engineContext)
+                        }
+                    }
                 }
             }
 

@@ -14,6 +14,83 @@ layer and the settings model are shared with the phone app:
   XR-only `renderSpatial()`; `PcmRing` is deliberately not copied, the XR
   player writes `AudioTrack` directly.
 
+## Engine modules
+
+The app no longer ships one monolithic `engine.js` as its only engine. The
+build partitions the monorepo into one ES module per package under
+`assets/modules`, and a small native loader resolves `@modplayjs/*` onto those
+files at runtime:
+
+```
+assets/modules/
+  engine-core/index.js            the shared engine entry
+  modplayjs-core/index.js         one per package
+  modplayjs-fmt-xm/index.js
+  install/xm.js                   registers the format
+  manifest.json                   what exists, which extension maps where
+```
+
+`./gradlew :app:buildModules` (part of `preBuild`) regenerates that tree from
+`packages/*/src` with `scripts/build-modules.mjs`. The task fails when a format
+names a missing package or a cross-package import has no asset, which is the
+error that would otherwise appear on the headset as a silent `undefined`.
+
+A session only loads what it plays: a MOD file touches core, the softmixer,
+Paula and `fmt-mod` (~407 KB), not the whole 1.3 MB. Formats are installed on
+demand in `XrPlayer.load()` from the extension -> format table in the
+manifest.
+
+### Publishing an engine catalog
+
+`build-modules.mjs` also writes a publishable tree to
+`build/engine-catalog/` (gitignored):
+
+```
+build/engine-catalog/
+  catalog.json                    the document below
+  modules/...                     the files it lists
+```
+
+Upload that directory to any static host. `catalog.json` is the whole update
+contract - one JSON file per release, no per-device build:
+
+```json
+{
+  "schema": 1,
+  "apiLevel": 1,
+  "generated": "2026-11-06T12:00:00.000Z",
+  "baseUrl": "https://example.org/modplay/engine/",
+  "engine":   { "asset": "engine-core/index.js", "bytes": 23166,
+                "sha256": "…", "version": "0.2.1" },
+  "packages": { "modplayjs-fmt-mo3": { "asset": "modplayjs-fmt-mo3/index.js",
+                "bytes": 103916, "sha256": "…", "version": "0.2.1" } },
+  "formats":  { "mo3": { "package": "modplayjs-fmt-mo3",
+                "install": "install/mo3.js", "extensions": ["mo3"] } }
+}
+```
+
+`baseUrl` may be relative to the catalog location, so a GitHub release page or
+a CDN needs no separate build. `MODPLAY_ENGINE_BASE_URL` overrides it at
+generation time. The script hashes every file it lists and fails if the
+catalog and the files disagree.
+
+On device, Settings -> Engine modules -> *Check for updates* fetches the
+catalog, compares SHA-256 per file, downloads only what differs into a staging
+directory, verifies each file and swaps the whole set in at once. A failed
+download or a broken engine rolls back one generation, then to the APK assets;
+an installed update never half-applies.
+
+Point the app at a catalog with `-PengineCatalogUrl=…` at build time,
+`MODPLAY_ENGINE_CATALOG_URL` in the environment, or for testing without a
+rebuild:
+
+```bash
+adb push catalog-url.txt /sdcard/Android/data/com.bitti06.modplayjs.xr/files/
+```
+
+`INTERNET` is the only network permission and it exists for this catalog.
+Songs are never downloaded.
+
 ## Build
 
 ```bash

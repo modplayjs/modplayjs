@@ -176,6 +176,15 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
+        // Where the published engine catalog lives. Empty disables the update
+        // UI; a build can set it with -PengineCatalogUrl=... or
+        // MODPLAY_ENGINE_CATALOG_URL in the environment.
+        val catalogUrl =
+            (project.findProperty("engineCatalogUrl") as String?)
+                ?: System.getenv("MODPLAY_ENGINE_CATALOG_URL")
+                ?: ""
+        buildConfigField("String", "ENGINE_CATALOG_URL", "\"$catalogUrl\"")
+
         ndk { abiFilters += listOf("arm64-v8a") }
 
         externalNativeBuild {
@@ -201,6 +210,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    testOptions {
+        // Android's android.util.Log is a stub on the JVM test classpath.
+        // Returning defaults turns its calls into no-ops instead of throwing.
+        unitTests.isReturnDefaultValues = true
     }
 
     compileOptions {
@@ -259,6 +274,11 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+
+    testImplementation("junit:junit:4.13.2")
+    // Android's org.json is a stub on the JVM unit-test classpath; the real
+    // artifact lets the catalog parser run there.
+    testImplementation("org.json:json:20240303")
 
     implementation(libs.meta.spatial.sdk)
     implementation(libs.meta.spatial.sdk.vr)

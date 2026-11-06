@@ -56004,6 +56004,60 @@
     }
   };
 
+  // ../android/engine/src/engine-services.ts
+  var services = {};
+  var staticFormatNames = [];
+
+  // ../android/engine/src/engine-provider.ts
+  var FORMAT_PLUGINS = [
+    plugin,
+    hmnPlugin,
+    fltPlugin,
+    plugin2,
+    plugin4,
+    plugin3,
+    plugin5,
+    plugin6,
+    plugin7,
+    plugin8,
+    plugin9,
+    plugin10,
+    plugin11,
+    plugin12,
+    mmd3Plugin,
+    med2Plugin,
+    med3Plugin,
+    med4Plugin,
+    plugin13,
+    plugin14,
+    plugin15,
+    pwPlugin
+  ];
+  function provide(core2) {
+    for (const plugin16 of FORMAT_PLUGINS) {
+      if (!staticFormatNames.includes(plugin16.name)) staticFormatNames.push(plugin16.name);
+      core2.registries.registerFormat(plugin16);
+    }
+    services.sid = {
+      dsp: sidDsp,
+      startTune: sidStartTune,
+      seek: sidSeek,
+      playTimeSeconds: getSidPlayTimeSeconds,
+      chipCount: getSidChipCount,
+      applySettings: applySidSettingsLive,
+      loadSongLengths: loadSidSongLengths
+    };
+    services.fc = {
+      effect: fcEffect,
+      installEventReader: () => {
+        setModEventReader((c, chn, row) => {
+          core2.registries.format("mod").readEvent(c, chn, row);
+        });
+      }
+    };
+  }
+  globalThis.__modplayProvide = provide;
+
   // ../../packages/dsp-paula/src/index.ts
   var PAULA_FREQUENCY = 70937892e-1 / 2;
   function periodToRate(period, sampleRate2) {
@@ -66743,40 +66797,66 @@
 
   // ../android/engine/src/engine-entry.ts
   var core = new Core();
-  var FORMAT_PLUGINS = [
-    plugin,
-    hmnPlugin,
-    fltPlugin,
-    plugin2,
-    plugin4,
-    plugin3,
-    plugin5,
-    plugin6,
-    plugin7,
-    plugin8,
-    plugin9,
-    plugin10,
-    plugin11,
-    plugin12,
-    mmd3Plugin,
-    med2Plugin,
-    med3Plugin,
-    med4Plugin,
-    plugin13,
-    plugin14,
-    plugin15,
-    pwPlugin
-  ];
-  for (const plugin16 of FORMAT_PLUGINS) core.registries.registerFormat(plugin16);
-  var ENGINE_VERSION = `formats:${FORMAT_PLUGINS.map((plugin16) => plugin16.name).join(",")}`;
-  core.registries.registerEffect(fcEffect);
-  setModEventReader((c, chn, row) => {
-    core.registries.format("mod").readEvent(c, chn, row);
-  });
+  globalThis.__modplayProvide?.(core);
+  var installedFormats = [...staticFormatNames];
+  var engineVersion = () => `formats:${installedFormats.join(",")}`;
+  var pendingFcReader = false;
+  function installFormat(_name, plugins) {
+    let added = 0;
+    for (const candidate of plugins) {
+      const plugin16 = candidate;
+      if (!plugin16 || typeof plugin16.name !== "string") continue;
+      if (installedFormats.includes(plugin16.name)) continue;
+      try {
+        core.registries.registerFormat(plugin16);
+        installedFormats.push(plugin16.name);
+        added++;
+      } catch {
+      }
+    }
+    if (pendingFcReader && installedFormats.includes("mod") && services.fc) {
+      try {
+        services.fc.installEventReader(core);
+        pendingFcReader = false;
+      } catch {
+      }
+    }
+    return added > 0;
+  }
+  globalThis.__modplayInstall = installFormat;
+  function attachServices(kind, value) {
+    if (kind === "sid") {
+      const sid = value;
+      services.sid = sid;
+      try {
+        core.registries.registerDsp(sid.dsp);
+      } catch {
+      }
+      return true;
+    }
+    if (kind === "fc") {
+      const fc = value;
+      services.fc = fc;
+      try {
+        core.registries.registerEffect(fc.effect);
+      } catch {
+      }
+      try {
+        fc.installEventReader(core);
+      } catch {
+        pendingFcReader = true;
+      }
+      return true;
+    }
+    return false;
+  }
+  globalThis.__modplayAttach = attachServices;
   core.registries.registerDsp(createPaulaPlugin());
   var mixer = createSoftMixerPlugin();
   core.registries.registerDsp(mixer);
-  core.registries.registerDsp(sidDsp);
+  if (services.sid) core.registries.registerDsp(services.sid.dsp);
+  if (services.fc) core.registries.registerEffect(services.fc.effect);
+  services.fc?.installEventReader(core);
   var settings = normaliseSettings({});
   var sampleRate = 48e3;
   var loaded = false;
@@ -66804,7 +66884,7 @@
   }
   function modulePosition() {
     if (streamed) return streamedFrames / sampleRate * 1e3;
-    if (isSid()) return getSidPlayTimeSeconds() * 1e3;
+    if (isSid()) return (services.sid?.playTimeSeconds() ?? 0) * 1e3;
     return core.playState.timeMs;
   }
   function applySettings() {
@@ -66829,7 +66909,7 @@
     for (let i = 0; i < n; i++) core.setChannelMute(i, channelMutes[i] === true);
   }
   function applySidSettings2() {
-    applySidSettingsLive({
+    services.sid?.applySettings({
       volume: settings.sid.volume,
       highQualitySID: settings.sid.quality !== "light",
       highQualityResampler: settings.sid.quality === "sinc",
@@ -66962,7 +67042,7 @@
       amigaFilter: tracker && mod.format === "mod" && mod.chn === 4,
       panSeparation: tracker && settings.mixer.layout === "panned",
       sidPanel: sid,
-      sidStereo: sid && getSidChipCount() > 1,
+      sidStereo: sid && (services.sid?.chipCount() ?? 0) > 1,
       audition: tracker && (mod.ins > 0 || core.samples.size > 0),
       channelMute: tracker && mod.chn > 0
     };
@@ -66995,7 +67075,7 @@
   function snapshotObject() {
     return {
       schemaVersion: SCHEMA_VERSION,
-      engineVersion: ENGINE_VERSION,
+      engineVersion: engineVersion(),
       state: buildState(),
       track: loaded ? buildTrack() : null,
       channels: loaded ? buildChannels() : [],
@@ -67053,7 +67133,7 @@
     ended = false;
     if (!streamed) {
       core.setSampleRate(sampleRate);
-      if (sidBytes && isSid()) sidStartTune(sidBytes, sampleRate, 1);
+      if (sidBytes && isSid()) services.sid?.startTune(sidBytes, sampleRate, 1);
       core.startSmix(4);
       core.startPlayer();
       applySettings();
@@ -67087,7 +67167,7 @@
       streamed.seek(target);
       streamedFrames = target / 1e3 * sampleRate;
     } else if (isSid()) {
-      sidSeek(target / 1e3);
+      services.sid?.seek(target / 1e3);
     } else {
       core.seekTime(target);
     }
@@ -67124,10 +67204,10 @@
       core.stopPlayer();
     } catch {
     }
-    sidStartTune(sidBytes, sampleRate, 1);
+    services.sid?.startTune(sidBytes, sampleRate, 1);
     core.startPlayer();
     applySidSettings2();
-    sidSeek(pos / 1e3);
+    services.sid?.seek(pos / 1e3);
   }
   function auditionInstrument(index, note = 60, volume = 64) {
     if (!loaded || streamed || isSid()) return;
@@ -67385,7 +67465,7 @@
         break;
       }
       case "loadSidSongLengths":
-        loadSidSongLengths(s(c.text));
+        services.sid?.loadSongLengths(s(c.text));
         break;
       case "setRepeat":
         settings.playback.repeat = s(c.value);
