@@ -910,16 +910,40 @@ class XrPlayer(
         rawAzimuths: List<Float>,
     ): List<Float> {
         if (channels <= 0) return emptyList()
+        if (channels == 1) return listOf(0f)
         if (layout == "full360") {
+            val step = 360f / channels
+            val offset = step / 2f
             return List(channels) { i ->
-                val angle = (i * 360f / channels) - 180f
+                val angle = -180f + offset + i * step
                 if (angle > 180f) angle - 360f else angle
+            }
+        }
+        if (layout == "lrlr" && channels >= 4) {
+            return List(channels) { i ->
+                when (i) {
+                    0 -> -45f  // Left Front
+                    1 -> 45f   // Right Front
+                    2 -> -135f // Left Back
+                    3 -> 135f  // Right Back
+                    else -> rawAzimuths.getOrElse(i) { 0f }
+                }
+            }
+        }
+        if (layout == "lrrl" && channels >= 4) {
+            return List(channels) { i ->
+                when (i) {
+                    0 -> -45f  // Left Front
+                    1 -> 45f   // Right Front
+                    2 -> 135f  // Right Back
+                    3 -> -135f // Left Back
+                    else -> rawAzimuths.getOrElse(i) { 0f }
+                }
             }
         }
         if (rawAzimuths.size >= channels && layout != "panned" && layout != "front180") {
             return rawAzimuths.take(channels)
         }
-        if (channels == 1) return listOf(0f)
         return List(channels) { i ->
             -90f + (i * 180f / (channels - 1))
         }
