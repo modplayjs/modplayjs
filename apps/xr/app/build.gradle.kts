@@ -109,6 +109,39 @@ val buildEngine =
 
 tasks.named("preBuild").configure { dependsOn(buildEngine, buildModules) }
 
+/**
+ * A release build with an engine-catalog URL but no public key would accept any
+ * catalog the transport hands it. Refuse to assemble that combination: the
+ * failure belongs on the build machine, not on a user's headset.
+ */
+val verifyCatalogSigning =
+    tasks.register("verifyCatalogSigning") {
+        group = "verification"
+        description = "Fails a release build that can download engine modules unsigned"
+        doLast {
+            val url =
+                (project.findProperty("engineCatalogUrl") as String?)
+                    ?: System.getenv("MODPLAY_ENGINE_CATALOG_URL")
+                    ?: ""
+            val key =
+                (project.findProperty("engineCatalogPubKey") as String?)
+                    ?: System.getenv("MODPLAY_ENGINE_CATALOG_PUBKEY")
+                    ?: ""
+            if (url.isNotBlank() && key.isBlank()) {
+                throw GradleException(
+                    "engineCatalogUrl is set but engineCatalogPubKey is not. " +
+                        "Signing is mandatory for a published catalog: run " +
+                        "'node scripts/engine-catalog-sign.mjs keygen' and pass its " +
+                        "public key with -PengineCatalogPubKey=...",
+                )
+            }
+        }
+    }
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(verifyCatalogSigning)
+}
+
 // V8 prebuilt: fetch it when missing, then verify. Fetching happens before
 // CMake configures, so a build that downloads V8 reports that it must run
 // again before the native layer actually links it.
@@ -184,6 +217,16 @@ android {
                 ?: System.getenv("MODPLAY_ENGINE_CATALOG_URL")
                 ?: ""
         buildConfigField("String", "ENGINE_CATALOG_URL", "\"$catalogUrl\"")
+
+        // Ed25519 public key (base64, SPKI/DER) that signs the engine catalog.
+        // Empty in debug builds is allowed and logged; a release build without
+        // it fails at assembly time, because an unverifiable engine update is
+        // worse than no update.
+        val catalogPubKey =
+            (project.findProperty("engineCatalogPubKey") as String?)
+                ?: System.getenv("MODPLAY_ENGINE_CATALOG_PUBKEY")
+                ?: ""
+        buildConfigField("String", "ENGINE_CATALOG_PUBKEY", "\"$catalogPubKey\"")
 
         ndk { abiFilters += listOf("arm64-v8a") }
 

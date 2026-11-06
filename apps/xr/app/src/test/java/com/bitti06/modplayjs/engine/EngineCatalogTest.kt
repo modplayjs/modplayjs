@@ -51,8 +51,8 @@ class EngineCatalogTest {
             setOf("engine-core/index.js", "modplayjs-fmt-mo3/index.js", "install/mo3.js"),
             catalog.files.keys,
         )
-        assertEquals(listOf("mo3"), catalog.formats.getValue("mo3").third)
-        assertEquals("modplayjs-fmt-mo3", catalog.formats.getValue("mo3").first)
+        assertEquals(listOf("mo3"), catalog.formats.getValue("mo3").extensions)
+        assertEquals("modplayjs-fmt-mo3", catalog.formats.getValue("mo3").packageName)
     }
 
     @Test
@@ -109,10 +109,10 @@ class EngineCatalogTest {
         assertTrue(parsed.files.isNotEmpty())
         assertTrue(parsed.formats.isNotEmpty())
         // Every format's install bridge must be a downloadable file too.
-        for ((_, entry) in parsed.formats) {
+        for ((_, format) in parsed.formats) {
             assertTrue(
-                "missing install file for ${entry.first}",
-                parsed.files.containsKey(entry.second),
+                "missing install file for ${format.packageName}",
+                parsed.files.containsKey(format.install),
             )
         }
         JSONObject(catalog.readText()) // still valid JSON

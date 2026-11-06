@@ -54,15 +54,47 @@ object EngineCatalog {
         val version: String,
     )
 
+    /** A format bridge: its package, install script and extensions. */
+    data class FormatEntry(
+        val name: String,
+        val packageName: String,
+        val install: String,
+        val bytes: Long,
+        val sha256: String,
+        val version: String,
+        val extensions: List<String>,
+    )
+
     data class Catalog(
         val schema: Int,
         val apiLevel: Int,
         val generated: String,
         val baseUrl: String,
-        val files: Map<String, Entry>,
-        /** Format name -> (package asset prefix, install bridge path, extensions). */
-        val formats: Map<String, Triple<String, String, List<String>>>,
-    )
+        val engine: Entry,
+        val packages: Map<String, Entry>,
+        val formats: Map<String, FormatEntry>,
+    ) {
+        /**
+         * Every file that has to exist on device: the engine, each package and
+         * each install bridge.
+         */
+        val files: Map<String, Entry>
+            get() = buildMap {
+                put(engine.asset, engine)
+                for (entry in packages.values) put(entry.asset, entry)
+                for (format in formats.values) {
+                    put(
+                        format.install,
+                        Entry(
+                            asset = format.install,
+                            bytes = format.bytes,
+                            sha256 = format.sha256,
+                            version = format.version,
+                        ),
+                    )
+                }
+            }
+    }
 
     data class Plan(
         val catalog: Catalog,
@@ -113,59 +145,65 @@ object EngineCatalog {
             if (base.startsWith("http")) base else URL(URL(catalogUrl), base).toString()
         val baseWithSlash = if (resolvedBase.endsWith('/')) resolvedBase else "$resolvedBase/"
 
-        val files = LinkedHashMap<String, Entry>()
-        fun addFile(obj: JSONObject?) {
-            if (obj == null) return
+        fun entryOf(obj: JSONObject?): Entry? {
+            if (obj == null) return null
             val asset = obj.optString("asset")
-            if (asset.isBlank()) return
-            files[asset] = Entry(
+            if (asset.isBlank()) return null
+            return Entry(
                 asset = asset,
                 bytes = obj.optLong("bytes", 0),
                 sha256 = obj.optString("sha256"),
                 version = obj.optString("version"),
             )
         }
-        addFile(root.optJSONObject("engine"))
-        val packages = root.optJSONObject("packages") ?: JSONObject()
-        for (key in packages.keys()) addFile(packages.optJSONObject(key))
 
-        val formats = LinkedHashMap<String, Triple<String, String, List<String>>>()
+        val engine = entryOf(root.optJSONObject("engine"))
+            ?: error("catalog has no engine entry")
+
+        val packagesJson = root.optJSONObject("packages") ?: JSONObject()
+        val packages = LinkedHashMap<String, Entry>()
+        for (name in packagesJson.keys()) {
+            entryOf(packagesJson.optJSONObject(name))?.let { packages[name] = it }
+        }
+
         val formatsJson = root.optJSONObject("formats") ?: JSONObject()
+        val formats = LinkedHashMap<String, FormatEntry>()
         for (name in formatsJson.keys()) {
-            val entry = formatsJson.optJSONObject(name) ?: continue
+            val obj = formatsJson.optJSONObject(name) ?: continue
             val extensions = ArrayList<String>()
-            val array = entry.optJSONArray("extensions")
-            if (array != null) {
+            obj.optJSONArray("extensions")?.let { array ->
                 for (i in 0 until array.length()) {
                     extensions += array.optString(i).lowercase()
                 }
             }
-            // The install bridge is a catalog file too: it must be downloaded
-            // like any other, otherwise a new format appears in the table with
-            // no way to register it.
-            addFile(
-                JSONObject()
-                    .put("asset", entry.optString("install"))
-                    .put("bytes", entry.optLong("bytes", 0))
-                    .put("sha256", entry.optString("sha256"))
-                    .put("version", entry.optString("version")),
-            )
-            formats[name] = Triple(
-                entry.optString("package"),
-                entry.optString("install"),
-                extensions,
-            )
+            formats[name] =
+                FormatEntry(
+                    name = name,
+                    packageName = obj.optString("package"),
+                    install = obj.optString("install"),
+                    bytes = obj.optLong("bytes", 0),
+                    sha256 = obj.optString("sha256"),
+                    version = obj.optString("version"),
+                    extensions = extensions,
+                )
         }
 
-        if (files.isEmpty()) error("catalog lists no modules")
-        return Catalog(
+        val catalog = Catalog(
             schema = schema,
             apiLevel = apiLevel,
             generated = generated,
             baseUrl = baseWithSlash,
-            files = files,
+            engine = engine,
+            packages = packages,
             formats = formats,
         )
+        if (catalog.files.isEmpty()) error("catalog lists no modules")
+
+        // Signature last: everything above decides whether the document is
+        // usable, this decides whether it is ours. Both matter, and a failure
+        // here must not be recoverable by ignoring a flag.
+        SignatureVerifier.verify(root.optString("signature"), catalog)
+        return catalog
     }
 
     /**
@@ -343,14 +381,17 @@ object EngineCatalog {
                     .put("version", entry.version),
             )
         }
-        for ((name, entry) in catalog.formats) {
+        for ((name, format) in catalog.formats) {
             val extensions = org.json.JSONArray()
-            entry.third.forEach(extensions::put)
+            format.extensions.forEach(extensions::put)
             formats.put(
                 name,
                 JSONObject()
-                    .put("package", entry.first)
-                    .put("install", entry.second)
+                    .put("package", format.packageName)
+                    .put("install", format.install)
+                    .put("bytes", format.bytes)
+                    .put("sha256", format.sha256)
+                    .put("version", format.version)
                     .put("extensions", extensions),
             )
         }

@@ -23,8 +23,9 @@
 
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -34,6 +35,8 @@ const packagesRoot = join(repoRoot, 'packages');
 const outRoot = join(xrRoot, 'app/src/main/assets/modules');
 /** Publishable artifact: manifests plus the files they describe. */
 const publishRoot = join(xrRoot, 'build/engine-catalog');
+/** Signing material lives outside the repo's tracked files. */
+const signingKey = join(xrRoot, 'build/engine-keys/private.pem');
 
 /**
  * Which package provides which tracker format, and which exports have to be
@@ -162,6 +165,12 @@ function versionOf(pkg) {
   }
 }
 
+/** Run the signing script against the catalog that was just written. */
+function signCatalog() {
+  execFileSync(process.execPath, [join(here, 'engine-catalog-sign.mjs'), 'sign',
+    join(publishRoot, 'catalog.json')], { stdio: 'inherit' });
+}
+
 function kb(bytes) {
   return `${Math.round(bytes / 1024)}K`;
 }
@@ -240,7 +249,7 @@ async function main() {
       bytes: statSync(file).size,
       sha256: sha256(file),
       version: versionOf(entry.pkg),
-      extensions: entry.ext ?? [],
+      extensions: (entry.ext ?? []).map((e) => e.toLowerCase()),
       ...(service ? { services: service.kind } : {}),
     };
   }
@@ -428,10 +437,21 @@ function writeCatalog(manifest, packages, total) {
     throw new Error(`catalog self-check failed:\n  ${broken.join('\n  ')}`);
   }
 
+  // Sign automatically when a key exists; a build machine that has the key
+  // should never be able to produce an unsigned catalog by forgetting a flag.
+  if (existsSync(signingKey)) {
+    signCatalog();
+  } else {
+    console.log(
+      'catalog: unsigned (no key at ' + signingKey + '; run engine-catalog-sign.mjs keygen)',
+    );
+  }
+
   const catalogBytes = statSync(join(publishRoot, 'catalog.json')).size;
+  const signed = existsSync(signingKey) ? 'signed' : 'UNSIGNED';
   console.log(
     `catalog: ${catalogBytes} bytes, ${Object.keys(catalog.packages).length} packages, ` +
-      `${Object.keys(catalog.formats).length} formats, hashes verified -> ${publishRoot}`,
+      `${Object.keys(catalog.formats).length} formats, hashes verified, ${signed} -> ${publishRoot}`,
   );
 }
 

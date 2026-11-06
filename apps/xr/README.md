@@ -74,6 +74,30 @@ a CDN needs no separate build. `MODPLAY_ENGINE_BASE_URL` overrides it at
 generation time. The script hashes every file it lists and fails if the
 catalog and the files disagree.
 
+The catalog is signed. `catalog.json` carries a `signature` field: an Ed25519
+signature over a canonical text form of the document (defined in
+`scripts/engine-catalog-sign.mjs` and mirrored byte-for-byte in
+`SignatureVerifier.kt`), not over the raw JSON, because key order and whitespace
+are not stable across JSON writers.
+
+Generate the key once, on the machine that publishes:
+
+```bash
+node scripts/engine-catalog-sign.mjs keygen
+# prints: -PengineCatalogPubKey=MCowBQYDK2VwAyEA...
+```
+
+The private key lands in `build/engine-keys/private.pem` (gitignored) and never
+leaves the build machine. `build-modules.mjs` signs automatically when that file
+exists. Pass the public key to the app build (`-PengineCatalogPubKey=…` or
+`MODPLAY_ENGINE_CATALOG_PUBKEY`); a release build that sets a catalog URL but no
+public key fails at assembly time, and a release build without a key refuses
+every catalog at runtime. Debug builds without a key log a warning instead, so a
+local test server works unsigned.
+
+This is what blocks a compromised CDN or release account: the transport decides
+*availability*, the signature decides *what code may run*.
+
 On device, Settings -> Engine modules -> *Check for updates* fetches the
 catalog, compares SHA-256 per file, downloads only what differs into a staging
 directory, verifies each file and swaps the whole set in at once. A failed
