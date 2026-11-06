@@ -81,16 +81,6 @@ class V8Engine(
 
     fun snapshot(): String = if (handle == 0L) """{"error":"v8-unavailable"}""" else nativeSnapshot(handle)
 
-    fun initOboe(): Boolean = if (handle == 0L) false else nativeInitOboe(handle)
-
-    fun pauseOboe() {
-        if (handle != 0L) nativePauseOboe()
-    }
-
-    fun stopOboe() {
-        if (handle != 0L) nativeStopOboe()
-    }
-
     private external fun nativeCreate(
         script: String,
         cacheDir: String,
@@ -118,13 +108,6 @@ class V8Engine(
     ): FloatArray
 
     private external fun nativeSnapshot(handle: Long): String
-
-    private external fun nativeInitOboe(handle: Long): Boolean
-
-    private external fun nativePauseOboe()
-
-    private external fun nativeStopOboe()
-
 
     companion object {
         private const val TAG = "V8Engine"
