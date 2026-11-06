@@ -5,8 +5,8 @@
   "version": "0.2.1",
   "type": "module",
   "scripts": {
-    "build:engine": "esbuild engine/src/engine-entry.ts --bundle --format=iife --target=es2022 --platform=neutral --legal-comments=none --outfile=app/src/main/assets/engine/engine.js",
-    "build:engine:min": "esbuild engine/src/engine-entry.ts --bundle --format=iife --target=es2022 --platform=neutral --minify --legal-comments=none --outfile=app/src/main/assets/engine/engine.js",
+    "build:engine": "esbuild engine/src/engine-monolith.ts --bundle --format=iife --target=es2022 --platform=neutral --legal-comments=none --outfile=app/src/main/assets/engine/engine.js",
+    "build:engine:min": "esbuild engine/src/engine-monolith.ts --bundle --format=iife --target=es2022 --platform=neutral --minify --legal-comments=none --outfile=app/src/main/assets/engine/engine.js",
     "typecheck": "tsc -p engine/tsconfig.json --noEmit"
   },
   "dependencies": {

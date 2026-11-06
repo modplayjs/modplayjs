@@ -1,38 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Android/headless engine entry. V8 evaluates this file once, then calls the
 // global API. No DOM, no Web Audio, no WASM, no prerender.
-import { CorePlayer, type Core } from '@modplayjs/core';
-import { plugin as modPlugin, hmnPlugin, fltPlugin } from '@modplayjs/fmt-mod';
-import { plugin as s3mPlugin } from '@modplayjs/fmt-s3m';
-import { plugin as xmPlugin } from '@modplayjs/fmt-xm';
-import { plugin as itPlugin } from '@modplayjs/fmt-it';
-import { plugin as mtmPlugin } from '@modplayjs/fmt-mtm';
-import { plugin as stmPlugin } from '@modplayjs/fmt-stm';
-import { plugin as s69Plugin } from '@modplayjs/fmt-669';
-import { plugin as sfxPlugin } from '@modplayjs/fmt-sfx';
-import { plugin as digiPlugin } from '@modplayjs/fmt-digi';
-import { plugin as asylumPlugin } from '@modplayjs/fmt-asylum';
-import { plugin as icePlugin } from '@modplayjs/fmt-ice';
-import {
-  plugin as medPlugin,
-  mmd3Plugin,
-  med2Plugin,
-  med3Plugin,
-  med4Plugin,
-} from '@modplayjs/fmt-med';
-import { plugin as stPlugin } from '@modplayjs/fmt-st';
-import {
-  plugin as sidPlugin,
-  sidDsp,
-  sidStartTune,
-  sidSeek,
-  applySidSettingsLive,
-  loadSidSongLengths,
-  getSidChipCount,
-  getSidPlayTimeSeconds,
-} from '@modplayjs/fmt-sid';
-import { plugin as fcPlugin, fcEffect, setModEventReader } from '@modplayjs/fmt-fc';
-import { pwPlugin } from '@modplayjs/fmt-prowizard';
+//
+// Format plugins are NOT imported here. The monolith build (apps/android) has
+// a provider module that registers all of them before this file runs; the
+// modular build (apps/xr) installs one per format at runtime through
+// globalThis.__modplayInstall. Everything the engine needs from an optional
+// package beyond its plugin value is injected via engine-services.
+import { CorePlayer } from '@modplayjs/core';
 import { createPaulaPlugin } from '@modplayjs/dsp-paula';
 import { createSoftMixerPlugin, type SoftMixer } from '@modplayjs/dsp-softmixer';
 import {
@@ -52,54 +27,112 @@ import {
   type AndroidState,
   type AndroidTrack,
 } from '@modplayjs/out-android';
+import { services, staticFormatNames } from './engine-services.js';
 
 const core = new CorePlayer();
 
-/**
- * Formats in probe order: the first plugin whose test() accepts the bytes wins,
- * so the order is part of the behaviour, not a list to sort.
- */
-const FORMAT_PLUGINS = [
-  modPlugin,
-  hmnPlugin,
-  fltPlugin,
-  s3mPlugin,
-  xmPlugin,
-  itPlugin,
-  mtmPlugin,
-  stmPlugin,
-  s69Plugin,
-  sfxPlugin,
-  digiPlugin,
-  asylumPlugin,
-  icePlugin,
-  medPlugin,
-  mmd3Plugin,
-  med2Plugin,
-  med3Plugin,
-  med4Plugin,
-  stPlugin,
-  sidPlugin,
-  fcPlugin,
-  pwPlugin,
-];
-for (const plugin of FORMAT_PLUGINS) core.registries.registerFormat(plugin);
+// The monolith bundle imports the provider first, which leaves this hook on the
+// global object. The modular build has no provider: formats arrive later through
+// __modplayInstall instead.
+(globalThis as unknown as { __modplayProvide?: (core: CorePlayer) => void })
+  .__modplayProvide?.(core);
 
 /**
- * What this build can play, handed to the app so it can rescan its library when
- * the set changes (a format added, removed or replaced). Decoder changes that
- * keep the set identical need no rescan.
+ * What this engine can play, handed to the app so it can rescan its library
+ * when the set changes (a format added, removed or replaced). Decoder changes
+ * that keep the set identical need no rescan.
+ *
+ * Built from the installed set, not from a compile-time list: in the modular
+ * build a format exists only after its install bridge ran.
  */
-const ENGINE_VERSION = `formats:${FORMAT_PLUGINS.map((plugin) => plugin.name).join(',')}`;
+const installedFormats: string[] = [...staticFormatNames];
+const engineVersion = (): string => `formats:${installedFormats.join(',')}`;
 
-core.registries.registerEffect(fcEffect);
-setModEventReader((c: Core, chn: number, row: number) => {
-  core.registries.format('mod').readEvent(c, chn, row);
-});
+/**
+ * Register one format bridge's plugins.
+ *
+ * Called once per format by the modular build, and by the provider module in
+ * the monolith build before this file runs. Re-registering a name throws in
+ * the registry, so a repeated install is filtered here instead of crashing the
+ * audio thread on a track change.
+ */
+let pendingFcReader = false;
+
+function installFormat(_name: string, plugins: unknown[]): boolean {
+  let added = 0;
+  for (const candidate of plugins) {
+    const plugin = candidate as { name?: string } | null;
+    if (!plugin || typeof plugin.name !== 'string') continue;
+    if (installedFormats.includes(plugin.name)) continue;
+    try {
+      core.registries.registerFormat(plugin as never);
+      installedFormats.push(plugin.name);
+      added++;
+    } catch {
+      // Already registered by another bridge: keep going, the format works.
+    }
+  }
+  if (pendingFcReader && installedFormats.includes('mod') && services.fc) {
+    try {
+      services.fc.installEventReader(core);
+      pendingFcReader = false;
+    } catch {
+      // Still no reader: try again on the next install.
+    }
+  }
+  return added > 0;
+}
+
+(globalThis as unknown as { __modplayInstall?: unknown }).__modplayInstall = installFormat;
+
+/**
+ * Attach an optional package's services after startup.
+ *
+ * A plugin is a value the registry can take at any time, but the SID DSP and
+ * the FC effect are consulted by the player and by the event reader. In the
+ * monolith build the provider sets them before this file runs; in the modular
+ * build they arrive when their format is installed, which can be after the
+ * first track. Installing them here keeps both builds on one code path.
+ */
+function attachServices(kind: string, value: unknown): boolean {
+  if (kind === 'sid') {
+    const sid = value as NonNullable<typeof services.sid>;
+    services.sid = sid;
+    try {
+      core.registries.registerDsp(sid.dsp);
+    } catch {
+      // Already registered (a repeated install): the DSP is a singleton.
+    }
+    return true;
+  }
+  if (kind === 'fc') {
+    const fc = value as NonNullable<typeof services.fc>;
+    services.fc = fc;
+    try {
+      core.registries.registerEffect(fc.effect);
+    } catch {
+      // Already registered.
+    }
+    // The event reader needs the MOD format plugin; skip it if FC arrives
+    // before MOD and install it later when MOD does.
+    try {
+      fc.installEventReader(core);
+    } catch {
+      pendingFcReader = true;
+    }
+    return true;
+  }
+  return false;
+}
+
+(globalThis as unknown as { __modplayAttach?: unknown }).__modplayAttach = attachServices;
+
 core.registries.registerDsp(createPaulaPlugin());
 const mixer = createSoftMixerPlugin() as SoftMixer;
 core.registries.registerDsp(mixer);
-core.registries.registerDsp(sidDsp);
+if (services.sid) core.registries.registerDsp(services.sid.dsp);
+if (services.fc) core.registries.registerEffect(services.fc.effect);
+services.fc?.installEventReader(core);
 
 let settings: AndroidSettings = normaliseSettings({});
 let sampleRate = 48000;
@@ -131,7 +164,7 @@ function durationMs(): number {
 
 function modulePosition(): number {
   if (streamed) return (streamedFrames / sampleRate) * 1000;
-  if (isSid()) return getSidPlayTimeSeconds() * 1000;
+  if (isSid()) return (services.sid?.playTimeSeconds() ?? 0) * 1000;
   return core.playState.timeMs;
 }
 
@@ -159,7 +192,7 @@ function applyMutes(): void {
 }
 
 function applySidSettings(): void {
-  applySidSettingsLive({
+  services.sid?.applySettings({
     volume: settings.sid.volume,
     highQualitySID: settings.sid.quality !== 'light',
     highQualityResampler: settings.sid.quality === 'sinc',
@@ -296,7 +329,7 @@ function buildCapabilities(): AndroidCapabilities {
     amigaFilter: tracker && mod.format === 'mod' && mod.chn === 4,
     panSeparation: tracker && settings.mixer.layout === 'panned',
     sidPanel: sid,
-    sidStereo: sid && getSidChipCount() > 1,
+    sidStereo: sid && (services.sid?.chipCount() ?? 0) > 1,
     audition: tracker && (mod.ins > 0 || core.samples.size > 0),
     channelMute: tracker && mod.chn > 0,
   };
@@ -331,7 +364,7 @@ function buildState(): AndroidState {
 function snapshotObject(): AndroidSnapshot {
   return {
     schemaVersion: SCHEMA_VERSION,
-    engineVersion: ENGINE_VERSION,
+    engineVersion: engineVersion(),
     state: buildState(),
     track: loaded ? buildTrack() : null,
     channels: loaded ? buildChannels() : [],
@@ -392,7 +425,7 @@ function play(): void {
   ended = false;
   if (!streamed) {
     core.setSampleRate(sampleRate);
-    if (sidBytes && isSid()) sidStartTune(sidBytes, sampleRate, 1);
+    if (sidBytes && isSid()) services.sid?.startTune(sidBytes, sampleRate, 1);
     core.startSmix(4);
     core.startPlayer();
     applySettings();
@@ -429,7 +462,7 @@ function seek(ms: number): void {
     streamed.seek(target);
     streamedFrames = (target / 1000) * sampleRate;
   } else if (isSid()) {
-    sidSeek(target / 1000);
+    services.sid?.seek(target / 1000);
   } else {
     core.seekTime(target);
   }
@@ -472,10 +505,10 @@ function restartSid(): void {
   } catch {
     /* no-op */
   }
-  sidStartTune(sidBytes, sampleRate, 1);
+  services.sid?.startTune(sidBytes, sampleRate, 1);
   core.startPlayer();
   applySidSettings();
-  sidSeek(pos / 1000);
+  services.sid?.seek(pos / 1000);
 }
 
 function auditionInstrument(index: number, note = 60, volume = 64): void {
@@ -759,7 +792,7 @@ function command(json: string): string {
       break;
     }
     case 'loadSidSongLengths':
-      loadSidSongLengths(s(c.text));
+      services.sid?.loadSongLengths(s(c.text));
       break;
     case 'setRepeat':
       settings.playback.repeat = s(c.value) as AndroidSettings['playback']['repeat'];

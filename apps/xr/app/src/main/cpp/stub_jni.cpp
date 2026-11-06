@@ -8,7 +8,7 @@
 #include <string>
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_bitti06_modplayjs_engine_V8Engine_nativeCreate(JNIEnv*, jobject, jstring, jstring) { return 0; }
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeCreate(JNIEnv*, jobject, jstring, jobject, jstring) { return 0; }
 extern "C" JNIEXPORT void JNICALL
 Java_com_bitti06_modplayjs_engine_V8Engine_nativeLoad(JNIEnv*, jobject, jlong, jbyteArray, jstring) {}
 extern "C" JNIEXPORT jstring JNICALL
@@ -29,3 +29,7 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeSnapshot(JNIEnv* env, jobject, 
 }
 extern "C" JNIEXPORT void JNICALL
 Java_com_bitti06_modplayjs_engine_V8Engine_nativeDestroy(JNIEnv*, jobject, jlong) {}
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeInstallFormat(JNIEnv*, jobject, jlong, jstring) {
+    return JNI_FALSE;
+}

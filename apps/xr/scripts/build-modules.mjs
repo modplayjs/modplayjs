@@ -22,7 +22,8 @@
 // central directory, and a plain identifier removes that whole class of doubt.
 
 import { build } from 'esbuild';
-import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,6 +32,8 @@ const xrRoot = resolve(here, '..');
 const repoRoot = resolve(xrRoot, '../..');
 const packagesRoot = join(repoRoot, 'packages');
 const outRoot = join(xrRoot, 'app/src/main/assets/modules');
+/** Publishable artifact: manifests plus the files they describe. */
+const publishRoot = join(xrRoot, 'build/engine-catalog');
 
 /**
  * Which package provides which tracker format, and which exports have to be
@@ -38,26 +41,73 @@ const outRoot = join(xrRoot, 'app/src/main/assets/modules');
  * bridges: adding a format means adding one row, not editing the engine.
  */
 const FORMATS = {
-  mod: { pkg: 'fmt-mod', exports: ['plugin', 'hmnPlugin', 'fltPlugin'] },
-  s3m: { pkg: 'fmt-s3m', exports: ['plugin'] },
-  xm: { pkg: 'fmt-xm', exports: ['plugin'] },
-  it: { pkg: 'fmt-it', exports: ['plugin'] },
-  mtm: { pkg: 'fmt-mtm', exports: ['plugin'] },
-  stm: { pkg: 'fmt-stm', exports: ['plugin'] },
-  '669': { pkg: 'fmt-669', exports: ['plugin'] },
-  sfx: { pkg: 'fmt-sfx', exports: ['plugin'] },
-  digi: { pkg: 'fmt-digi', exports: ['plugin'] },
-  asylum: { pkg: 'fmt-asylum', exports: ['plugin'] },
-  ice: { pkg: 'fmt-ice', exports: ['plugin'] },
-  med: { pkg: 'fmt-med', exports: ['plugin', 'mmd3Plugin', 'med2Plugin', 'med3Plugin', 'med4Plugin'] },
-  st: { pkg: 'fmt-st', exports: ['plugin'] },
-  sid: { pkg: 'fmt-sid', exports: ['plugin'] },
-  fc: { pkg: 'fmt-fc', exports: ['plugin'] },
-  prowizard: { pkg: 'fmt-prowizard', exports: ['pwPlugin'] },
+  mod: { pkg: 'fmt-mod', exports: ['plugin', 'hmnPlugin', 'fltPlugin'], ext: ['mod', 'hmn', 'flt'] },
+  s3m: { pkg: 'fmt-s3m', exports: ['plugin'], ext: ['s3m'] },
+  xm: { pkg: 'fmt-xm', exports: ['plugin'], ext: ['xm'] },
+  it: { pkg: 'fmt-it', exports: ['plugin'], ext: ['it'] },
+  mtm: { pkg: 'fmt-mtm', exports: ['plugin'], ext: ['mtm'] },
+  stm: { pkg: 'fmt-stm', exports: ['plugin'], ext: ['stm'] },
+  '669': { pkg: 'fmt-669', exports: ['plugin'], ext: ['669'] },
+  sfx: { pkg: 'fmt-sfx', exports: ['plugin'], ext: ['sfx'] },
+  digi: { pkg: 'fmt-digi', exports: ['plugin'], ext: ['digi'] },
+  asylum: { pkg: 'fmt-asylum', exports: ['plugin'], ext: ['asylum'] },
+  ice: { pkg: 'fmt-ice', exports: ['plugin'], ext: ['ice'] },
+  med: {
+    pkg: 'fmt-med',
+    exports: ['plugin', 'mmd3Plugin', 'med2Plugin', 'med3Plugin', 'med4Plugin'],
+    ext: ['med', 'mmd', 'mmd0', 'mmd1', 'mmd2', 'mmd3', 'mmdc'],
+  },
+  st: { pkg: 'fmt-st', exports: ['plugin'], ext: ['st'] },
+  sid: { pkg: 'fmt-sid', exports: ['plugin'], ext: ['sid'] },
+  fc: { pkg: 'fmt-fc', exports: ['plugin'], ext: ['fc13', 'fc14'] },
+  prowizard: {
+    pkg: 'fmt-prowizard',
+    exports: ['pwPlugin'],
+    ext: ['pow', 'pp', 'xpk', 'pack', 'p61', 'utz'],
+  },
 };
 
 /** Loaded for every session; the mixer and the Paula path are not optional. */
 const ALWAYS = ['core', 'effects-shared', 'dsp-softmixer', 'dsp-paula', 'out-android'];
+
+/**
+ * Packages whose exports the engine calls directly, and how the bridge builds
+ * the service object from them. Kept here next to FORMATS so a package that
+ * grows a service export is one edit, not a hunt through the C++ and Kotlin.
+ */
+const SERVICE_BRIDGES = {
+  'fmt-sid': {
+    kind: 'sid',
+    exports: [
+      'sidDsp',
+      'sidStartTune',
+      'sidSeek',
+      'getSidPlayTimeSeconds',
+      'getSidChipCount',
+      'applySidSettingsLive',
+      'loadSidSongLengths',
+    ],
+    wire: {
+      dsp: 'sidDsp',
+      startTune: 'sidStartTune',
+      seek: 'sidSeek',
+      playTimeSeconds: 'getSidPlayTimeSeconds',
+      chipCount: 'getSidChipCount',
+      applySettings: 'applySidSettingsLive',
+      loadSongLengths: 'loadSidSongLengths',
+    },
+  },
+  'fmt-fc': {
+    kind: 'fc',
+    exports: ['fcEffect', 'setModEventReader'],
+    wire: {
+      effect: 'fcEffect',
+      // The reader needs the MOD format plugin; the engine calls this after
+      // registering MOD, and retries if MOD is installed later.
+      installEventReader: '() => setModEventReader((c, chn, row) => c.registries.format("mod").readEvent(c, chn, row))',
+    },
+  },
+};
 
 const assetName = (pkg) => `modplayjs-${pkg}`;
 const specifier = (pkg) => `@modplayjs/${pkg}`;
@@ -96,6 +146,20 @@ async function importsOf(pkg) {
   };
   walk(join(packagesRoot, pkg, 'src'));
   return [...seen].sort();
+}
+
+/** sha256 of a file, hex, for the catalog's integrity check. */
+function sha256(path) {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+/** Version of a package, for the catalog's update decision. */
+function versionOf(pkg) {
+  try {
+    return JSON.parse(readFileSync(join(packagesRoot, pkg, 'package.json'), 'utf8')).version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
 }
 
 function kb(bytes) {
@@ -138,6 +202,8 @@ async function main() {
       specifier: specifier(pkg),
       asset: `${assetName(pkg)}/index.js`,
       bytes: size,
+      sha256: sha256(outfile),
+      version: versionOf(pkg),
       imports: await importsOf(pkg),
     };
     console.log(`  ${assetName(pkg).padEnd(24)} ${kb(size).padStart(6)}`);
@@ -148,19 +214,72 @@ async function main() {
       throw new Error(`format "${format}" names a missing package: ${entry.pkg}`);
     }
     const names = entry.exports.join(', ');
-    const body =
-      `// Generated by build-modules.mjs - registers "${format}".\n` +
-      `import { ${names} } from '${specifier(entry.pkg)}';\n` +
-      `globalThis.__modplayInstall('${format}', [${names}]);\n`;
+    const lines = [
+      `// Generated by build-modules.mjs - registers "${format}".`,
+      `import { ${names} } from '${specifier(entry.pkg)}';`,
+    ];
+    // Services are the exports the engine calls directly, not registry values:
+    // SID tuning/seeking and the FC event reader. They are injected so the
+    // shared engine never imports an optional package.
+    const service = SERVICE_BRIDGES[entry.pkg];
+    if (service) {
+      lines.push(
+        `import { ${service.exports.join(', ')} } from '${specifier(entry.pkg)}';`,
+        `globalThis.__modplayAttach('${service.kind}', {`,
+      );
+      for (const [key, expr] of Object.entries(service.wire)) lines.push(`  ${key}: ${expr},`);
+      lines.push('});');
+    }
+    lines.push(`globalThis.__modplayInstall('${format}', [${names}]);`, '');
     const file = join(outRoot, 'install', `${format}.js`);
     mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, body);
+    writeFileSync(file, lines.join('\n'));
     manifest.formats[format] = {
       package: assetName(entry.pkg),
       install: `install/${format}.js`,
-      exports: entry.exports,
+      bytes: statSync(file).size,
+      sha256: sha256(file),
+      version: versionOf(entry.pkg),
+      extensions: entry.ext ?? [],
+      ...(service ? { services: service.kind } : {}),
     };
   }
+
+  // The engine itself is a module too: same loader, same resolution, same
+  // cache. It imports only @modplayjs/core, dsp-*, out-android and
+  // stream-audio; every format arrives later through an install bridge.
+  const engineEntry = join(repoRoot, 'apps/android/engine/src/engine-entry.ts');
+  await build({
+    entryPoints: [engineEntry],
+    bundle: true,
+    format: 'esm',
+    target: 'es2022',
+    platform: 'neutral',
+    legalComments: 'none',
+    external: ['@modplayjs/*'],
+    outfile: join(outRoot, 'engine-core/index.js'),
+  });
+  const engineFile = join(outRoot, 'engine-core/index.js');
+  const engineBytes = statSync(engineFile).size;
+  total += engineBytes;
+  manifest.engine = {
+    asset: 'engine-core/index.js',
+    bytes: engineBytes,
+    sha256: sha256(engineFile),
+    version: versionOf('core'),
+    // Read from the bundle instead of a hardcoded list: a new import in
+    // engine-entry.ts must show up in the catalog's reachability walk, or the
+    // published tree would be missing the package and the device would fail
+    // to start the engine after the update.
+    imports: [
+      ...new Set(
+        [...readFileSync(engineFile, 'utf8').matchAll(/from "(@modplayjs\/[a-z0-9-]+)"/g)].map(
+          (match) => match[1],
+        ),
+      ),
+    ],
+  };
+  console.log(`  ${'engine-core'.padEnd(24)} ${kb(engineBytes).padStart(6)}`);
 
   writeFileSync(join(outRoot, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -183,7 +302,125 @@ async function main() {
     `\n${packages.length} packages, ${kb(total)} total, ` +
       `${installBytes} format bridges, manifest written`,
   );
+  writeCatalog(manifest, packages, total);
   console.log(`out: ${outRoot}`);
+}
+
+/**
+ * The publishable catalog. One JSON document that lists every engine module
+ * with size, SHA-256 and version; a host only has to serve this file plus the
+ * modules/ tree next to it. The app downloads only the files whose hash differs
+ * from what it has, so a one-format update is tens of kilobytes.
+ *
+ * Written to build/engine-catalog/ (gitignored) together with a copy of the
+ * files, so the directory can be uploaded as-is.
+ */
+/**
+ * Packages the engine can actually reach.
+ *
+ * The catalog is what a device downloads, so it must not carry packages the XR
+ * app never imports (out-webaudio, out-pcm, playhead are for other hosts).
+ * Start at engine-core plus every published format, then follow `imports`
+ * until it closes.
+ */
+function reachable(manifest) {
+  const bySpecifier = new Map(
+    Object.entries(manifest.packages).map(([name, info]) => [info.specifier, name]),
+  );
+  const seen = new Set();
+  const queue = [];
+  const push = (specifier) => {
+    const name = bySpecifier.get(specifier);
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      queue.push(name);
+    }
+  };
+
+  for (const specifier of manifest.engine.imports) push(specifier);
+  for (const format of Object.values(manifest.formats)) {
+    push(`@modplayjs/${format.package.replace(/^modplayjs-/, '')}`);
+  }
+  while (queue.length > 0) {
+    const name = queue.pop();
+    for (const specifier of manifest.packages[name].imports) push(specifier);
+  }
+  return seen;
+}
+
+function writeCatalog(manifest, packages, total) {
+  rmSync(publishRoot, { recursive: true, force: true });
+  mkdirSync(join(publishRoot, 'modules'), { recursive: true });
+
+  const catalog = {
+    schema: 1,
+    apiLevel: 1,
+    generated: manifest.generated,
+    // Asset paths in the catalog are relative to the modules root, so the
+    // default base is the `modules/` directory next to catalog.json. An
+    // absolute override points at a hosted modules directory.
+    baseUrl: process.env.MODPLAY_ENGINE_BASE_URL ?? 'modules/',
+    engine: manifest.engine,
+    packages: {},
+    formats: {},
+  };
+
+  const used = reachable(manifest);
+  for (const [name, info] of Object.entries(manifest.packages)) {
+    if (!used.has(name)) continue;
+    catalog.packages[name] = {
+      asset: info.asset,
+      bytes: info.bytes,
+      sha256: info.sha256,
+      version: info.version,
+    };
+  }
+  for (const [format, info] of Object.entries(manifest.formats)) {
+    catalog.formats[format] = {
+      package: info.package,
+      install: info.install,
+      bytes: info.bytes,
+      sha256: info.sha256,
+      version: info.version,
+      extensions: info.extensions,
+    };
+  }
+
+  writeFileSync(join(publishRoot, 'catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
+  cpSync(outRoot, join(publishRoot, 'modules'), { recursive: true });
+
+  // Self-check: every file the catalog promises must exist in the publish tree
+  // with the hash it advertises. A catalog that lies is worse than no catalog,
+  // because the device downloads it and then rejects every file.
+  const broken = [];
+  const files = [catalog.engine, ...Object.values(catalog.packages), ...Object.values(catalog.formats)];
+  for (const info of files) {
+    if (!info || !info.asset) continue;
+    const file = join(publishRoot, 'modules', info.asset);
+    try {
+      if (statSync(file).size !== info.bytes) broken.push(`${info.asset}: size`);
+      else if (sha256(file) !== info.sha256) broken.push(`${info.asset}: sha256`);
+    } catch {
+      broken.push(`${info.asset}: missing`);
+    }
+  }
+  for (const info of Object.values(catalog.formats)) {
+    const file = join(publishRoot, 'modules', info.install);
+    try {
+      if (sha256(file) !== info.sha256) broken.push(`${info.install}: sha256`);
+    } catch {
+      broken.push(`${info.install}: missing`);
+    }
+  }
+  if (broken.length > 0) {
+    throw new Error(`catalog self-check failed:\n  ${broken.join('\n  ')}`);
+  }
+
+  const catalogBytes = statSync(join(publishRoot, 'catalog.json')).size;
+  console.log(
+    `catalog: ${catalogBytes} bytes, ${Object.keys(catalog.packages).length} packages, ` +
+      `${Object.keys(catalog.formats).length} formats, hashes verified -> ${publishRoot}`,
+  );
 }
 
 main().catch((error) => {

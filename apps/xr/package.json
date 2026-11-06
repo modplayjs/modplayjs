@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build:engine": "esbuild ../../apps/android/engine/src/engine-entry.ts --bundle --format=iife --target=es2022 --platform=neutral --legal-comments=none --outfile=app/src/main/assets/engine/engine.js",
+    "build:engine": "esbuild ../../apps/android/engine/src/engine-monolith.ts --bundle --format=iife --target=es2022 --platform=neutral --legal-comments=none --outfile=app/src/main/assets/engine/engine.js",
     "assemble": "npm run build:engine && ./gradlew :app:assembleDebug",
     "lint": "./gradlew :app:lintDebug",
     "typecheck": "tsc -p ../../apps/android/engine/tsconfig.json --noEmit",

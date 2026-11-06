@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-06T19:04:41.719Z",
+  "generated": "2026-11-06T19:46:43.747Z",
   "layout": "modules/<name>/index.js",
   "always": [
     "modplayjs-core",
@@ -13,12 +13,16 @@
       "specifier": "@modplayjs/core",
       "asset": "modplayjs-core/index.js",
       "bytes": 250222,
+      "sha256": "6a335ebcd482b6472da4f977cd33b640cae640082902591dc3b94e1419f70019",
+      "version": "0.2.1",
       "imports": []
     },
     "modplayjs-dsp-paula": {
       "specifier": "@modplayjs/dsp-paula",
       "asset": "modplayjs-dsp-paula/index.js",
       "bytes": 4801,
+      "sha256": "686f2e9538cefcd094c0670593583a86ee72bfa9fb002d7e6098d3ca40e9daf6",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -27,6 +31,8 @@
       "specifier": "@modplayjs/dsp-softmixer",
       "asset": "modplayjs-dsp-softmixer/index.js",
       "bytes": 97217,
+      "sha256": "6a8d087582ec1f50ae1d742de7257f5d1fe7b538890a96bf52fc56d86ba6c602",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -35,6 +41,8 @@
       "specifier": "@modplayjs/effects-shared",
       "asset": "modplayjs-effects-shared/index.js",
       "bytes": 79,
+      "sha256": "629bd7de7de77351a1889981e7298dafb4966687f715755d6689b6d6805b0632",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -43,6 +51,8 @@
       "specifier": "@modplayjs/fmt-669",
       "asset": "modplayjs-fmt-669/index.js",
       "bytes": 6980,
+      "sha256": "53fcad63c5d21a80a1a36b6139b89f6a63eb6298f5b167a499caea8e111e6c05",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core",
         "@modplayjs/fmt-mod"
@@ -52,6 +62,8 @@
       "specifier": "@modplayjs/fmt-asylum",
       "asset": "modplayjs-fmt-asylum/index.js",
       "bytes": 5828,
+      "sha256": "6f88025f853cbab2ad507eccb88cca58f4563d957319582345e16215bb1dbbfe",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core",
         "@modplayjs/fmt-mod"
@@ -61,6 +73,8 @@
       "specifier": "@modplayjs/fmt-digi",
       "asset": "modplayjs-fmt-digi/index.js",
       "bytes": 7104,
+      "sha256": "95d24343d8300e1691243fcfacb6a63816489c09854901056eff0a634efbb3a1",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core",
         "@modplayjs/fmt-mod"
@@ -70,6 +84,8 @@
       "specifier": "@modplayjs/fmt-fc",
       "asset": "modplayjs-fmt-fc/index.js",
       "bytes": 83767,
+      "sha256": "74c33e3b53f5b8562b29d98556a07f463b91bdfa2c6f853ba01c7a7403c2302a",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -78,6 +94,8 @@
       "specifier": "@modplayjs/fmt-ice",
       "asset": "modplayjs-fmt-ice/index.js",
       "bytes": 5669,
+      "sha256": "8ce6368cb7b2681233b8aee10aa2f820f79fc8a8c722698ed86b4e197fb178e4",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core",
         "@modplayjs/fmt-mod"
@@ -87,6 +105,8 @@
       "specifier": "@modplayjs/fmt-it",
       "asset": "modplayjs-fmt-it/index.js",
       "bytes": 47088,
+      "sha256": "3aaab6cd0a92891744e691373c03ce2cb5d6f4a93964d9387267793b8a64732c",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -95,6 +115,8 @@
       "specifier": "@modplayjs/fmt-med",
       "asset": "modplayjs-fmt-med/index.js",
       "bytes": 87300,
+      "sha256": "15e6fe50096ed300ca7448085df33bd619b7a27125e43e26dfe7f345e1e81f7c",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -103,6 +125,8 @@
       "specifier": "@modplayjs/fmt-mo3",
       "asset": "modplayjs-fmt-mo3/index.js",
       "bytes": 103916,
+      "sha256": "ab727b98dd0d4f57831c836459f98b99e21dd7708cd52c9cd247407e24e89e3f",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core",
         "@modplayjs/fmt-mod",
@@ -113,6 +137,8 @@
       "specifier": "@modplayjs/fmt-mod",
       "asset": "modplayjs-fmt-mod/index.js",
       "bytes": 61947,
+      "sha256": "0212923e4f49d61760bd2b5e6be6aa80982d002a7f0873e5bfd557df3b10dd0a",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -121,6 +147,8 @@
       "specifier": "@modplayjs/fmt-mtm",
       "asset": "modplayjs-fmt-mtm/index.js",
       "bytes": 9081,
+      "sha256": "37c5a2127b7c26c03b34d67dcc00a089bc05f9778bb398db4196f2bc1cb56bd0",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core",
         "@modplayjs/fmt-mod"
@@ -130,6 +158,8 @@
       "specifier": "@modplayjs/fmt-prowizard",
       "asset": "modplayjs-fmt-prowizard/index.js",
       "bytes": 99106,
+      "sha256": "b352da6d9b8ea96554a8588ce4b7057fcc0b522e3321b8476521a273da817589",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core",
         "@modplayjs/fmt-mod"
@@ -139,6 +169,8 @@
       "specifier": "@modplayjs/fmt-s3m",
       "asset": "modplayjs-fmt-s3m/index.js",
       "bytes": 25004,
+      "sha256": "e50180a143c60e05aa54000ac24b94235a54bb487f1eda51e39d3c5a19af4c04",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -147,6 +179,8 @@
       "specifier": "@modplayjs/fmt-sfx",
       "asset": "modplayjs-fmt-sfx/index.js",
       "bytes": 7245,
+      "sha256": "5aacbf43155444c7dd1602a8d3a4c82f5089909b53e2f224d8f357f8976ad5a1",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core",
         "@modplayjs/fmt-mod"
@@ -156,6 +190,8 @@
       "specifier": "@modplayjs/fmt-sid",
       "asset": "modplayjs-fmt-sid/index.js",
       "bytes": 276645,
+      "sha256": "c6595bd392be03ba0ce66401f55d139c8a6d84803ef1c37060ea175273220e4e",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -164,6 +200,8 @@
       "specifier": "@modplayjs/fmt-st",
       "asset": "modplayjs-fmt-st/index.js",
       "bytes": 10984,
+      "sha256": "4e9283ba453830a1c8dfbf255e6554452555217e6bcd42c06c3417b7e0fa7eca",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core",
         "@modplayjs/fmt-mod"
@@ -173,6 +211,8 @@
       "specifier": "@modplayjs/fmt-stm",
       "asset": "modplayjs-fmt-stm/index.js",
       "bytes": 11887,
+      "sha256": "e8dcbf733dbb0bbf4c563aab92a1ed67f5a1ff2ed4fa881b53774a047dbbf092",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -181,6 +221,8 @@
       "specifier": "@modplayjs/fmt-xm",
       "asset": "modplayjs-fmt-xm/index.js",
       "bytes": 34037,
+      "sha256": "b836d0070140aafb64ddc09d2bc8f971b30393967ed15d62db8405f1d7c12f65",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core",
         "@modplayjs/fmt-it",
@@ -191,12 +233,16 @@
       "specifier": "@modplayjs/out-android",
       "asset": "modplayjs-out-android/index.js",
       "bytes": 3336,
+      "sha256": "a3de90709145df3ba34eeac089ac9869bbf9380750a2490eee79a694bf7ee347",
+      "version": "0.2.1",
       "imports": []
     },
     "modplayjs-out-pcm": {
       "specifier": "@modplayjs/out-pcm",
       "asset": "modplayjs-out-pcm/index.js",
       "bytes": 2814,
+      "sha256": "be2572860e468de012c542feff7e9118e634e8bc10c92ba33faaa31c178c8ab0",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -205,6 +251,8 @@
       "specifier": "@modplayjs/out-webaudio",
       "asset": "modplayjs-out-webaudio/index.js",
       "bytes": 13980,
+      "sha256": "2164b76f5cf815ea8aa7d38bd40be912578665478ddb222c23f859e9ec663429",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/core"
       ]
@@ -213,18 +261,24 @@
       "specifier": "@modplayjs/playhead",
       "asset": "modplayjs-playhead/index.js",
       "bytes": 5631,
+      "sha256": "b94c2e36c28aea8ca1cb64f6870f306c18b8db9d259ebf072aa210f8cc8a48d9",
+      "version": "0.2.1",
       "imports": []
     },
     "modplayjs-stb-vorbis": {
       "specifier": "@modplayjs/stb-vorbis",
       "asset": "modplayjs-stb-vorbis/index.js",
       "bytes": 61452,
+      "sha256": "900f8314d3ad0f1f5ef5c13da853e39259f648040498e1b531c31f733d89e186",
+      "version": "0.2.1",
       "imports": []
     },
     "modplayjs-stream-audio": {
       "specifier": "@modplayjs/stream-audio",
       "asset": "modplayjs-stream-audio/index.js",
       "bytes": 13091,
+      "sha256": "4a95dad44d70d7a1cec9ac091b02d828a5c712703fca220143c32cf7d12f346a",
+      "version": "0.2.1",
       "imports": [
         "@modplayjs/fmt-mo3",
         "@modplayjs/stb-vorbis"
@@ -235,120 +289,191 @@
     "669": {
       "package": "modplayjs-fmt-669",
       "install": "install/669.js",
-      "exports": [
-        "plugin"
+      "bytes": 144,
+      "sha256": "1dee716c3b0ad0cb55b6b57d242794527c7b6fdb11ca495482b648f9b5a7ad0d",
+      "version": "0.2.1",
+      "extensions": [
+        "669"
       ]
     },
     "mod": {
       "package": "modplayjs-fmt-mod",
       "install": "install/mod.js",
-      "exports": [
-        "plugin",
-        "hmnPlugin",
-        "fltPlugin"
+      "bytes": 188,
+      "sha256": "597dbf121f28e945c5d6a63a5031295900d04d20d8e04271b8e874eb375e8d25",
+      "version": "0.2.1",
+      "extensions": [
+        "mod",
+        "hmn",
+        "flt"
       ]
     },
     "s3m": {
       "package": "modplayjs-fmt-s3m",
       "install": "install/s3m.js",
-      "exports": [
-        "plugin"
+      "bytes": 144,
+      "sha256": "d75fcf40a1c4f49e11a054f9e99df52f913d30ca638e4634033803fa2d0ca333",
+      "version": "0.2.1",
+      "extensions": [
+        "s3m"
       ]
     },
     "xm": {
       "package": "modplayjs-fmt-xm",
       "install": "install/xm.js",
-      "exports": [
-        "plugin"
+      "bytes": 141,
+      "sha256": "f184f1ab92907185084bbf6e7b4652f33ea05d2496b84c3217b5208f268c1f4a",
+      "version": "0.2.1",
+      "extensions": [
+        "xm"
       ]
     },
     "it": {
       "package": "modplayjs-fmt-it",
       "install": "install/it.js",
-      "exports": [
-        "plugin"
+      "bytes": 141,
+      "sha256": "e9810ac6ef6f97ff61cb31983d7312be1f2ddcd5da656fb0e2ad92dfcd8fb88b",
+      "version": "0.2.1",
+      "extensions": [
+        "it"
       ]
     },
     "mtm": {
       "package": "modplayjs-fmt-mtm",
       "install": "install/mtm.js",
-      "exports": [
-        "plugin"
+      "bytes": 144,
+      "sha256": "855d78da574737cd885320494a4bf923582bef4064033de42abca833c60266dc",
+      "version": "0.2.1",
+      "extensions": [
+        "mtm"
       ]
     },
     "stm": {
       "package": "modplayjs-fmt-stm",
       "install": "install/stm.js",
-      "exports": [
-        "plugin"
+      "bytes": 144,
+      "sha256": "4fb03af82b70e18c28791507aa4ff505d6b8863fff3b12b33b6be2ee49d3b495",
+      "version": "0.2.1",
+      "extensions": [
+        "stm"
       ]
     },
     "sfx": {
       "package": "modplayjs-fmt-sfx",
       "install": "install/sfx.js",
-      "exports": [
-        "plugin"
+      "bytes": 144,
+      "sha256": "0c63c5f362a371255a4ebe59d68cc305a0aebe12ec6c9ec57b9c189e975b00b0",
+      "version": "0.2.1",
+      "extensions": [
+        "sfx"
       ]
     },
     "digi": {
       "package": "modplayjs-fmt-digi",
       "install": "install/digi.js",
-      "exports": [
-        "plugin"
+      "bytes": 147,
+      "sha256": "34760dcd60f008babbc034a026d5f03e4398bc27f144f28a1c35505a4155e4cd",
+      "version": "0.2.1",
+      "extensions": [
+        "digi"
       ]
     },
     "asylum": {
       "package": "modplayjs-fmt-asylum",
       "install": "install/asylum.js",
-      "exports": [
-        "plugin"
+      "bytes": 153,
+      "sha256": "e774fb90ee16bc92da4b362b10ae0c2792d581e45b719562c86093cad9d7c54a",
+      "version": "0.2.1",
+      "extensions": [
+        "asylum"
       ]
     },
     "ice": {
       "package": "modplayjs-fmt-ice",
       "install": "install/ice.js",
-      "exports": [
-        "plugin"
+      "bytes": 144,
+      "sha256": "e928537d1750e296d3c33c418b46a993063aafc2b93059a85c80abca9b2f23d3",
+      "version": "0.2.1",
+      "extensions": [
+        "ice"
       ]
     },
     "med": {
       "package": "modplayjs-fmt-med",
       "install": "install/med.js",
-      "exports": [
-        "plugin",
-        "mmd3Plugin",
-        "med2Plugin",
-        "med3Plugin",
-        "med4Plugin"
+      "bytes": 240,
+      "sha256": "6e540e10c9fcc210d90814a4a3afb75c1158cad3df22280b1eaf42254dfbd60a",
+      "version": "0.2.1",
+      "extensions": [
+        "med",
+        "mmd",
+        "mmd0",
+        "mmd1",
+        "mmd2",
+        "mmd3",
+        "mmdc"
       ]
     },
     "st": {
       "package": "modplayjs-fmt-st",
       "install": "install/st.js",
-      "exports": [
-        "plugin"
+      "bytes": 141,
+      "sha256": "215df841cb407e1f6049f9f982042500cb84dfb38ebf763109ca63d7eb037232",
+      "version": "0.2.1",
+      "extensions": [
+        "st"
       ]
     },
     "sid": {
       "package": "modplayjs-fmt-sid",
       "install": "install/sid.js",
-      "exports": [
-        "plugin"
-      ]
+      "bytes": 543,
+      "sha256": "9a3fa607caabfa4098f795fea7a4572b3ac58ae2c6f1ce8222a7637b6740ad2d",
+      "version": "0.2.1",
+      "extensions": [
+        "sid"
+      ],
+      "services": "sid"
     },
     "fc": {
       "package": "modplayjs-fmt-fc",
       "install": "install/fc.js",
-      "exports": [
-        "plugin"
-      ]
+      "bytes": 380,
+      "sha256": "e2bc11269c8061fb06edda7b298feaa4f04f49681708711c333bf2842c42d566",
+      "version": "0.2.1",
+      "extensions": [
+        "fc13",
+        "fc14"
+      ],
+      "services": "fc"
     },
     "prowizard": {
       "package": "modplayjs-fmt-prowizard",
       "install": "install/prowizard.js",
-      "exports": [
-        "pwPlugin"
+      "bytes": 166,
+      "sha256": "bff951b8c17a6ff83fc3799734e0de5d49dca31ea9991671f619aaee6af78b1d",
+      "version": "0.2.1",
+      "extensions": [
+        "pow",
+        "pp",
+        "xpk",
+        "pack",
+        "p61",
+        "utz"
       ]
     }
+  },
+  "engine": {
+    "asset": "engine-core/index.js",
+    "bytes": 23166,
+    "sha256": "2c801ef33c96a19a0bdaf918e1493ef437093514d90bd8799cdfcce76623857f",
+    "version": "0.2.1",
+    "imports": [
+      "@modplayjs/core",
+      "@modplayjs/dsp-paula",
+      "@modplayjs/dsp-softmixer",
+      "@modplayjs/stream-audio",
+      "@modplayjs/out-android"
+    ]
   }
 }

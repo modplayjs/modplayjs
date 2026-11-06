@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <android/asset_manager_jni.h>
+#include "module_loader.h"
 #include "spatial_bus_mixer.h"
 #include "v8.h"
 #include "libplatform/libplatform.h"
@@ -12,6 +14,7 @@
 #define LOG_TAG "modplay-v8"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 
 namespace {
 std::once_flag g_init;
@@ -21,6 +24,7 @@ std::unique_ptr<v8::ArrayBuffer::Allocator> g_allocator;
 struct Engine {
     v8::Isolate* isolate = nullptr;
     v8::Global<v8::Context> context;
+    ModuleLoader* loader = nullptr;
 };
 
 void init_v8() {
@@ -60,7 +64,8 @@ Engine* engine(jlong h) { return reinterpret_cast<Engine*>(h); }
 } // namespace
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_bitti06_modplayjs_engine_V8Engine_nativeCreate(JNIEnv* env, jobject, jstring script, jstring) {
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeCreate(
+        JNIEnv* env, jobject, jstring script, jobject assetManager, jstring overlayRoot) {
     init_v8();
     auto* e = new Engine();
     v8::Isolate::CreateParams params;
@@ -72,27 +77,85 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeCreate(JNIEnv* env, jobject, js
     v8::Local<v8::Context> context = v8::Context::New(e->isolate);
     e->context.Reset(e->isolate, context);
     v8::Context::Scope context_scope(context);
-    const char* src = env->GetStringUTFChars(script, nullptr);
-    v8::Local<v8::String> source = v8::String::NewFromUtf8(e->isolate, src).ToLocalChecked();
-    env->ReleaseStringUTFChars(script, src);
-    v8::TryCatch try_catch(e->isolate);
-    v8::Local<v8::Script> compiled;
-    if (!v8::Script::Compile(context, source).ToLocal(&compiled)) {
-        LOGE("engine compile failed: %s", to_string(e, try_catch.Exception()).c_str());
-        e->context.Reset();
-        e->isolate->Dispose();
-        delete e;
-        return 0;
+
+    // One loader per isolate: the asset manager resolves @modplayjs/* onto the
+    // partitioned asset tree, and the compiled modules are cached here. The
+    // overlay directory, when set, is an app-private tree that wins per file -
+    // it is where a published engine catalog installs updated modules.
+    std::string overlay;
+    if (overlayRoot) {
+        const char* o = env->GetStringUTFChars(overlayRoot, nullptr);
+        overlay.assign(o);
+        env->ReleaseStringUTFChars(overlayRoot, o);
     }
-    v8::Local<v8::Value> result;
-    if (!compiled->Run(context).ToLocal(&result)) {
-        LOGE("engine run failed: %s", to_string(e, try_catch.Exception()).c_str());
+    e->loader = new ModuleLoader(e->isolate, AAssetManager_fromJava(env, assetManager),
+                                 std::move(overlay));
+    if (!e->loader->overlayRoot().empty()) {
+        LOGI("engine overlay: %s", e->loader->overlayRoot().c_str());
+    }
+
+    bool started = false;
+    if (e->loader->ready()) {
+        // The modular path: engine-core is an ES module that imports
+        // @modplayjs/core and friends from the asset tree.
+        started = e->loader->run(context, "modules/engine-core/index.js");
+        if (started) LOGI("engine: modular, %zu modules compiled", e->loader->moduleCount());
+        else LOGW("engine-core failed, falling back to the bundled script");
+    }
+
+    if (!started && script) {
+        // The monolith fallback: a single bundled classic script, evaluated as
+        // before. Used when the modular assets are missing or engine-core
+        // threw, so a broken asset build costs a diagnostic line instead of
+        // the whole app.
+        v8::TryCatch try_catch(e->isolate);
+        const char* src = env->GetStringUTFChars(script, nullptr);
+        v8::Local<v8::String> source =
+            v8::String::NewFromUtf8(e->isolate, src).ToLocalChecked();
+        env->ReleaseStringUTFChars(script, src);
+        v8::Local<v8::Script> compiled;
+        if (!v8::Script::Compile(context, source).ToLocal(&compiled)) {
+            LOGE("engine compile failed: %s", to_string(e, try_catch.Exception()).c_str());
+        } else {
+            v8::Local<v8::Value> result;
+            if (compiled->Run(context).ToLocal(&result)) {
+                started = true;
+                LOGI("engine: bundled script");
+            } else {
+                LOGE("engine run failed: %s", to_string(e, try_catch.Exception()).c_str());
+            }
+        }
+    }
+
+    if (!started) {
+        delete e->loader;
         e->context.Reset();
         e->isolate->Dispose();
         delete e;
         return 0;
     }
     return reinterpret_cast<jlong>(e);
+}
+
+/**
+ * Install one format bridge (assets/modules/install/<format>.js).
+ *
+ * Runs on the audio thread, like every other V8 call. The bridge imports its
+ * package, attaches any services the engine needs and registers the plugins;
+ * the module cache makes a second install of the same format a no-op.
+ */
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeInstallFormat(
+        JNIEnv* env, jobject, jlong h, jstring format) {
+    Engine* e = engine(h);
+    if (!e || !e->loader) return JNI_FALSE;
+    const char* c = env->GetStringUTFChars(format, nullptr);
+    const std::string name(c);
+    env->ReleaseStringUTFChars(format, c);
+    v8::Isolate::Scope isolate_scope(e->isolate);
+    v8::HandleScope handle_scope(e->isolate);
+    auto ctx = e->context.Get(e->isolate);
+    return e->loader->run(ctx, "modules/install/" + name + ".js") ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -249,6 +312,8 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeDestroy(JNIEnv*, jobject, jlong
         v8::Isolate::Scope isolate_scope(e->isolate);
         e->context.Reset();
     }
+    delete e->loader;
+    e->loader = nullptr;
     e->isolate->Dispose();
     delete e;
 }

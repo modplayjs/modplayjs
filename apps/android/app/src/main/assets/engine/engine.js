@@ -6879,7 +6879,7 @@
       info_pitchbend: 0,
       info_position: 0,
       info_finalvol: 0,
-      info_finalpan: 0,
+      info_finalpan: 128,
       info_notepan: 0
     };
   }
@@ -17050,7 +17050,7 @@
     }
   };
 
-  // ../../packages/fmt-med/dist/mmdCommon.js
+  // ../../packages/fmt-med/src/mmdCommon.ts
   var MED_VER_2102 = MED_VER_210;
   var MED_VER_3002 = MED_VER_300;
   var MED_VER_3202 = MED_VER_320;
@@ -17107,12 +17107,10 @@
       case 0:
         break;
       case 1:
-        if (!event.fxp)
-          event.fxt = 0;
+        if (!event.fxp) event.fxt = 0;
         break;
       case 2:
-        if (!event.fxp)
-          event.fxt = 0;
+        if (!event.fxp) event.fxt = 0;
         break;
       case 3:
         break;
@@ -17215,14 +17213,12 @@
         break;
       case 22:
         event.fxt = fx_exports.FX_EXTENDED;
-        if (event.fxp > 15)
-          event.fxp = 15;
+        if (event.fxp > 15) event.fxp = 15;
         event.fxp |= 96;
         break;
       case 24:
         event.fxt = fx_exports.FX_EXTENDED;
-        if (event.fxp > 15)
-          event.fxp = 15;
+        if (event.fxp > 15) event.fxp = 15;
         event.fxp |= 192;
         break;
       case 25:
@@ -17261,8 +17257,7 @@
         if (event.fxp >= 240 || event.fxp <= 16) {
           let fxp = (event.fxp << 24 >> 24) + 16;
           fxp <<= 3;
-          if (fxp === 256)
-            fxp--;
+          if (fxp === 256) fxp--;
           event.fxt = fx_exports.FX_SETPAN;
           event.fxp = fxp;
         }
@@ -17373,8 +17368,7 @@
         skip2 -= 8;
       }
       out.push(e);
-      if (skip2)
-        seek2(skip2);
+      if (skip2) seek2(skip2);
     }
     return out;
   }
@@ -17383,11 +17377,9 @@
     for (let i = 0; i < count && i < expdata.i_ext_entries; i++) {
       const skip2 = expdata.i_ext_entrsz - 40;
       const name = raw(40);
-      if (name.length < 40)
-        throw new ParseError("MED: iinfo truncated");
+      if (name.length < 40) throw new ParseError("MED: iinfo truncated");
       out.push(copyAdjustName(name, 40));
-      if (skip2)
-        seek2(skip2);
+      if (skip2) seek2(skip2);
     }
     return out;
   }
@@ -17395,14 +17387,13 @@
     let s = "";
     for (let i = 0; i < n && i < r.length; i++) {
       const c = r[i];
-      if (c === 0)
-        break;
+      if (c === 0) break;
       s += c > 127 || c < 32 || c === 127 ? "." : String.fromCharCode(c);
     }
     return s.replace(/ +$/, "");
   }
 
-  // ../../packages/fmt-med/dist/instr.js
+  // ../../packages/fmt-med/src/instr.ts
   function emptySynth() {
     return {
       defaultdecay: 0,
@@ -17417,12 +17408,11 @@
     };
   }
   var Reader = class {
-    bytes;
-    pos;
     constructor(bytes, start) {
       this.bytes = bytes;
       this.pos = start;
     }
+    pos;
     get length() {
       return this.bytes.length;
     }
@@ -17485,15 +17475,11 @@
     let flg = 0;
     let enable = 1;
     if (ver >= 2 && st.expdata.s_ext_entrsz >= 8) {
-      if (e.instr_flags & 1)
-        flg |= SampleFlags.LOOP;
-      if (e.instr_flags & 8)
-        flg |= SampleFlags.BIDIR;
-      if (e.instr_flags & 4)
-        enable = 0;
+      if (e.instr_flags & 1) flg |= SampleFlags.LOOP;
+      if (e.instr_flags & 8) flg |= SampleFlags.BIDIR;
+      if (e.instr_flags & 4) enable = 0;
     } else {
-      if (sample.replen > 1)
-        flg |= SampleFlags.LOOP;
+      if (sample.replen > 1) flg |= SampleFlags.LOOP;
     }
     let sampletrans = 36 + sample.strans;
     const synthtrans = 12 + sample.strans;
@@ -17526,8 +17512,7 @@
   function mmdSetDefaultPitchNote(st, i, e, ver) {
     if (ver >= 3) {
       let note = 53;
-      if (e.default_pitch)
-        note = e.default_pitch - 1;
+      if (e.default_pitch) note = e.default_pitch - 1;
       if (note >= 0 && note < 121) {
         st.instruments[i].mapXpo[12] = note;
       }
@@ -17535,10 +17520,15 @@
   }
   function mmdAllocTables(st, i, synth) {
     const ie = st.instruments[i].extras;
-    if (!ie)
-      return;
-    ie.volTable = st.bytes.slice(st.start + (synth.voltblPos ?? 0), st.start + (synth.voltblPos ?? 0) + synth.voltbllen);
-    ie.wavTable = st.bytes.slice(st.start + (synth.wftblPos ?? 0), st.start + (synth.wftblPos ?? 0) + synth.wftbllen);
+    if (!ie) return;
+    ie.volTable = st.bytes.slice(
+      st.start + (synth.voltblPos ?? 0),
+      st.start + (synth.voltblPos ?? 0) + synth.voltbllen
+    );
+    ie.wavTable = st.bytes.slice(
+      st.start + (synth.wftblPos ?? 0),
+      st.start + (synth.wftblPos ?? 0) + synth.wftbllen
+    );
   }
   function loadSampleInto(st, smpIdx, bigend) {
     const s = st.samples[smpIdx];
@@ -17548,11 +17538,9 @@
     const cur = "r" in st && st.r ? st.r : st;
     const take = Math.min(bytelen, Math.max(0, st.bytes.length - cur.pos));
     s.data = st.bytes.subarray(cur.pos, cur.pos + take);
-    if (bigend)
-      s.flags |= 1 << 11;
+    if (bigend) s.flags |= 1 << 11;
     cur.pos += bytelen;
-    if (cur !== st)
-      st.pos = cur.pos;
+    if (cur !== st) st.pos = cur.pos;
   }
   function readSynthInstr(r, pos) {
     r.seek(pos);
@@ -17570,8 +17558,7 @@
     r.skip(synth.voltbllen);
     synth.wftblPos = r.pos;
     r.skip(synth.wftbllen);
-    for (let j = 0; j < synth.wforms; j++)
-      synth.wf.push(r.u32());
+    for (let j = 0; j < synth.wforms; j++) synth.wf.push(r.u32());
     return synth;
   }
   function synthExtras(synth) {
@@ -17625,8 +17612,7 @@
     const xxi = st.instruments[i];
     xxi.nsm = synth.wforms;
     xxi.sub = [];
-    for (let j = 0; j < synth.wforms; j++)
-      xxi.sub.push(makeSub());
+    for (let j = 0; j < synth.wforms; j++) xxi.sub.push(makeSub());
     const ie = synthExtras(synth);
     xxi.extras = ie;
     const info = instrumentInfo(st, { length, type }, e, sample);
@@ -17697,8 +17683,7 @@
     const xxi = st.instruments[i];
     xxi.nsm = synth.wforms;
     xxi.sub = [];
-    for (let j = 0; j < synth.wforms; j++)
-      xxi.sub.push(makeSub());
+    for (let j = 0; j < synth.wforms; j++) xxi.sub.push(makeSub());
     const ie = synthExtras(synth);
     xxi.extras = ie;
     const fin = (e.finetune << 4 & 255) << 24 >> 24;
@@ -17756,8 +17741,7 @@
     const xxi = st.instruments[i];
     xxi.nsm = numOct;
     xxi.sub = [];
-    for (let j = 0; j < numOct; j++)
-      xxi.sub.push(makeSub());
+    for (let j = 0; j < numOct; j++) xxi.sub.push(makeSub());
     xxi.extras = holdDecayExtras(e);
     let size = Math.trunc(instr.length / ((1 << numOct) - 1));
     const info = instrumentInfo(st, instr, e, sample);
@@ -17825,10 +17809,8 @@
       for (let j = 0; j < 9; j++) {
         for (let k = 0; k < 12; k++) {
           let xpo = 0;
-          if (j < 1)
-            xpo = 12 * (1 - j);
-          else if (j > octaves)
-            xpo = -12 * (j - octaves);
+          if (j < 1) xpo = 12 * (1 - j);
+          else if (j > octaves) xpo = -12 * (j - octaves);
           xxi.mapXpo[12 * j + k] = xpo;
         }
       }
@@ -17878,11 +17860,10 @@
     return out;
   }
 
-  // ../../packages/fmt-med/dist/mmd1.js
+  // ../../packages/fmt-med/src/mmd1.ts
   var XMP_MAX_KEYS2 = 121;
   function mmd1Test(bytes) {
-    if (bytes.length < 4)
-      return false;
+    if (bytes.length < 4) return false;
     const id = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
     return id === "MMD0" || id === "MMD1" || id === "MMDC";
   }
@@ -17916,8 +17897,7 @@
     };
     const s32 = () => u32() | 0;
     const seek2 = (p) => {
-      if (p < 0)
-        throw new ParseError("MED: seek error");
+      if (p < 0) throw new ParseError("MED: seek error");
       pos = p;
     };
     const skip2 = (n) => {
@@ -17965,16 +17945,14 @@
       throw new ParseError(`MED: unsupported block count (${numblocks}) or song length (${songlen})`);
     }
     const playseq = [];
-    for (let i = 0; i < 256; i++)
-      playseq.push(u8());
+    for (let i = 0; i < 256; i++) playseq.push(u8());
     const deftempo = u16();
     const playtransp = s8();
     const flags = u8();
     const flags2 = u8();
     const tempo2 = u8();
     const trkvol = [];
-    for (let i = 0; i < 16; i++)
-      trkvol.push(u8());
+    for (let i = 0; i < 16; i++) trkvol.push(u8());
     u8();
     const numsamples = u8();
     if (numsamples > 63) {
@@ -17982,8 +17960,7 @@
     }
     let quirks = Quirk.RTONCE;
     const stslide = (flags & FLAG_STSLIDE) !== 0;
-    if (!stslide)
-      quirks |= Quirk.VSALL | Quirk.PBALL;
+    if (!stslide) quirks |= Quirk.VSALL | Quirk.PBALL;
     const hexvol = (flags & FLAG_VOLHEX) !== 0 ? 1 : 0;
     const med8ch = (flags & FLAG_8CHANNEL) !== 0 ? 1 : 0;
     const bpmOn = (flags2 & FLAG2_BPM) !== 0 ? 1 : 0;
@@ -17996,14 +17973,12 @@
     const smplarr = [];
     seek2(start + smplarrOffset);
     for (let i = 0; i < ins; i++) {
-      if (pos >= bytes.length)
-        throw new ParseError(`MED: read error at smplarr pos ${i}`);
+      if (pos >= bytes.length) throw new ParseError(`MED: read error at smplarr pos ${i}`);
       smplarr.push(s32());
     }
     let smp = 0;
     for (let i = 0; i < ins; i++) {
-      if (smplarr[i] === 0)
-        continue;
+      if (smplarr[i] === 0) continue;
       seek2(start + smplarr[i]);
       u32();
       const type2 = s16();
@@ -18053,11 +18028,9 @@
       seek2(start + songnameOffset);
       let s = "";
       for (let i = 0; i < expdata.songnamelen; i++) {
-        if (i >= 64)
-          break;
+        if (i >= 64) break;
         const c = u8();
-        if (c === 0)
-          break;
+        if (c === 0) break;
         s += String.fromCharCode(c);
       }
       title = s;
@@ -18067,8 +18040,7 @@
         let c = "";
         for (let i = 0; i < buf.length; i++) {
           const ch = buf[i];
-          if (ch === 0)
-            break;
+          if (ch === 0) break;
           c += String.fromCharCode(ch);
         }
         comment = c;
@@ -18077,14 +18049,12 @@
     const blockarr = [];
     seek2(start + blockarrOffset);
     for (let i = 0; i < pat; i++) {
-      if (pos > bytes.length)
-        throw new ParseError(`MED: read error at blockarr pos ${i}`);
+      if (pos > bytes.length) throw new ParseError(`MED: read error at blockarr pos ${i}`);
       blockarr.push(u32());
     }
     let chn = 0;
     for (let i = 0; i < pat; i++) {
-      if (blockarr[i] === 0)
-        continue;
+      if (blockarr[i] === 0) continue;
       seek2(start + blockarr[i]);
       let numtracks;
       let lines;
@@ -18098,8 +18068,7 @@
       if (lines + 1 > 3200) {
         throw new ParseError(`MED: invalid line count ${lines + 1} in block ${i}`);
       }
-      if (numtracks > chn)
-        chn = numtracks;
+      if (numtracks > chn) chn = numtracks;
     }
     if (chn > Math.min(16, 64)) {
       throw new ParseError(`MED: invalid channel count ${chn}`);
@@ -18111,8 +18080,7 @@
         const tracks = [];
         for (let k = 0; k < chn; k++) {
           const ev = [];
-          for (let j = 0; j < 64; j++)
-            ev.push({ note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
+          for (let j = 0; j < 64; j++) ev.push({ note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
           tracks.push({ rows: 64, event: ev });
         }
         patterns.push({ rows: 64, tracks });
@@ -18141,8 +18109,7 @@
             continue;
           }
           let n = pack + 1;
-          if (n > size - j)
-            n = size - j;
+          if (n > size - j) n = size - j;
           patbuf.set(bytes.subarray(pos, pos + n), j);
           pos += n;
           j += n;
@@ -18157,8 +18124,7 @@
       const perTrack = [];
       for (let k = 0; k < chn; k++) {
         const evs = [];
-        for (let j = 0; j < rows; j++)
-          evs.push({ note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
+        for (let j = 0; j < rows; j++) evs.push({ note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
         perTrack.push(evs);
       }
       let p = 0;
@@ -18166,10 +18132,8 @@
         for (let j = 0; j < rows; j++) {
           for (let k = 0; k < numtracks; k++) {
             const e = { note: patbuf[p] & 127, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 };
-            if (e.note)
-              e.note += 12 + playtransp;
-            if (e.note >= XMP_MAX_KEYS2)
-              e.note = 0;
+            if (e.note) e.note += 12 + playtransp;
+            if (e.note >= XMP_MAX_KEYS2) e.note = 0;
             e.ins = patbuf[p + 1] & 63;
             e.fxt = patbuf[p + 2];
             e.fxp = patbuf[p + 3];
@@ -18182,10 +18146,8 @@
         for (let j = 0; j < rows; j++) {
           for (let k = 0; k < numtracks; k++) {
             const e = { note: patbuf[p] & 63, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 };
-            if (e.note)
-              e.note += 12 + playtransp;
-            if (e.note >= XMP_MAX_KEYS2)
-              e.note = 0;
+            if (e.note) e.note += 12 + playtransp;
+            if (e.note >= XMP_MAX_KEYS2) e.note = 0;
             e.ins = patbuf[p + 1] >> 4 | (patbuf[p] & 128) >> 3 | (patbuf[p] & 64) >> 1;
             e.fxt = patbuf[p + 1] & 15;
             e.fxp = patbuf[p + 2];
@@ -18196,8 +18158,7 @@
         }
       }
       const tracksArr = [];
-      for (let k = 0; k < chn; k++)
-        tracksArr.push({ rows, event: perTrack[k] });
+      for (let k = 0; k < chn; k++) tracksArr.push({ rows, event: perTrack[k] });
       patterns.push({ rows, tracks: tracksArr });
     }
     const instruments = [];
@@ -18216,19 +18177,23 @@
       });
     }
     const expSmp = new Array(ins);
-    for (let i = 0; i < ins; i++)
-      expSmp[i] = zeroInstrExt();
+    for (let i = 0; i < ins; i++) expSmp[i] = zeroInstrExt();
     if (expsmpOffset) {
       seek2(start + expsmpOffset);
-      const list = readInstrExtArray((n) => {
-        if (n)
-          skip2(n);
-        return u8();
-      }, () => u16(), () => u32(), (d) => skip2(d), ins, expdata, false);
-      if (pos > bytes.length)
-        throw new ParseError("MED: read error at expsmp");
-      for (let i = 0; i < list.length; i++)
-        expSmp[i] = list[i];
+      const list = readInstrExtArray(
+        (n) => {
+          if (n) skip2(n);
+          return u8();
+        },
+        () => u16(),
+        () => u32(),
+        (d) => skip2(d),
+        ins,
+        expdata,
+        false
+      );
+      if (pos > bytes.length) throw new ParseError("MED: read error at expsmp");
+      for (let i = 0; i < list.length; i++) expSmp[i] = list[i];
     }
     if (iinfoOffset) {
       seek2(start + iinfoOffset);
@@ -18251,15 +18216,13 @@
     };
     let smpIdx = 0;
     for (let i = 0; i < ins; i++) {
-      if (smplarr[i] === 0)
-        continue;
+      if (smplarr[i] === 0) continue;
       st.pos = start + smplarr[i];
       smpIdx = mmdLoadInstrument(st, i, smpIdx);
     }
     void smpIdx;
     for (const raw2 of samples) {
-      if (raw2)
-        ctx.addSample(raw2);
+      if (raw2) ctx.addSample(raw2);
     }
     const channels = [];
     for (let i = 0; i < chn; i++) {
@@ -18308,11 +18271,10 @@
     return mod;
   }
 
-  // ../../packages/fmt-med/dist/mmd3.js
+  // ../../packages/fmt-med/src/mmd3.ts
   var XMP_MAX_KEYS3 = 121;
   function mmd3Test(bytes) {
-    if (bytes.length < 4)
-      return false;
+    if (bytes.length < 4) return false;
     const id = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
     return id === "MMD2" || id === "MMD3";
   }
@@ -18346,8 +18308,7 @@
     };
     const s32 = () => u32() | 0;
     const seek2 = (p) => {
-      if (p < 0)
-        throw new ParseError("MED: seek error");
+      if (p < 0) throw new ParseError("MED: seek error");
       pos = p;
     };
     const skip2 = (n) => {
@@ -18425,12 +18386,10 @@
       throw new ParseError(`MED: unsupported song length ${len}`);
     }
     const xxo = [];
-    for (let i = 0; i < len; i++)
-      xxo.push(u16());
+    for (let i = 0; i < len; i++) xxo.push(u16());
     let quirks = Quirk.RTONCE;
     const stslide = (flags & FLAG_STSLIDE) !== 0;
-    if (!stslide)
-      quirks |= Quirk.VSALL | Quirk.PBALL;
+    if (!stslide) quirks |= Quirk.VSALL | Quirk.PBALL;
     const hexvol = (flags & FLAG_VOLHEX) !== 0 ? 1 : 0;
     const med8ch = (flags & FLAG_8CHANNEL) !== 0 ? 1 : 0;
     const bpmOn = (flags2 & FLAG2_BPM) !== 0 ? 1 : 0;
@@ -18442,14 +18401,12 @@
     const smplarr = [];
     seek2(start + smplarrOffset);
     for (let i = 0; i < ins; i++) {
-      if (pos >= bytes.length)
-        throw new ParseError(`MED: read error at smplarr pos ${i}`);
+      if (pos >= bytes.length) throw new ParseError(`MED: read error at smplarr pos ${i}`);
       smplarr.push(s32());
     }
     let smp = 0;
     for (let i = 0; i < ins; i++) {
-      if (smplarr[i] === 0)
-        continue;
+      if (smplarr[i] === 0) continue;
       seek2(start + smplarr[i]);
       u32();
       const type2 = s16();
@@ -18461,8 +18418,7 @@
       } else {
         smp++;
       }
-      if (pos > bytes.length)
-        throw new ParseError(`MED: read error at sample ${i}`);
+      if (pos > bytes.length) throw new ParseError(`MED: read error at sample ${i}`);
     }
     if (smp > 1024) {
       throw new ParseError(`MED: too many samples (${smp})`);
@@ -18496,16 +18452,13 @@
       expdata.songnamelen = u32();
       u32();
       mmdinfoOffset = u32();
-      if (pos > bytes.length)
-        throw new ParseError("MED: read error in expdata");
+      if (pos > bytes.length) throw new ParseError("MED: read error in expdata");
       seek2(start + songnameOffset);
       let s = "";
       for (let i = 0; i < expdata.songnamelen; i++) {
-        if (i >= 64)
-          break;
+        if (i >= 64) break;
         const c = u8();
-        if (c === 0)
-          break;
+        if (c === 0) break;
         s += String.fromCharCode(c);
       }
       title = s;
@@ -18521,8 +18474,7 @@
             let c = "";
             for (let i = 0; i < buf.length; i++) {
               const ch = buf[i];
-              if (ch === 0)
-                break;
+              if (ch === 0) break;
               c += String.fromCharCode(ch);
             }
             comment = c;
@@ -18533,27 +18485,22 @@
     const blockarr = [];
     seek2(start + blockarrOffset);
     for (let i = 0; i < pat; i++) {
-      if (pos > bytes.length)
-        throw new ParseError(`MED: read error at blockarr pos ${i}`);
+      if (pos > bytes.length) throw new ParseError(`MED: read error at blockarr pos ${i}`);
       blockarr.push(u32());
     }
     let chn = 0;
     let maxLines = 1;
     for (let i = 0; i < pat; i++) {
-      if (blockarr[i] === 0)
-        continue;
+      if (blockarr[i] === 0) continue;
       seek2(start + blockarr[i]);
       const blockNumtracks = u16();
       const blockLines = u16();
-      if (pos > bytes.length)
-        throw new ParseError(`MED: read error at block ${i}`);
+      if (pos > bytes.length) throw new ParseError(`MED: read error at block ${i}`);
       if (blockLines + 1 > 9999) {
         throw new ParseError(`MED: invalid line count ${blockLines + 1} in block ${i}`);
       }
-      if (blockNumtracks > chn)
-        chn = blockNumtracks;
-      if (blockLines + 1 > maxLines)
-        maxLines = blockLines + 1;
+      if (blockNumtracks > chn) chn = blockNumtracks;
+      if (blockLines + 1 > maxLines) maxLines = blockLines + 1;
     }
     if (chn <= 0 || chn > 64) {
       throw new ParseError(`MED: invalid channel count ${chn}`);
@@ -18568,8 +18515,7 @@
         const tracks = [];
         for (let k = 0; k < chn; k++) {
           const ev = [];
-          for (let j = 0; j < 64; j++)
-            ev.push({ note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
+          for (let j = 0; j < 64; j++) ev.push({ note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
           tracks.push({ rows: 64, event: ev });
         }
         patterns.push({ rows: 64, tracks });
@@ -18589,8 +18535,7 @@
       const perTrack = [];
       for (let k = 0; k < chn; k++) {
         const evs = [];
-        for (let j = 0; j < rows; j++)
-          evs.push({ note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
+        for (let j = 0; j < rows; j++) evs.push({ note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
         perTrack.push(evs);
       }
       let p = 0;
@@ -18598,10 +18543,8 @@
         for (let k = 0; k < blockNumtracks; k++) {
           const e = { note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 };
           e.note = patbuf[p] & 127;
-          if (e.note)
-            e.note += 12 + playtransp;
-          if (e.note >= XMP_MAX_KEYS3)
-            e.note = 0;
+          if (e.note) e.note += 12 + playtransp;
+          if (e.note >= XMP_MAX_KEYS3) e.note = 0;
           e.ins = patbuf[p + 1] & 63;
           e.fxt = patbuf[p + 2];
           e.fxp = patbuf[p + 3];
@@ -18611,8 +18554,7 @@
         }
       }
       const tracksArr = [];
-      for (let k = 0; k < chn; k++)
-        tracksArr.push({ rows, event: perTrack[k] });
+      for (let k = 0; k < chn; k++) tracksArr.push({ rows, event: perTrack[k] });
       patterns.push({ rows, tracks: tracksArr });
     }
     const instruments = [];
@@ -18631,19 +18573,23 @@
       });
     }
     const expSmp = new Array(ins);
-    for (let i = 0; i < ins; i++)
-      expSmp[i] = zeroInstrExt();
+    for (let i = 0; i < ins; i++) expSmp[i] = zeroInstrExt();
     if (expsmpOffset) {
       seek2(start + expsmpOffset);
-      const list = readInstrExtArray((n) => {
-        if (n)
-          skip2(n);
-        return u8();
-      }, () => u16(), () => u32(), (d) => skip2(d), ins, expdata, true);
-      if (pos > bytes.length)
-        throw new ParseError("MED: read error at expsmp");
-      for (let i = 0; i < list.length; i++)
-        expSmp[i] = list[i];
+      const list = readInstrExtArray(
+        (n) => {
+          if (n) skip2(n);
+          return u8();
+        },
+        () => u16(),
+        () => u32(),
+        (d) => skip2(d),
+        ins,
+        expdata,
+        true
+      );
+      if (pos > bytes.length) throw new ParseError("MED: read error at expsmp");
+      for (let i = 0; i < list.length; i++) expSmp[i] = list[i];
     }
     if (iinfoOffset) {
       seek2(start + iinfoOffset);
@@ -18666,15 +18612,13 @@
     };
     let smpIdx = 0;
     for (let i = 0; i < ins; i++) {
-      if (smplarr[i] === 0)
-        continue;
+      if (smplarr[i] === 0) continue;
       st.pos = start + smplarr[i];
       smpIdx = mmdLoadInstrument(st, i, smpIdx);
     }
     void smpIdx;
     for (const raw2 of samples) {
-      if (raw2)
-        ctx.addSample(raw2);
+      if (raw2) ctx.addSample(raw2);
     }
     const channels = [];
     seek2(start + trackvolsOffset);
@@ -18688,8 +18632,7 @@
         channels[i].pan = 128 + (p > 127 ? 127 : p);
       }
     } else {
-      for (let i = 0; i < chn; i++)
-        channels[i].pan = 128;
+      for (let i = 0; i < chn; i++) channels[i].pan = 128;
     }
     const mod = {
       title,
@@ -18729,10 +18672,9 @@
     return mod;
   }
 
-  // ../../packages/fmt-med/dist/med2.js
+  // ../../packages/fmt-med/src/med2.ts
   function med2Test(bytes) {
-    if (bytes.length < 4)
-      return false;
+    if (bytes.length < 4) return false;
     return bytes[0] === 77 && bytes[1] === 69 && bytes[2] === 68 && bytes[3] === 2;
   }
   function makeSub2(vol, sid) {
@@ -18782,15 +18724,13 @@
     }
     pos += 40;
     for (let i = 0; i < 31; i++) {
-      if (pos + 40 > bytes.length)
-        throw new ParseError("MED2: truncated names");
+      if (pos + 40 > bytes.length) throw new ParseError("MED2: truncated names");
       const buf = bytes.subarray(pos, pos + 40);
       pos += 40;
       let s = "";
       for (let j = 0; j < 40; j++) {
         const c = buf[j];
-        if (c === 0)
-          break;
+        if (c === 0) break;
         s += c > 127 || c < 32 || c === 127 ? "." : String.fromCharCode(c);
       }
       instruments[i].name = s.replace(/ +$/, "");
@@ -18816,16 +18756,14 @@
     const chn = 4;
     const pat = u16();
     const xxoRaw = [];
-    for (let i = 0; i < 100; i++)
-      xxoRaw.push(u8());
+    for (let i = 0; i < 100; i++) xxoRaw.push(u8());
     const len = u16();
     if (pat > 256 || len > 100) {
       throw new ParseError("MED2: invalid pattern count or song length");
     }
     const xxo = xxoRaw.slice(0, len);
     const k = u16();
-    if (k < 1)
-      throw new ParseError("MED2: invalid tempo");
+    if (k < 1) throw new ParseError("MED2: invalid tempo");
     const speed = 6;
     const bpm = k;
     const timeFactor = MED_TIME_FACTOR;
@@ -18834,8 +18772,7 @@
     pos += 4;
     pos += 16;
     let quirks = 0;
-    if (sliding === 6)
-      quirks |= Quirk.VSALL | Quirk.PBALL;
+    if (sliding === 6) quirks |= Quirk.VSALL | Quirk.PBALL;
     const patterns = [];
     for (let i = 0; i < pat; i++) {
       pos += 4;
@@ -18883,8 +18820,7 @@
         }
       }
       const tracksArr = [];
-      for (let kk = 0; kk < chn; kk++)
-        tracksArr.push({ rows: 64, event: perTrack[kk] });
+      for (let kk = 0; kk < chn; kk++) tracksArr.push({ rows: 64, event: perTrack[kk] });
       patterns.push({ rows: 64, tracks: tracksArr });
     }
     const samples = [];
@@ -18957,12 +18893,11 @@
     return mod;
   }
   function periodToNote3(period) {
-    if (period <= 0)
-      return 0;
+    if (period <= 0) return 0;
     return Math.round(12 * Math.log(13696 / period) / Math.LN2) + 1;
   }
 
-  // ../../packages/fmt-med/dist/med3.js
+  // ../../packages/fmt-med/src/med3.ts
   var MASK = 2147483648;
   var M0F_LINEMSK0F = 1;
   var M0F_LINEMSK1F = 2;
@@ -18980,8 +18915,7 @@
   var EX_DELAY3 = 13;
   var FX_MED_RETRIG2 = 147;
   function med3Test(bytes) {
-    if (bytes.length < 4)
-      return false;
+    if (bytes.length < 4) return false;
     return bytes[0] === 77 && bytes[1] === 69 && bytes[2] === 68 && bytes[3] === 3;
   }
   function makeSub3(vol, sid) {
@@ -19021,11 +18955,10 @@
     };
   }
   var NibbleReader = class {
-    mem;
-    nbnum = 0;
     constructor(mem) {
       this.mem = mem;
     }
+    nbnum = 0;
     getNibble() {
       const mloc = this.nbnum >> 1;
       const res = this.nbnum & 1 ? this.mem[mloc] & 15 : this.mem[mloc] >> 4;
@@ -19053,16 +18986,14 @@
       const lmActive = i < 32 ? (linemsk0 & MASK) !== 0 : (linemsk1 & MASK) !== 0;
       const fmActive = i < 32 ? (fxmsk0 & MASK) !== 0 : (fxmsk1 & MASK) !== 0;
       if (lmActive) {
-        if (Math.trunc(trkn / 4) > nibsLeft)
-          throw new ParseError("MED3: pattern overflow");
+        if (Math.trunc(trkn / 4) > nibsLeft) throw new ParseError("MED3: pattern overflow");
         nibsLeft -= Math.trunc(trkn / 4);
         let lmsk = nr.getNibbles(Math.trunc(trkn / 4));
         lmsk = lmsk << 16 - trkn & 65535;
         let tmpto = i * trkn * 3;
         for (let bcnt = 0; bcnt < trkn; bcnt++) {
           if (lmsk & 32768) {
-            if (nibsLeft < 3)
-              throw new ParseError("MED3: pattern overflow");
+            if (nibsLeft < 3) throw new ParseError("MED3: pattern overflow");
             nibsLeft -= 3;
             patbuf[tmpto] = nr.getNibbles(2);
             patbuf[tmpto + 1] = nr.getNibble() << 4;
@@ -19072,16 +19003,14 @@
         }
       }
       if (fmActive) {
-        if (Math.trunc(trkn / 4) > nibsLeft)
-          throw new ParseError("MED3: pattern overflow");
+        if (Math.trunc(trkn / 4) > nibsLeft) throw new ParseError("MED3: pattern overflow");
         nibsLeft -= Math.trunc(trkn / 4);
         let lmsk = nr.getNibbles(Math.trunc(trkn / 4));
         lmsk = lmsk << 16 - trkn & 65535;
         let tmpto = i * trkn * 3;
         for (let bcnt = 0; bcnt < trkn; bcnt++) {
           if (lmsk & 32768) {
-            if (nibsLeft < 3)
-              throw new ParseError("MED3: pattern overflow");
+            if (nibsLeft < 3) throw new ParseError("MED3: pattern overflow");
             nibsLeft -= 3;
             patbuf[tmpto + 1] = (patbuf[tmpto + 1] | nr.getNibble()) & 255;
             patbuf[tmpto + 2] = nr.getNibbles(2);
@@ -19104,11 +19033,9 @@
       for (let i = 0; i < 64; i++) {
         const e = { note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 };
         e.note = patbuf[i * 12 + j * 3 + 0];
-        if (e.note)
-          e.note += 48;
+        if (e.note) e.note += 48;
         e.ins = patbuf[i * 12 + j * 3 + 1] >> 4;
-        if (e.ins)
-          e.ins++;
+        if (e.ins) e.ins++;
         e.fxt = patbuf[i * 12 + j * 3 + 1] & 15;
         e.fxp = patbuf[i * 12 + j * 3 + 2];
         switch (e.fxt) {
@@ -19192,14 +19119,12 @@
       for (let j = 0; j < 40; j++) {
         const c = u8();
         buf.push(c);
-        if (c === 0)
-          break;
+        if (c === 0) break;
       }
       let s = "";
       for (let j = 0; j < buf.length && j < 32; j++) {
         const c = buf[j];
-        if (c === 0)
-          break;
+        if (c === 0) break;
         s += c > 127 || c < 32 || c === 127 ? "." : String.fromCharCode(c);
       }
       instruments.push(makeInstrument(s, i));
@@ -19230,8 +19155,7 @@
       throw new ParseError("MED3: invalid pattern count or song length");
     }
     const xxo = [];
-    for (let i = 0; i < modlen; i++)
-      xxo.push(u8());
+    for (let i = 0; i < modlen; i++) xxo.push(u8());
     const tempo = u16();
     const transp = s8();
     const flags = u8();
@@ -19243,17 +19167,14 @@
     const timeFactor = MED_TIME_FACTOR;
     mask = u32();
     for (let i = 0; i < 32; i++, mask = mask << 1 >>> 0) {
-      if (mask & MASK)
-        pos += 1;
+      if (mask & MASK) pos += 1;
     }
     mask = u32();
     for (let i = 0; i < 32; i++, mask = mask << 1 >>> 0) {
-      if (mask & MASK)
-        pos += 1;
+      if (mask & MASK) pos += 1;
     }
     let quirks = Quirk.RTONCE;
-    if (sliding === 6)
-      quirks |= Quirk.VSALL | Quirk.PBALL;
+    if (sliding === 6) quirks |= Quirk.VSALL | Quirk.PBALL;
     for (let i = 0; i < 32; i++) {
       instruments[i].sub[0].xpo = transp;
     }
@@ -19265,42 +19186,28 @@
       const conv = new Uint8Array(16 + convsz);
       const cv = new DataView(conv.buffer);
       let p16 = 0;
-      if (b & M0F_LINEMSK00)
-        cv.setUint32(p16, 0, false);
-      else if (b & M0F_LINEMSK0F)
-        cv.setUint32(p16, 4294967295, false);
-      else
-        cv.setUint32(p16, u32(), false);
+      if (b & M0F_LINEMSK00) cv.setUint32(p16, 0, false);
+      else if (b & M0F_LINEMSK0F) cv.setUint32(p16, 4294967295, false);
+      else cv.setUint32(p16, u32(), false);
       p16 += 4;
-      if (b & M0F_LINEMSK10)
-        cv.setUint32(p16, 0, false);
-      else if (b & M0F_LINEMSK1F)
-        cv.setUint32(p16, 4294967295, false);
-      else
-        cv.setUint32(p16, u32(), false);
+      if (b & M0F_LINEMSK10) cv.setUint32(p16, 0, false);
+      else if (b & M0F_LINEMSK1F) cv.setUint32(p16, 4294967295, false);
+      else cv.setUint32(p16, u32(), false);
       p16 += 4;
-      if (b & M0F_FXMSK00)
-        cv.setUint32(p16, 0, false);
-      else if (b & M0F_FXMSK0F)
-        cv.setUint32(p16, 4294967295, false);
-      else
-        cv.setUint32(p16, u32(), false);
+      if (b & M0F_FXMSK00) cv.setUint32(p16, 0, false);
+      else if (b & M0F_FXMSK0F) cv.setUint32(p16, 4294967295, false);
+      else cv.setUint32(p16, u32(), false);
       p16 += 4;
-      if (b & M0F_FXMSK10)
-        cv.setUint32(p16, 0, false);
-      else if (b & M0F_FXMSK1F)
-        cv.setUint32(p16, 4294967295, false);
-      else
-        cv.setUint32(p16, u32(), false);
+      if (b & M0F_FXMSK10) cv.setUint32(p16, 0, false);
+      else if (b & M0F_FXMSK1F) cv.setUint32(p16, 4294967295, false);
+      else cv.setUint32(p16, u32(), false);
       p16 += 4;
       const databytes = raw(convsz);
-      if (databytes.length < convsz)
-        throw new ParseError("MED3: truncated pattern");
+      if (databytes.length < convsz) throw new ParseError("MED3: truncated pattern");
       conv.set(databytes, 16);
       const grid = unpackBlock(conv, convsz, chn);
       const tracksArr = [];
-      for (let k = 0; k < chn; k++)
-        tracksArr.push({ rows: 64, event: grid[k] });
+      for (let k = 0; k < chn; k++) tracksArr.push({ rows: 64, event: grid[k] });
       patterns.push({ rows: 64, tracks: tracksArr });
     }
     const samples = [];
@@ -19322,11 +19229,9 @@
       });
     }
     mask = u32();
-    if (pos >= bytes.length)
-      mask = 4294967295;
+    if (pos >= bytes.length) mask = 4294967295;
     for (let i = 0; i < 32; i++, mask = mask << 1 >>> 0) {
-      if ((~mask & MASK) !== 0)
-        continue;
+      if ((~mask & MASK) !== 0) continue;
       if ((~flags & FLAG_INSTRSATT) !== 0) {
         const inst2 = instruments[i];
         const s2 = samples[i];
@@ -19343,10 +19248,8 @@
       inst.nsm = 1;
       const s = samples[i];
       s.length = u32();
-      if (s.length === 0)
-        inst.nsm = 0;
-      if (u16() !== 0)
-        continue;
+      if (s.length === 0) inst.nsm = 0;
+      if (u16() !== 0) continue;
       const bytelen = s.length;
       const remaining = bytes.length - pos;
       const take = Math.min(bytelen, Math.max(0, remaining));
@@ -19399,7 +19302,7 @@
     return mod;
   }
 
-  // ../../packages/fmt-med/dist/med4.js
+  // ../../packages/fmt-med/src/med4.ts
   var FX_VOLSLIDE3 = 10;
   var FX_BREAK3 = 13;
   var FX_EXTENDED3 = 14;
@@ -19409,8 +19312,7 @@
   var EX_RETRIG3 = 9;
   var EX_DELAY4 = 13;
   function med4Test(bytes) {
-    if (bytes.length < 4)
-      return false;
+    if (bytes.length < 4) return false;
     return bytes[0] === 77 && bytes[1] === 69 && bytes[2] === 68 && bytes[3] === 4;
   }
   function makeSub4(vol, sid) {
@@ -19505,14 +19407,13 @@
     }
   }
   var Stream = class {
-    bytes;
-    hasNibble = false;
-    value = 0;
-    pos;
     constructor(bytes, pos) {
       this.bytes = bytes;
       this.pos = pos;
     }
+    hasNibble = false;
+    value = 0;
+    pos;
     read4() {
       this.hasNibble = !this.hasNibble;
       if (!this.hasNibble) {
@@ -19541,12 +19442,9 @@
       return (a << 12 | b << 8 | c << 4 | d) & 65535;
     }
     readAligned16(bits) {
-      if (bits <= 4)
-        return this.read4() << 12;
-      if (bits <= 8)
-        return this.read8() << 8;
-      if (bits <= 12)
-        return this.read12() << 4;
+      if (bits <= 4) return this.read4() << 12;
+      if (bits <= 8) return this.read8() << 8;
+      if (bits <= 12) return this.read12() << 4;
       return this.read16();
     }
   };
@@ -19599,31 +19497,26 @@
       const bytesArr = [];
       let m = m0;
       for (let i = 0; m !== 0 && i < 8; i++, m = m << 1 & 255) {
-        if (m & 128)
-          bytesArr.push(u8());
+        if (m & 128) bytesArr.push(u8());
       }
       if (bytesArr.length > 0) {
         let big = 0n;
-        for (const b of bytesArr)
-          big = big << 8n | BigInt(b);
+        for (const b of bytesArr) big = big << 8n | BigInt(b);
         big <<= BigInt(8 * (8 - bytesArr.length));
         maskHi = Number(big >> 32n & 0xffffffffn);
         mask = Number(big & 0xffffffffn);
       }
     }
     const tempInst = [];
-    for (let i = 0; i < 64; i++)
-      tempInst.push({ name: "", loop_start: 0, loop_end: 0, volume: 0, transpose: 0 });
+    for (let i = 0; i < 64; i++) tempInst.push({ name: "", loop_start: 0, loop_end: 0, volume: 0, transpose: 0 });
     let numIns = 0;
     {
       const m64base = BigInt(maskHi) << 32n | BigInt(mask >>> 0);
       for (let i = 0; i < 64; i++) {
         const m64 = m64base << BigInt(i) & 0xffffffffffffffffn;
-        if (m64 === 0n)
-          break;
+        if (m64 === 0n) break;
         const asS64 = m64 >= 1n << 63n ? m64 - (1n << 64n) : m64;
-        if (asS64 > 0n)
-          continue;
+        if (asS64 > 0n) continue;
         numIns = i + 1;
         const t = tempInst[i];
         const c = u8();
@@ -19633,38 +19526,28 @@
         let s = "";
         for (let j = 0; j < nameBuf.length; j++) {
           const ch = nameBuf[j];
-          if (ch === 0)
-            break;
+          if (ch === 0) break;
           s += ch > 127 || ch < 32 || ch === 127 ? "." : String.fromCharCode(ch);
         }
         t.name = s;
         t.volume = 64;
         let loopLen = 0;
-        if ((c & 1) === 0)
-          t.loop_start = u16() << 1;
-        if ((c & 2) === 0)
-          loopLen = u16() << 1;
-        if ((c & 4) === 0)
-          u8();
-        if ((c & 8) === 0)
-          u8();
-        if ((c & 48) === 0)
-          t.volume = u8();
-        if ((c & 64) === 0)
-          t.transpose = s8();
+        if ((c & 1) === 0) t.loop_start = u16() << 1;
+        if ((c & 2) === 0) loopLen = u16() << 1;
+        if ((c & 4) === 0) u8();
+        if ((c & 8) === 0) u8();
+        if ((c & 48) === 0) t.volume = u8();
+        if ((c & 64) === 0) t.transpose = s8();
         t.loop_end = t.loop_start + loopLen;
         t.loop_start &= ~255;
       }
     }
     const pat = u16();
     const len = u16();
-    if (pos > bytes.length)
-      throw new ParseError("MED4: truncated header");
-    if (pat > 256 || len > 255)
-      throw new ParseError("MED4: invalid pattern count or song length");
+    if (pos > bytes.length) throw new ParseError("MED4: truncated header");
+    if (pat > 256 || len > 255) throw new ParseError("MED4: invalid pattern count or song length");
     const xxo = [];
-    for (let i = 0; i < len; i++)
-      xxo.push(u8());
+    for (let i = 0; i < len; i++) xxo.push(u8());
     const tempo = u16();
     const transp = s8();
     const flags = s8();
@@ -19673,48 +19556,38 @@
     const timeFactor = MED_TIME_FACTOR;
     let quirks = Quirk.RTONCE;
     let hexvol = 0;
-    if ((~flags & 32) !== 0)
-      quirks |= Quirk.VSALL | Quirk.PBALL;
-    if ((flags & 16) !== 0)
-      hexvol = 1;
-    if (vermaj === 2)
-      speed = (flags & 32) !== 0 ? 5 : 6;
+    if ((~flags & 32) !== 0) quirks |= Quirk.VSALL | Quirk.PBALL;
+    if ((flags & 16) !== 0) hexvol = 1;
+    if (vermaj === 2) speed = (flags & 32) !== 0 ? 5 : 6;
     pos += 20;
     const trkvol = [];
-    for (let i = 0; i < 16; i++)
-      trkvol.push(u8());
+    for (let i = 0; i < 16; i++) trkvol.push(u8());
     u8();
-    for (let i = 0; i < 64; i++)
-      tempInst[i].transpose += transp;
+    for (let i = 0; i < 64; i++) tempInst[i].transpose += transp;
     let chn = 0;
     const scanPos = pos;
     for (let i = 0; i < pat; i++) {
       const size = u8();
       const c = u8();
-      if (c > chn)
-        chn = c;
+      if (c > chn) chn = c;
       u8();
       const plen = u16();
       skip2(size + plen - 4);
     }
-    if (chn > 16)
-      throw new ParseError("MED4: invalid channel count");
+    if (chn > 16) throw new ParseError("MED4: invalid channel count");
     const patterns = [];
     pos = scanPos;
     for (let i = 0; i < pat; i++) {
       const size = u8();
       const blockPos = pos;
       const blockChn = u8();
-      if (blockChn > chn)
-        throw new ParseError(`MED4: channel count mismatch at pattern ${i}`);
+      if (blockChn > chn) throw new ParseError(`MED4: channel count mismatch at pattern ${i}`);
       const rows = u8() + 1;
       const plen = u16();
       const ctl = [0, 0, 0, 0];
       for (let j = 0; j < 4; j++) {
-        if (rows > j * 64)
-          ctl[j] = u8();
-        else
-          break;
+        if (rows > j * 64) ctl[j] = u8();
+        else break;
       }
       const linemask = [];
       const fxmask = [];
@@ -19737,8 +19610,7 @@
       const eventGrid = [];
       for (let k = 0; k < chn; k++) {
         const evs = [];
-        for (let j = 0; j < rows; j++)
-          evs.push({ note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
+        for (let j = 0; j < rows; j++) evs.push({ note: 0, ins: 0, vol: 0, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
         eventGrid.push(evs);
       }
       seek2(blockPos + size);
@@ -19746,8 +19618,7 @@
       for (let y = 0; y < numMasks; y++) {
         for (let j = 0; j < 32; j++) {
           const line = y * 32 + j;
-          if (line >= rows)
-            break;
+          if (line >= rows) break;
           if ((linemask[y] & 2147483648) !== 0) {
             let chmsk = stream.readAligned16(blockChn);
             for (let k = 0; k < blockChn; k++, chmsk = chmsk << 1 & 65535) {
@@ -19755,8 +19626,7 @@
                 const x = stream.read12();
                 const e = eventGrid[k][line];
                 e.note = x >> 4;
-                if (e.note)
-                  e.note += 48;
+                if (e.note) e.note += 48;
                 e.ins = x & 15;
               }
             }
@@ -19779,13 +19649,11 @@
       }
       seek2(blockPos + size + plen);
       const tracksArr = [];
-      for (let k = 0; k < chn; k++)
-        tracksArr.push({ rows, event: eventGrid[k] });
+      for (let k = 0; k < chn; k++) tracksArr.push({ rows, event: eventGrid[k] });
       patterns.push({ rows, tracks: tracksArr });
     }
     const instruments = [];
-    for (let i = 0; i < numIns; i++)
-      instruments.push(makeInstrument2(tempInst[i].name));
+    for (let i = 0; i < numIns; i++) instruments.push(makeInstrument2(tempInst[i].name));
     const samples = [];
     let smpIdx = 0;
     const sampleCheck = () => {
@@ -19821,10 +19689,8 @@
       for (let j = 0; j < 9; j++) {
         for (let k = 0; k < 12; k++) {
           let xpo = 0;
-          if (j < 4)
-            xpo = 12 * (4 - j);
-          else if (j > 6)
-            xpo = -12 * (j - 6);
+          if (j < 4) xpo = 12 * (4 - j);
+          else if (j > 6) xpo = -12 * (j - 6);
           xxi.mapXpo[12 * j + k] = xpo;
         }
       }
@@ -19832,8 +19698,7 @@
     };
     const loadSynth = (i, type, at) => {
       const startPos = at.pos;
-      if (startPos + 22 > curBytes.length)
-        throw new ParseError("MED4: truncated synth");
+      if (startPos + 22 > curBytes.length) throw new ParseError("MED4: truncated synth");
       const magic = curDvL.getUint32(startPos, false);
       if (magic !== 1297303552) {
         throw new ParseError(`MED4: invalid MSH0 at instrument ${i}`);
@@ -19862,8 +19727,7 @@
       p += 2;
       void synthRep;
       void synthReplen;
-      if (wforms === 65535)
-        return;
+      if (wforms === 65535) return;
       if (voltbllen > 128 || wftbllen > 128 || wforms > 64) {
         throw new ParseError(`MED4: invalid synth tables at instrument ${i}`);
       }
@@ -19879,8 +19743,7 @@
       const xxi = instruments[i];
       xxi.nsm = wforms;
       xxi.sub = [];
-      for (let j2 = 0; j2 < wforms; j2++)
-        xxi.sub.push(makeSub4(0, 0));
+      for (let j2 = 0; j2 < wforms; j2++) xxi.sub.push(makeSub4(0, 0));
       xxi.extras = {
         vts: volspeed,
         wts: wfspeed,
@@ -19976,8 +19839,7 @@
       for (let i = 0; i < numIns; i++) {
         const inst = instruments[i];
         const data = ctx.externalInstrument ? ctx.externalInstrument(inst.name) : null;
-        if (!data || data.length === 0)
-          continue;
+        if (!data || data.length === 0) continue;
         const extLen = data.length;
         const edv = new DataView(data.buffer, data.byteOffset, data.byteLength);
         const savedBytes = curBytes;
@@ -20003,8 +19865,7 @@
         }
       }
     } else {
-      if (pat > 256 || len > 255)
-        throw new ParseError("MED4: invalid pattern count or song length");
+      if (pat > 256 || len > 255) throw new ParseError("MED4: invalid pattern count or song length");
       const maskLo = u32();
       if (maskLo === 1296385110) {
         throw new ParseError("MED4: invalid module MED4 with no samples");
@@ -20019,10 +19880,8 @@
         let p = posSave;
         for (let i = 0; m2 !== 0n && i < 64; i++, m2 = m2 << 1n & 0xffffffffffffffffn) {
           const asS64 = m2 >= 1n << 63n ? m2 - (1n << 64n) : m2;
-          if (asS64 > 0n)
-            continue;
-          if (p + 6 > bytes.length)
-            break;
+          if (asS64 > 0n) continue;
+          if (p + 6 > bytes.length) break;
           let _len = dvL.getInt32(p, false);
           const _type = dvL.getInt16(p + 4, false);
           p += 6;
@@ -20048,8 +19907,7 @@
       const at = { pos };
       for (let i = 0; m !== 0n && i < numIns; i++, m = m << 1n & 0xffffffffffffffffn) {
         const asS64 = m >= 1n << 63n ? m - (1n << 64n) : m;
-        if (asS64 > 0n)
-          continue;
+        if (asS64 > 0n) continue;
         const length = dvL.getInt32(at.pos, false);
         const type = dvL.getInt16(at.pos + 4, false);
         at.pos += 6;
@@ -20058,18 +19916,15 @@
       pos = at.pos;
     }
     for (const raw of samples) {
-      if (raw)
-        ctx.addSample(raw);
+      if (raw) ctx.addSample(raw);
     }
     {
       let p = pos;
       for (; ; ) {
-        if (p + 8 > bytes.length)
-          break;
+        if (p + 8 > bytes.length) break;
         const id = dvL.getInt32(p, false);
         const size = dvL.getInt32(p + 4, false);
-        if (id <= 0 || size <= 0)
-          break;
+        if (id <= 0 || size <= 0) break;
         p += 8;
         if (id === 1296385110) {
           const ver = dvL.getUint32(p, false);
@@ -20080,8 +19935,7 @@
           let c = "";
           for (let i = 0; i < readLen && p + i < bytes.length; i++) {
             const ch = bytes[p + i];
-            if (ch === 0)
-              break;
+            if (ch === 0) break;
             c += String.fromCharCode(ch);
           }
           commentText = c;
@@ -20133,7 +19987,7 @@
     return mod;
   }
 
-  // ../../packages/fmt-med/dist/readevent.js
+  // ../../packages/fmt-med/src/readevent.ts
   function trackerVersion(core2) {
     const extras = core2.module.extras;
     return extras?.kind === "med" ? extras.trackerVersion : 0;
@@ -20141,11 +19995,9 @@
   function setDefaultPitchNote(core2, ins, defaultPitch, ver) {
     if (ver >= 3) {
       let note = MMD3_DEFAULT_NOTE;
-      if (defaultPitch)
-        note = defaultPitch - 1;
+      if (defaultPitch) note = defaultPitch - 1;
       const inst = core2.module.instruments[ins];
-      if (note >= 0 && note < 121)
-        inst.mapXpo[12] = note;
+      if (note >= 0 && note < 121) inst.mapXpo[12] = note;
     }
   }
   function readEventMed(core2, e, chn) {
@@ -20268,7 +20120,7 @@
     }
   }
 
-  // ../../packages/fmt-med/dist/index.js
+  // ../../packages/fmt-med/src/index.ts
   function makePlugin(name, test, load2) {
     return {
       name,
@@ -52565,7 +52417,7 @@
     return (v.flags & 64) === 0;
   }
 
-  // ../../packages/fmt-prowizard/dist/pw-pp.js
+  // ../../packages/fmt-prowizard/src/pw-pp.ts
   function put8(out, b) {
     out.push(b & 255);
   }
@@ -52582,8 +52434,7 @@
     let ssize = 0;
     for (let i2 = 0; i2 < 31; i2++) {
       const pos = start + i2 * 8;
-      if (pos + 8 > data.length)
-        throw new ParseError("pp10: truncated sample headers");
+      if (pos + 8 > data.length) throw new ParseError("pp10: truncated sample headers");
       const tmp = data.slice(pos, pos + 8);
       writeZero(out, 22);
       const size = readmem16b6(tmp, 0);
@@ -52591,8 +52442,7 @@
       if (tmp[4] === 0 && tmp[5] === 0) {
         tmp[5] = 1;
       }
-      for (let k = 0; k < 8; k++)
-        out.push(tmp[k]);
+      for (let k = 0; k < 8; k++) out.push(tmp[k]);
     }
     const len = data[start + 248];
     put8(out, len);
@@ -52603,13 +52453,11 @@
       for (let i2 = 0; i2 < 128; i2++) {
         const t = data[start + 250 + j * 128 + i2];
         trkNum[j].push(t);
-        if (t > ntrk)
-          ntrk = t;
+        if (t > ntrk) ntrk = t;
       }
     }
     let i = 0;
-    for (; i < len; i++)
-      put8(out, i);
+    for (; i < len; i++) put8(out, i);
     writeZero(out, 128 - i);
     put32b(out, 1294879534);
     const pdata = new Uint8Array(1024);
@@ -52625,8 +52473,7 @@
           }
         }
       }
-      for (let b = 0; b < 1024; b++)
-        out.push(pdata[b]);
+      for (let b = 0; b < 1024; b++) out.push(pdata[b]);
     }
     const smpOff = start + 762 + (ntrk + 1 << 8);
     moveData(data, smpOff, out, ssize);
@@ -52634,10 +52481,8 @@
   }
   function testPp10(data, start) {
     const s = data.length - start;
-    if (s < 1024)
-      return 1024 - s;
-    if (data[start + 249] > 127)
-      return -1;
+    if (s < 1024) return 1024 - s;
+    if (data[start + 249] > 127) return -1;
     let ssize = 0;
     for (let i = 0; i < 31; i++) {
       const d = start + i * 8;
@@ -52645,38 +52490,26 @@
       const lstart = readmem16b6(data, d + 4) << 1;
       const lsize = readmem16b6(data, d + 6) << 1;
       ssize += size;
-      if (lsize === 0)
-        return -1;
-      if (lstart !== 0 && lsize <= 2)
-        return -1;
-      if (lstart + lsize > size + 2)
-        return -1;
-      if (data[d + 2] > 15)
-        return -1;
-      if (data[d + 3] > 64)
-        return -1;
-      if (lstart > size)
-        return -1;
-      if (size > 65535)
-        return -1;
+      if (lsize === 0) return -1;
+      if (lstart !== 0 && lsize <= 2) return -1;
+      if (lstart + lsize > size + 2) return -1;
+      if (data[d + 2] > 15) return -1;
+      if (data[d + 3] > 64) return -1;
+      if (lstart > size) return -1;
+      if (size > 65535) return -1;
     }
-    if (ssize <= 2)
-      return -1;
-    if (data[start + 248] === 0 || data[start + 248] > 127)
-      return -1;
+    if (ssize <= 2) return -1;
+    if (data[start + 248] === 0 || data[start + 248] > 127) return -1;
     let ntrk = 0;
     for (let i = 0; i < 512; i++) {
       const t = data[start + 250 + i];
-      if (t > ntrk)
-        ntrk = t;
+      if (t > ntrk) ntrk = t;
     }
     ntrk++;
     const need = 762 + ntrk * 256;
-    if (s < need)
-      return need - s;
+    if (s < need) return need - s;
     for (let i = 0; i < ntrk * 64; i++) {
-      if (data[start + 762 + i * 4] > 19)
-        return -1;
+      if (data[start + 762 + i * 4] > 19) return -1;
     }
     return 0;
   }
@@ -52700,8 +52533,7 @@
       put16b(out, readmem16b6(data, start + i2 * 8 + 6));
     }
     const numpat = data[start + 248];
-    if (numpat > 128)
-      throw new ParseError("pp21: too many patterns");
+    if (numpat > 128) throw new ParseError("pp21: too many patterns");
     put8(out, numpat);
     put8(out, data[start + 249]);
     const trk = [[], [], [], []];
@@ -52710,13 +52542,11 @@
       for (let i2 = 0; i2 < 128; i2++) {
         const t = data[start + 250 + j * 128 + i2];
         trk[j].push(t);
-        if (t > max)
-          max = t;
+        if (t > max) max = t;
       }
     }
     let i = 0;
-    for (; i < numpat; i++)
-      put8(out, i);
+    for (; i < numpat; i++) put8(out, i);
     writeZero(out, 128 - i);
     put32b(out, 1294879534);
     const tptr = [];
@@ -52724,19 +52554,16 @@
       const row = [];
       for (let k = 0; k < 64; k++) {
         let v = readmem16b6(data, start + 762 + (j * 64 + k) * 2);
-        if (is30)
-          v >>= 2;
+        if (is30) v >>= 2;
         row.push(v);
       }
       tptr.push(row);
     }
     const tabOff = start + 762 + (max + 1) * 128;
     const tabsize = readmem32b7(data, tabOff);
-    if (tabsize === 0)
-      throw new ParseError("pp21: zero reference table size");
+    if (tabsize === 0) throw new ParseError("pp21: zero reference table size");
     const tab = data.subarray(tabOff + 4, tabOff + 4 + tabsize);
-    if (tab.length < tabsize)
-      throw new ParseError("pp21: reference table truncated");
+    if (tab.length < tabsize) throw new ParseError("pp21: reference table truncated");
     for (i = 0; i < numpat; i++) {
       for (let j = 0; j < 64; j++) {
         for (let c = 0; c < 4; c++) {
@@ -52752,78 +52579,58 @@
   }
   function testPp21Pp30(data, start, is30) {
     const s = data.length - start;
-    if (s < 762)
-      return 762 - s;
+    if (s < 762) return 762 - s;
     let ssize = 0;
     for (let i = 0; i < 31; i++) {
       const d = start + i * 8;
       const len = readmem16b6(data, d) << 1;
       const lstart = readmem16b6(data, d + 4) << 1;
       ssize += len;
-      if (data[d + 2] > 15)
-        return -1;
-      if (data[d + 3] > 64)
-        return -1;
-      if (lstart > len)
-        return -1;
+      if (data[d + 2] > 15) return -1;
+      if (data[d + 3] > 64) return -1;
+      if (lstart > len) return -1;
     }
-    if (ssize <= 2)
-      return -1;
+    if (ssize <= 2) return -1;
     const npat = data[start + 248];
-    if (npat === 0 || npat > 127)
-      return -1;
+    if (npat === 0 || npat > 127) return -1;
     let tsize = 0;
     for (let i = 0; i < 512; i++) {
       const trk = data[start + 250 + i];
-      if (trk > tsize)
-        tsize = trk;
+      if (trk > tsize) tsize = trk;
     }
     tsize++;
     tsize <<= 6;
     const need = tsize * 2 + 4 + 762;
-    if (s < need)
-      return need - s;
+    if (s < need) return need - s;
     let maxRef = 0;
     if (!is30) {
       for (let i = 0; i < tsize; i++) {
         const ref = readmem16b6(data, start + i * 2 + 762);
-        if (ref > 16384)
-          return -1;
-        if (ref > maxRef)
-          maxRef = ref;
+        if (ref > 16384) return -1;
+        if (ref > maxRef) maxRef = ref;
       }
-      if (readmem32b7(data, start + tsize * 2 + 762) !== (maxRef + 1) * 4)
-        return -1;
+      if (readmem32b7(data, start + tsize * 2 + 762) !== (maxRef + 1) * 4) return -1;
     } else {
       for (let i = 0; i < tsize; i++) {
         const ref = readmem16b6(data, start + i * 2 + 762);
-        if (ref > maxRef)
-          maxRef = ref;
-        if ((ref & 3) !== 0)
-          return -1;
+        if (ref > maxRef) maxRef = ref;
+        if ((ref & 3) !== 0) return -1;
       }
       maxRef >>= 2;
       let refSize = readmem32b7(data, start + tsize * 2 + 762);
-      if (refSize > 65535)
-        return -1;
-      if (refSize !== maxRef + 1 << 2)
-        return -1;
+      if (refSize > 65535) return -1;
+      if (refSize !== maxRef + 1 << 2) return -1;
       refSize >>= 2;
       const need2 = refSize * 4 + tsize * 2 + 4 + 762;
-      if (s < need2)
-        return need2 - s;
+      if (s < need2) return need2 - s;
       for (let i = 0; i < refSize; i++) {
         const d = start + tsize * 2 + 766 + i * 4;
         const fxt = data[d + 2] & 15;
         const fxp = data[d + 3];
-        if (fxt === 12 && fxp > 65)
-          return -1;
-        if (fxt === 13 && (fxp > 100 || (fxp & 15) > 9))
-          return -1;
-        if (fxt === 11 && fxp > 127)
-          return -1;
-        if ((data[d] & 240) > 16)
-          return -1;
+        if (fxt === 12 && fxp > 65) return -1;
+        if (fxt === 13 && (fxp > 100 || (fxp & 15) > 9)) return -1;
+        if (fxt === 11 && fxp > 127) return -1;
+        if ((data[d] & 240) > 16) return -1;
       }
     }
     pwReadTitle(null, 0);
@@ -52846,7 +52653,7 @@
     depack: (data, start) => depackPp21Pp30(data, start, true)
   };
 
-  // ../../packages/fmt-prowizard/dist/ptktable.js
+  // ../../packages/fmt-prowizard/src/ptktable.ts
   var ptkTable = [
     [0, 0],
     [3, 88],
@@ -52893,7 +52700,7 @@
     return n >= 0 && n < ptkTable.length;
   }
 
-  // ../../packages/fmt-prowizard/dist/pw-p40.js
+  // ../../packages/fmt-prowizard/src/pw-p40.ts
   var MAGIC_P40A = 1345597505;
   var MAGIC_P40B = 1345597506;
   var MAGIC_P41A = 1345597761;
@@ -52915,8 +52722,7 @@
     out.push(c1 << 4 & 16 | ptkTable[Math.trunc(mynote / 2)][0]);
     out.push(ptkTable[Math.trunc(mynote / 2)][1]);
     const b = c2 & 15;
-    if (b === 8)
-      c2 -= 8;
+    if (b === 8) c2 -= 8;
     out.push(c2 & 255);
     if (b === 5 || b === 6 || b === 10) {
       c3 = c3 > 127 ? c3 << 4 & 240 : c3;
@@ -52946,11 +52752,9 @@
     const id = u32();
     u8();
     const len = u8();
-    if (len >= 128)
-      throw new Error("p4x: pattern list too long");
+    if (len >= 128) throw new Error("p4x: pattern list too long");
     const nsmp = u8();
-    if (nsmp > 31)
-      throw new Error("p4x: too many samples");
+    if (nsmp > 31) throw new Error("p4x: too many samples");
     u8();
     const trkdatOfs = u32() + 4;
     const trktabOfs = u32() + 4;
@@ -52970,12 +52774,10 @@
       const loopAddr = u32();
       const loopSize = u16();
       let fine = 0;
-      if (id === MAGIC_P40A || id === MAGIC_P40B)
-        fine = u16();
+      if (id === MAGIC_P40A || id === MAGIC_P40B) fine = u16();
       u8();
       const vol = u8();
-      if (id === MAGIC_P41A)
-        fine = u16();
+      if (id === MAGIC_P41A) fine = u16();
       if (addr < 0 || loopAddr < 0 || loopAddr < addr || addr > inSize - smpOfs) {
         throw new Error("p4x: bad sample addresses");
       }
@@ -52989,22 +52791,18 @@
     {
       const pad = new Array(30).fill(0);
       pad[29] = 1;
-      for (let i = nsmp; i < 31; i++)
-        out.push(...pad);
+      for (let i = nsmp; i < 31; i++) out.push(...pad);
     }
     put82(out, len);
     put82(out, 127);
     seek2(trktabOfs);
-    for (let c1 = 0; c1 < len; c1++)
-      put82(out, c1);
-    for (let c1 = len; c1 < 128; c1++)
-      put82(out, 0);
+    for (let c1 = 0; c1 < len; c1++) put82(out, c1);
+    for (let c1 = len; c1 < 128; c1++) put82(out, 0);
     put32b2(out, PW_MOD_MAGIC);
     const trackAddr = [];
     for (let i = 0; i < len; i++) {
       const row = [];
-      for (let j = 0; j < 4; j++)
-        row.push(u16() + trkdatOfs);
+      for (let j = 0; j < 4; j++) row.push(u16() + trkdatOfs);
       trackAddr.push(row);
     }
     const tdata = new Uint8Array(512 * 256);
@@ -53017,8 +52815,7 @@
       const tmp = [];
       setEvent(tmp, c1, c2, c3);
       const base = trackOff(p, j, k);
-      for (let b = 0; b < 4; b++)
-        tdata[base + b] = tmp[b] ?? 0;
+      for (let b = 0; b < 4; b++) tdata[base + b] = tmp[b] ?? 0;
     };
     for (let i = 0; i < len; i++) {
       for (let j = 0; j < 4; j++) {
@@ -53026,16 +52823,13 @@
         for (let k = 0; k < 64; k++) {
           let [c1, c2, c3, c4] = read4();
           if (c1 !== 128) {
-            if (pos > data.length)
-              throw new Error("p4x: track read error");
+            if (pos > data.length) throw new Error("p4x: track read error");
             trySet(i, j, k, c1, c2, c3);
-            if (c4 > 0 && c4 < 128)
-              k += c4;
+            if (c4 > 0 && c4 < 128) k += c4;
             if (c4 > 127) {
               k++;
               for (let l = 256; l > c4; l--) {
-                if (k >= 64)
-                  break;
+                if (k >= 64) break;
                 trySet(i, j, k, c1, c2, c3);
                 k++;
               }
@@ -53048,17 +52842,14 @@
           const b = (c3 << 8) + c4 + trkdatOfs;
           pos = start + b;
           for (let c = 0; c <= c5; c++) {
-            if (k >= 64)
-              break;
+            if (k >= 64) break;
             [c1, c2, c3, c4] = read4();
             trySet(i, j, k, c1, c2, c3);
-            if (c4 > 0 && c4 < 128)
-              k += c4;
+            if (c4 > 0 && c4 < 128) k += c4;
             if (c4 > 127) {
               k++;
               for (let l = 256; l > c4; l--) {
-                if (k >= 64)
-                  break;
+                if (k >= 64) break;
                 trySet(i, j, k, c1, c2, c3);
                 k++;
               }
@@ -53075,8 +52866,7 @@
       for (let j = 0; j < 64; j++) {
         for (let k = 0; k < 4; k++) {
           const base = trackOff(i, k, j);
-          for (let b = 0; b < 4; b++)
-            out.push(tdata[base + b]);
+          for (let b = 0; b < 4; b++) out.push(tdata[base + b]);
         }
       }
     }
@@ -53087,11 +52877,9 @@
   }
   function testP4x(data, start) {
     const s = data.length - start;
-    if (s < 8)
-      return 8 - s;
+    if (s < 8) return 8 - s;
     const id = readmem32b7(data, start);
-    if (id !== MAGIC_P40A && id !== MAGIC_P40B && id !== MAGIC_P41A)
-      return -1;
+    if (id !== MAGIC_P40A && id !== MAGIC_P40B && id !== MAGIC_P41A) return -1;
     pwReadTitle(null, 0);
     return 0;
   }
@@ -53101,7 +52889,7 @@
     depack: depackP4x
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-theplayer.js
+  // ../../packages/fmt-prowizard/src/pw-theplayer.ts
   var PW_MOD_MAGIC2 = 1294879534;
   function put83(out, b) {
     out.push(b & 255);
@@ -53122,8 +52910,7 @@
     }
     const b = c2v & 15;
     let c2 = c2v;
-    if (b === 8)
-      c2 -= 8;
+    if (b === 8) c2 -= 8;
     out.push(c2 & 255);
     let c3 = c3v;
     if (b === 5 || b === 6 || b === 10) {
@@ -53152,8 +52939,7 @@
             c1 = 255 - c1;
             const cell2 = [];
             const effect2 = setEvent2(cell2, c1, c2, c3);
-            for (let t = 0; t < 4; t++)
-              tdata[trackOff2(i, j, k) + t] = cell2[t] ?? 0;
+            for (let t = 0; t < 4; t++) tdata[trackOff2(i, j, k) + t] = cell2[t] ?? 0;
             if (effect2 === 13) {
               maxRow = k;
               break;
@@ -53168,12 +52954,10 @@
             }
             const c4b = 256 - c4;
             for (let l = 0; l < c4b; l++) {
-              if (++k >= 64)
-                break;
+              if (++k >= 64) break;
               const cell22 = [];
               setEvent2(cell22, c1, c2, c3);
-              for (let t = 0; t < 4; t++)
-                tdata[trackOff2(i, j, k) + t] = cell22[t] ?? 0;
+              for (let t = 0; t < 4; t++) tdata[trackOff2(i, j, k) + t] = cell22[t] ?? 0;
             }
             continue;
           }
@@ -53189,12 +52973,10 @@
               if ((c1 & 128) !== 0 && c1 !== 128) {
                 const c4b = u8();
                 c1 = 255 - c1;
-                if (k >= 64)
-                  continue;
+                if (k >= 64) continue;
                 const cell3 = [];
                 const effect2 = setEvent2(cell3, c1, c2b, c3b);
-                for (let t = 0; t < 4; t++)
-                  tdata[trackOff2(i, j, k) + t] = cell3[t] ?? 0;
+                for (let t = 0; t < 4; t++) tdata[trackOff2(i, j, k) + t] = cell3[t] ?? 0;
                 if (effect2 === 13) {
                   maxRow = k;
                   k = l = 9999;
@@ -53212,20 +52994,16 @@
                 const fold = 256 - c4b;
                 let foldCount = fold;
                 while (foldCount-- > 0) {
-                  if (++k >= 64)
-                    break;
+                  if (++k >= 64) break;
                   const cell22 = [];
                   setEvent2(cell22, c1, c2b, c3b);
-                  for (let t = 0; t < 4; t++)
-                    tdata[trackOff2(i, j, k) + t] = cell22[t] ?? 0;
+                  for (let t = 0; t < 4; t++) tdata[trackOff2(i, j, k) + t] = cell22[t] ?? 0;
                 }
               }
-              if (k >= 64)
-                break;
+              if (k >= 64) break;
               const cell2 = [];
               setEvent2(cell2, c1, c2b, c3b);
-              for (let t = 0; t < 4; t++)
-                tdata[trackOff2(i, j, k) + t] = cell2[t] ?? 0;
+              for (let t = 0; t < 4; t++) tdata[trackOff2(i, j, k) + t] = cell2[t] ?? 0;
             }
             pos = posSaved;
             k--;
@@ -53233,8 +53011,7 @@
           }
           const cell = [];
           const effect = setEvent2(cell, c1, c2, c3);
-          for (let t = 0; t < 4; t++)
-            tdata[trackOff2(i, j, k) + t] = cell[t] ?? 0;
+          for (let t = 0; t < 4; t++) tdata[trackOff2(i, j, k) + t] = cell[t] ?? 0;
           if (effect === 13) {
             maxRow = k;
             break;
@@ -53259,18 +53036,15 @@
     };
     const sdataAddr = u16();
     let npat = u8();
-    if (npat > 128)
-      throw new Error("theplayer: too many patterns");
+    if (npat > 128) throw new Error("theplayer: too many patterns");
     let nins = u8();
     let delta = 0;
-    if ((nins & 128) !== 0)
-      delta = 1;
+    if ((nins & 128) !== 0) delta = 1;
     if (version >= 96 && (nins & 64) !== 0) {
       throw new Error("theplayer: packed samples not supported");
     }
     nins &= 63;
-    if (nins > 31)
-      throw new Error("theplayer: too many samples");
+    if (nins > 31) throw new Error("theplayer: too many samples");
     writeZero(out, 20);
     const isize = new Array(31).fill(0);
     const smpSize = new Array(31).fill(0);
@@ -53284,8 +53058,7 @@
         isize[i] = isize[65535 - j0];
         saddr[i] = saddr[65535 - j0];
       } else {
-        if (i > 0)
-          saddr[i] = saddr[i - 1] + smpSize[i - 1];
+        if (i > 0) saddr[i] = saddr[i - 1] + smpSize[i - 1];
         smpSize[i] = j0 * 2;
       }
       const j = Math.trunc(smpSize[i] / 2);
@@ -53305,122 +53078,93 @@
     {
       const pad = new Array(30).fill(0);
       pad[29] = 1;
-      for (; i < 31; i++)
-        out.push(...pad);
+      for (; i < 31; i++) out.push(...pad);
     }
     const taddr = [];
     for (let p = 0; p < npat; p++) {
       const row = [];
-      for (let j = 0; j < 4; j++)
-        row.push(u16());
+      for (let j = 0; j < 4; j++) row.push(u16());
       taddr.push(row);
     }
     const ptable = new Array(128).fill(0);
     let patPos = 0;
     for (; patPos < 128; patPos++) {
       const c1 = u8();
-      if (c1 === 255)
-        break;
+      if (c1 === 255) break;
       ptable[patPos] = version >= 96 ? c1 : Math.trunc(c1 / 2);
     }
     put83(out, patPos);
     put83(out, 127);
-    for (let p = 0; p < 128; p++)
-      put83(out, ptable[p]);
+    for (let p = 0; p < 128; p++) put83(out, ptable[p]);
     put32b3(out, PW_MOD_MAGIC2);
     const tdata = new Uint8Array(512 * 256);
     decodePattern(data, pos, npat, tdata, taddr);
     for (let p = 0; p < npat; p++) {
-      for (let b = 0; b < 1024; b++)
-        out.push(tdata[p * 1024 + b]);
+      for (let b = 0; b < 1024; b++) out.push(tdata[p * 1024 + b]);
     }
     for (let s = 0; s < nins; s++) {
       const smpBuf = new Uint8Array(smpSize[s]);
       const src = start + sdataAddr + saddr[s];
-      for (let k = 0; k < smpSize[s]; k++)
-        smpBuf[k] = data[src + k] ?? 0;
+      for (let k = 0; k < smpSize[s]; k++) smpBuf[k] = data[src + k] ?? 0;
       if (delta === 1) {
         for (let j = 1; j < smpSize[s]; j++) {
           const c3 = 256 - smpBuf[j] + smpBuf[j - 1];
           smpBuf[j] = c3 & 255;
         }
       }
-      for (let k = 0; k < smpSize[s]; k++)
-        out.push(smpBuf[k]);
+      for (let k = 0; k < smpSize[s]; k++) out.push(smpBuf[k]);
     }
     return Uint8Array.from(out);
   }
   function theplayerTest(data, start, version) {
     const s = data.length - start;
-    if (s < 4)
-      return 4 - s;
+    if (s < 4) return 4 - s;
     const numPat = data[start + 2];
-    if (numPat === 0 || numPat > 127)
-      return -1;
+    if (numPat === 0 || numPat > 127) return -1;
     const numIns = data[start + 3] & 63;
-    if (numIns === 0 || numIns > 31)
-      return -1;
-    if (s < numIns * 6 + 4)
-      return numIns * 6 + 4 - s;
+    if (numIns === 0 || numIns > 31) return -1;
+    if (s < numIns * 6 + 4) return numIns * 6 + 4 - s;
     for (let i = 0; i < numIns; i++) {
-      if (data[start + i * 6 + 7] > 64)
-        return -1;
-      if (data[start + i * 6 + 6] > 15)
-        return -1;
+      if (data[start + i * 6 + 7] > 64) return -1;
+      if (data[start + i * 6 + 6] > 15) return -1;
     }
     for (let i = 0; i < numIns; i++) {
       const size = readmem16b6(data, start + i * 6 + 4);
-      if (size <= 65503 && size > 32768 || size === 0)
-        return -1;
+      if (size <= 65503 && size > 32768 || size === 0) return -1;
       const lstart = readmem16b6(data, start + i * 6 + 8);
-      if (lstart !== 65535 && lstart >= size)
-        return -1;
-      if (size > 65503 && 65535 - size > numIns)
-        return -1;
+      if (lstart !== 65535 && lstart >= size) return -1;
+      if (size > 65503 && 65535 - size > numIns) return -1;
     }
     const sdata = readmem16b6(data, start);
-    if (sdata < numIns * 6 + 4 + numPat * 8)
-      return -1;
-    if (s < numPat * 8 + numIns * 6 + 4)
-      return numPat * 8 + numIns * 6 + 4 - s;
+    if (sdata < numIns * 6 + 4 + numPat * 8) return -1;
+    if (s < numPat * 8 + numIns * 6 + 4) return numPat * 8 + numIns * 6 + 4 - s;
     for (let i = 0; i < numPat * 4; i++) {
       const x = readmem16b6(data, start + 4 + numIns * 6 + i * 2);
-      if (x + numIns * 6 + 4 + numPat * 8 > sdata)
-        return -1;
+      if (x + numIns * 6 + 4 + numPat * 8 > sdata) return -1;
     }
-    if (s < numPat * 8 + numIns * 6 + 4 + 128)
-      return numPat * 8 + numIns * 6 + 4 + 128 - s;
+    if (s < numPat * 8 + numIns * 6 + 4 + 128) return numPat * 8 + numIns * 6 + 4 + 128 - s;
     let len = 0;
     while (len < 128) {
       const pat = data[start + numIns * 6 + 4 + numPat * 8 + len];
-      if (pat === 255)
-        break;
+      if (pat === 255) break;
       if (version >= 96) {
-        if (pat > numPat - 1)
-          return -1;
+        if (pat > numPat - 1) return -1;
       } else {
-        if ((pat & 1) !== 0)
-          return -1;
-        if (pat > numPat * 2)
-          return -1;
+        if ((pat & 1) !== 0) return -1;
+        if (pat > numPat * 2) return -1;
       }
       len++;
     }
-    if (numIns * 6 + 4 + numPat * 8 + len > sdata)
-      return -1;
-    if (len === 0 || len === 128)
-      return -1;
-    if (s < sdata + 1)
-      return sdata + 1 - s;
+    if (numIns * 6 + 4 + numPat * 8 + len > sdata) return -1;
+    if (len === 0 || len === 128) return -1;
+    if (s < sdata + 1) return sdata + 1 - s;
     len++;
     for (let i = numIns * 6 + 4 + numPat * 8 + len; i < sdata; i++) {
       const d = start + i;
       if ((~data[d] & 128) !== 0) {
-        if (data[d] > 73)
-          return -1;
+        if (data[d] > 73) return -1;
         const ins = data[d] << 4 & 16 | data[d + 1] >> 4 & 15;
-        if (ins > numIns)
-          return -1;
+        if (ins > numIns) return -1;
         i += 2;
       } else {
         i += 3;
@@ -53440,7 +53184,7 @@
     depack: (data, start) => theplayerDepack(data, start, 96)
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-tp1.js
+  // ../../packages/fmt-prowizard/src/pw-tp1.ts
   var PW_MOD_MAGIC3 = 1294879534;
   function put84(out, b) {
     out.push(b & 255);
@@ -53467,8 +53211,7 @@
     };
     u32();
     u32();
-    for (let i = 0; i < 20; i++)
-      out.push(data[pos++] ?? 0);
+    for (let i = 0; i < 20; i++) out.push(data[pos++] ?? 0);
     const smpOfs = u32();
     let ssize = 0;
     for (let i = 0; i < 31; i++) {
@@ -53490,8 +53233,7 @@
     let patOfs = 4294967295;
     for (let i = 0; i < len; i++) {
       paddr.push(u32());
-      if (patOfs > paddr[i])
-        patOfs = paddr[i];
+      if (patOfs > paddr[i]) patOfs = paddr[i];
     }
     const pnum = new Array(128).fill(0);
     const paddrOrd = [paddr[0]];
@@ -53509,8 +53251,7 @@
         pnum[i] = npat++;
       }
     }
-    for (let i = 0; i < 128; i++)
-      put84(out, pnum[i]);
+    for (let i = 0; i < 128; i++) put84(out, pnum[i]);
     put32b4(out, PW_MOD_MAGIC3);
     const pdata = new Uint8Array(1024);
     for (let i = 0; i < npat; i++) {
@@ -53519,8 +53260,7 @@
       for (let j = 0; j < 256; j++) {
         const p = j * 4;
         const c1 = u8();
-        if (c1 === 192)
-          continue;
+        if (c1 === 192) continue;
         if ((c1 & 192) === 128) {
           const fxt2 = c1 >> 2 & 15;
           const fxp2 = u8();
@@ -53531,8 +53271,7 @@
         const c2 = u8();
         const c3 = u8();
         const note = (c1 & 254) >> 1;
-        if (!ptkIsValidNote(note))
-          throw new Error("tp1: invalid note");
+        if (!ptkIsValidNote(note)) throw new Error("tp1: invalid note");
         const ins = c2 >> 4 & 15 | c1 << 4 & 16;
         const fxt = c2 & 15;
         const fxp = c3;
@@ -53541,48 +53280,38 @@
         pdata[p + 2] = ins << 4 & 240 | fxt;
         pdata[p + 3] = fxp;
       }
-      for (let k = 0; k < 1024; k++)
-        out.push(pdata[k]);
+      for (let k = 0; k < 1024; k++) out.push(pdata[k]);
     }
     moveData(data, start + smpOfs, out, ssize);
     return Uint8Array.from(out);
   }
   function testTp1(data, start) {
     const s = data.length - start;
-    if (s < 1024)
-      return 1024 - s;
+    if (s < 1024) return 1024 - s;
     if (data[start] !== 77 || data[start + 1] !== 69 || // 'ME'
     data[start + 2] !== 88 || data[start + 3] !== 88) {
       return -1;
     }
     const size = readmem32b7(data, start + 4);
-    if (size < 794 || size > 2129178)
-      return -1;
+    if (size < 794 || size > 2129178) return -1;
     for (let i = 0; i < 31; i++) {
       const d = start + i * 8 + 32;
-      if (data[d] > 15)
-        return -1;
-      if (data[d + 1] > 64)
-        return -1;
+      if (data[d] > 15) return -1;
+      if (data[d + 1] > 64) return -1;
     }
     const smpOfs = readmem32b7(data, start + 28);
-    if (smpOfs === 0 || smpOfs > size)
-      return -1;
+    if (smpOfs === 0 || smpOfs > size) return -1;
     for (let i = 0; i < 31; i++) {
       const d = start + i * 8 + 32;
       const sz = readmem16b6(data, d + 2) << 1;
       const lstart = readmem16b6(data, d + 4) << 1;
       const lsize = readmem16b6(data, d + 6) << 1;
-      if (sz > 65535 || lstart > 65535 || lsize > 65535)
-        return -1;
-      if (lstart + lsize > sz + 2)
-        return -1;
-      if (lstart !== 0 && lsize === 0)
-        return -1;
+      if (sz > 65535 || lstart > 65535 || lsize > 65535) return -1;
+      if (lstart + lsize > sz + 2) return -1;
+      if (lstart !== 0 && lsize === 0) return -1;
     }
     const len = readmem16b6(data, start + 280) + 1;
-    if (len > 128)
-      return -1;
+    if (len > 128) return -1;
     return 0;
   }
   var pwTp1 = {
@@ -53591,7 +53320,7 @@
     depack: depackTp1
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-tp3.js
+  // ../../packages/fmt-prowizard/src/pw-tp3.ts
   var PW_MOD_MAGIC4 = 1294879534;
   function put85(out, b) {
     out.push(b & 255);
@@ -53612,8 +53341,7 @@
       return v;
     };
     pos += 8;
-    for (let i = 0; i < 20; i++)
-      out.push(data[pos++] ?? 0);
+    for (let i = 0; i < 20; i++) out.push(data[pos++] ?? 0);
     const nins = u16() >> 3;
     let ssize = 0;
     for (let i = 0; i < nins; i++) {
@@ -53631,13 +53359,11 @@
     {
       const pad = new Array(30).fill(0);
       pad[29] = 1;
-      for (let i = nins; i < 31; i++)
-        out.push(...pad);
+      for (let i = nins; i < 31; i++) out.push(...pad);
     }
     u8();
     const len = u8();
-    if (len >= 128)
-      throw new Error("tp23: sequence too long");
+    if (len >= 128) throw new Error("tp23: sequence too long");
     put85(out, len);
     put85(out, 127);
     const pnum = [];
@@ -53645,20 +53371,16 @@
     for (let i = 0; i < len; i++) {
       const p = u16() >> 3;
       pnum.push(p);
-      if (p > npat)
-        npat = p;
+      if (p > npat) npat = p;
     }
-    if (npat >= 128)
-      throw new Error("tp23: too many patterns");
+    if (npat >= 128) throw new Error("tp23: too many patterns");
     const trkOfs = [];
     for (let i = 0; i <= npat; i++) {
       const row = [];
-      for (let j = 0; j < 4; j++)
-        row.push(u16());
+      for (let j = 0; j < 4; j++) row.push(u16());
       trkOfs.push(row);
     }
-    for (let i = 0; i < 128; i++)
-      put85(out, pnum[i]);
+    for (let i = 0; i < 128; i++) put85(out, pnum[i]);
     put32b5(out, PW_MOD_MAGIC4);
     const patOfs = pos + 2;
     const pdata = new Uint8Array(1024);
@@ -53679,13 +53401,10 @@
             let fxt2 = ver === 2 ? c1 >> 2 & 15 : c1 >> 1 & 15;
             let fxp2 = c22;
             if (fxt2 === 5 || fxt2 === 6 || fxt2 === 10) {
-              if (fxp2 > 128)
-                fxp2 = 256 - fxp2;
-              else if (fxp2 <= 128)
-                fxp2 = fxp2 << 4 & 240;
+              if (fxp2 > 128) fxp2 = 256 - fxp2;
+              else if (fxp2 <= 128) fxp2 = fxp2 << 4 & 240;
             }
-            if (fxt2 === 8)
-              fxt2 = 0;
+            if (fxt2 === 8) fxt2 = 0;
             pdata[p + 2] = fxt2;
             pdata[p + 3] = fxp2;
             continue;
@@ -53696,13 +53415,10 @@
           if (ver === 2) {
             note = (c1 & 254) >> 1;
           } else {
-            if ((c1 & 64) === 64)
-              note = 127 - c1;
-            else
-              note = c1 & 63;
+            if ((c1 & 64) === 64) note = 127 - c1;
+            else note = c1 & 63;
           }
-          if (!ptkIsValidNote(note))
-            throw new Error("tp23: invalid note");
+          if (!ptkIsValidNote(note)) throw new Error("tp23: invalid note");
           const fxt = c2 & 15;
           if (fxt === 0) {
             pdata[p] = ins & 240 | ptkTable[note][0];
@@ -53712,49 +53428,38 @@
           }
           const c3 = u8();
           let fxtV = fxt;
-          if (fxtV === 8)
-            fxtV = 0;
+          if (fxtV === 8) fxtV = 0;
           let fxp = c3;
           if (fxtV === 5 || fxtV === 6 || fxtV === 10) {
-            if (fxp > 128)
-              fxp = 256 - fxp;
-            else if (fxp <= 128)
-              fxp = fxp << 4 & 240;
+            if (fxp > 128) fxp = 256 - fxp;
+            else if (fxp <= 128) fxp = fxp << 4 & 240;
           }
           pdata[p] = ins & 240 | ptkTable[note][0];
           pdata[p + 1] = ptkTable[note][1];
           pdata[p + 2] = ins << 4 & 240 | fxtV;
           pdata[p + 3] = fxp;
         }
-        if (pos > maxTrkOfs)
-          maxTrkOfs = pos;
+        if (pos > maxTrkOfs) maxTrkOfs = pos;
       }
-      for (let k = 0; k < 1024; k++)
-        out.push(pdata[k]);
+      for (let k = 0; k < 1024; k++) out.push(pdata[k]);
     }
-    if (ver > 2 && (maxTrkOfs & 1) !== 0)
-      maxTrkOfs += 1;
+    if (ver > 2 && (maxTrkOfs & 1) !== 0) maxTrkOfs += 1;
     moveData(data, maxTrkOfs, out, ssize);
     return Uint8Array.from(out);
   }
   function testTp23(data, start, magic) {
     const s = data.length - start;
-    if (s < 1024)
-      return 1024 - s;
+    if (s < 1024) return 1024 - s;
     for (let i = 0; i < 8; i++) {
-      if (data[start + i] !== magic.charCodeAt(i))
-        return -1;
+      if (data[start + i] !== magic.charCodeAt(i)) return -1;
     }
     let nins = readmem16b6(data, start + 28);
-    if (nins === 0 || (nins & 7) !== 0 || nins >> 3 > 31)
-      return -1;
+    if (nins === 0 || (nins & 7) !== 0 || nins >> 3 > 31) return -1;
     nins >>= 3;
     for (let i = 0; i < nins; i++) {
       const d = start + i * 8;
-      if (data[d + 30] > 15)
-        return -1;
-      if (data[d + 31] > 64)
-        return -1;
+      if (data[d + 30] > 15) return -1;
+      if (data[d + 31] > 64) return -1;
     }
     let ssize = 0;
     for (let i = 0; i < nins; i++) {
@@ -53762,19 +53467,14 @@
       const l = readmem16b6(data, d + 32) << 1;
       const lstart = readmem16b6(data, d + 34) << 1;
       const lsize = readmem16b6(data, d + 36) << 1;
-      if (l > 65535 || lstart > 65535 || lsize > 65535)
-        return -1;
-      if (lstart + lsize > l + 2)
-        return -1;
-      if (lstart !== 0 && lsize === 0)
-        return -1;
+      if (l > 65535 || lstart > 65535 || lsize > 65535) return -1;
+      if (lstart + lsize > l + 2) return -1;
+      if (lstart !== 0 && lsize === 0) return -1;
       ssize += l;
     }
-    if (ssize <= 4)
-      return -1;
+    if (ssize <= 4) return -1;
     const npat = data[start + nins * 8 + 31];
-    if (npat === 0 || npat > 128)
-      return -1;
+    if (npat === 0 || npat > 128) return -1;
     pwReadTitle(data.subarray(start + 8), 20);
     return 0;
   }
@@ -53789,7 +53489,7 @@
     depack: (data, start) => depackTp23(data, start, 2)
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-unic.js
+  // ../../packages/fmt-prowizard/src/pw-unic.ts
   var MAGIC_M_K_ = 1294879534;
   var MAGIC_UNIC = 1431193923;
   var MAGIC_0000 = 0;
@@ -53811,12 +53511,10 @@
       pos += 2;
       return v;
     };
-    for (let i = 0; i < 20; i++)
-      out.push(data[pos++] ?? 0);
+    for (let i = 0; i < 20; i++) out.push(data[pos++] ?? 0);
     let ssize = 0;
     for (let i = 0; i < 31; i++) {
-      for (let k = 0; k < 20; k++)
-        out.push(data[pos++] ?? 0);
+      for (let k = 0; k < 20; k++) out.push(data[pos++] ?? 0);
       put86(out, 0);
       put86(out, 0);
       const c1 = u8();
@@ -53845,14 +53543,11 @@
     put86(out, 127);
     u8();
     const tmp = [];
-    for (let i = 0; i < 128; i++)
-      tmp.push(u8());
-    for (let i = 0; i < 128; i++)
-      put86(out, tmp[i]);
+    for (let i = 0; i < 128; i++) tmp.push(u8());
+    for (let i = 0; i < 128; i++) put86(out, tmp[i]);
     let max = 0;
     for (let i = 0; i < 128; i++) {
-      if (tmp[i] > max)
-        max = tmp[i];
+      if (tmp[i] > max) max = tmp[i];
     }
     max++;
     put32b6(out, 1294879534);
@@ -53866,12 +53561,10 @@
         const c1 = u8();
         const c2 = u8();
         const c3 = u8();
-        if (pos > data.length + 1)
-          throw new Error("unic: read error");
+        if (pos > data.length + 1) throw new Error("unic: read error");
         const ins = c1 >> 2 & 16 | c2 >> 4 & 15;
         const note = c1 & 63;
-        if (!ptkIsValidNote(note))
-          throw new Error("unic: invalid note");
+        if (!ptkIsValidNote(note)) throw new Error("unic: invalid note");
         const fxt = c2 & 15;
         let fxp = c3;
         if (fxt === 13) {
@@ -53898,139 +53591,100 @@
       const lsize = readmem16b6(data, d + 48) << 1;
       const fine = readmem16b6(data, d + 40);
       ssize += len;
-      if (lsize !== 0 && len + 2 < lstart + lsize)
-        return -1;
-      if (len > 65535 || lstart > 65535 || lsize > 65535)
-        return -1;
-      if (data[d + 45] > 64)
-        return -1;
-      if (fine !== 0 && len === 0 || fine > 8 && fine < 247)
-        return -1;
-      if (lstart !== 0 && lsize <= 2)
-        return -1;
-      if (data[d + 45] !== 0 && len === 0)
-        return -1;
-      if (len !== 0)
-        maxIns = i + 1;
+      if (lsize !== 0 && len + 2 < lstart + lsize) return -1;
+      if (len > 65535 || lstart > 65535 || lsize > 65535) return -1;
+      if (data[d + 45] > 64) return -1;
+      if (fine !== 0 && len === 0 || fine > 8 && fine < 247) return -1;
+      if (lstart !== 0 && lsize <= 2) return -1;
+      if (data[d + 45] !== 0 && len === 0) return -1;
+      if (len !== 0) maxIns = i + 1;
     }
-    if (ssize <= 2)
-      return -1;
+    if (ssize <= 2) return -1;
     return maxIns;
   }
   function checkPatternListSize(data, start) {
     const len = data[start + 950];
-    if (len === 0 || len > 127)
-      return -1;
+    if (len === 0 || len > 127) return -1;
     let psize = 0;
     let i = 0;
     for (; i < len; i++) {
       const x = data[start + 952 + i];
-      if (x > 127)
-        return -1;
-      if (x > psize)
-        psize = x;
+      if (x > 127) return -1;
+      if (x > psize) psize = x;
     }
     for (; i !== 128; i++) {
-      if (data[start + 952 + i] !== 0)
-        return -1;
+      if (data[start + 952 + i] !== 0) return -1;
     }
     psize++;
     psize <<= 8;
     return psize;
   }
   function checkPattern(data, s, psize, maxIns, offset) {
-    if (s < offset + psize * 3 + 2)
-      return offset + psize * 3 + 2 - s;
+    if (s < offset + psize * 3 + 2) return offset + psize * 3 + 2 - s;
     for (let i = 0; i < psize; i++) {
       const d = offset + i * 3;
-      if (data[d] > 116)
-        return -1;
-      if ((data[d] & 63) > 36)
-        return -1;
-      if ((data[d + 1] & 15) === 12 && data[d + 2] > 64)
-        return -1;
-      if ((data[d + 1] & 15) === 11 && data[d + 2] > 127)
-        return -1;
-      if ((data[d + 1] & 15) === 13 && data[d + 2] > 64)
-        return -1;
+      if (data[d] > 116) return -1;
+      if ((data[d] & 63) > 36) return -1;
+      if ((data[d + 1] & 15) === 12 && data[d + 2] > 64) return -1;
+      if ((data[d + 1] & 15) === 11 && data[d + 2] > 127) return -1;
+      if ((data[d + 1] & 15) === 13 && data[d + 2] > 64) return -1;
       const ins = data[d] >> 2 & 48 | data[d + 1] >> 4 & 15;
-      if (ins > maxIns)
-        return -1;
+      if (ins > maxIns) return -1;
     }
     return 0;
   }
   function testUnicId(data, start) {
     const s = data.length - start;
-    if (s < 1084)
-      return 1084 - s;
-    if (readmem32b7(data, start + 1080) !== MAGIC_M_K_)
-      return -1;
+    if (s < 1084) return 1084 - s;
+    if (readmem32b7(data, start + 1080) !== MAGIC_M_K_) return -1;
     let ssize = 0;
     for (let i = 0; i < 31; i++) {
       const d = start + i * 30;
       const size = readmem16b6(data, d + 42) << 1;
       ssize += size;
       const end = readmem16b6(data, d + 46) + readmem16b6(data, d + 48) << 1;
-      if (size + 2 < end)
-        return -1;
+      if (size + 2 < end) return -1;
     }
-    if (ssize <= 2)
-      return -1;
+    if (ssize <= 2) return -1;
     for (let i = 0; i < 31; i++) {
       const d = start + i * 30;
       const fine = data[d + 40] << 24 >> 24;
-      if (fine < -8 || fine > 7)
-        return -1;
-      if (data[d + 44] !== 0 || data[d + 45] > 64)
-        return -1;
+      if (fine < -8 || fine > 7) return -1;
+      if (data[d + 44] !== 0 || data[d + 45] > 64) return -1;
     }
     const psize = checkPatternListSize(data, start);
-    if (psize < 0)
-      return -1;
-    if (s < psize * 3 + 1084)
-      return psize * 3 + 1084 - s;
+    if (psize < 0) return -1;
+    if (s < psize * 3 + 1084) return psize * 3 + 1084 - s;
     for (let i = 0; i < psize; i++) {
-      if (data[start + 1084 + i * 3] > 116)
-        return -1;
+      if (data[start + 1084 + i * 3] > 116) return -1;
     }
     return 0;
   }
   function testUnicEmptyId(data, start) {
     const s = data.length - start;
-    if (s < 1084)
-      return 1084 - s;
-    if (readmem32b7(data, start + 1080) !== MAGIC_0000)
-      return -1;
+    if (s < 1084) return 1084 - s;
+    if (readmem32b7(data, start + 1080) !== MAGIC_0000) return -1;
     const maxIns = checkInstruments(data, start);
-    if (maxIns < 0)
-      return -1;
+    if (maxIns < 0) return -1;
     const psize = checkPatternListSize(data, start);
-    if (psize < 0)
-      return -1;
+    if (psize < 0) return -1;
     const r = checkPattern(data, s, psize, maxIns, start + 1084);
-    if (r < 0)
-      return r;
+    if (r < 0) return r;
     return 0;
   }
   function testUnicNoid(data, start) {
     const s = data.length - start;
-    if (s < 1084)
-      return 1084 - s;
-    if (readmem32b7(data, start + 1080) === MAGIC_0000)
-      return -1;
+    if (s < 1084) return 1084 - s;
+    if (readmem32b7(data, start + 1080) === MAGIC_0000) return -1;
     const maxIns = checkInstruments(data, start);
-    if (maxIns < 0)
-      return -1;
+    if (maxIns < 0) return -1;
     const psize = checkPatternListSize(data, start);
-    if (psize < 0)
-      return -1;
+    if (psize < 0) return -1;
     const r = checkPattern(data, s, psize, maxIns, start + 1080);
-    if (r < 0)
-      return r;
+    if (r < 0) return r;
     for (let i = 0; i < 20; i++) {
       const c = data[start + i];
-      if (c !== 0 && c < 32 || c > 180)
-        return -1;
+      if (c !== 0 && c < 32 || c > 180) return -1;
     }
     return 0;
   }
@@ -54050,7 +53704,7 @@
     depack: depackUnic
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-unic2.js
+  // ../../packages/fmt-prowizard/src/pw-unic2.ts
   function put87(out, b) {
     out.push(b & 255);
   }
@@ -54072,8 +53726,7 @@
     writeZero(out, 20);
     let ssize = 0;
     for (let i = 0; i < 31; i++) {
-      for (let k = 0; k < 20; k++)
-        out.push(data[pos++] ?? 0);
+      for (let k = 0; k < 20; k++) out.push(data[pos++] ?? 0);
       put87(out, 0);
       put87(out, 0);
       const c1 = u8();
@@ -54102,14 +53755,11 @@
     put87(out, 127);
     u8();
     const tmp = [];
-    for (let i = 0; i < 128; i++)
-      tmp.push(u8());
-    for (let i = 0; i < 128; i++)
-      put87(out, tmp[i]);
+    for (let i = 0; i < 128; i++) tmp.push(u8());
+    for (let i = 0; i < 128; i++) put87(out, tmp[i]);
     let maxpat = 0;
     for (let i = 0; i < 128; i++) {
-      if (tmp[i] > maxpat)
-        maxpat = tmp[i];
+      if (tmp[i] > maxpat) maxpat = tmp[i];
     }
     maxpat++;
     put32b7(out, 1294879534);
@@ -54120,8 +53770,7 @@
         const c3 = u8();
         const ins = c1 >> 2 & 16 | c2 >> 4 & 15;
         const note = c1 & 63;
-        if (!ptkIsValidNote(note))
-          throw new Error("unic2: invalid note");
+        if (!ptkIsValidNote(note)) throw new Error("unic2: invalid note");
         const fxt = c2 & 15;
         let fxp = c3;
         if (fxt === 13) {
@@ -54140,10 +53789,8 @@
   }
   function testUnic2(data, start) {
     const s = data.length - start;
-    if (s < 1084)
-      return 1084 - s;
-    if (readmem32b7(data, start + 1080) === 0)
-      return -1;
+    if (s < 1084) return 1084 - s;
+    if (readmem32b7(data, start + 1080) === 0) return -1;
     let ssize = 0;
     let maxIns = 0;
     for (let i2 = 0; i2 < 31; i2++) {
@@ -54152,56 +53799,38 @@
       const lstart = readmem16b6(data, d + 26) << 1;
       const lsize = readmem16b6(data, d + 28) << 1;
       ssize += size;
-      if (size + 2 < lstart + lsize)
-        return -1;
-      if (size > 65535 || lstart > 65535 || lsize > 65535)
-        return -1;
-      if (data[d + 25] > 64)
-        return -1;
-      if (readmem16b6(data, d + 20) !== 0 && size === 0)
-        return -1;
-      if (data[d + 25] !== 0 && size === 0)
-        return -1;
-      if (size !== 0)
-        maxIns = i2 + 1;
+      if (size + 2 < lstart + lsize) return -1;
+      if (size > 65535 || lstart > 65535 || lsize > 65535) return -1;
+      if (data[d + 25] > 64) return -1;
+      if (readmem16b6(data, d + 20) !== 0 && size === 0) return -1;
+      if (data[d + 25] !== 0 && size === 0) return -1;
+      if (size !== 0) maxIns = i2 + 1;
     }
-    if (ssize <= 2)
-      return -1;
+    if (ssize <= 2) return -1;
     const len = data[start + 930];
-    if (len === 0 || len > 127)
-      return -1;
+    if (len === 0 || len > 127) return -1;
     let psize = 0;
     let i = 0;
     for (; i < len; i++) {
       const x = data[start + 932 + i];
-      if (x > 127)
-        return -1;
-      if (x > psize)
-        psize = x;
+      if (x > 127) return -1;
+      if (x > psize) psize = x;
     }
     for (i += 2; i !== 128; i++) {
-      if (data[start + 932 + i] !== 0)
-        return -1;
+      if (data[start + 932 + i] !== 0) return -1;
     }
     psize++;
     psize <<= 8;
-    if (s < 1060 + psize * 3 + 2)
-      return 1060 + psize * 3 + 2 - s;
+    if (s < 1060 + psize * 3 + 2) return 1060 + psize * 3 + 2 - s;
     for (i = 0; i < psize; i++) {
       const d = start + 1060 + i * 3;
-      if (data[d] > 116)
-        return -1;
-      if ((data[d] & 63) > 36)
-        return -1;
-      if ((data[d + 1] & 15) === 12 && data[d + 2] > 64)
-        return -1;
-      if ((data[d + 1] & 15) === 11 && data[d + 2] > 127)
-        return -1;
-      if ((data[d + 1] & 15) === 13 && data[d + 2] > 64)
-        return -1;
+      if (data[d] > 116) return -1;
+      if ((data[d] & 63) > 36) return -1;
+      if ((data[d + 1] & 15) === 12 && data[d + 2] > 64) return -1;
+      if ((data[d + 1] & 15) === 11 && data[d + 2] > 127) return -1;
+      if ((data[d + 1] & 15) === 13 && data[d + 2] > 64) return -1;
       const ins = data[d] >> 2 & 48 | data[d + 2] >> 4 & 15;
-      if (ins > maxIns)
-        return -1;
+      if (ins > maxIns) return -1;
     }
     pwReadTitle(null, 0);
     return 0;
@@ -54212,7 +53841,7 @@
     depack: depackUnic2
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-np12.js
+  // ../../packages/fmt-prowizard/src/pw-np12.ts
   var PW_MOD_MAGIC5 = 1294879534;
   function put88(out, b) {
     out.push(b & 255);
@@ -54242,8 +53871,7 @@
     const nins = c1 << 4 & 240 | c2 >> 4 & 15;
     writeZero(out, 20);
     const len = u16() >> 1;
-    if (len > 128)
-      throw new Error("np: pattern list too long");
+    if (len > 128) throw new Error("np: pattern list too long");
     u16();
     u16();
     let ssize = 0;
@@ -54263,8 +53891,7 @@
     {
       const pad = new Array(30).fill(0);
       pad[29] = 1;
-      for (let i = nins; i < 31; i++)
-        out.push(...pad);
+      for (let i = nins; i < 31; i++) out.push(...pad);
     }
     put88(out, len);
     put88(out, 127);
@@ -54275,14 +53902,11 @@
     for (let i = 0; i < len; i++) {
       const p = u16() >> 3;
       ptable.push(p);
-      if (p > npat)
-        npat = p;
+      if (p > npat) npat = p;
     }
     npat++;
-    if (!ver1 && npat > 128)
-      throw new Error("np2: too many patterns");
-    for (let i = 0; i < 128; i++)
-      put88(out, ptable[i]);
+    if (!ver1 && npat > 128) throw new Error("np2: too many patterns");
+    for (let i = 0; i < 128; i++) put88(out, ptable[i]);
     put32b8(out, PW_MOD_MAGIC5);
     const trkAddr = [];
     let maxAddr = 0;
@@ -54291,8 +53915,7 @@
       for (let j = 0; j < 4; j++) {
         const a = u16();
         row.push(a);
-        if (a > maxAddr)
-          maxAddr = a;
+        if (a > maxAddr) maxAddr = a;
       }
       trkAddr.push(row);
     }
@@ -54307,8 +53930,7 @@
           const c22 = u8();
           const c3 = u8();
           const c4 = Math.trunc((c12 & 254) / 2);
-          if (!ptkIsValidNote(c4))
-            throw new Error("np: invalid note");
+          if (!ptkIsValidNote(c4)) throw new Error("np: invalid note");
           let eff2 = c22;
           let eff3 = c3;
           switch (c22 & 15) {
@@ -54327,8 +53949,7 @@
               eff3 = Math.trunc((eff3 + 4) / 2);
               break;
             case 14:
-              if (!ver1)
-                eff3--;
+              if (!ver1) eff3--;
               break;
           }
           tmp[x] = c12 << 4 & 16 | ptkTable[c4][0];
@@ -54337,29 +53958,22 @@
           tmp[x + 3] = eff3 & 255;
         }
       }
-      for (let k = 0; k < 1024; k++)
-        out.push(tmp[k]);
+      for (let k = 0; k < 1024; k++) out.push(tmp[k]);
     }
     moveData(data, start + maxAddr + 192 + trkStart, out, ssize);
     return Uint8Array.from(out);
   }
   function testNp12(data, start, ver1) {
     const s = data.length - start;
-    if (s < 10)
-      return 10 - s;
+    if (s < 10) return 10 - s;
     const ptabSize = readmem16b6(data, start + 2);
-    if (ptabSize === 0 || (ptabSize & 1) !== 0 || ptabSize > 255)
-      return -1;
-    if ((data[start + 1] & 15) !== 12)
-      return -1;
+    if (ptabSize === 0 || (ptabSize & 1) !== 0 || ptabSize > 255) return -1;
+    if ((data[start + 1] & 15) !== 12) return -1;
     const numIns = data[start] << 4 & 240 | data[start + 1] >> 4 & 15;
-    if (numIns === 0 || numIns > 31)
-      return -1;
-    if (s < 15 + numIns * 16)
-      return 15 + numIns * 16 - s;
+    if (numIns === 0 || numIns > 31) return -1;
+    if (s < 15 + numIns * 16) return 15 + numIns * 16 - s;
     for (let i = 0; i < numIns; i++) {
-      if (data[start + 15 + i * 16] > 64)
-        return -1;
+      if (data[start + 15 + i * 16] > 64) return -1;
     }
     let ssize = 0;
     for (let i = 0; i < numIns; i++) {
@@ -54367,49 +53981,36 @@
       const len = readmem16b6(data, d + 12) << 1;
       const lstart = readmem16b6(data, d + 20) << 1;
       const lsize = ver1 ? readmem16b6(data, d + 22) : readmem16b6(data, d + 22) << 1;
-      if (len > 65535 || lstart > 65535 || lsize > 65535)
-        return -1;
-      if (lstart + lsize > len + 2)
-        return -1;
-      if (lstart === 0 && lsize !== 0)
-        return -1;
+      if (len > 65535 || lstart > 65535 || lsize > 65535) return -1;
+      if (lstart + lsize > len + 2) return -1;
+      if (lstart === 0 && lsize !== 0) return -1;
       ssize += len;
     }
-    if (ssize <= 4)
-      return -1;
+    if (ssize <= 4) return -1;
     let hdrSize = numIns * 16 + 8 + 4;
-    if (s < hdrSize + ptabSize + 2)
-      return hdrSize + ptabSize + 2 - s;
+    if (s < hdrSize + ptabSize + 2) return hdrSize + ptabSize + 2 - s;
     let maxPptr = 0;
     for (let i = 0; i < ptabSize; i += 2) {
       const pptr = readmem16b6(data, start + hdrSize + i);
       if (ver1) {
-        if ((pptr & 7) !== 0 || pptr >= 1024)
-          return -1;
+        if ((pptr & 7) !== 0 || pptr >= 1024) return -1;
       } else {
-        if ((pptr & 7) !== 0 || pptr > 1024)
-          return -1;
+        if ((pptr & 7) !== 0 || pptr > 1024) return -1;
       }
-      if (pptr > maxPptr)
-        maxPptr = pptr;
+      if (pptr > maxPptr) maxPptr = pptr;
     }
     hdrSize += ptabSize + maxPptr + 8;
     const trkSize = readmem16b6(data, start + 6);
-    if (trkSize < 192 || (trkSize & 63) !== 0)
-      return -1;
+    if (trkSize < 192 || (trkSize & 63) !== 0) return -1;
     const need = hdrSize + trkSize + (ver1 ? 0 : 16);
-    if (s < need)
-      return need - s;
+    if (s < need) return need - s;
     for (let i = 0; i < trkSize; i += 3) {
       const d = start + hdrSize + i;
-      if (data[d] > 73)
-        return -1;
+      if (data[d] > 73) return -1;
       if (!ver1) {
         const ins = data[d] << 4 & 16 | data[d + 1] >> 4 & 15;
-        if (ins > numIns)
-          return -1;
-        if ((data[d + 1] & 15) === 0 && data[d + 2] !== 0)
-          return -1;
+        if (ins > numIns) return -1;
+        if ((data[d + 1] & 15) === 0 && data[d + 2] !== 0) return -1;
       }
     }
     pwReadTitle(null, 0);
@@ -54426,7 +54027,7 @@
     depack: (data, st) => depackNp12(data, st, false)
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-np3.js
+  // ../../packages/fmt-prowizard/src/pw-np3.ts
   var PW_MOD_MAGIC6 = 1294879534;
   function put89(out, b) {
     out.push(b & 255);
@@ -54451,8 +54052,7 @@
     const nins = c1 << 4 & 240 | c2 >> 4 & 15;
     writeZero(out, 20);
     const len = u16() >> 1;
-    if (len > 128)
-      throw new Error("np3: pattern list too long");
+    if (len > 128) throw new Error("np3: pattern list too long");
     u16();
     u16();
     let ssize = 0;
@@ -54471,8 +54071,7 @@
     {
       const pad = new Array(30).fill(0);
       pad[29] = 1;
-      for (let i = nins; i < 31; i++)
-        out.push(...pad);
+      for (let i = nins; i < 31; i++) out.push(...pad);
     }
     put89(out, len);
     put89(out, 127);
@@ -54483,18 +54082,15 @@
     for (let i = 0; i < len; i++) {
       const p = Math.trunc(u16() / 8);
       ptable.push(p);
-      if (p > npat)
-        npat = p;
+      if (p > npat) npat = p;
     }
     npat++;
-    for (let i = 0; i < 128; i++)
-      put89(out, ptable[i]);
+    for (let i = 0; i < 128; i++) put89(out, ptable[i]);
     put32b9(out, PW_MOD_MAGIC6);
     const trkAddr = [];
     for (let i = 0; i < npat; i++) {
       const row = [];
-      for (let j = 0; j < 4; j++)
-        row.push(u16());
+      for (let j = 0; j < 4; j++) row.push(u16());
       trkAddr.push(row);
     }
     const trkStart = pos;
@@ -54513,8 +54109,7 @@
           const c22 = u8();
           const c3 = u8();
           const c4 = Math.trunc((c12 & 254) / 2);
-          if (!ptkIsValidNote(c4))
-            throw new Error("np3: invalid note");
+          if (!ptkIsValidNote(c4)) throw new Error("np3: invalid note");
           let eff2 = c22;
           let eff3 = c3;
           switch (c22 & 15) {
@@ -54540,37 +54135,27 @@
           tmp[x + 1] = ptkTable[c4][1];
           tmp[x + 2] = eff2;
           tmp[x + 3] = eff3;
-          if ((c22 & 15) === 13)
-            break;
+          if ((c22 & 15) === 13) break;
         }
-        if (pos > smpAddr)
-          smpAddr = pos;
+        if (pos > smpAddr) smpAddr = pos;
       }
-      for (let k = 0; k < 1024; k++)
-        out.push(tmp[k]);
+      for (let k = 0; k < 1024; k++) out.push(tmp[k]);
     }
-    if ((smpAddr & 1) !== 0)
-      smpAddr++;
+    if ((smpAddr & 1) !== 0) smpAddr++;
     moveData(data, smpAddr, out, ssize);
     return Uint8Array.from(out);
   }
   function testNp3(data, start) {
     const s = data.length - start;
-    if (s < 10)
-      return 10 - s;
+    if (s < 10) return 10 - s;
     const ptabSize = readmem16b6(data, start + 2);
-    if (ptabSize === 0 || (ptabSize & 1) !== 0 || ptabSize > 255)
-      return -1;
-    if ((data[start + 1] & 15) !== 12)
-      return -1;
+    if (ptabSize === 0 || (ptabSize & 1) !== 0 || ptabSize > 255) return -1;
+    if ((data[start + 1] & 15) !== 12) return -1;
     const numIns = data[start] << 4 & 240 | data[start + 1] >> 4 & 15;
-    if (numIns === 0 || numIns > 31)
-      return -1;
-    if (s < 15 + numIns * 16)
-      return 15 + numIns * 16 - s;
+    if (numIns === 0 || numIns > 31) return -1;
+    if (s < 15 + numIns * 16) return 15 + numIns * 16 - s;
     for (let i = 0; i < numIns; i++) {
-      if (data[start + 9 + i * 16] > 64)
-        return -1;
+      if (data[start + 9 + i * 16] > 64) return -1;
     }
     let ssize = 0;
     for (let i = 0; i < numIns; i++) {
@@ -54578,48 +54163,33 @@
       const len = readmem16b6(data, d + 14) << 1;
       const lstart = readmem16b6(data, d + 20) << 1;
       const lsize = readmem16b6(data, d + 22) << 1;
-      if (len > 65535 || lstart > 65535 || lsize > 65535)
-        return -1;
-      if (lstart + lsize > len + 2)
-        return -1;
-      if (lstart === 0 && lsize !== 0)
-        return -1;
+      if (len > 65535 || lstart > 65535 || lsize > 65535) return -1;
+      if (lstart + lsize > len + 2) return -1;
+      if (lstart === 0 && lsize !== 0) return -1;
       ssize += len;
     }
-    if (ssize <= 4)
-      return -1;
+    if (ssize <= 4) return -1;
     let hdrSize = numIns * 16 + 8 + 4;
-    if (s < hdrSize + ptabSize + 2)
-      return hdrSize + ptabSize + 2 - s;
+    if (s < hdrSize + ptabSize + 2) return hdrSize + ptabSize + 2 - s;
     let maxPptr = 0;
     for (let i = 0; i < ptabSize; i += 2) {
       const pptr = readmem16b6(data, start + hdrSize + i);
-      if ((pptr & 7) !== 0 || pptr >= 1024)
-        return -1;
-      if (pptr > maxPptr)
-        maxPptr = pptr;
+      if ((pptr & 7) !== 0 || pptr >= 1024) return -1;
+      if (pptr > maxPptr) maxPptr = pptr;
     }
     hdrSize += ptabSize + maxPptr + 8;
     const trkSize = readmem16b6(data, start + 6);
-    if (trkSize <= 63)
-      return -1;
-    if (s < hdrSize + trkSize + 2)
-      return hdrSize + trkSize + 2 - s;
+    if (trkSize <= 63) return -1;
+    if (s < hdrSize + trkSize + 2) return hdrSize + trkSize + 2 - s;
     let errcount = 0;
     for (let i = 0; i < trkSize; i++) {
       const d = start + hdrSize + i;
-      if ((data[d] & 128) !== 0)
-        continue;
-      if (data[d] > 73 || (data[d + 1] & 15) === 10)
-        errcount++;
-      if ((data[d + 1] & 15) === 13 && data[d + 2] > 64)
-        errcount++;
-      if ((data[d] << 4 & 16 | data[d + 1] >> 4 & 15) > numIns)
-        errcount++;
-      if (data[d] === 0 && data[d + 1] === 0 && data[d + 2] === 0 && i < trkSize - 3)
-        errcount++;
-      if (errcount > 1)
-        return -1;
+      if ((data[d] & 128) !== 0) continue;
+      if (data[d] > 73 || (data[d + 1] & 15) === 10) errcount++;
+      if ((data[d + 1] & 15) === 13 && data[d + 2] > 64) errcount++;
+      if ((data[d] << 4 & 16 | data[d + 1] >> 4 & 15) > numIns) errcount++;
+      if (data[d] === 0 && data[d + 1] === 0 && data[d + 2] === 0 && i < trkSize - 3) errcount++;
+      if (errcount > 1) return -1;
       i += 2;
     }
     pwReadTitle(null, 0);
@@ -54631,7 +54201,7 @@
     depack: depackNp3
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-xann.js
+  // ../../packages/fmt-prowizard/src/pw-xann.ts
   var SMP_DESC_ADDRESS = 518;
   var PAT_DATA_ADDRESS = 1084;
   function put810(out, b) {
@@ -54683,17 +54253,14 @@
     let c5 = 0;
     for (; c5 < 128; c5++) {
       const k = u32();
-      if (k === 0)
-        break;
+      if (k === 0) break;
       ptable[c5] = Math.trunc((k - 60) / 1024) - 1;
-      if (ptable[c5] > pat)
-        pat = ptable[c5];
+      if (ptable[c5] > pat) pat = ptable[c5];
     }
     pat++;
     put810(out, c5);
     put810(out, 127);
-    for (let i = 0; i < 128; i++)
-      put810(out, ptable[i]);
+    for (let i = 0; i < 128; i++) put810(out, ptable[i]);
     put32b10(out, 1294879534);
     pos = start + PAT_DATA_ADDRESS;
     for (let i = 0; i < pat; i++) {
@@ -54702,8 +54269,7 @@
         const note = u8();
         let fxt = u8();
         let fxp = u8();
-        if (!ptkIsValidNote(note >> 1))
-          throw new Error("xann: invalid note");
+        if (!ptkIsValidNote(note >> 1)) throw new Error("xann: invalid note");
         switch (fxt) {
           case 0:
             fxt = 0;
@@ -54833,15 +54399,12 @@
   }
   function testXann(data, start) {
     const s = data.length - start;
-    if (s < 2048)
-      return 2048 - s;
-    if (data[start + 3] !== 60)
-      return -1;
+    if (s < 2048) return 2048 - s;
+    if (data[start + 3] !== 60) return -1;
     for (let i = 0; i < 128; i++) {
       const j = readmem32b7(data, start + i * 4);
       const k = j & ~3;
-      if (k !== j || j > 132156)
-        return -1;
+      if (k !== j || j > 132156) return -1;
     }
     for (let i = 0; i < 64; i++) {
       if (data[start + 3 + i * 4] !== 60 && data[start + 3 + i * 4] !== 0) {
@@ -54849,16 +54412,13 @@
       }
     }
     for (let i = 0; i < 31; i++) {
-      if (data[start + 519 + 16 * i] > 64)
-        return -1;
+      if (data[start + 519 + 16 * i] > 64) return -1;
     }
     for (let i = 0; i < 30; i++) {
       const j = readmem32b7(data, start + 526 + 16 * i);
       const k = readmem32b7(data, start + 520 + 16 * (i + 1));
-      if (j < 2108 || k < 2108)
-        return -1;
-      if (j > k)
-        return -1;
+      if (j < 2108 || k < 2108) return -1;
+      if (j > k) return -1;
     }
     pwReadTitle(null, 0);
     return 0;
@@ -54869,7 +54429,7 @@
     depack: depackXann
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-wn.js
+  // ../../packages/fmt-prowizard/src/pw-wn.ts
   var PW_MOD_MAGIC7 = 1294879534;
   function put811(out, b) {
     out.push(b & 255);
@@ -54880,21 +54440,18 @@
   function depackWn(data, start) {
     let pos = start;
     const out = [];
-    for (let i = 0; i < 950; i++)
-      out.push(data[pos++] ?? 0);
+    for (let i = 0; i < 950; i++) out.push(data[pos++] ?? 0);
     let ssize = 0;
     for (let i = 0; i < 31; i++) {
       ssize += (data[start + 42 + i * 30] << 8 | data[start + 43 + i * 30]) * 2;
     }
     const npat = data[start + 950];
     put811(out, npat);
-    for (let i = 0; i < 129; i++)
-      out.push(data[start + 951 + i] ?? 0);
+    for (let i = 0; i < 129; i++) out.push(data[start + 951 + i] ?? 0);
     put32b11(out, PW_MOD_MAGIC7);
     let max = 0;
     for (let i = 0; i < 128; i++) {
-      if (data[start + 951 + i + 1] > max)
-        max = data[start + 951 + i + 1];
+      if (data[start + 951 + i + 1] > max) max = data[start + 951 + i + 1];
     }
     max++;
     pos = start + 1084;
@@ -54904,8 +54461,7 @@
         const c2 = data[pos++] ?? 0;
         const c3 = data[pos++] ?? 0;
         const c4 = data[pos++] ?? 0;
-        if (!ptkIsValidNote(Math.trunc(c1 / 2)))
-          throw new Error("wn: invalid note");
+        if (!ptkIsValidNote(Math.trunc(c1 / 2))) throw new Error("wn: invalid note");
         put811(out, c2 & 240 | ptkTable[Math.trunc(c1 / 2)][0]);
         put811(out, ptkTable[Math.trunc(c1 / 2)][1]);
         put811(out, c2 << 4 & 240 | c3);
@@ -54917,14 +54473,10 @@
   }
   function testWn(data, start) {
     const s = data.length - start;
-    if (s < 1082)
-      return 1082 - s;
-    if (data[start + 1080] !== 87 || data[start + 1081] !== 78)
-      return -1;
-    if (data[start + 951] !== 127)
-      return -1;
-    if (data[start + 950] > 127)
-      return -1;
+    if (s < 1082) return 1082 - s;
+    if (data[start + 1080] !== 87 || data[start + 1081] !== 78) return -1;
+    if (data[start + 951] !== 127) return -1;
+    if (data[start + 950] > 127) return -1;
     pwReadTitle(data.subarray(start), 20);
     return 0;
   }
@@ -54934,7 +54486,7 @@
     depack: depackWn
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-zen.js
+  // ../../packages/fmt-prowizard/src/pw-zen.ts
   var PW_MOD_MAGIC8 = 1294879534;
   function put812(out, b) {
     out.push(b & 255);
@@ -54962,8 +54514,7 @@
     const ptableAddr = u32();
     const patMax = u8();
     const patPos = u8();
-    if (patPos >= 128 || patMax >= 128)
-      throw new Error("zen: counts too large");
+    if (patPos >= 128 || patMax >= 128) throw new Error("zen: counts too large");
     writeZero(out, 20);
     let ssize = 0;
     let sdataAddr = 999999;
@@ -54979,8 +54530,7 @@
       put812(out, vol);
       const loopSize = u16();
       const k = u32();
-      if (k < sdataAddr)
-        sdataAddr = k;
+      if (k < sdataAddr) sdataAddr = k;
       const j = Math.trunc((u32() - k) / 2);
       put16b11(out, j);
       put16b11(out, loopSize);
@@ -54989,8 +54539,7 @@
     put812(out, 127);
     pos = start + ptableAddr;
     const paddr = [];
-    for (let i = 0; i < patPos; i++)
-      paddr.push(u32());
+    for (let i = 0; i < patPos; i++) paddr.push(u32());
     const ptable = new Array(128).fill(0);
     const paddr2 = new Array(128).fill(0);
     let c4 = 0;
@@ -55014,8 +54563,7 @@
         c4++;
       }
     }
-    for (let i = 0; i < 128; i++)
-      put812(out, ptable[i]);
+    for (let i = 0; i < 128; i++) put812(out, ptable[i]);
     put32b12(out, PW_MOD_MAGIC8);
     for (let i = 0; i <= patMax; i++) {
       const pat = new Uint8Array(1024);
@@ -55027,8 +54575,7 @@
         const c3 = u8();
         const c4v = u8();
         const note = Math.trunc((c2 & 127) / 2);
-        if (!ptkIsValidNote(note))
-          throw new Error("zen: invalid note");
+        if (!ptkIsValidNote(note)) throw new Error("zen: invalid note");
         const fxp = c4v;
         const ins = c2 << 4 & 16 | c3 >> 4 & 15;
         const fxt = c3 & 15;
@@ -55040,42 +54587,32 @@
         j = c1;
         j++;
       }
-      for (let k = 0; k < 1024; k++)
-        out.push(pat[k]);
+      for (let k = 0; k < 1024; k++) out.push(pat[k]);
     }
     moveData(data, start + sdataAddr, out, ssize);
     return Uint8Array.from(out);
   }
   function testZen(data, start) {
     const s = data.length - start;
-    if (s < 9 + 16 * 31)
-      return 9 + 16 * 31 - s;
+    if (s < 9 + 16 * 31) return 9 + 16 * 31 - s;
     const patOfs = readmem32b7(data, start);
-    if (patOfs < 502 || patOfs > 2163190)
-      return -1;
+    if (patOfs < 502 || patOfs > 2163190) return -1;
     for (let i = 0; i < 31; i++) {
       const d = start + 16 * i;
-      if (data[d + 9] > 64)
-        return -1;
-      if (readmem16b6(data, d + 6) % 72 !== 0)
-        return -1;
+      if (data[d + 9] > 64) return -1;
+      if (readmem16b6(data, d + 6) % 72 !== 0) return -1;
     }
     for (let i = 0; i < 31; i++) {
       const size = readmem16b6(data, start + 10 + i * 16) << 1;
       const lsize = readmem16b6(data, start + 12 + i * 16) << 1;
       const sdata = readmem32b7(data, start + 14 + i * 16);
-      if (size > 65535 || lsize > 65535)
-        return -1;
-      if (sdata < patOfs)
-        return -1;
+      if (size > 65535 || lsize > 65535) return -1;
+      if (sdata < patOfs) return -1;
     }
     const len = data[start + 5];
-    if (len === 0 || len > 127)
-      return -1;
-    if (s < patOfs + len * 4 + 4)
-      return patOfs + len * 4 + 4 - s;
-    if (readmem32b7(data, start + patOfs + len * 4) !== 4294967295)
-      return -1;
+    if (len === 0 || len > 127) return -1;
+    if (s < patOfs + len * 4 + 4) return patOfs + len * 4 + 4 - s;
+    if (readmem32b7(data, start + patOfs + len * 4) !== 4294967295) return -1;
     pwReadTitle(null, 0);
     return 0;
   }
@@ -55085,7 +54622,7 @@
     depack: depackZen
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-ksm.js
+  // ../../packages/fmt-prowizard/src/pw-ksm.ts
   var PW_MOD_MAGIC9 = 1294879534;
   function put813(out, b) {
     out.push(b & 255);
@@ -55099,8 +54636,7 @@
   function depackKsm(data, start) {
     let pos = start + 2;
     const out = [];
-    for (let i = 0; i < 13; i++)
-      out.push(data[pos++] ?? 0);
+    for (let i = 0; i < 13; i++) out.push(data[pos++] ?? 0);
     writeZero(out, 7);
     pos = start + 32;
     let ssize = 0;
@@ -55124,8 +54660,7 @@
     {
       const pad = new Array(30).fill(0);
       pad[29] = 1;
-      for (let i = 0; i < 16; i++)
-        out.push(...pad);
+      for (let i = 0; i < 16; i++) out.push(...pad);
     }
     pos = start + 512;
     const trknum = [];
@@ -55135,11 +54670,9 @@
       const row = [data[pos] ?? 0, data[pos + 1] ?? 0, data[pos + 2] ?? 0, data[pos + 3] ?? 0];
       pos += 4;
       trknum.push(row);
-      if (row[0] === 255)
-        break;
+      if (row[0] === 255) break;
       for (const v of row) {
-        if (v > maxTrknum)
-          maxTrknum = v;
+        if (v > maxTrknum) maxTrknum = v;
       }
     }
     put813(out, len);
@@ -55188,16 +54721,14 @@
           break;
         }
       }
-      if (status === 0)
-        continue;
+      if (status === 0) continue;
       realTnum.push([trknum[i][0], trknum[i][1], trknum[i][2], trknum[i][3]]);
       c1count++;
       status = 1;
     }
     void c5;
     void c1count;
-    for (let i = 0; i < 128; i++)
-      put813(out, plist[i]);
+    for (let i = 0; i < 128; i++) put813(out, plist[i]);
     put32b13(out, PW_MOD_MAGIC9);
     for (let i = 0; i < c1count; i++) {
       const tmp = new Uint8Array(1024);
@@ -55205,8 +54736,7 @@
       for (let k = 0; k < 4; k++) {
         pos = start + 1536 + 192 * (realTnum[i][k] ?? 0);
         const td = new Uint8Array(192);
-        for (let t = 0; t < 192; t++)
-          td[t] = data[pos++] ?? 0;
+        for (let t = 0; t < 192; t++) td[t] = data[pos++] ?? 0;
         tdata.push(td);
       }
       for (let j = 0; j < 64; j++) {
@@ -55214,56 +54744,43 @@
         for (let k = 0; k < 4; k++) {
           const t = tdata[k];
           const tBase = j * 3;
-          if (!ptkIsValidNote(t[tBase] ?? 0))
-            throw new Error("ksm: invalid note");
+          if (!ptkIsValidNote(t[tBase] ?? 0)) throw new Error("ksm: invalid note");
           tmp[x + k * 4] = ptkTable[t[tBase] ?? 0][0];
           tmp[x + k * 4 + 1] = ptkTable[t[tBase] ?? 0][1];
           let t1 = t[tBase + 1];
-          if ((t1 & 15) === 13)
-            t1 -= 3;
+          if ((t1 & 15) === 13) t1 -= 3;
           tmp[x + k * 4 + 2] = t1;
           tmp[x + k * 4 + 3] = t[tBase + 2];
         }
       }
-      for (let k = 0; k < 1024; k++)
-        out.push(tmp[k]);
+      for (let k = 0; k < 1024; k++) out.push(tmp[k]);
     }
     moveData(data, start + 1536 + 192 * (maxTrknum + 1), out, ssize);
     return Uint8Array.from(out);
   }
   function testKsm(data, start) {
     const s = data.length - start;
-    if (s < 1536)
-      return 1536 - s;
-    if (data[start] !== 77 || data[start + 1] !== 46)
-      return -1;
-    if (data[start + 15] !== 97)
-      return -1;
+    if (s < 1536) return 1536 - s;
+    if (data[start] !== 77 || data[start + 1] !== 46) return -1;
+    if (data[start + 15] !== 97) return -1;
     for (let i2 = 0; i2 < 15; i2++) {
-      if (data[start + 54 + i2 * 32] > 64)
-        return -1;
+      if (data[start + 54 + i2 * 32] > 64) return -1;
     }
     let maxTrk = 0;
     let i = 0;
     for (; i < 1024; i++) {
       const x = data[start + i + 512];
-      if (x === 255)
-        break;
-      if (x > maxTrk)
-        maxTrk = x;
+      if (x === 255) break;
+      if (x > maxTrk) maxTrk = x;
     }
-    if (i === 1024)
-      return -1;
-    if (maxTrk === 0)
-      return -1;
+    if (i === 1024) return -1;
+    if (maxTrk === 0) return -1;
     const need = 1536 + maxTrk * 192 + 64 * 3;
-    if (s < need)
-      return need - s;
+    if (s < need) return need - s;
     for (i = 0; i <= maxTrk; i++) {
       const d = start + 1536 + i * 192;
       for (let j = 0; j < 64; j++) {
-        if (data[d + j * 3] > 36)
-          return -1;
+        if (data[d + j * 3] > 36) return -1;
       }
     }
     pwReadTitle(data.subarray(start + 2), 13);
@@ -55275,7 +54792,7 @@
     depack: depackKsm
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-hrt.js
+  // ../../packages/fmt-prowizard/src/pw-hrt.ts
   var PW_MOD_MAGIC10 = 1294879534;
   function put814(out, b) {
     out.push(b & 255);
@@ -55287,8 +54804,7 @@
     let pos = start;
     const out = [];
     const buf = new Uint8Array(950);
-    for (let i = 0; i < 950; i++)
-      buf[i] = data[pos++] ?? 0;
+    for (let i = 0; i < 950; i++) buf[i] = data[pos++] ?? 0;
     for (let i = 0; i < 31; i++) {
       const p = 38 + 30 * i;
       buf[p] = 0;
@@ -55296,8 +54812,7 @@
       buf[p + 2] = 0;
       buf[p + 3] = 0;
     }
-    for (let i = 0; i < 950; i++)
-      out.push(buf[i]);
+    for (let i = 0; i < 950; i++) out.push(buf[i]);
     let ssize = 0;
     for (let i = 0; i < 31; i++) {
       ssize += (buf[42 + 30 * i] << 8 | buf[43 + 30 * i]) * 2;
@@ -55306,14 +54821,11 @@
     put814(out, len);
     put814(out, data[pos++] ?? 0);
     const plist = new Uint8Array(128);
-    for (let i = 0; i < 128; i++)
-      plist[i] = data[pos++] ?? 0;
-    for (let i = 0; i < 128; i++)
-      out.push(plist[i]);
+    for (let i = 0; i < 128; i++) plist[i] = data[pos++] ?? 0;
+    for (let i = 0; i < 128; i++) out.push(plist[i]);
     let npat = 0;
     for (let i = 0; i < 128; i++) {
-      if (plist[i] > npat)
-        npat = plist[i];
+      if (plist[i] > npat) npat = plist[i];
     }
     npat++;
     put32b14(out, PW_MOD_MAGIC10);
@@ -55344,17 +54856,14 @@
   }
   function testHrt(data, start) {
     const s = data.length - start;
-    if (s < 1084)
-      return 1084 - s;
+    if (s < 1084) return 1084 - s;
     if ((data[start + 1080] << 24 | data[start + 1081] << 16 | data[start + 1082] << 8 | data[start + 1083]) !== 1213355041) {
       return -1;
     }
     for (let i = 0; i < 31; i++) {
       const d = start + 20 + i * 30;
-      if (data[d + 24] > 15)
-        return -1;
-      if (data[d + 25] > 64)
-        return -1;
+      if (data[d + 24] > 15) return -1;
+      if (data[d + 25] > 64) return -1;
     }
     pwReadTitle(data.subarray(start), 20);
     return 0;
@@ -55365,7 +54874,7 @@
     depack: depackHrt
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-mp.js
+  // ../../packages/fmt-prowizard/src/pw-mp.ts
   var MAGIC_TRK1 = 1414679345;
   var PW_MOD_MAGIC11 = 1294879534;
   function put815(out, b) {
@@ -55392,8 +54901,7 @@
       return v;
     };
     writeZero(out, 20);
-    if (u32() !== MAGIC_TRK1)
-      pos -= 4;
+    if (u32() !== MAGIC_TRK1) pos -= 4;
     let ssize = 0;
     for (let i = 0; i < 31; i++) {
       writeZero(out, 22);
@@ -55411,13 +54919,11 @@
     for (let i = 0; i < 128; i++) {
       const c1 = u8();
       put815(out, c1);
-      if (c1 > max)
-        max = c1;
+      if (c1 > max) max = c1;
     }
     max++;
     put32b15(out, PW_MOD_MAGIC11);
-    if (u32() !== 0)
-      pos -= 4;
+    if (u32() !== 0) pos -= 4;
     moveData(data, pos, out, 1024 * max);
     pos += 1024 * max;
     moveData(data, pos, out, ssize);
@@ -55425,8 +54931,7 @@
   }
   function testMpNoid(data, start) {
     const s = data.length - start;
-    if (s < 378)
-      return 378 - s;
+    if (s < 378) return 378 - s;
     let hdrSsize = 0;
     for (let i = 0; i < 31; i++) {
       const d = start + i * 8;
@@ -55434,80 +54939,59 @@
       const lstart = readmem16b6(data, d + 4) << 1;
       const lsize = readmem16b6(data, d + 6) << 1;
       hdrSsize += size;
-      if (data[d + 2] > 15)
-        return -1;
-      if (lsize !== 2 && lstart + lsize > size)
-        return -1;
-      if (lsize > size + 2)
-        return -1;
-      if (lstart !== 0 && lsize <= 2)
-        return -1;
-      if (size !== 0 && lsize === 0)
-        return -1;
+      if (data[d + 2] > 15) return -1;
+      if (lsize !== 2 && lstart + lsize > size) return -1;
+      if (lsize > size + 2) return -1;
+      if (lstart !== 0 && lsize <= 2) return -1;
+      if (size !== 0 && lsize === 0) return -1;
     }
-    if (hdrSsize <= 2)
-      return -1;
+    if (hdrSsize <= 2) return -1;
     const len = data[start + 248];
-    if (len === 0 || len > 127)
-      return -1;
+    if (len === 0 || len > 127) return -1;
     let psize = 0;
     for (let i = 0; i < 128; i++) {
       const pat = data[start + 250 + i];
-      if (pat > 127)
-        return -1;
-      if (pat > psize)
-        psize = pat;
-      if (i > len + 3 && pat !== 0)
-        return -1;
+      if (pat > 127) return -1;
+      if (pat > psize) psize = pat;
+      if (i > len + 3 && pat !== 0) return -1;
     }
     psize++;
     psize <<= 8;
-    if (s < 378 + psize * 4)
-      return 378 + psize * 4 - s;
+    if (s < 378 + psize * 4) return 378 + psize * 4 - s;
     for (let i = 0; i < 31; i++) {
       const d = start + i * 8;
       const val = readmem16b6(data, d) & 4095;
-      if (val > 0 && val < 113)
-        return -1;
+      if (val > 0 && val < 113) return -1;
     }
     for (let i = 0; i < 31; i++) {
       const d = start + i * 8;
       const size = readmem16b6(data, d) << 1;
       const lend = readmem16b6(data, d + 4) + readmem16b6(data, d + 6) << 1;
-      if (lend > size + 2)
-        return -1;
+      if (lend > size + 2) return -1;
     }
     pwReadTitle(null, 0);
     return 0;
   }
   function testMpId(data, start) {
     const s = data.length - start;
-    if (s < 382)
-      return 382 - s;
-    if (readmem32b7(data, start) !== MAGIC_TRK1)
-      return -1;
+    if (s < 382) return 382 - s;
+    if (readmem32b7(data, start) !== MAGIC_TRK1) return -1;
     for (let i = 0; i < 31; i++) {
-      if (data[start + 6 + 8 * i] > 15)
-        return -1;
+      if (data[start + 6 + 8 * i] > 15) return -1;
     }
     const len = data[start + 252];
-    if (len === 0 || len > 127)
-      return -1;
+    if (len === 0 || len > 127) return -1;
     let psize = 0;
     for (let i = 0; i < 128; i++) {
       const pat = data[start + 254 + i];
-      if (pat > 127)
-        return -1;
-      if (pat > psize)
-        psize = pat;
+      if (pat > 127) return -1;
+      if (pat > psize) psize = pat;
     }
     psize++;
     psize <<= 8;
-    if (s < 382 + psize * 4)
-      return 382 + psize * 4 - s;
+    if (s < 382 + psize * 4) return 382 + psize * 4 - s;
     for (let i = 0; i < psize; i++) {
-      if (data[start + 382 + i * 4] > 19)
-        return -1;
+      if (data[start + 382 + i * 4] > 19) return -1;
     }
     pwReadTitle(null, 0);
     return 0;
@@ -55523,7 +55007,7 @@
     depack: depackMp
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-di.js
+  // ../../packages/fmt-prowizard/src/pw-di.ts
   var PW_MOD_MAGIC12 = 1294879534;
   function put816(out, b) {
     out.push(b & 255);
@@ -55563,8 +55047,7 @@
     };
     writeZero(out, 20);
     const nins = u16();
-    if (nins > 31)
-      throw new Error("di: too many samples");
+    if (nins > 31) throw new Error("di: too many samples");
     const seqOfs = u32();
     u32();
     const smpOfs = u32();
@@ -55581,8 +55064,7 @@
     }
     {
       const pad = new Array(30).fill(0);
-      for (let i2 = nins; i2 < 31; i2++)
-        out.push(...pad);
+      for (let i2 = nins; i2 < 31; i2++) out.push(...pad);
     }
     const posAfterSamples = pos;
     pos = start + seqOfs;
@@ -55600,16 +55082,13 @@
     let max = 0;
     for (i = 0; i < 128; i++) {
       put816(out, ptable[i]);
-      if (ptable[i] > max)
-        max = ptable[i];
+      if (ptable[i] > max) max = ptable[i];
     }
-    if (max >= 128)
-      throw new Error("di: pattern number too high");
+    if (max >= 128) throw new Error("di: pattern number too high");
     put32b16(out, PW_MOD_MAGIC12);
     pos = posAfterSamples;
     const paddr = [];
-    for (i = 0; i <= max; i++)
-      paddr.push(u16());
+    for (i = 0; i <= max; i++) paddr.push(u16());
     for (i = 0; i <= max; i++) {
       pos = start + paddr[i];
       for (let k = 0; k < 256; k++) {
@@ -55631,51 +55110,36 @@
   }
   function testDi(data, start) {
     const s = data.length - start;
-    if (s < 14)
-      return 14 - s;
+    if (s < 14) return 14 - s;
     const numsmp = readmem16b6(data, start);
-    if (numsmp > 31)
-      return -1;
-    if (s < 14 + numsmp * 8)
-      return 14 + numsmp * 8 - s;
+    if (numsmp > 31) return -1;
+    if (s < 14 + numsmp * 8) return 14 + numsmp * 8 - s;
     let ssize = 0;
     for (let i = 0; i < numsmp; i++) {
       const d = start + i * 8 + 14;
       const len = readmem16b6(data, d) << 1;
       const lstart = readmem16b6(data, d + 4) << 1;
       const lsize = readmem16b6(data, d + 6) << 1;
-      if (len > 65535 || lstart > 65535 || lsize > 65535)
-        return -1;
-      if (lstart + lsize > len)
-        return -1;
-      if (data[d + 2] > 15)
-        return -1;
-      if (data[d + 3] > 64)
-        return -1;
+      if (len > 65535 || lstart > 65535 || lsize > 65535) return -1;
+      if (lstart + lsize > len) return -1;
+      if (data[d + 2] > 15) return -1;
+      if (data[d + 3] > 64) return -1;
       ssize += len;
     }
-    if (ssize <= 2)
-      return -1;
+    if (ssize <= 2) return -1;
     const psize = numsmp * 8 + 2;
     const ptabOfs = readmem32b7(data, start + 2);
     const patOfs = readmem32b7(data, start + 6);
     const smpOfs = readmem32b7(data, start + 10);
-    if (ptabOfs < psize)
-      return -1;
-    if (patOfs <= ptabOfs || smpOfs <= ptabOfs || smpOfs <= patOfs)
-      return -1;
-    if (patOfs - ptabOfs > 128)
-      return -1;
-    if (s < patOfs)
-      return patOfs - s;
+    if (ptabOfs < psize) return -1;
+    if (patOfs <= ptabOfs || smpOfs <= ptabOfs || smpOfs <= patOfs) return -1;
+    if (patOfs - ptabOfs > 128) return -1;
+    if (s < patOfs) return patOfs - s;
     for (let i = ptabOfs; i < patOfs - 1; i++) {
-      if (data[start + i] > 128)
-        return -1;
+      if (data[start + i] > 128) return -1;
     }
-    if (data[start + patOfs - 1] !== 255)
-      return -1;
-    if (smpOfs > 65535)
-      return -1;
+    if (data[start + patOfs - 1] !== 255) return -1;
+    if (smpOfs > 65535) return -1;
     pwReadTitle(null, 0);
     return 0;
   }
@@ -55685,7 +55149,7 @@
     depack: depackDi
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-ac1d.js
+  // ../../packages/fmt-prowizard/src/pw-ac1d.ts
   var NO_NOTE = 255;
   function put817(out, b) {
     out.push(b & 255);
@@ -55730,11 +55194,9 @@
     let npat = 0;
     for (; npat < 128; npat++) {
       paddr.push(u32());
-      if (paddr[npat] === 0)
-        break;
+      if (paddr[npat] === 0) break;
     }
-    if (npat === 0)
-      throw new Error("ac1d: no patterns");
+    if (npat === 0) throw new Error("ac1d: no patterns");
     npat--;
     put817(out, npos);
     put817(out, ntkByte);
@@ -55759,12 +55221,9 @@
           const c2 = u8();
           const ins = (c1 & 192) >> 2 | c2 >> 4 & 15;
           let note = c1 & 63;
-          if (note === 63)
-            note = NO_NOTE;
-          else if (note !== 0)
-            note -= 11;
-          if (note === 0)
-            note++;
+          if (note === 63) note = NO_NOTE;
+          else if (note !== 0) note -= 11;
+          if (note === 0) note++;
           tmp[x] = ins & 240;
           if (note !== NO_NOTE && ptkIsValidNote(note)) {
             tmp[x] = (tmp[x] | ptkTable[note][0]) & 255;
@@ -55781,27 +55240,21 @@
           tmp[x + 3] = fxp;
         }
       }
-      for (let t = 0; t < 1024; t++)
-        out.push(tmp[t]);
+      for (let t = 0; t < 1024; t++) out.push(tmp[t]);
     }
     moveData(data, start + saddr, out, ssize);
     return Uint8Array.from(out);
   }
   function testAc1d(data, start) {
     const s = data.length - start;
-    if (s < 896)
-      return 896 - s;
-    if (data[start + 2] !== 172 || data[start + 3] !== 29)
-      return -1;
-    if (data[start] > 127)
-      return -1;
+    if (s < 896) return 896 - s;
+    if (data[start + 2] !== 172 || data[start + 3] !== 29) return -1;
+    if (data[start] > 127) return -1;
     for (let i = 0; i < 31; i++) {
-      if (data[start + 10 + 8 * i] > 15)
-        return -1;
+      if (data[start + 10 + 8 * i] > 15) return -1;
     }
     for (let i = 0; i < 128; i++) {
-      if (data[start + 768 + i] > 127)
-        return -1;
+      if (data[start + 768 + i] > 127) return -1;
     }
     pwReadTitle(null, 0);
     return 0;
@@ -55812,7 +55265,7 @@
     depack: depackAc1d
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-eureka.js
+  // ../../packages/fmt-prowizard/src/pw-eureka.ts
   var PW_MOD_MAGIC13 = 1294879534;
   function put32b18(out, v) {
     out.push(v >>> 24 & 255, v >> 16 & 255, v >> 8 & 255, v & 255);
@@ -55820,16 +55273,14 @@
   function depackEu(data, start) {
     let pos = start;
     const out = [];
-    for (let i = 0; i < 1080; i++)
-      out.push(data[pos++] ?? 0);
+    for (let i = 0; i < 1080; i++) out.push(data[pos++] ?? 0);
     let ssize = 0;
     for (let i = 0; i < 31; i++) {
       ssize += 2 * (data[start + i * 30 + 42] << 8 | data[start + i * 30 + 43]);
     }
     let npat = 0;
     for (let i = 0; i < 128; i++) {
-      if (data[start + 952 + i] > npat)
-        npat = data[start + 952 + i];
+      if (data[start + 952 + i] > npat) npat = data[start + 952 + i];
     }
     npat++;
     put32b18(out, PW_MOD_MAGIC13);
@@ -55875,80 +55326,62 @@
           }
         }
       }
-      for (let k = 0; k < 1024; k++)
-        out.push(tmp[k]);
+      for (let k = 0; k < 1024; k++) out.push(tmp[k]);
     }
     moveData(data, start + smpAddr, out, ssize);
     return Uint8Array.from(out);
   }
   function testEu(data, start) {
     const s = data.length - start;
-    if (s < 1084)
-      return 1084 - s;
+    if (s < 1084) return 1084 - s;
     const len = data[start + 950];
-    if (len === 0 || len > 127)
-      return -1;
+    if (len === 0 || len > 127) return -1;
     for (let i2 = 0; i2 < 31; i2++) {
       const d = start + i2 * 30;
       const size = readmem16b6(data, d + 42) << 1;
       const lstart = readmem16b6(data, d + 46) << 1;
       const lsize = readmem16b6(data, d + 48) << 1;
-      if (size > 65535 || lstart > 65535 || lsize > 65535)
-        return -1;
-      if (lstart + lsize > size + 2)
-        return -1;
-      if (data[d + 44] > 15 || data[d + 45] > 64)
-        return -1;
+      if (size > 65535 || lstart > 65535 || lsize > 65535) return -1;
+      if (lstart + lsize > size + 2) return -1;
+      if (data[d + 44] > 15 || data[d + 45] > 64) return -1;
     }
     const smpOfs = readmem32b7(data, start + 1080);
-    if (smpOfs < 1084)
-      return -1;
+    if (smpOfs < 1084) return -1;
     let maxPat = 0;
     let i = 0;
     for (; i < len; i++) {
       const pat = data[start + 952 + i];
-      if (pat > 127)
-        return -1;
-      if (pat > maxPat)
-        maxPat = pat;
+      if (pat > 127) return -1;
+      if (pat > maxPat) maxPat = pat;
     }
     for (; i < 128; i++) {
-      if (data[start + 952 + i] !== 0)
-        return -1;
+      if (data[start + 952 + i] !== 0) return -1;
     }
     maxPat++;
     let maxTrk = 0;
     let minTrk = 999999;
-    if (s < maxPat * 4 * 2 + 1085)
-      return maxPat * 4 * 2 + 1085 - s;
+    if (s < maxPat * 4 * 2 + 1085) return maxPat * 4 * 2 + 1085 - s;
     for (i = 0; i < maxPat * 4; i++) {
       const trk = readmem16b6(data, start + i * 2 + 1084);
-      if (trk > smpOfs || trk < 1084)
-        return -1;
-      if (trk > maxTrk)
-        maxTrk = trk;
-      if (trk < minTrk)
-        minTrk = trk;
+      if (trk > smpOfs || trk < 1084) return -1;
+      if (trk > maxTrk) maxTrk = trk;
+      if (trk < minTrk) minTrk = trk;
     }
-    if (s < maxTrk)
-      return maxTrk - s;
+    if (s < maxTrk) return maxTrk - s;
     for (i = minTrk; i < maxTrk; i++) {
       const c = data[start + i];
-      if ((c & 192) === 192)
-        continue;
+      if ((c & 192) === 192) continue;
       if ((c & 192) === 128) {
         i += 2;
         continue;
       }
       if ((c & 192) === 64) {
-        if ((c & 63) === 0 && data[start + i + 1] === 0)
-          return -1;
+        if ((c & 63) === 0 && data[start + i + 1] === 0) return -1;
         i++;
         continue;
       }
       if ((c & 192) === 0) {
-        if (c > 19)
-          return -1;
+        if (c > 19) return -1;
         i += 3;
         continue;
       }
@@ -55961,7 +55394,7 @@
     depack: depackEu
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-fcm.js
+  // ../../packages/fmt-prowizard/src/pw-fcm.ts
   var PW_MOD_MAGIC14 = 1294879534;
   function put818(out, b) {
     out.push(b & 255);
@@ -55990,13 +55423,11 @@
     u32();
     u16();
     u32();
-    for (let i2 = 0; i2 < 20; i2++)
-      out.push(data[pos++] ?? 0);
+    for (let i2 = 0; i2 < 20; i2++) out.push(data[pos++] ?? 0);
     u32();
     let ssize = 0;
     for (let i2 = 0; i2 < 31; i2++) {
-      for (let k = 0; k < 22; k++)
-        out.push(0);
+      for (let k = 0; k < 22; k++) out.push(0);
       const size = u16();
       put16b16(out, size);
       ssize += size * 2;
@@ -56004,8 +55435,7 @@
       put818(out, u8());
       put16b16(out, u16());
       let loopSize = u16();
-      if (loopSize === 0)
-        loopSize = 1;
+      if (loopSize === 0) loopSize = 1;
       put16b16(out, loopSize);
     }
     u32();
@@ -56018,36 +55448,28 @@
     for (; i < patPos; i++) {
       const c1 = u8();
       put818(out, c1);
-      if (c1 > patMax)
-        patMax = c1;
+      if (c1 > patMax) patMax = c1;
     }
-    for (; i < 128; i++)
-      put818(out, 0);
+    for (; i < 128; i++) put818(out, 0);
     put32b19(out, PW_MOD_MAGIC14);
     u32();
     for (i = 0; i <= patMax; i++) {
-      for (let k = 0; k < 1024; k++)
-        out.push(data[pos++] ?? 0);
+      for (let k = 0; k < 1024; k++) out.push(data[pos++] ?? 0);
     }
     u32();
-    for (let k = 0; k < ssize && pos < data.length; k++)
-      out.push(data[pos++] ?? 0);
+    for (let k = 0; k < ssize && pos < data.length; k++) out.push(data[pos++] ?? 0);
     return Uint8Array.from(out);
   }
   function testFcm(data, start) {
     const s = data.length - start;
-    if (s < 37 + 8 * 31)
-      return 37 + 8 * 31 - s;
+    if (s < 37 + 8 * 31) return 37 + 8 * 31 - s;
     if (data[start] !== 70 || data[start + 1] !== 67 || data[start + 2] !== 45 || data[start + 3] !== 77) {
       return -1;
     }
-    if (data[start + 4] !== 1)
-      return -1;
-    if (data[start + 5] !== 0)
-      return -1;
+    if (data[start + 4] !== 1) return -1;
+    if (data[start + 5] !== 0) return -1;
     for (let j = 0; j < 31; j++) {
-      if (data[start + 37 + 8 * j] > 64)
-        return -1;
+      if (data[start + 37 + 8 * j] > 64) return -1;
     }
     pwReadTitle(data.subarray(start + 10), 20);
     return 0;
@@ -56058,7 +55480,7 @@
     depack: depackFcm
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-fuchs.js
+  // ../../packages/fmt-prowizard/src/pw-fuchs.ts
   var PW_MOD_MAGIC15 = 1294879534;
   function put32b20(out, v) {
     out.push(v >>> 24 & 255, v >> 16 & 255, v >> 8 & 255, v & 255);
@@ -56077,8 +55499,7 @@
       return v;
     };
     const hdr = new Uint8Array(1080);
-    for (let i = 0; i < 10; i++)
-      hdr[i] = data[pos++] ?? 0;
+    for (let i = 0; i < 10; i++) hdr[i] = data[pos++] ?? 0;
     u32();
     const smpLen = [];
     for (let i = 0; i < 16; i++) {
@@ -56114,11 +55535,9 @@
     for (let i = 0; i < 40; i++) {
       const pat = u16();
       hdr[952 + i] = pat & 255;
-      if (pat > maxPat)
-        maxPat = pat;
+      if (pat > maxPat) maxPat = pat;
     }
-    for (let i = 0; i < 1080; i++)
-      out.push(hdr[i]);
+    for (let i = 0; i < 1080; i++) out.push(hdr[i]);
     put32b20(out, PW_MOD_MAGIC15);
     u32();
     const patSize = u32();
@@ -56126,50 +55545,40 @@
       throw new Error("fuchs: bad pattern size");
     }
     const tmp = new Uint8Array(patSize);
-    for (let i = 0; i < patSize; i++)
-      tmp[i] = data[pos++] ?? 0;
+    for (let i = 0; i < patSize; i++) tmp[i] = data[pos++] ?? 0;
     for (let i = 0; i < patSize; i += 4) {
       if ((tmp[i + 2] & 15) === 12) {
         const x = tmp[i + 3];
         tmp[i + 3] = 10 * (x >> 4) + (x & 15);
       }
     }
-    for (let i = 0; i < patSize; i++)
-      out.push(tmp[i]);
+    for (let i = 0; i < patSize; i++) out.push(tmp[i]);
     pos += 4;
     for (let i = 0; i < 16; i++) {
       if (smpLen[i] !== 0) {
-        for (let k = 0; k < smpLen[i] && pos < data.length; k++)
-          out.push(data[pos++] ?? 0);
+        for (let k = 0; k < smpLen[i] && pos < data.length; k++) out.push(data[pos++] ?? 0);
       }
     }
     return Uint8Array.from(out);
   }
   function testFuchs(data, start) {
     const s = data.length - start;
-    if (s < 196)
-      return 196 - s;
-    if (readmem32b7(data, start + 192) !== 1397706311)
-      return -1;
+    if (s < 196) return 196 - s;
+    if (readmem32b7(data, start + 192) !== 1397706311) return -1;
     const hdrSsize = readmem32b7(data, start + 10);
-    if (hdrSsize <= 2 || hdrSsize >= 65535 * 16)
-      return -1;
+    if (hdrSsize <= 2 || hdrSsize >= 65535 * 16) return -1;
     let ssize = 0;
     for (let i = 0; i < 16; i++) {
       const d = start + i * 2;
       const len = readmem16b6(data, d + 14);
       const lstart = readmem16b6(data, d + 78);
-      if (data[d + 46] > 64)
-        return -1;
-      if (len < lstart)
-        return -1;
+      if (data[d + 46] > 64) return -1;
+      if (len < lstart) return -1;
       ssize += len;
     }
-    if (ssize <= 2 || ssize > hdrSsize)
-      return -1;
+    if (ssize <= 2 || ssize > hdrSsize) return -1;
     for (let i = 0; i < 40; i++) {
-      if (data[start + i * 2 + 113] > 40)
-        return -1;
+      if (data[start + i * 2 + 113] > 40) return -1;
     }
     pwReadTitle(null, 0);
     return 0;
@@ -56180,7 +55589,7 @@
     depack: depackFuchs
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-skyt.js
+  // ../../packages/fmt-prowizard/src/pw-skyt.ts
   var PW_MOD_MAGIC16 = 1294879534;
   function put819(out, b) {
     out.push(b & 255);
@@ -56208,8 +55617,7 @@
     writeZero(out, 20);
     let ssize = 0;
     for (let i = 0; i < 31; i++) {
-      for (let k = 0; k < 22; k++)
-        out.push(0);
+      for (let k = 0; k < 22; k++) out.push(0);
       const size = u16();
       put16b17(out, size);
       ssize += size * 2;
@@ -56222,8 +55630,7 @@
     u32();
     u32();
     const patPos = u8() + 1;
-    if (patPos >= 128)
-      throw new Error("skyt: too many patterns");
+    if (patPos >= 128) throw new Error("skyt: too many patterns");
     put819(out, patPos);
     put819(out, 127);
     const trkval = [];
@@ -56233,13 +55640,11 @@
       for (let j = 0; j < 4; j++) {
         const v = u16();
         row.push(v);
-        if (v > maxTrk)
-          maxTrk = v;
+        if (v > maxTrk) maxTrk = v;
       }
       trkval.push(row);
     }
-    for (let i = 0; i < 128; i++)
-      put819(out, i < patPos ? i : 0);
+    for (let i = 0; i < 128; i++) put819(out, i < patPos ? i : 0);
     put32b21(out, PW_MOD_MAGIC16);
     u8();
     const trkAddr = pos;
@@ -56247,8 +55652,7 @@
       const pat = new Uint8Array(1024);
       for (let j = 0; j < 4; j++) {
         const tv = trkval[i][j];
-        if (tv === void 0 || tv === 0)
-          continue;
+        if (tv === void 0 || tv === 0) continue;
         pos = trkAddr + (tv - 1 << 8);
         for (let k = 0; k < 64; k++) {
           const x = k * 16 + j * 4;
@@ -56256,29 +55660,24 @@
           const c2 = u8();
           const c3 = u8();
           const c4 = u8();
-          if (!ptkIsValidNote(c1))
-            throw new Error("skyt: invalid note");
+          if (!ptkIsValidNote(c1)) throw new Error("skyt: invalid note");
           pat[x] = c2 & 240 | ptkTable[c1][0];
           pat[x + 1] = ptkTable[c1][1];
           pat[x + 2] = c2 << 4 & 240 | c3;
           pat[x + 3] = c4;
         }
       }
-      for (let k = 0; k < 1024; k++)
-        out.push(pat[k]);
+      for (let k = 0; k < 1024; k++) out.push(pat[k]);
     }
     pos = trkAddr + (maxTrk << 8);
-    for (let k = 0; k < ssize && pos < data.length; k++)
-      out.push(data[pos++] ?? 0);
+    for (let k = 0; k < ssize && pos < data.length; k++) out.push(data[pos++] ?? 0);
     return Uint8Array.from(out);
   }
   function testSkyt(data, start) {
     const s = data.length - start;
-    if (s < 8 * 31 + 12)
-      return 8 * 31 + 12 - s;
+    if (s < 8 * 31 + 12) return 8 * 31 + 12 - s;
     for (let i = 0; i < 31; i++) {
-      if (data[start + 8 * i + 4] > 64)
-        return -1;
+      if (data[start + 8 * i + 4] > 64) return -1;
     }
     if ((data[start + 256] << 24 | data[start + 257] << 16 | data[start + 258] << 8 | data[start + 259]) !== 1397446996) {
       return -1;
@@ -56292,7 +55691,7 @@
     depack: depackSkyt
   };
 
-  // ../../packages/fmt-prowizard/dist/pw-starpack.js
+  // ../../packages/fmt-prowizard/src/pw-starpack.ts
   function put820(out, v) {
     out.push(v & 255);
   }
@@ -56326,8 +55725,7 @@
     moveDataInto(out, data, pos, 20);
     pos += 20;
     for (let i = 0; i < 31; i++) {
-      for (let k = 0; k < 22; k++)
-        out.push(0);
+      for (let k = 0; k < 22; k++) out.push(0);
       const size = u16();
       put16b18(out, size);
       ssize += 2 * size;
@@ -56337,11 +55735,9 @@
       put16b18(out, u16());
     }
     const patPos = u16() >> 2 & 255;
-    if (patPos >= 128)
-      throw new Error("starpack: too many positions");
+    if (patPos >= 128) throw new Error("starpack: too many positions");
     pos += 2;
-    for (let i = 0; i < 128; i++)
-      paddr[i] = u32();
+    for (let i = 0; i < 128; i++) paddr[i] = u32();
     let tmpPtr = 0;
     for (let i = 0; i < patPos; i++) {
       if (i === 0) {
@@ -56356,11 +55752,9 @@
           break;
         }
       }
-      if (j === i)
-        pnum[i] = tmpPtr++;
+      if (j === i) pnum[i] = tmpPtr++;
     }
-    for (let i = 0; i < 128; i++)
-      paddrTmp[i] = paddr[i];
+    for (let i = 0; i < 128; i++) paddrTmp[i] = paddr[i];
     {
       let done = false;
       while (!done) {
@@ -56386,8 +55780,7 @@
         paddrTmp2[j2] = paddrTmp[i];
         continue;
       }
-      if (paddrTmp[i] === paddrTmp2[j2])
-        continue;
+      if (paddrTmp[i] === paddrTmp2[j2]) continue;
       j2++;
       paddrTmp2[j2] = paddrTmp[i];
     }
@@ -56413,16 +55806,13 @@
       }
     }
     pnum.fill(0);
-    for (let i = 0; i < patPos; i++)
-      pnum[i] = pnumTmp[i];
+    for (let i = 0; i < patPos; i++) pnum[i] = pnumTmp[i];
     put820(out, patPos);
     for (let i = 0; i < patPos; i++) {
-      if (pnum[i] > numPat)
-        numPat = pnum[i];
+      if (pnum[i] > numPat) numPat = pnum[i];
     }
     put820(out, 127);
-    for (let i = 0; i < 128; i++)
-      put820(out, pnum[i]);
+    for (let i = 0; i < 128; i++) put820(out, pnum[i]);
     put32b22(
       out,
       1294879534
@@ -56438,8 +55828,7 @@
         for (let k = 0; k < 4; k++) {
           const ofs = j * 16 + k * 4;
           const c1 = u8();
-          if (c1 === 128)
-            continue;
+          if (c1 === 128) continue;
           const c2 = u8();
           const c3 = u8();
           const c4 = u8();
@@ -56452,57 +55841,44 @@
           buffer[ofs + 2] = (buffer[ofs + 2] | c5 << 4 & 240) & 255;
         }
       }
-      for (let k = 0; k < 1024; k++)
-        out.push(buffer[k]);
+      for (let k = 0; k < 1024; k++) out.push(buffer[k]);
     }
     pos = smpAddr;
-    for (let k = 0; k < ssize && pos < data.length; k++)
-      out.push(data[pos++] ?? 0);
+    for (let k = 0; k < ssize && pos < data.length; k++) out.push(data[pos++] ?? 0);
     return Uint8Array.from(out);
   }
   function moveDataInto(out, src, from, len) {
-    for (let i = 0; i < len && from + i < src.length; i++)
-      out.push(src[from + i]);
+    for (let i = 0; i < len && from + i < src.length; i++) out.push(src[from + i]);
   }
   function testStarpack(data, start) {
     const s = data.length - start;
     const rd16 = (o) => readmem16b6(data, start + o);
     const rd32 = (o) => readmem32b7(data, start + o);
-    if (s < 788)
-      return 788 - s;
+    if (s < 788) return 788 - s;
     const plistSize = rd16(268);
-    if ((plistSize & 3) !== 0)
-      return -1;
+    if ((plistSize & 3) !== 0) return -1;
     const len = plistSize >> 2;
-    if (len === 0 || len > 127)
-      return -1;
-    if (data[start + 784] !== 0)
-      return -1;
+    if (len === 0 || len > 127) return -1;
+    if (data[start + 784] !== 0) return -1;
     for (let i = 0; i < 31; i++) {
       const d = start + i * 8;
       const size = readmem16b6(data, d + 20) << 1;
       const lend = readmem16b6(data, d + 24) + readmem16b6(data, d + 26) << 1;
-      if (lend > size + 2)
-        return -1;
+      if (lend > size + 2) return -1;
     }
     for (let i = 0; i < 31; i++) {
       const d = start + i * 8;
-      if (data[d + 22] > 15 || data[d + 23] > 64)
-        return -1;
+      if (data[d + 22] > 15 || data[d + 23] > 64) return -1;
     }
     const sdataOfs = rd32(784);
-    if (sdataOfs < 788)
-      return -1;
+    if (sdataOfs < 788) return -1;
     for (let i = 0; i < len; i++) {
-      if (rd32(i * 4 + 272) > sdataOfs)
-        return -1;
+      if (rd32(i * 4 + 272) > sdataOfs) return -1;
     }
     for (let i = len; i < 128; i++) {
-      if (rd32(i * 4 + 272) !== 0)
-        return -1;
+      if (rd32(i * 4 + 272) !== 0) return -1;
     }
-    if (s < sdataOfs + 8)
-      return sdataOfs + 8 - s;
+    if (s < sdataOfs + 8) return sdataOfs + 8 - s;
     let pdataOfs = 788;
     while (pdataOfs < sdataOfs + 4) {
       const d = start + pdataOfs;
@@ -56511,14 +55887,10 @@
         pdataOfs++;
         continue;
       }
-      if (d0 > 128)
-        return -1;
-      if (rd32(pdataOfs) === 0)
-        return -1;
-      if (data[d + 2] * 15 === 12 && data[d + 3] > 64)
-        return -1;
-      if (data[d + 2] * 15 === 13 && data[d + 3] > 64)
-        return -1;
+      if (d0 > 128) return -1;
+      if (rd32(pdataOfs) === 0) return -1;
+      if (data[d + 2] * 15 === 12 && data[d + 3] > 64) return -1;
+      if (data[d + 2] * 15 === 13 && data[d + 3] > 64) return -1;
       pdataOfs += 4;
     }
     pwReadTitle(data.subarray(start, start + 20), 0);
@@ -56530,7 +55902,7 @@
     depack: depackStarpack
   };
 
-  // ../../packages/fmt-prowizard/dist/prowiz.js
+  // ../../packages/fmt-prowizard/src/prowiz.ts
   function readmem16b6(d, off) {
     return d[off] << 8 | d[off + 1];
   }
@@ -56589,37 +55961,31 @@
     }
   }
   function writeZero(out, len) {
-    for (let i = 0; i < len; i++)
-      out.push(0);
+    for (let i = 0; i < len; i++) out.push(0);
   }
   function pwReadTitle(b, s) {
-    if (b === null)
-      return "";
-    if (s > 20)
-      s = 20;
+    if (b === null) return "";
+    if (s > 20) s = 20;
     let t = "";
-    for (let i = 0; i < s; i++)
-      t += String.fromCharCode(b[i]);
+    for (let i = 0; i < s; i++) t += String.fromCharCode(b[i]);
     return t;
   }
   function pwCheck(data, start) {
     for (let i = 0; i < pwFormats.length; i++) {
       const res = pwFormats[i].test(data, start);
-      if (res === 0)
-        return pwFormats[i];
+      if (res === 0) return pwFormats[i];
     }
     return null;
   }
   function pwWizardry(data, start, outName) {
     const format = pwCheck(data, start);
-    if (format === null)
-      throw new ParseError("prowizard: no format matched");
+    if (format === null) throw new ParseError("prowizard: no format matched");
     const out = format.depack(data, start);
     outName.name = format.name;
     return out;
   }
 
-  // ../../packages/fmt-prowizard/dist/pw-plugin.js
+  // ../../packages/fmt-prowizard/src/pw-plugin.ts
   function pwTest(bytes) {
     return pwCheck(bytes, 0) !== null;
   }
@@ -56637,6 +56003,60 @@
       readEventDispatch(core2, chn, row);
     }
   };
+
+  // engine/src/engine-services.ts
+  var services = {};
+  var staticFormatNames = [];
+
+  // engine/src/engine-provider.ts
+  var FORMAT_PLUGINS = [
+    plugin,
+    hmnPlugin,
+    fltPlugin,
+    plugin2,
+    plugin4,
+    plugin3,
+    plugin5,
+    plugin6,
+    plugin7,
+    plugin8,
+    plugin9,
+    plugin10,
+    plugin11,
+    plugin12,
+    mmd3Plugin,
+    med2Plugin,
+    med3Plugin,
+    med4Plugin,
+    plugin13,
+    plugin14,
+    plugin15,
+    pwPlugin
+  ];
+  function provide(core2) {
+    for (const plugin16 of FORMAT_PLUGINS) {
+      if (!staticFormatNames.includes(plugin16.name)) staticFormatNames.push(plugin16.name);
+      core2.registries.registerFormat(plugin16);
+    }
+    services.sid = {
+      dsp: sidDsp,
+      startTune: sidStartTune,
+      seek: sidSeek,
+      playTimeSeconds: getSidPlayTimeSeconds,
+      chipCount: getSidChipCount,
+      applySettings: applySidSettingsLive,
+      loadSongLengths: loadSidSongLengths
+    };
+    services.fc = {
+      effect: fcEffect,
+      installEventReader: () => {
+        setModEventReader((c, chn, row) => {
+          core2.registries.format("mod").readEvent(c, chn, row);
+        });
+      }
+    };
+  }
+  globalThis.__modplayProvide = provide;
 
   // ../../packages/dsp-paula/src/index.ts
   var PAULA_FREQUENCY = 70937892e-1 / 2;
@@ -65219,6 +64639,16 @@
     dischargeFrames = 0;
     /** ticksize × 2 int accumulators (s->buf32). */
     buf32 = new Int32Array(0);
+    /**
+     * Spatial mode: every module channel is mixed into its own mono bus instead
+     * of the stereo pair, so the host can feed one audio object per channel.
+     * The pan/layout information is not applied here — it becomes the object's
+     * azimuth in the host. Off by default; the stereo path is untouched.
+     */
+    spatial = false;
+    /** Mono stems of the last rendered tick, normalised to [-1, 1]. */
+    stemOut = [];
+    stemBuf = [];
     /** Per-voice Paula state (vi->paula; one per voice slot). */
     paula = [];
     paulaVoicesInited = -1;
@@ -65289,11 +64719,14 @@
       const voices = core2.voiceStates;
       const xcArr = core2.channelStates;
       buf32.fill(0, 0, ticksize * 2);
+      if (this.spatial) this.prepareStems(core2, ticksize);
       for (let voc = 0; voc < voices.length; voc++) {
         const vi = voices[voc];
+        const stem = this.spatial && vi.chn >= 0 && vi.chn < this.stemBuf.length ? this.stemBuf[vi.chn] : null;
+        const mixBuf = stem ?? buf32;
         if ((vi.flags & VoiceFlag.ANTICLICK) !== 0) {
           if (coreInterp > 0) {
-            this.doAnticlick(buf32, 0, vi, this.dischargeFrames);
+            this.doAnticlick(mixBuf, 0, vi, this.dischargeFrames);
           }
           vi.flags &= ~VoiceFlag.ANTICLICK;
         }
@@ -65314,7 +64747,10 @@
           pan = hardLeft ? -128 : 127;
         }
         let volL, volR;
-        if (pan === 32768) {
+        if (stem !== null) {
+          volL = vol * 128;
+          volR = vol * 128;
+        } else if (pan === 32768) {
           volL = vol * 128;
           volR = -vol * 128;
         } else {
@@ -65396,11 +64832,11 @@
               }
               if (deltaL === 0 && deltaR === 0) rsize = samples;
               const lastNeg = bufPos + (samples - 1) * 2;
-              const prevL = buf32[lastNeg] ?? 0;
-              const prevR = buf32[lastNeg + 1] ?? 0;
+              const prevL = mixBuf[lastNeg] ?? 0;
+              const prevR = mixBuf[lastNeg + 1] ?? 0;
               if (paula !== null && !bits16 && !stereo) {
                 this.mixPaula(
-                  buf32,
+                  mixBuf,
                   bufPos,
                   nativeOf(xxs),
                   posInt,
@@ -65414,7 +64850,7 @@
                 );
               } else if (paula === null) {
                 this.mixSample(
-                  buf32,
+                  mixBuf,
                   bufPos,
                   xxs,
                   posInt,
@@ -65429,8 +64865,8 @@
                   rsize
                 );
               }
-              vi.sleft = (buf32[lastNeg] ?? 0) - prevL;
-              vi.sright = (buf32[lastNeg + 1] ?? 0) - prevR;
+              vi.sleft = (mixBuf[lastNeg] ?? 0) - prevL;
+              vi.sright = (mixBuf[lastNeg + 1] ?? 0) - prevR;
               bufPosAfter = bufPos + samples * 2;
               vi.old_vl += samples * deltaL;
               vi.old_vr += samples * deltaR;
@@ -65445,7 +64881,7 @@
           const hasLoop = (xxs.flags & SampleFlags.LOOP) !== 0 || (xxs.flags & SampleFlags.SUSTAIN) !== 0 && (~vi.flags & VoiceFlag.RELEASE) !== 0;
           if ((!hasLoop || splitNoloop) && (vi.flags & VoiceFlag.SAMPLE_QUEUED) === 0) {
             if (size > 0) {
-              this.doAnticlick(buf32, bufPosAfter, vi, size);
+              this.doAnticlick(mixBuf, bufPosAfter, vi, size);
               this.setSampleEnd(core2, vi, 1);
             }
             size = 0;
@@ -65455,7 +64891,7 @@
           if (size > 0 || !reverse2 && vi.pos >= vi.end || reverse2 && vi.pos <= vi.start) {
             if ((vi.flags & VoiceFlag.SAMPLE_QUEUED) !== 0) {
               if (size > 0) {
-                this.doAnticlick(buf32, bufPosAfter, vi, size);
+                this.doAnticlick(mixBuf, bufPosAfter, vi, size);
               }
               const queuedSmp = vi.queued.smp;
               if (queuedSmp < 0) {
@@ -65495,7 +64931,10 @@
           volEnd = Math.trunc(volEnd * this.mvol / this.mvolbase);
         }
         let volL2, volR2;
-        if (panEnd === 32768) {
+        if (stem !== null) {
+          volL2 = volEnd * 128;
+          volR2 = volEnd * 128;
+        } else if (panEnd === 32768) {
           volL2 = volEnd * 128;
           volR2 = -volEnd * 128;
         } else {
@@ -65504,6 +64943,47 @@
         }
         vi.old_vl = volL2;
         vi.old_vr = volR2;
+      }
+      if (this.spatial) this.downmixStems(buf32, ticksize);
+    }
+    /** Allocate/clear one mono accumulator per module channel for this tick. */
+    prepareStems(core2, ticksize) {
+      const n = core2.channelStates.length;
+      while (this.stemBuf.length < n) this.stemBuf.push(new Int32Array(0));
+      while (this.stemOut.length < n) this.stemOut.push(new Float32Array(0));
+      for (let ch = 0; ch < n; ch++) {
+        let b = this.stemBuf[ch];
+        if (b.length < ticksize * 2) {
+          b = new Int32Array(ticksize * 2);
+          this.stemBuf[ch] = b;
+        }
+        b.fill(0, 0, ticksize * 2);
+        let o = this.stemOut[ch];
+        if (o.length < ticksize) {
+          o = new Float32Array(ticksize);
+          this.stemOut[ch] = o;
+        }
+      }
+    }
+    /**
+     * Publish the mono stems and keep the stereo buffer populated, so a spatial
+     * render still yields a usable stereo fallback (and the existing parity
+     * tests keep seeing the same buffer shape).
+     */
+    downmixStems(buf32, ticksize) {
+      const shift = DOWNMIX_SHIFT - this.amplify;
+      for (let ch = 0; ch < this.stemBuf.length; ch++) {
+        const src = this.stemBuf[ch];
+        const dst = this.stemOut[ch];
+        for (let i = 0; i < ticksize; i++) {
+          const v = src[i * 2];
+          buf32[i * 2] = (buf32[i * 2] ?? 0) + v;
+          buf32[i * 2 + 1] = (buf32[i * 2 + 1] ?? 0) + v;
+          let smp = v >> shift;
+          if (smp > LIM16_HI) smp = LIM16_HI;
+          else if (smp < LIM16_LO) smp = LIM16_LO;
+          dst[i] = smp / 32768;
+        }
       }
     }
     /**
@@ -67260,10 +66740,10 @@
     };
   }
 
-  // ../../packages/out-android/dist/types.js
+  // ../../packages/out-android/src/types.ts
   var SCHEMA_VERSION = 1;
 
-  // ../../packages/out-android/dist/defaults.js
+  // ../../packages/out-android/src/defaults.ts
   var DEFAULT_SETTINGS = {
     schemaVersion: 1,
     transport: {
@@ -67299,7 +66779,10 @@
         sampleRate: input.transport?.sampleRate ?? d.transport.sampleRate,
         interpolation: input.transport?.interpolation ?? d.transport.interpolation,
         numVoices: clamp3(input.transport?.numVoices ?? d.transport.numVoices, 4, 64),
-        tempoFactor: Math.min(4, Math.max(0.25, input.transport?.tempoFactor ?? d.transport.tempoFactor))
+        tempoFactor: Math.min(
+          4,
+          Math.max(0.25, input.transport?.tempoFactor ?? d.transport.tempoFactor)
+        )
       },
       mixer: { ...d.mixer, ...input.mixer },
       sid: {
@@ -67314,40 +66797,66 @@
 
   // engine/src/engine-entry.ts
   var core = new Core();
-  var FORMAT_PLUGINS = [
-    plugin,
-    hmnPlugin,
-    fltPlugin,
-    plugin2,
-    plugin4,
-    plugin3,
-    plugin5,
-    plugin6,
-    plugin7,
-    plugin8,
-    plugin9,
-    plugin10,
-    plugin11,
-    plugin12,
-    mmd3Plugin,
-    med2Plugin,
-    med3Plugin,
-    med4Plugin,
-    plugin13,
-    plugin14,
-    plugin15,
-    pwPlugin
-  ];
-  for (const plugin16 of FORMAT_PLUGINS) core.registries.registerFormat(plugin16);
-  var ENGINE_VERSION = `formats:${FORMAT_PLUGINS.map((plugin16) => plugin16.name).join(",")}`;
-  core.registries.registerEffect(fcEffect);
-  setModEventReader((c, chn, row) => {
-    core.registries.format("mod").readEvent(c, chn, row);
-  });
+  globalThis.__modplayProvide?.(core);
+  var installedFormats = [...staticFormatNames];
+  var engineVersion = () => `formats:${installedFormats.join(",")}`;
+  var pendingFcReader = false;
+  function installFormat(_name, plugins) {
+    let added = 0;
+    for (const candidate of plugins) {
+      const plugin16 = candidate;
+      if (!plugin16 || typeof plugin16.name !== "string") continue;
+      if (installedFormats.includes(plugin16.name)) continue;
+      try {
+        core.registries.registerFormat(plugin16);
+        installedFormats.push(plugin16.name);
+        added++;
+      } catch {
+      }
+    }
+    if (pendingFcReader && installedFormats.includes("mod") && services.fc) {
+      try {
+        services.fc.installEventReader(core);
+        pendingFcReader = false;
+      } catch {
+      }
+    }
+    return added > 0;
+  }
+  globalThis.__modplayInstall = installFormat;
+  function attachServices(kind, value) {
+    if (kind === "sid") {
+      const sid = value;
+      services.sid = sid;
+      try {
+        core.registries.registerDsp(sid.dsp);
+      } catch {
+      }
+      return true;
+    }
+    if (kind === "fc") {
+      const fc = value;
+      services.fc = fc;
+      try {
+        core.registries.registerEffect(fc.effect);
+      } catch {
+      }
+      try {
+        fc.installEventReader(core);
+      } catch {
+        pendingFcReader = true;
+      }
+      return true;
+    }
+    return false;
+  }
+  globalThis.__modplayAttach = attachServices;
   core.registries.registerDsp(createPaulaPlugin());
   var mixer = createSoftMixerPlugin();
   core.registries.registerDsp(mixer);
-  core.registries.registerDsp(sidDsp);
+  if (services.sid) core.registries.registerDsp(services.sid.dsp);
+  if (services.fc) core.registries.registerEffect(services.fc.effect);
+  services.fc?.installEventReader(core);
   var settings = normaliseSettings({});
   var sampleRate = 48e3;
   var loaded = false;
@@ -67362,6 +66871,7 @@
   var channelMutes = [];
   var soloChannel = null;
   var savedMutes = null;
+  var spatialEnabled = false;
   var isStreamed = () => streamed !== null;
   var isSid = () => core.module?.format === "sid";
   function durationMs() {
@@ -67374,7 +66884,7 @@
   }
   function modulePosition() {
     if (streamed) return streamedFrames / sampleRate * 1e3;
-    if (isSid()) return getSidPlayTimeSeconds() * 1e3;
+    if (isSid()) return (services.sid?.playTimeSeconds() ?? 0) * 1e3;
     return core.playState.timeMs;
   }
   function applySettings() {
@@ -67390,6 +66900,7 @@
       amigaFilter: settings.mixer.amigaFilter,
       amplify: settings.mixer.amplify
     });
+    mixer.spatial = spatialEnabled && !isSid();
     if (!isSid()) applyMutes();
   }
   function applyMutes() {
@@ -67398,7 +66909,7 @@
     for (let i = 0; i < n; i++) core.setChannelMute(i, channelMutes[i] === true);
   }
   function applySidSettings2() {
-    applySidSettingsLive({
+    services.sid?.applySettings({
       volume: settings.sid.volume,
       highQualitySID: settings.sid.quality !== "light",
       highQualityResampler: settings.sid.quality === "sinc",
@@ -67531,7 +67042,7 @@
       amigaFilter: tracker && mod.format === "mod" && mod.chn === 4,
       panSeparation: tracker && settings.mixer.layout === "panned",
       sidPanel: sid,
-      sidStereo: sid && getSidChipCount() > 1,
+      sidStereo: sid && (services.sid?.chipCount() ?? 0) > 1,
       audition: tracker && (mod.ins > 0 || core.samples.size > 0),
       channelMute: tracker && mod.chn > 0
     };
@@ -67564,7 +67075,7 @@
   function snapshotObject() {
     return {
       schemaVersion: SCHEMA_VERSION,
-      engineVersion: ENGINE_VERSION,
+      engineVersion: engineVersion(),
       state: buildState(),
       track: loaded ? buildTrack() : null,
       channels: loaded ? buildChannels() : [],
@@ -67622,7 +67133,7 @@
     ended = false;
     if (!streamed) {
       core.setSampleRate(sampleRate);
-      if (sidBytes && isSid()) sidStartTune(sidBytes, sampleRate, 1);
+      if (sidBytes && isSid()) services.sid?.startTune(sidBytes, sampleRate, 1);
       core.startSmix(4);
       core.startPlayer();
       applySettings();
@@ -67656,7 +67167,7 @@
       streamed.seek(target);
       streamedFrames = target / 1e3 * sampleRate;
     } else if (isSid()) {
-      sidSeek(target / 1e3);
+      services.sid?.seek(target / 1e3);
     } else {
       core.seekTime(target);
     }
@@ -67693,10 +67204,10 @@
       core.stopPlayer();
     } catch {
     }
-    sidStartTune(sidBytes, sampleRate, 1);
+    services.sid?.startTune(sidBytes, sampleRate, 1);
     core.startPlayer();
     applySidSettings2();
-    sidSeek(pos / 1e3);
+    services.sid?.seek(pos / 1e3);
   }
   function auditionInstrument(index, note = 60, volume = 64) {
     if (!loaded || streamed || isSid()) return;
@@ -67753,6 +67264,19 @@
     }
     return { pattern: orderIndex, rows: pat.rows, channels, cells };
   }
+  function playhead() {
+    const mod = core.module;
+    const ps = core.playState;
+    return JSON.stringify({
+      playing: playing && !paused && !ended,
+      paused,
+      ended,
+      positionMs: modulePosition(),
+      ord: streamed ? 0 : ps.ord,
+      row: streamed ? 0 : ps.row,
+      pattern: streamed || !mod ? 0 : mod.xxo[ps.ord] ?? 0
+    });
+  }
   function command(json) {
     let c;
     try {
@@ -67765,6 +67289,8 @@
     switch (c.type) {
       case "getPattern":
         return JSON.stringify(patternObject(typeof c.pattern === "number" ? c.pattern : -1));
+      case "playhead":
+        return playhead();
       case "play":
         play();
         break;
@@ -67939,7 +67465,7 @@
         break;
       }
       case "loadSidSongLengths":
-        loadSidSongLengths(s(c.text));
+        services.sid?.loadSongLengths(s(c.text));
         break;
       case "setRepeat":
         settings.playback.repeat = s(c.value);
@@ -67950,11 +67476,87 @@
       case "setAutoAdvance":
         settings.playback.autoAdvance = c.enabled === true;
         break;
+      case "setSpatial":
+        spatialEnabled = c.enabled === true;
+        applySettings();
+        break;
+      case "spatialInfo":
+        return spatialInfo();
       default:
         setSetting(s(c.key), c.value);
         break;
     }
     return snapshot();
+  }
+  var spatialStage = [];
+  var spatialStageLen = 0;
+  var spatialStageOff = 0;
+  function spatialChannels() {
+    return core.module?.chn ?? 0;
+  }
+  function azimuthFor(i) {
+    const layout = settings.mixer.layout;
+    if (layout !== "panned" && i < 4) {
+      const left = layout === "lrlr" ? i % 2 === 0 : i === 0 || i === 3;
+      const magnitude = i < 2 ? 45 : 15;
+      return left ? -magnitude : magnitude;
+    }
+    const xc = core.channelStates[i];
+    const pan = xc ? (xc.info_finalpan - 128) / 128 : 0;
+    return pan * 60 * (settings.transport.panSeparation / 100);
+  }
+  function spatialInfo() {
+    const n = spatialChannels();
+    const azimuths = [];
+    for (let i = 0; i < n; i++) azimuths.push(Math.round(azimuthFor(i) * 10) / 10);
+    return JSON.stringify({
+      enabled: spatialEnabled,
+      available: loaded && !isStreamed() && !isSid(),
+      layout: settings.mixer.layout,
+      channels: n,
+      azimuths
+    });
+  }
+  function renderSpatial(frames) {
+    if (!loaded || !playing || paused || ended || frames <= 0) return new Float32Array(0);
+    if (isStreamed() || isSid()) return new Float32Array(0);
+    const n = spatialChannels();
+    if (n <= 0) return new Float32Array(0);
+    const mix = core.dsp();
+    mix.spatial = true;
+    const out = new Float32Array(n * frames);
+    let filled = 0;
+    while (filled < frames) {
+      if (spatialStageOff >= spatialStageLen) {
+        const scratch = new Float32Array(core.ticksize * 2);
+        const ret = core.playBuffer(scratch, scratch.length);
+        if (ret <= 0) {
+          if (ret < 0) ended = true;
+          break;
+        }
+        spatialStageLen = core.ticksize;
+        spatialStageOff = 0;
+        for (let ch = 0; ch < n; ch++) {
+          const src = mix.stemOut[ch];
+          let dst = spatialStage[ch];
+          if (!dst || dst.length < spatialStageLen) {
+            dst = new Float32Array(spatialStageLen);
+            spatialStage[ch] = dst;
+          } else {
+            dst.fill(0, 0, spatialStageLen);
+          }
+          if (src) dst.set(src.subarray(0, spatialStageLen));
+        }
+      }
+      const take = Math.min(spatialStageLen - spatialStageOff, frames - filled);
+      for (let ch = 0; ch < n; ch++) {
+        const src = spatialStage[ch];
+        if (src) out.set(src.subarray(spatialStageOff, spatialStageOff + take), ch * frames + filled);
+      }
+      spatialStageOff += take;
+      filled += take;
+    }
+    return filled === frames ? out : out.subarray(0, n * filled);
   }
   var api = {
     load,
@@ -67964,6 +67566,8 @@
     stop,
     seek,
     render,
+    renderSpatial,
+    spatialInfo,
     command,
     snapshot,
     setSettings: (json) => {
