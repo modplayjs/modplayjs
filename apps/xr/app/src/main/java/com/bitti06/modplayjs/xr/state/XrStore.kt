@@ -124,7 +124,7 @@ object XrStore {
         scanRequests = requests
         scope.launch(Dispatchers.IO) {
             for (unused in requests) {
-                val lib = library ?: continue
+                val lib = this@XrStore.library ?: continue
                 _scanning.value = true
                 _scanCount.value = 0
                 _scanItem.value = ""

@@ -35,3 +35,4 @@ apps/xr/app/keystore.properties
 engine-keys/
 # Local test helper: URL of a catalog served from the dev machine.
 catalog-url.txt
+release
