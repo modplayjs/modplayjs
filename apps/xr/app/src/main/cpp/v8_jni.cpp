@@ -300,9 +300,9 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeStartSpatialBuses(
         ? static_cast<int16_t*>(env->GetDirectBufferAddress(reverbBuffer))
         : nullptr;
 
-    LOGI("spatial buses: %d of %d, %d frames, session buffers %s", g_busCount, int(buses),
-         int(frames), g_reverbPcm ? "ok" : "missing");
-    return (g_busPcm[0] && g_reverbPcm) ? JNI_TRUE : JNI_FALSE;
+    LOGI("spatial buses: %d of %d, %d frames, reverb %s", g_busCount, int(buses),
+         int(frames), g_reverbPcm ? "on" : "off");
+    return g_busPcm[0] ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -340,8 +340,10 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeMixSpatial(
         SpatialBusMixer::toPcm16(g_busFloat + size_t(b) * size_t(frames), g_busPcm[b], frames,
                                  0.5f);
     }
-    g_busMixer->renderReverb(g_busFloat, frames, g_reverbFloat);
-    SpatialBusMixer::toPcm16(g_reverbFloat, g_reverbPcm, frames * 4, 0.8f);
+    if (g_reverbPcm) {
+        g_busMixer->renderReverb(g_busFloat, frames, g_reverbFloat);
+        SpatialBusMixer::toPcm16(g_reverbFloat, g_reverbPcm, frames * 4, 0.8f);
+    }
     return 0;
 }
 

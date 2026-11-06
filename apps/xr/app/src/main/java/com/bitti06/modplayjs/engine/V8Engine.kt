@@ -87,7 +87,7 @@ class V8Engine(
     /** True when the native mixer accepted the direct buffers. */
     fun startSpatialBuses(
         busBuffers: Array<ByteBuffer>,
-        reverbBuffer: ByteBuffer,
+        reverbBuffer: ByteBuffer?,
         sampleRate: Int,
         frames: Int,
         busCount: Int,
@@ -146,7 +146,7 @@ class V8Engine(
 
     private external fun nativeStartSpatialBuses(
         busBuffers: Array<ByteBuffer>,
-        reverbBuffer: ByteBuffer,
+        reverbBuffer: ByteBuffer?,
         sampleRate: Int,
         frames: Int,
         busCount: Int,

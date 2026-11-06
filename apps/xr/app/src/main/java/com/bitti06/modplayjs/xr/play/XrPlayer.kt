@@ -700,27 +700,40 @@ class XrPlayer(
         val feature = spatialAudio ?: return
 
         val tracks =
-            Array(BUS_COUNT) {
-                newTrack(
-                    AudioFormat.CHANNEL_OUT_MONO,
-                    audioManager?.generateAudioSessionId() ?: 0,
-                    1,
-                )
-            }
+            runCatching {
+                Array(BUS_COUNT) {
+                    newTrack(
+                        AudioFormat.CHANNEL_OUT_MONO,
+                        audioManager?.generateAudioSessionId() ?: 0,
+                        1,
+                    )
+                }
+            }.getOrNull() ?: return
         val buffers =
             Array(BUS_COUNT) {
                 ByteBuffer.allocateDirect(BLOCK * BYTES_PER_SAMPLE)
                     .order(ByteOrder.nativeOrder())
             }
-        val reverb = newTrack(AudioFormat.CHANNEL_OUT_QUAD, audioManager?.generateAudioSessionId() ?: 0, 4)
+        // The reverb is optional: if a 4-channel track is not supported, the
+        // buses still work and the mix stays dry instead of falling to stereo.
+        val reverb =
+            runCatching {
+                newTrack(
+                    AudioFormat.CHANNEL_OUT_QUAD,
+                    audioManager?.generateAudioSessionId() ?: 0,
+                    4,
+                )
+            }.getOrNull()
         val reverbBuf =
-            ByteBuffer.allocateDirect(BLOCK * 4 * BYTES_PER_SAMPLE)
-                .order(ByteOrder.nativeOrder())
+            reverb?.let {
+                ByteBuffer.allocateDirect(BLOCK * 4 * BYTES_PER_SAMPLE)
+                    .order(ByteOrder.nativeOrder())
+            }
 
         val ok = engine?.startSpatialBuses(buffers, reverbBuf, SAMPLE_RATE, BLOCK, BUS_COUNT) == true
         if (!ok) {
             tracks.forEach { runCatching { it.release() } }
-            runCatching { reverb.release() }
+            reverb?.let { runCatching { it.release() } }
             Log.e(TAG, "native bus mixer unavailable")
             return
         }
@@ -742,13 +755,15 @@ class XrPlayer(
                         AudioSessionId(BUS_BASE + i, AudioType.MONO),
                     )
             }
-            feature.registerAudioSessionId(REVERB_ID, reverb.audioSessionId)
-            reverbEntity =
-                Entity.create(
-                    Transform(Pose(Vector3(ringCenterX, RING_Y, ringCenterZ))),
-                    AudioSessionId(REVERB_ID, AudioType.AMBISONIC_ORDER_1),
-                    SoundfieldOrientation(SoundfieldOrientationType.POSITION_Y_LOCKED),
-                )
+            reverb?.let {
+                feature.registerAudioSessionId(REVERB_ID, it.audioSessionId)
+                reverbEntity =
+                    Entity.create(
+                        Transform(Pose(Vector3(ringCenterX, RING_Y, ringCenterZ))),
+                        AudioSessionId(REVERB_ID, AudioType.AMBISONIC_ORDER_1),
+                        SoundfieldOrientation(SoundfieldOrientationType.POSITION_Y_LOCKED),
+                    )
+            }
             placedRadius = ringRadius
             placedX = ringCenterX
             placedZ = ringCenterZ
