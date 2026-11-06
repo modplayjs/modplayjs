@@ -65,7 +65,8 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
 
-        <meta-data android:name="com.oculus.supportedDevices" android:value="quest3" />
+        <meta-data android:name="com.oculus.supportedDevices" android:value="quest3|quest3s|questpro|quest2" />
+        <meta-data android:name="com.oculus.supportedPlatforms" android:value="quest3|quest3s|questpro|quest2" />
         <meta-data android:name="com.oculus.vr.focusaware" android:value="true" />
         <!-- VRC.Quest.Functional.14: the app can start straight into passthrough
              (Skybox follows scene.isSystemPassthroughEnabled), so the system
