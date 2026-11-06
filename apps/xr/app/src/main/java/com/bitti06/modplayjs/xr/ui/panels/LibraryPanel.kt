@@ -20,7 +20,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -37,7 +36,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.xr.R
-import com.bitti06.modplayjs.xr.library.ScanResult
 import com.bitti06.modplayjs.xr.library.TrackFile
 import com.bitti06.modplayjs.xr.state.XrStore
 import com.bitti06.modplayjs.xr.ui.panel.Chip
@@ -45,8 +43,6 @@ import com.bitti06.modplayjs.xr.ui.panel.EmptyNote
 import com.bitti06.modplayjs.xr.ui.panel.PanelScaffold
 import com.bitti06.modplayjs.xr.ui.panel.PanelTokens
 import com.bitti06.modplayjs.xr.ui.panel.SettingsButton
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 private enum class Filter(@get:StringRes val label: Int) {
     All(R.string.xr_filter_all),
@@ -64,39 +60,24 @@ private enum class Sort(@get:StringRes val label: Int) {
 @Composable
 fun LibraryPanel() {
     val version by XrStore.libraryVersion.collectAsState()
-    var result by remember { mutableStateOf(ScanResult(emptyList(), emptyList(), 0)) }
+    val recentsVersion by XrStore.recentsVersion.collectAsState()
+    val result by XrStore.libraryTracks.collectAsState()
+    val isScanning by XrStore.scanning.collectAsState()
+    val scanCount by XrStore.scanCount.collectAsState()
+    val scanItem by XrStore.scanItem.collectAsState()
     var filter by remember { mutableStateOf(Filter.All) }
     var sort by remember { mutableStateOf(Sort.Name) }
     var query by remember { mutableStateOf("") }
-    var scanId by remember { mutableIntStateOf(0) }
     var selectedFolder by remember { mutableStateOf<String?>(null) }
     var favoritesVersion by remember { mutableIntStateOf(0) }
     val favorites = remember(version, favoritesVersion) { XrStore.favorites() }
-
-    var isScanning by remember { mutableStateOf(false) }
-    var scanCount by remember { mutableIntStateOf(0) }
-    var scanCurrentItem by remember { mutableStateOf("") }
-
-    LaunchedEffect(scanId) {
-        isScanning = true
-        scanCount = 0
-        scanCurrentItem = ""
-        val res = withContext(Dispatchers.IO) {
-            XrStore.scan { count, item ->
-                scanCount = count
-                scanCurrentItem = item
-            }
-        }
-        if (res != null) result = res
-        isScanning = false
-    }
 
     val foldersList = remember(result.tracks) {
         result.tracks.map { it.folder }.distinct().sorted()
     }
 
     val shown: List<TrackFile> =
-        remember(result, filter, sort, query, favorites, selectedFolder) {
+        remember(result, filter, sort, query, favorites, selectedFolder, recentsVersion) {
             val filtered =
                 when (filter) {
                     Filter.All -> {
@@ -142,7 +123,7 @@ fun LibraryPanel() {
                 verticalArrangement = Arrangement.spacedBy(PanelTokens.GapXs),
             ) {
                 Text(
-                    "LIBRARY",
+                    stringResource(R.string.xr_library_heading).uppercase(),
                     fontSize = PanelTokens.Meta,
                     fontWeight = FontWeight.Bold,
                     color = PanelTokens.TextFaint,
@@ -184,7 +165,7 @@ fun LibraryPanel() {
 
                 if (foldersList.isNotEmpty()) {
                     Text(
-                        "FOLDERS",
+                        stringResource(R.string.xr_folders_heading).uppercase(),
                         fontSize = PanelTokens.Meta,
                         fontWeight = FontWeight.Bold,
                         color = PanelTokens.TextFaint,
@@ -221,7 +202,11 @@ fun LibraryPanel() {
                             .padding(vertical = PanelTokens.GapXs),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("+ Folder", fontSize = PanelTokens.ChipText, color = PanelTokens.TextDim)
+                        Text(
+                            stringResource(R.string.xr_add_folder_short),
+                            fontSize = PanelTokens.ChipText,
+                            color = PanelTokens.TextDim,
+                        )
                     }
                     Box(
                         modifier = Modifier
@@ -232,7 +217,11 @@ fun LibraryPanel() {
                             .padding(vertical = PanelTokens.GapXs),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("+ File", fontSize = PanelTokens.ChipText, color = PanelTokens.TextDim)
+                        Text(
+                            stringResource(R.string.xr_add_file_short),
+                            fontSize = PanelTokens.ChipText,
+                            color = PanelTokens.TextDim,
+                        )
                     }
                 }
             }
@@ -278,9 +267,13 @@ fun LibraryPanel() {
                         sort = Sort.entries[(sort.ordinal + 1) % Sort.entries.size]
                     }
                     Chip(
-                        if (isScanning) "⚡ ($scanCount)" else stringResource(R.string.xr_rescan),
+                        if (isScanning) {
+                            stringResource(R.string.xr_scanning_short, scanCount)
+                        } else {
+                            stringResource(R.string.xr_rescan)
+                        },
                     ) {
-                        if (!isScanning) scanId++
+                        if (!isScanning) XrStore.rescan()
                     }
                 }
 
@@ -295,20 +288,20 @@ fun LibraryPanel() {
                         horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
                     ) {
                         Text(
-                            "⚡ Scanning...",
+                            stringResource(R.string.xr_scanning),
                             fontSize = PanelTokens.Body,
                             fontWeight = FontWeight.Bold,
                             color = PanelTokens.Accent,
                         )
                         Text(
-                            "$scanCount tracks",
+                            stringResource(R.string.xr_scan_tracks, scanCount),
                             fontSize = PanelTokens.Mono,
                             fontFamily = FontFamily.Monospace,
                             color = PanelTokens.AccentAlt,
                         )
-                        if (scanCurrentItem.isNotBlank()) {
+                        if (scanItem.isNotBlank()) {
                             Text(
-                                scanCurrentItem,
+                                scanItem,
                                 fontSize = PanelTokens.Meta,
                                 color = PanelTokens.TextFaint,
                                 maxLines = 1,

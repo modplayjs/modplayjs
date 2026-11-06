@@ -8,6 +8,8 @@ import com.bitti06.modplayjs.xr.library.ScanResult
 import com.bitti06.modplayjs.xr.library.TrackFile
 import com.bitti06.modplayjs.xr.play.XrPlayer
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,6 +50,42 @@ object XrStore {
     private val _libraryVersion = MutableStateFlow(0)
     val libraryVersion: StateFlow<Int> = _libraryVersion.asStateFlow()
 
+    /**
+     * Bumped when a track is played, which is what the "Recent" filter sorts
+     * by. It is separate from [libraryVersion] on purpose: playing a module
+     * must not trigger a library rescan.
+     */
+    private val _recentsVersion = MutableStateFlow(0)
+    val recentsVersion: StateFlow<Int> = _recentsVersion.asStateFlow()
+
+    /**
+     * The last library scan.
+     *
+     * It lives here rather than in the panel because only visible panels are
+     * composed: a scan result held in `LibraryPanel` was dropped whenever the
+     * panel hid, and coming back started a full SAF walk of every picked tree
+     * again. The result and the progress are ordinary flows, so the panel can
+     * come and go without owning the scan.
+     */
+    private val _libraryTracks = MutableStateFlow(ScanResult(emptyList(), emptyList(), 0))
+    val libraryTracks: StateFlow<ScanResult> = _libraryTracks.asStateFlow()
+
+    private val _scanning = MutableStateFlow(false)
+    val scanning: StateFlow<Boolean> = _scanning.asStateFlow()
+
+    private val _scanCount = MutableStateFlow(0)
+    val scanCount: StateFlow<Int> = _scanCount.asStateFlow()
+
+    private val _scanItem = MutableStateFlow("")
+    val scanItem: StateFlow<String> = _scanItem.asStateFlow()
+
+    /**
+     * Scan requests. Conflated, so a burst of changes runs one walk with the
+     * latest grants instead of one walk per change: a picker return, a restore
+     * and an ignore landing in the same frame are one scan.
+     */
+    private var scanRequests: Channel<Unit>? = null
+
     private var player: XrPlayer? = null
     /** Last playback state, so the library only moves on a transition. */
     private var wasPlaying = false
@@ -79,6 +117,30 @@ object XrStore {
         scope.launch { overlays.collect { refresh(freeLayout.value, passthrough.value) } }
         scope.launch { freeLayout.collect { refresh(it, passthrough.value) } }
         scope.launch { passthrough.collect { refresh(freeLayout.value, it) } }
+
+        // One scan at a time, off the main thread. Every library change posts
+        // here; the conflated channel folds a burst into a single walk.
+        val requests = Channel<Unit>(Channel.CONFLATED)
+        scanRequests = requests
+        scope.launch(Dispatchers.IO) {
+            for (unused in requests) {
+                val lib = library ?: continue
+                _scanning.value = true
+                _scanCount.value = 0
+                _scanItem.value = ""
+                val scanned =
+                    runCatching {
+                        lib.scan { count, item ->
+                            _scanCount.value = count
+                            _scanItem.value = item
+                        }
+                    }.getOrNull()
+                if (scanned != null) _libraryTracks.value = scanned
+                _scanning.value = false
+                _scanItem.value = ""
+            }
+        }
+        scope.launch { _libraryVersion.collect { requests.trySend(Unit) } }
     }
 
     /** Re-read every source with the values the state already carries. */
@@ -245,7 +307,16 @@ object XrStore {
         _libraryVersion.value += 1
     }
 
-    fun scan(onProgress: ((Int, String) -> Unit)? = null): ScanResult? = library?.scan(onProgress)
+    /** A track was played: the recents order changed, the library did not. */
+    fun recentsChanged() {
+        _recentsVersion.value += 1
+        refresh()
+    }
+
+    /** Manual rescan from the library panel. */
+    fun rescan() {
+        scanRequests?.trySend(Unit)
+    }
 
     fun favorites(): Set<String> = library?.favorites().orEmpty()
 

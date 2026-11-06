@@ -159,7 +159,7 @@ class XrActivity : AppSystemActivity(), XrHost {
         placement = PanelPlacement(this, panelAnimator)
         player = XrPlayer(this)
         library = Library(this)
-        playlist = Playlist(library, player) { XrStore.libraryChanged() }
+        playlist = Playlist(library, player) { XrStore.recentsChanged() }
         player.onEnded = { playlist.onEnded() }
 
         XrStore.host = this
