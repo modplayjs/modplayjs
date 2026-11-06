@@ -2,6 +2,7 @@ package com.bitti06.modplayjs.engine
 
 import android.content.Context
 import android.util.Log
+import java.nio.ByteBuffer
 
 /**
  * Owns the V8 isolate. Every method must be called from the same thread
@@ -81,6 +82,40 @@ class V8Engine(
 
     fun snapshot(): String = if (handle == 0L) """{"error":"v8-unavailable"}""" else nativeSnapshot(handle)
 
+    // ------------------------------------------------------- spatial buses
+
+    /** True when the native mixer accepted the direct buffers. */
+    fun startSpatialBuses(
+        busBuffers: Array<ByteBuffer>,
+        reverbBuffer: ByteBuffer,
+        sampleRate: Int,
+        frames: Int,
+        busCount: Int,
+    ): Boolean =
+        handle != 0L &&
+            nativeStartSpatialBuses(busBuffers, reverbBuffer, sampleRate, frames, busCount)
+
+    /** 5 floats per source: azimuthDeg, distanceM, gain, spreadDeg, occlusion01. */
+    fun setSpatialSources(params: FloatArray, count: Int) {
+        if (handle != 0L) nativeSetSpatialSources(params, count)
+    }
+
+    fun setSpatialRoom(width: Float, depth: Float, height: Float, absorption: Float) {
+        if (handle != 0L) nativeSetSpatialRoom(width, depth, height, absorption)
+    }
+
+    fun setSpatialWet(percent: Int) {
+        if (handle != 0L) nativeSetSpatialWet(percent)
+    }
+
+    /** Mixes the stems into the bus buffers. Returns 0 on success. */
+    fun mixSpatial(stems: FloatArray, sources: Int, frames: Int): Int =
+        if (handle == 0L) -1 else nativeMixSpatial(stems, sources, frames)
+
+    fun stopSpatialBuses() {
+        if (handle != 0L) nativeStopSpatialBuses()
+    }
+
     private external fun nativeCreate(
         script: String,
         cacheDir: String,
@@ -108,6 +143,29 @@ class V8Engine(
     ): FloatArray
 
     private external fun nativeSnapshot(handle: Long): String
+
+    private external fun nativeStartSpatialBuses(
+        busBuffers: Array<ByteBuffer>,
+        reverbBuffer: ByteBuffer,
+        sampleRate: Int,
+        frames: Int,
+        busCount: Int,
+    ): Boolean
+
+    private external fun nativeSetSpatialSources(params: FloatArray, count: Int)
+
+    private external fun nativeSetSpatialRoom(
+        width: Float,
+        depth: Float,
+        height: Float,
+        absorption: Float,
+    )
+
+    private external fun nativeSetSpatialWet(percent: Int)
+
+    private external fun nativeMixSpatial(stems: FloatArray, sources: Int, frames: Int): Int
+
+    private external fun nativeStopSpatialBuses()
 
     companion object {
         private const val TAG = "V8Engine"

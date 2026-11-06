@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include "spatial_bus_mixer.h"
 #include "v8.h"
 #include "libplatform/libplatform.h"
 
@@ -249,4 +251,111 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeDestroy(JNIEnv*, jobject, jlong
     }
     e->isolate->Dispose();
     delete e;
+}
+
+
+// --------------------------------------------------------------- bus mixer
+//
+// The mixdown itself lives in spatial_bus_mixer.cpp. This section only owns
+// the JNI boundary: the direct buffers Kotlin writes to its AudioTracks, the
+// source parameters, and the float-to-PCM conversion.
+
+static std::mutex g_busMutex;
+static SpatialBusMixer* g_busMixer = nullptr;
+static int16_t* g_busPcm[SpatialBusMixer::kMaxBuses] = {};
+static int16_t* g_reverbPcm = nullptr;
+static float* g_busFloat = nullptr;
+static float* g_reverbFloat = nullptr;
+static int g_busCount = 0;
+static int g_busFrames = 0;
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeStartSpatialBuses(
+        JNIEnv* env, jobject, jobjectArray buffers, jobject reverbBuffer,
+        jint sampleRate, jint frames, jint buses) {
+    std::lock_guard<std::mutex> lock(g_busMutex);
+    delete g_busMixer;
+    delete[] g_busFloat;
+    delete[] g_reverbFloat;
+    g_busMixer = nullptr;
+    g_busFloat = nullptr;
+    g_reverbFloat = nullptr;
+    g_reverbPcm = nullptr;
+
+    if (!buffers || frames <= 0 || buses <= 0) return JNI_FALSE;
+    g_busCount = std::min<int>(buses, SpatialBusMixer::kMaxBuses);
+    g_busFrames = frames;
+
+    g_busMixer = new SpatialBusMixer();
+    g_busMixer->configure(sampleRate, frames, g_busCount);
+    g_busFloat = new float[size_t(g_busCount) * size_t(frames)];
+    g_reverbFloat = new float[size_t(frames) * 4];
+
+    for (int i = 0; i < g_busCount; ++i) {
+        jobject buf = env->GetObjectArrayElement(buffers, i);
+        g_busPcm[i] = buf ? static_cast<int16_t*>(env->GetDirectBufferAddress(buf)) : nullptr;
+        if (buf) env->DeleteLocalRef(buf);
+    }
+    g_reverbPcm = reverbBuffer
+        ? static_cast<int16_t*>(env->GetDirectBufferAddress(reverbBuffer))
+        : nullptr;
+
+    LOGI("spatial buses: %d of %d, %d frames, session buffers %s", g_busCount, int(buses),
+         int(frames), g_reverbPcm ? "ok" : "missing");
+    return (g_busPcm[0] && g_reverbPcm) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeSetSpatialSources(
+        JNIEnv* env, jobject, jfloatArray params, jint count) {
+    if (!g_busMixer || !params) return;
+    auto* p = static_cast<jfloat*>(env->GetPrimitiveArrayCritical(params, nullptr));
+    if (!p) return;
+    g_busMixer->setSources(p, count);
+    env->ReleasePrimitiveArrayCritical(params, p, JNI_ABORT);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeSetSpatialRoom(
+        JNIEnv*, jobject, jfloat width, jfloat depth, jfloat height, jfloat absorption) {
+    if (g_busMixer) g_busMixer->setRoom(width, depth, height, absorption);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeSetSpatialWet(JNIEnv*, jobject, jint percent) {
+    if (g_busMixer) g_busMixer->setWet(percent);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeMixSpatial(
+        JNIEnv* env, jobject, jfloatArray stems, jint sources, jint frames) {
+    if (!g_busMixer || !g_busFloat || frames <= 0 || frames > g_busFrames) return -1;
+
+    auto* s = static_cast<jfloat*>(env->GetPrimitiveArrayCritical(stems, nullptr));
+    if (!s) return -1;
+    g_busMixer->mix(s, sources, frames, g_busFloat);
+    env->ReleasePrimitiveArrayCritical(stems, s, JNI_ABORT);
+
+    for (int b = 0; b < g_busCount; ++b) {
+        SpatialBusMixer::toPcm16(g_busFloat + size_t(b) * size_t(frames), g_busPcm[b], frames,
+                                 0.5f);
+    }
+    g_busMixer->renderReverb(g_busFloat, frames, g_reverbFloat);
+    SpatialBusMixer::toPcm16(g_reverbFloat, g_reverbPcm, frames * 4, 0.8f);
+    return 0;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeStopSpatialBuses(JNIEnv*, jobject) {
+    std::lock_guard<std::mutex> lock(g_busMutex);
+    delete g_busMixer;
+    delete[] g_busFloat;
+    delete[] g_reverbFloat;
+    g_busMixer = nullptr;
+    g_busFloat = nullptr;
+    g_reverbFloat = nullptr;
+    g_reverbPcm = nullptr;
+    for (auto& p : g_busPcm) p = nullptr;
+    g_busCount = 0;
+    g_busFrames = 0;
 }

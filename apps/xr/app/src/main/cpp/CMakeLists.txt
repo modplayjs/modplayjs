@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MODPLAY_V8)
-    add_library(modplay_v8 SHARED v8_jni.cpp)
+    add_library(modplay_v8 SHARED v8_jni.cpp spatial_bus_mixer.cpp)
     target_compile_definitions(modplay_v8 PRIVATE MODPLAY_V8=1 V8_COMPRESS_POINTERS=1)
     target_include_directories(modplay_v8 PRIVATE ${V8_INCLUDE})
     target_link_libraries(modplay_v8 PRIVATE ${V8_LIB} android log z)
