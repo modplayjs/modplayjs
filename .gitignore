@@ -15,4 +15,10 @@ main.zip
 
 # Play upload assets assembled by apps/android/scripts/store-assets.ps1
 apps/android/store/upload/
+
+# Signing material never belongs in the repository: an upload key that is
+# public can sign updates for the package. See apps/xr/README.md.
 apps/xr/release.keystore
+apps/xr/*.keystore
+apps/xr/keystore.properties
+apps/xr/app/keystore.properties

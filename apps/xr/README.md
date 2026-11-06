@@ -188,6 +188,18 @@ The Library panel scans that folder (plus `files/modules`) on start and on
 - favorites, recents, Room-backed index
 - MRUK room geometry, occlusion, reflections (next step: P4)
 
+## Signing
+
+The upload key is not part of the repository. Create
+`apps/xr/app/keystore.properties` (also accepted: `apps/xr/keystore.properties`)
+from `apps/xr/keystore.properties.template`, or set the four `MODPLAY_XR_*`
+environment variables. Without it `assembleRelease` produces an unsigned APK.
+
+`apps/xr/release.keystore` and both `keystore.properties` locations are ignored
+by git. A keystore that was ever pushed must be treated as compromised: anyone
+holding it can sign an update for `com.bitti06.modplayjs.xr`. Generate a new one
+and rotate it in the store console instead of reusing the old file.
+
 ## Localisation
 
 All panel text comes from `res/values/strings.xml` (English) and
