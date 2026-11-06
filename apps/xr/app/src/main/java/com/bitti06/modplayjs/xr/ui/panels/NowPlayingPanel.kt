@@ -69,7 +69,12 @@ fun NowPlayingPanel() {
             Spacer(Modifier.weight(1f))
             MetaText(
                 if (playback.loaded) {
-                    "${playback.channels} ch · ${formatTime(playback.positionMs)} / ${formatTime(playback.durationMs)}"
+                    stringResource(
+                        R.string.xr_now_meta,
+                        playback.channels,
+                        formatTime(playback.positionMs),
+                        formatTime(playback.durationMs),
+                    )
                 } else {
                     stringResource(R.string.xr_push_hint, "…/files/modules")
                 },

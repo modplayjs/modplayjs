@@ -23,14 +23,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bitti06.modplayjs.engine.PatternColors
@@ -73,6 +77,30 @@ private fun stripDotsFast(raw: String): String {
 }
 
 /**
+ * Letter spacing that makes exactly [CELL_CHARS] monospace glyphs fill
+ * [CELL_WIDTH].
+ *
+ * A row is one Text node so the list stays fast, which means the cells run
+ * together at the font's own advance instead of each sitting in its own 96 dp
+ * box. At 10 sp that advance is about 78 dp for 13 glyphs, so the combined
+ * string fell roughly 18 dp behind per column: at 32 channels the last one sat
+ * more than 600 dp left of its line. Compose adds letter spacing after every
+ * glyph, the last one included, so the measured run plus n spacings is exactly
+ * the column width and every cell starts on its own line again.
+ */
+@Composable
+private fun rememberCellSpacing(): TextUnit {
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    return remember(density, measurer) {
+        val style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = CELL_TEXT)
+        val run = measurer.measure(EMPTY_CELL, style, maxLines = 1).size.width
+        val target = with(density) { CELL_WIDTH.toPx() }
+        with(density) { ((target - run) / CELL_CHARS.toFloat()).toSp() }
+    }
+}
+
+/**
  * The playing pattern the way a tracker shows it: one row per line, one column
  * per channel, cells in four colours so the eye can follow a single column
  * through the matrix.
@@ -91,6 +119,7 @@ fun PatternPanel() {
     val listState = rememberLazyListState()
     val scrollState = rememberScrollState()
     val palette = patternPalette(state.player.patternColors)
+    val cellSpacing = rememberCellSpacing()
 
     // Follow the playhead three rows down from the top edge instead of pinned
     // to it, and only scroll when the row left the window: collecting the flow
@@ -116,7 +145,7 @@ fun PatternPanel() {
         title = stringResource(R.string.xr_pattern, pattern.pattern.toString().padStart(2, '0')),
         subtitle =
             if (pattern.rows > 0) {
-                "${pattern.channels} ch · ${pattern.rows} rows"
+                stringResource(R.string.xr_pattern_size, pattern.channels, pattern.rows)
             } else {
                 "—"
             },
@@ -136,7 +165,11 @@ fun PatternPanel() {
 
         Box(modifier = Modifier.weight(1f).horizontalScroll(scrollState)) {
             Column(modifier = Modifier.width(gridWidth).fillMaxHeight()) {
-                PatternHeader(channels = pattern.channels, line = palette.line)
+                PatternHeader(
+                    channels = pattern.channels,
+                    line = palette.line,
+                    cellSpacing = cellSpacing,
+                )
                 LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
                     items(count = pattern.rows, key = { row -> row }) { row ->
                         PatternRow(
@@ -146,6 +179,7 @@ fun PatternPanel() {
                             active = row == playhead.row,
                             palette = palette,
                             stripDots = state.player.stripDots,
+                            cellSpacing = cellSpacing,
                         )
                     }
                 }
@@ -155,7 +189,11 @@ fun PatternPanel() {
 }
 
 @Composable
-private fun PatternHeader(channels: Int, line: Color) {
+private fun PatternHeader(
+    channels: Int,
+    line: Color,
+    cellSpacing: TextUnit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -184,6 +222,7 @@ private fun PatternHeader(channels: Int, line: Color) {
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 softWrap = false,
+                letterSpacing = cellSpacing,
                 modifier = Modifier.width(CELL_WIDTH),
             )
         }
@@ -203,6 +242,7 @@ private fun PatternRow(
     active: Boolean,
     palette: PatternPalette,
     stripDots: Boolean,
+    cellSpacing: TextUnit,
 ) {
     val rowAnnotated = remember(cells, row, channels, palette, stripDots) {
         buildAnnotatedString {
@@ -238,6 +278,7 @@ private fun PatternRow(
             fontFamily = FontFamily.Monospace,
             maxLines = 1,
             softWrap = false,
+            letterSpacing = cellSpacing,
             modifier = Modifier.width(CELL_WIDTH * channels),
         )
     }

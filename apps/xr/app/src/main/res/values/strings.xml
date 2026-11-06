@@ -11,6 +11,8 @@
     <string name="xr_sources">Sources</string>
     <string name="xr_pattern">Pattern %1$s</string>
     <string name="xr_pattern_meta">%1$d ch · row %2$d</string>
+    <string name="xr_now_meta">%1$d ch · %2$s / %3$s</string>
+    <string name="xr_pattern_size">%1$d ch · %2$d rows</string>
     <string name="xr_pattern_empty">No pattern data (SID or stream).</string>
     <string name="xr_no_module">No module loaded.</string>
     <string name="xr_no_track">No track loaded</string>
@@ -21,6 +23,13 @@
     <string name="xr_filter_recent">Recent</string>
     <string name="xr_folders">Folders</string>
     <string name="xr_files">Files</string>
+    <string name="xr_library_heading">Library</string>
+    <string name="xr_folders_heading">Folders</string>
+    <string name="xr_add_folder_short">+ Folder</string>
+    <string name="xr_add_file_short">+ File</string>
+    <string name="xr_scanning">⚡ Scanning…</string>
+    <string name="xr_scanning_short">⚡ (%1$d)</string>
+    <string name="xr_scan_tracks">%1$d tracks</string>
     <string name="xr_rescan">Rescan</string>
     <string name="xr_sort">Sort %1$s</string>
     <string name="xr_sort_name">Name</string>
