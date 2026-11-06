@@ -83,21 +83,21 @@ val PANELS: List<PanelSpec> =
             androidId = R.id.panel_main,
             width = 1.8f,
             height = 1.05f,
-            pose = at(0f, 1.45f, 1.70f),
+            pose = at(0f, 1.60f, 1.70f),
         ) { NowPlayingPanel() },
         PanelSpec(
             id = PanelId.LIBRARY,
             androidId = R.id.panel_library,
             width = 1.4f,
             height = 0.95f,
-            pose = at(-1.75f, 1.45f, 1.75f),
+            pose = at(-1.75f, 1.60f, 1.75f),
         ) { LibraryPanel() },
         PanelSpec(
             id = PanelId.SETTINGS,
             androidId = R.id.panel_settings,
             width = 1.4f,
             height = 0.95f,
-            pose = at(1.75f, 1.45f, 1.75f),
+            pose = at(1.75f, 1.60f, 1.75f),
         ) { SettingsPanel() },
         PanelSpec(
             id = PanelId.PATTERN,
@@ -105,38 +105,36 @@ val PANELS: List<PanelSpec> =
             width = 1.6f,
             height = 0.9f,
             resolutionScale = 0.9f,
-            pose = at(-2.0f, 0.52f, 1.70f),
+            pose = at(-2.0f, 0.65f, 1.70f),
         ) { PatternPanel() },
-        // The details shelf sits below now playing, elevated to 0.58 m so it is
-        // comfortable to read without overlapping the main panel.
         PanelSpec(
             id = PanelId.DETAILS,
             androidId = R.id.panel_details,
             width = 2.2f,
             height = 0.75f,
             transparent = true,
-            pose = at(0f, 0.58f, 1.95f),
+            pose = at(0f, 0.72f, 1.95f),
         ) { DetailsPanel() },
         PanelSpec(
             id = PanelId.DEBUG,
             androidId = R.id.panel_debug,
             width = 1.4f,
             height = 0.85f,
-            pose = at(1.75f, 0.45f, 1.75f),
+            pose = at(1.75f, 0.60f, 1.75f),
         ) { DebugPanel() },
         PanelSpec(
             id = PanelId.QUEUE,
             androidId = R.id.panel_queue,
             width = 1.2f,
             height = 0.85f,
-            pose = at(-0.95f, 1.45f, 2.4f),
+            pose = at(-0.95f, 1.60f, 2.4f),
         ) { QueuePanel() },
         PanelSpec(
             id = PanelId.IGNORED,
             androidId = R.id.panel_ignored,
             width = 1.2f,
             height = 0.85f,
-            pose = at(0.95f, 1.45f, 2.4f),
+            pose = at(0.95f, 1.60f, 2.4f),
         ) { IgnoredPanel() },
     )
 

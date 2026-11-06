@@ -191,9 +191,9 @@ private fun PatternHeader(channels: Int, line: Color) {
 }
 
 /**
- * Row number plus one coloured cell per channel. The AnnotatedString is built
- * once per (cell text, palette) through remember, so a playhead move does not
- * rebuild two thousand styled strings.
+ * Row number plus a single combined AnnotatedString for all channels. Combining
+ * cells into one Text node per row reduces Compose layout nodes from N*32 down
+ * to N*1, eliminating UI lag on modules with >6 channels.
  */
 @Composable
 private fun PatternRow(
@@ -204,6 +204,16 @@ private fun PatternRow(
     palette: PatternPalette,
     stripDots: Boolean,
 ) {
+    val rowAnnotated = remember(cells, row, channels, palette, stripDots) {
+        buildAnnotatedString {
+            for (ch in 0 until channels) {
+                val raw = cells.getOrElse(row * channels + ch) { EMPTY_CELL }
+                val cell = if (stripDots) stripDotsFast(raw) else raw
+                appendCell(cell, palette)
+            }
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -222,21 +232,14 @@ private fun PatternRow(
             softWrap = false,
             modifier = Modifier.width(ROW_NUM_WIDTH),
         )
-        for (ch in 0 until channels) {
-            val raw = cells.getOrElse(row * channels + ch) { EMPTY_CELL }
-            val text = remember(raw, stripDots, palette) {
-                val cell = if (stripDots) stripDotsFast(raw) else raw
-                annotatedCell(cell, palette)
-            }
-            Text(
-                text,
-                fontSize = CELL_TEXT,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-                softWrap = false,
-                modifier = Modifier.width(CELL_WIDTH),
-            )
-        }
+        Text(
+            rowAnnotated,
+            fontSize = CELL_TEXT,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.width(CELL_WIDTH * channels),
+        )
     }
 }
 
@@ -262,25 +265,19 @@ private fun patternPalette(colors: PatternColors): PatternPalette =
         )
     }
 
-/**
- * Splits one engine cell into its four fields. The engine writes them at fixed
- * widths (3 / 2 / 2 / 3); a short or unexpected string is shown dimmed instead
- * of mis-sliced.
- */
-private fun annotatedCell(cell: String, palette: PatternPalette): AnnotatedString =
-    buildAnnotatedString {
-        if (cell.length < CELL_CHARS) {
-            withStyle(SpanStyle(color = palette.empty)) { append(cell) }
-            return@buildAnnotatedString
-        }
-        field(cell, 0, 3, NOTE_EMPTY, palette.note, palette.empty)
-        append(' ')
-        field(cell, 4, 6, FIELD_EMPTY, palette.instrument, palette.empty)
-        append(' ')
-        field(cell, 7, 9, FIELD_EMPTY, palette.volume, palette.empty)
-        append(' ')
-        field(cell, 10, 13, FIELD_EMPTY, palette.effect, palette.empty)
+private fun AnnotatedString.Builder.appendCell(cell: String, palette: PatternPalette) {
+    if (cell.length < CELL_CHARS) {
+        withStyle(SpanStyle(color = palette.empty)) { append(cell.padEnd(CELL_CHARS)) }
+        return
     }
+    field(cell, 0, 3, NOTE_EMPTY, palette.note, palette.empty)
+    append(' ')
+    field(cell, 4, 6, FIELD_EMPTY, palette.instrument, palette.empty)
+    append(' ')
+    field(cell, 7, 9, FIELD_EMPTY, palette.volume, palette.empty)
+    append(' ')
+    field(cell, 10, 13, FIELD_EMPTY, palette.effect, palette.empty)
+}
 
 private fun AnnotatedString.Builder.field(
     cell: String,

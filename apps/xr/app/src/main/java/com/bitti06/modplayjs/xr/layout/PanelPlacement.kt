@@ -143,14 +143,17 @@ class PanelPlacement(
         edit.apply()
     }
 
-    /** Persist the current poses. */
+    /** Persist the current poses, clamping coordinates to bounded space. */
     fun save(entities: Map<PanelId, Entity>) {
         val edit = prefs.edit()
         for ((id, entity) in entities) {
             val pose = readPose(entity) ?: continue
-            edit.putFloat("x${id.name}", pose.t.x)
-            edit.putFloat("y${id.name}", pose.t.y)
-            edit.putFloat("z${id.name}", pose.t.z)
+            val cx = pose.t.x.coerceIn(-3.5f, 3.5f)
+            val cy = pose.t.y.coerceIn(0.4f, 2.5f)
+            val cz = pose.t.z.coerceIn(0.8f, 3.5f)
+            edit.putFloat("x${id.name}", cx)
+            edit.putFloat("y${id.name}", cy)
+            edit.putFloat("z${id.name}", cz)
             edit.putFloat("qx${id.name}", pose.q.x)
             edit.putFloat("qy${id.name}", pose.q.y)
             edit.putFloat("qz${id.name}", pose.q.z)
@@ -164,12 +167,10 @@ class PanelPlacement(
         if (!prefs.contains(key)) return null
         return Pose(
             Vector3(
-                prefs.getFloat(key, 0f),
-                prefs.getFloat("y${id.name}", 1.45f),
-                prefs.getFloat("z${id.name}", 1.75f),
+                prefs.getFloat(key, 0f).coerceIn(-3.5f, 3.5f),
+                prefs.getFloat("y${id.name}", 1.60f).coerceIn(0.4f, 2.5f),
+                prefs.getFloat("z${id.name}", 1.75f).coerceIn(0.8f, 3.5f),
             ),
-            // Named arguments: the primary constructor is Quaternion(w, x, y, z),
-            // so positional qx,qy,qz,qw rotated panels around the wrong axis.
             Quaternion(
                 w = prefs.getFloat("qw${id.name}", 1f),
                 x = prefs.getFloat("qx${id.name}", 0f),
@@ -261,7 +262,8 @@ class PanelPlacement(
          * 41: details moved below now playing, so poses saved under 40 hold
          * the old overlap.
          * 42: details panel elevated higher (y=0.58m).
+         * 43: default height updated to eye-level (y=1.60m) and pose clamping added.
          */
-        const val LAYOUT_VERSION = 42
+        const val LAYOUT_VERSION = 43
     }
 }
