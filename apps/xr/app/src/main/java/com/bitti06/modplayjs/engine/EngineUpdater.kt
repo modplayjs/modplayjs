@@ -55,26 +55,41 @@ object EngineUpdater {
      * Catalog location, in order: the stored override, a pushed text file, the
      * build-time default.
      *
-     * The file in the app's external files dir is for testing without a
-     * rebuild: `adb push catalog-url.txt /sdcard/Android/data/<pkg>/files/`.
+     * The text file exists so a catalog can be pointed at without a rebuild.
+     * Two locations are checked because only one of them is reachable from a
+     * development machine on current Android:
+     *
+     * - `filesDir/catalog-url.txt` (internal). `adb shell run-as <pkg> cp` can
+     *   write it on a debuggable build, on every Android version.
+     * - `<externalFilesDir>/catalog-url.txt`. `adb push` reaches it only once
+     *   the app has created the directory itself, and only where adbd is
+     *   allowed to write into `Android/data`; a push into a directory that
+     *   does not exist yet fails with `secure_mkdirs failed: Permission
+     *   denied`, and scoped storage has made that the normal case.
+     *
+     * Internal first: it is the location that works without assumptions.
      */
     fun catalogUrl(context: Context): String? {
         val stored =
             context.getSharedPreferences("xr", Context.MODE_PRIVATE)
                 .getString("engineCatalogUrl", null)
         val pushed =
-            runCatching {
-                java.io.File(context.getExternalFilesDir(null), "catalog-url.txt")
-                    .takeIf { it.isFile }
-                    ?.readText()
-                    ?.trim()
-            }.getOrNull()
+            pushedText(java.io.File(context.filesDir, "catalog-url.txt"))
+                ?: context.getExternalFilesDir(null)?.let {
+                    pushedText(java.io.File(it, "catalog-url.txt"))
+                }
         val url =
             stored?.takeIf { it.isNotBlank() }
                 ?: pushed?.takeIf { it.isNotBlank() }
                 ?: BuildConfig.ENGINE_CATALOG_URL
         return url.takeIf { it.isNotBlank() }
     }
+
+    /** Content of a pushed text file, trimmed, or null when absent/blank. */
+    private fun pushedText(file: java.io.File): String? =
+        runCatching {
+            file.takeIf { it.isFile }?.readText()?.trim()?.takeIf { it.isNotBlank() }
+        }.getOrNull()
 
     fun storeCatalogUrl(context: Context, url: String?) {
         context.getSharedPreferences("xr", Context.MODE_PRIVATE)

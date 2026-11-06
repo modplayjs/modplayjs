@@ -103,6 +103,36 @@ local test server works unsigned.
 This is what blocks a compromised CDN or release account: the transport decides
 *availability*, the signature decides *what code may run*.
 
+### The key never goes into CI
+
+No workflow in this repository touches the XR app, so the signing key never
+reaches a runner today. Keep it that way: sign on the machine that publishes,
+and let CI build only with the public key.
+
+The reason is not the `.gitignore`. A key injected into a workflow lands in the
+runner's workspace as untracked file, where `git ls-files` cannot see it - the
+`secrets-guard` job and the signer's own tracked-key check both look at the
+index, not the filesystem. Once it is on disk, three things can pick it up:
+an `upload-artifact` path that covers `apps/xr/build/` instead of
+`apps/xr/build/engine-catalog/`, a cache step over the workspace, or a
+job-level `env:` that every later step - including `npm ci` and any third-party
+action - inherits.
+
+If signing in CI ever becomes necessary, do all of this:
+
+- write the key to `$RUNNER_TEMP`, outside `$GITHUB_WORKSPACE`, and set
+  `MODPLAY_ENGINE_SIGNING_KEY` to that path;
+- put the `env:` on the signing step, never on the job;
+- upload `apps/xr/build/engine-catalog`, never `apps/xr/build`;
+- delete the key with `if: always()`.
+
+`MODPLAY_ENGINE_SIGNING_KEY` is honoured by both `build-modules.mjs` and the
+Gradle task, so the key does not have to live in `apps/xr/build/` at all.
+
+`git clean -xdf` deletes it too, because it sits inside a build directory.
+Keep a copy outside the repository before the first catalog is published; if it
+is lost, existing installs can only be moved to a new key through an app update.
+
 On device, Settings -> Engine modules -> *Check for updates* fetches the
 catalog, compares SHA-256 per file, downloads only what differs into a staging
 directory, verifies each file and swaps the whole set in at once. A failed
@@ -111,11 +141,31 @@ an installed update never half-applies.
 
 Point the app at a catalog with `-PengineCatalogUrl=…` at build time,
 `MODPLAY_ENGINE_CATALOG_URL` in the environment, or for testing without a
-rebuild:
+rebuild, by dropping a `catalog-url.txt` where the app looks for it.
+
+`adb push` into `/sdcard/Android/data/<pkg>/files/` is the obvious way and it
+usually fails: `remote secure_mkdirs failed: Permission denied`. adbd may only
+write into an app's external files directory if that directory already exists
+*and* the device lets the shell user through `Android/data`, and scoped storage
+made both conditional. The app therefore also reads the file from its internal
+directory, which `run-as` reaches on every Android version:
+
+```bash
+printf '%s\n' 'http://192.168.1.20:8080/catalog.json' > catalog-url.txt
+adb push catalog-url.txt /data/local/tmp/catalog-url.txt
+adb shell run-as com.bitti06.modplayjs.xr cp /data/local/tmp/catalog-url.txt files/catalog-url.txt
+adb shell run-as com.bitti06.modplayjs.xr rm /data/local/tmp/catalog-url.txt
+```
+
+The external location still works where a push succeeds, so the shorter command
+is worth trying first:
 
 ```bash
 adb push catalog-url.txt /sdcard/Android/data/com.bitti06.modplayjs.xr/files/
 ```
+
+The stored preference wins over both files, and both files win over the
+build-time URL, so a pushed file overrides a baked-in default.
 
 `INTERNET` is the only network permission and it exists for this catalog.
 Songs are never downloaded.
@@ -127,7 +177,8 @@ or CDN needed, plain HTTP is enough for a debug build on the same network:
 npm run build:modules            # writes build/engine-catalog/
 npx serve apps/xr/build/engine-catalog -l 8080
 echo 'http://<your-ip>:8080/catalog.json' > catalog-url.txt
-adb push catalog-url.txt /sdcard/Android/data/com.bitti06.modplayjs.xr/files/
+adb push catalog-url.txt /data/local/tmp/catalog-url.txt
+adb shell run-as com.bitti06.modplayjs.xr cp /data/local/tmp/catalog-url.txt files/catalog-url.txt
 ```
 
 The catalog is refused when it is older than the app's own manifest, when its
@@ -296,11 +347,19 @@ names in the list show where a module came from (`adb`, `picked`, or the tree).
 Or push a folder:
 
 ```bash
-adb push testfiles/ "/sdcard/Android/data/com.bitti06.modplayjs.xr/files/modules/"
+adb push testfiles /data/local/tmp/testfiles
+adb shell run-as com.bitti06.modplayjs.xr cp -r /data/local/tmp/testfiles files/modules/
 ```
 
-The Library panel scans that folder (plus `files/modules`) on start and on
-*Rescan*. Supported extensions are in `library/Library.kt`.
+The `adb push` into `Android/data` that this replaced fails on scoped storage
+for the reason above; `files/modules` is the other root the scanner reads, and
+`run-as` always reaches it. The external root still works when a push succeeds,
+and the app creates it on start, so a push into
+`/sdcard/Android/data/com.bitti06.modplayjs.xr/files/modules/` works after one
+launch on devices that allow it at all.
+
+The Library panel scans both roots on start and on *Rescan*. Supported
+extensions are in `library/Library.kt`.
 
 ## What is not in this base
 

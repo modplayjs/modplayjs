@@ -35,8 +35,14 @@ const packagesRoot = join(repoRoot, 'packages');
 const outRoot = join(xrRoot, 'app/src/main/assets/modules');
 /** Publishable artifact: manifests plus the files they describe. */
 const publishRoot = join(xrRoot, 'build/engine-catalog');
-/** Signing material lives outside the repo's tracked files. */
-const signingKey = join(xrRoot, 'build/engine-keys/private.pem');
+/**
+ * Signing material lives outside the repo's tracked files. The environment
+ * override exists so a release machine can keep the key somewhere else - and
+ * so CI can point at a path it never stores in the workspace, if it is ever
+ * given one at all.
+ */
+const signingKey =
+  process.env.MODPLAY_ENGINE_SIGNING_KEY ?? join(xrRoot, 'build/engine-keys/private.pem');
 
 /**
  * Which package provides which tracker format, and which exports have to be

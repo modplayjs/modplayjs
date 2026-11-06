@@ -69,6 +69,33 @@ val engineBundle = file("src/main/assets/engine/engine.js")
  */
 val modulesDir = file("src/main/assets/modules")
 
+/**
+ * The publishable tree: `catalog.json` plus the files it describes.
+ *
+ * This has to be declared as an output. Without it, deleting or losing
+ * catalog.json left the task UP-TO-DATE and the next release published nothing,
+ * and a key created *after* the first build never re-signed the existing
+ * catalog because Gradle saw no reason to run the task again.
+ */
+val catalogDir = rootProject.file("build/engine-catalog")
+
+/**
+ * Ed25519 key; its presence decides whether the catalog gets signed.
+ *
+ * The same MODPLAY_ENGINE_SIGNING_KEY override the scripts honour, so a key
+ * kept outside `build/` still makes the task re-sign when it is created or
+ * rotated.
+ */
+val catalogSigningKey =
+    System.getenv("MODPLAY_ENGINE_SIGNING_KEY")?.let { file(it) }
+        ?: rootProject.file("build/engine-keys/private.pem")
+
+/**
+ * Public half of that key. Safe to fingerprint, and it is what changes when the
+ * key is rotated, which has to re-sign the catalog.
+ */
+val catalogPublicKey = catalogSigningKey.parentFile.resolve("public.base64")
+
 val buildModules =
     tasks.register<Exec>("buildModules") {
         group = "build"
@@ -78,8 +105,22 @@ val buildModules =
         inputs.files(
             fileTree(rootProject.file("../../packages")) { include("*/src/**") },
             file("scripts/build-modules.mjs"),
+            file("scripts/engine-catalog-sign.mjs"),
         ).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("moduleSources")
+        // Signing is part of the task: creating or rotating the key has to
+        // invalidate a catalog that was produced with the previous one. A
+        // filtered provider rather than inputs.file(...).optional(), which
+        // still fails validation when the file is absent.
+        //
+        // Only the public key is fingerprinted by content. The private key
+        // contributes its presence, never its bytes: build metadata (the build
+        // cache key in particular) must not carry anything derived from it.
+        inputs.property("catalogSigning", catalogSigningKey.isFile)
+        inputs.files(provider { listOfNotNull(catalogPublicKey.takeIf { it.isFile }) })
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+            .withPropertyName("catalogPublicKey")
         outputs.dir(modulesDir)
+        outputs.dir(catalogDir)
         onlyIf("node on PATH") { onPath(nodeCommand) }
         doFirst {
             if (!onPath(nodeCommand)) {
