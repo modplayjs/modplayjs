@@ -795,6 +795,11 @@ class XrPlayer(
         outputs += TrackOut(0, track.audioSessionId, track)
         outputMode = 1
         outChannels = 1
+        val silence = ShortArray(BLOCK * 4)
+        runCatching {
+            track.write(silence, 0, silence.size, AudioTrack.WRITE_BLOCKING)
+            track.write(silence, 0, silence.size, AudioTrack.WRITE_BLOCKING)
+        }
         track.play()
     }
 
@@ -917,6 +922,28 @@ class XrPlayer(
 
     /** Start (or resume) the fixed graph. Main thread: the tracks are shared. */
     private fun startBuses() {
+        if (!busesReady) {
+            val silence = ByteBuffer.allocateDirect(BLOCK * BYTES_PER_SAMPLE)
+                .order(ByteOrder.nativeOrder())
+            for (track in busTracks) {
+                runCatching {
+                    silence.clear()
+                    track.write(silence, BLOCK * BYTES_PER_SAMPLE, AudioTrack.WRITE_BLOCKING)
+                    silence.clear()
+                    track.write(silence, BLOCK * BYTES_PER_SAMPLE, AudioTrack.WRITE_BLOCKING)
+                }
+            }
+            reverbTrack?.let { rev ->
+                val revSilence = ByteBuffer.allocateDirect(BLOCK * 4 * BYTES_PER_SAMPLE)
+                    .order(ByteOrder.nativeOrder())
+                runCatching {
+                    revSilence.clear()
+                    rev.write(revSilence, BLOCK * 4 * BYTES_PER_SAMPLE, AudioTrack.WRITE_BLOCKING)
+                    revSilence.clear()
+                    rev.write(revSilence, BLOCK * 4 * BYTES_PER_SAMPLE, AudioTrack.WRITE_BLOCKING)
+                }
+            }
+        }
         for (track in busTracks) {
             if (track.playState != AudioTrack.PLAYSTATE_PLAYING) track.play()
         }
@@ -1025,7 +1052,7 @@ class XrPlayer(
         val minBuf =
             AudioTrack.getMinBufferSize(SAMPLE_RATE, channelMask, AudioFormat.ENCODING_PCM_16BIT)
                 .takeIf { it > 0 } ?: 0
-        val twoBlocks = BLOCK * 2 * channels * BYTES_PER_SAMPLE
+        val fourBlocks = BLOCK * 4 * channels * BYTES_PER_SAMPLE
         val builder = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -1042,7 +1069,7 @@ class XrPlayer(
             )
             .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
             .setTransferMode(AudioTrack.MODE_STREAM)
-            .setBufferSizeInBytes(maxOf(minBuf, twoBlocks))
+            .setBufferSizeInBytes(maxOf(minBuf, fourBlocks))
         if (sessionId != null && sessionId > 0) builder.setSessionId(sessionId)
         return builder.build()
     }
