@@ -120,6 +120,28 @@ fun SettingsPanel() {
                             radiusManual = false
                         }
                     }
+                    ToggleRow(
+                        stringResource(R.string.xr_ring_follow),
+                        state.ringFollowsHead,
+                    ) {
+                        XrStore.setRingFollowsHead(!state.ringFollowsHead)
+                    }
+                    MetaText(
+                        stringResource(
+                            if (state.ringFollowsHead) {
+                                R.string.xr_ring_follow_hint
+                            } else {
+                                R.string.xr_ring_world_hint
+                            },
+                        ),
+                    )
+                    ToggleRow(
+                        stringResource(R.string.xr_ring_tilt),
+                        state.ringTilts,
+                    ) {
+                        XrStore.setRingTilts(!state.ringTilts)
+                    }
+                    MetaText(stringResource(R.string.xr_ring_tilt_hint))
                     StepperRow(
                         stringResource(R.string.xr_room_wet),
                         "${state.reverbWet} %",

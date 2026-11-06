@@ -38,6 +38,8 @@ import com.meta.spatial.core.SystemBase
 import com.meta.spatial.isdk.IsdkDefaultCursorSystem
 import com.meta.spatial.isdk.IsdkSystem
 import com.meta.spatial.mruk.MRUKFeature
+import com.meta.spatial.mruk.MRUKRoom
+import com.meta.spatial.mruk.MRUKSceneEventListener
 import com.meta.spatial.runtime.PanelShapeLayerBlendType
 import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
@@ -316,7 +318,10 @@ class XrActivity : AppSystemActivity(), XrHost {
     private fun feedSpatialInputs() {
         // Occluders do not depend on the head, so they are published even
         // before the avatar exists and the pose is still unreadable.
-        readHeadPose()?.let { player.setListener(it.t.x, it.t.y, it.t.z) }
+        readHeadPose()?.let { head ->
+            val (yaw, pitch) = headYawPitch(head.q)
+            player.setListener(head.t.x, head.t.y, head.t.z, yaw, pitch)
+        }
 
         val boxes = ArrayList<Float>(PANELS.size * 7)
         for (spec in PANELS) {
@@ -355,6 +360,23 @@ class XrActivity : AppSystemActivity(), XrHost {
         )
 
     /**
+     * Yaw and pitch of a head quaternion, in radians.
+     *
+     * Pitch is positive when looking up. It is derived from the rotated forward
+     * vector rather than from the Euler decomposition, so a roll (which the
+     * runtime reports when the user lies on their side) cannot make the pitch
+     * ambiguous.
+     */
+    private fun headYawPitch(q: Quaternion): Pair<Float, Float> {
+        val yaw = yawOf(q)
+        // Forward is (0,0,-1) in this SDK (a panel's front is its local -Z).
+        // Rotating it by q gives y = 2(w·x - y·z) = sin(pitch), positive when
+        // the user looks up.
+        val fy = 2f * (q.w * q.x - q.y * q.z)
+        return yaw to kotlin.math.asin(fy.coerceIn(-1f, 1f))
+    }
+
+    /**
      * Move the arc from the world origin to the user's head, once.
      *
      * `PANELS` authors the arc around an eye at 1.6 m on the origin. The real
@@ -369,33 +391,66 @@ class XrActivity : AppSystemActivity(), XrHost {
         // force: a panel already holds the placeholder Transform from creation,
         // which apply() would otherwise leave alone in free mode.
         placement.apply(panels, force = true)
+        // The bus ring is built from the same pose, so panels and sound share
+        // one frame: height from the ear, centre from the listener, yaw from
+        // where the user is looking.
+        player.setRingAuto(
+            player.ringRadius(),
+            head.t.x,
+            head.t.z,
+        )
+        player.recenterRing(head.t.x, head.t.y, head.t.z, yawOf(head.q))
         anchoredToHead = true
-        Log.i(TAG, "arc anchored to head at (${head.t.x}, ${head.t.y}, ${head.t.z})")
+        Log.i(
+            TAG,
+            "arc anchored to head at (${head.t.x}, ${head.t.y}, ${head.t.z}) " +
+                "yaw=${Math.toDegrees(yawOf(head.q).toDouble()).toInt()}",
+        )
     }
 
     /** Called once the user grants the runtime USE_SCENE permission. */
     fun onScenePermissionGranted() {
+        // Room changes are a first-class event: a repeated space setup or a
+        // different room used to leave the radius and the reverb tail on the
+        // old bounds, because the scene was read exactly once.
+        mrukFeature.addSceneEventListener(
+            object : MRUKSceneEventListener {
+                override fun onRoomUpdated(room: MRUKRoom) {
+                    runOnUiThread { applyRoom(room) }
+                }
+
+                override fun onRoomAdded(room: MRUKRoom) {
+                    runOnUiThread { applyRoom(room) }
+                }
+            },
+        )
         mrukFeature.loadSceneFromDevice().whenComplete { _, _ ->
             runOnUiThread {
-                val bounds = mrukFeature.getCurrentRoom()?.roomBounds ?: return@runOnUiThread
-                val size = bounds.size()
-                // Centre the ring on the listener, not on the room. MRUK
-                // reports its bounds in its own coordinate space - the runtime
-                // logs a scene origin offset of about -1.3 / -1.0 m and a
-                // rotation - while the audio objects live in the app's
-                // reference space. A room centre taken from MRUK therefore put
-                // the whole ring metres away, and every channel bunched up in
-                // front of the user. The radius still follows the room size.
-                val head = readHeadPose()
-                player.setRingAuto(
-                    XrPlayer.autoRadius(size.x, size.z),
-                    head?.t?.x ?: 0f,
-                    head?.t?.z ?: 0f,
-                )
-                // Sabine estimate for the room reverb, from the same bounds.
-                player.setRoomSize(size.x, size.y, size.z)
+                mrukFeature.getCurrentRoom()?.let { applyRoom(it) }
             }
         }
+    }
+
+    /**
+     * Radius and reverb from the room bounds.
+     *
+     * The ring is never centred on the room: MRUK reports its bounds in its own
+     * coordinate space - the runtime logs a scene origin offset of about
+     * -1.3 / -1.0 m and a rotation - while the audio objects live in the app's
+     * reference space. Only the size is taken from the room; the centre stays
+     * on the listener, and the height on the ear.
+     */
+    private fun applyRoom(room: MRUKRoom) {
+        if (!::player.isInitialized) return
+        val size = room.roomBounds.size()
+        val head = readHeadPose()
+        player.setRingAuto(
+            XrPlayer.autoRadius(size.x, size.z),
+            head?.t?.x ?: player.ringCenterX(),
+            head?.t?.z ?: player.ringCenterZ(),
+        )
+        // Sabine estimate for the room reverb, from the same bounds.
+        player.setRoomSize(size.x, size.y, size.z)
     }
 
     // ---- XrHost ----------------------------------------------------------
@@ -494,9 +549,26 @@ class XrActivity : AppSystemActivity(), XrHost {
         val now = System.nanoTime()
         if (now - lastRecenterNs < RECENTER_DEBOUNCE_NS) return
         lastRecenterNs = now
-        if (::placement.isInitialized && !placement.free) placement.apply(panels)
+
+        // A recenter moves and rotates the LOCAL_FLOOR origin. Every entity
+        // keeps its coordinates and the user gets a new frame, so an anchor
+        // taken before the recenter puts the arc metres away. Re-read the head
+        // and rebuild both the arc and the ring from it. Free placements are
+        // left alone: the user put those in the world on purpose.
+        val head = readHeadPose()
+        if (head != null && ::placement.isInitialized) {
+            placement.setAnchor(head)
+            if (!placement.free) placement.apply(panels, force = true)
+            if (::player.isInitialized) {
+                player.recenterRing(head.t.x, head.t.y, head.t.z, yawOf(head.q))
+            }
+            Log.i(
+                TAG,
+                "recenter: head at (${head.t.x}, ${head.t.y}, ${head.t.z}) " +
+                    "free=${placement.free}",
+            )
+        }
         XrScene.reapply()
-        Log.i(TAG, "recenter: userInitiated=$isUserInitiated free=${::placement.isInitialized && placement.free}")
     }
 
     /**

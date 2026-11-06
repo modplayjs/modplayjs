@@ -13,6 +13,9 @@ import com.meta.spatial.toolkit.Transform
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Where the panels stand: a fixed arc, or free placement the user arranges by
@@ -22,6 +25,12 @@ import kotlinx.coroutines.flow.asStateFlow
  * Free placement persists the pose per panel; stationary restores the arc and
  * removes the grab component. Mode switches slide through [PanelAnimator]; a
  * reset lands instantly, because a reset should.
+ *
+ * The anchor is a full pose, not a translation: [setAnchor] takes the head's
+ * yaw as well. With only the translation the authored arc was always built
+ * towards world +Z, so a session that started facing another way put the arc
+ * at the user's side and left azimuth 0 - the channel meant to be "in front" -
+ * pointing somewhere else.
  */
 class PanelPlacement(
     context: Context,
@@ -32,13 +41,15 @@ class PanelPlacement(
     private val specs = PANELS.associateBy { it.id }
 
     /**
-     * Where the user's head was when the arc was first placed. The authored
-     * poses assume the eye sits at [DEFAULT_EYE_HEIGHT] on the world origin;
-     * this offset moves the whole arc to the real head position, so the panels
-     * appear in front of the user at eye height whether the runtime reports
-     * poses floor-relative (head y ~ 1.6) or eye-relative (head y ~ 0).
+     * Where the user's head was when the arc was placed. The authored poses
+     * assume the eye at [DEFAULT_EYE_HEIGHT] on the origin facing +Z; this
+     * offset and yaw move the whole arc onto the real head, so the panels
+     * appear in front of the user at eye height whatever the runtime reports.
      */
-    private var anchor = Vector3(0f, 0f, 0f)
+    private var anchorT = Vector3(0f, 0f, 0f)
+
+    /** Head yaw at the anchor, radians. Applied to the offset and the panels. */
+    private var anchorYaw = 0f
 
     private val _free: MutableStateFlow<Boolean>
 
@@ -58,25 +69,47 @@ class PanelPlacement(
         get() = _free.value
 
     /**
-     * Anchor the arc to the head position read once at startup.
+     * Anchor the arc to a head pose.
+     *
+     * Called at startup and again after a recenter, because a recenter moves
+     * and rotates the LOCAL_FLOOR origin: the entities keep their coordinates,
+     * the user gets a new frame, and an anchor from before the recenter would
+     * place the arc metres away.
      *
      * `null` keeps the authored poses, which assume an eye at
-     * [DEFAULT_EYE_HEIGHT] on the world origin.
+     * [DEFAULT_EYE_HEIGHT] on the world origin facing +Z.
      */
     fun setAnchor(head: Pose?) {
-        anchor =
-            if (head == null) {
-                Vector3(0f, 0f, 0f)
-            } else {
-                Vector3(head.t.x, head.t.y - DEFAULT_EYE_HEIGHT, head.t.z)
-            }
+        if (head == null) {
+            anchorT = Vector3(0f, 0f, 0f)
+            anchorYaw = 0f
+            return
+        }
+        anchorT = Vector3(head.t.x, head.t.y - DEFAULT_EYE_HEIGHT, head.t.z)
+        anchorYaw = yawOf(head.q)
     }
 
-    /** Move an authored pose to the anchored head position. */
+    /**
+     * Move an authored pose into the anchored frame.
+     *
+     * The offset is rotated by the anchor yaw and the yaw is added to the
+     * panel's own rotation, so a panel authored facing +Z still faces the user
+     * after the arc has been turned.
+     */
     private fun anchored(pose: Pose): Pose {
-        val p = pose.t
-        return Pose(Vector3(p.x + anchor.x, p.y + anchor.y, p.z + anchor.z), pose.q)
+        val c = cos(anchorYaw)
+        val s = sin(anchorYaw)
+        val x = c * pose.t.x - s * pose.t.z
+        val z = s * pose.t.x + c * pose.t.z
+        return Pose(
+            Vector3(x + anchorT.x, pose.t.y + anchorT.y, z + anchorT.z),
+            Quaternion(0f, yawOf(pose.q) + anchorYaw, 0f),
+        )
     }
+
+    /** Yaw of a quaternion that carries only a rotation around Y. */
+    private fun yawOf(q: Quaternion): Float =
+        atan2(2f * (q.w * q.y + q.x * q.z), 1f - 2f * (q.y * q.y + q.z * q.z))
 
     /**
      * Place every panel and set its grab state.
@@ -269,7 +302,9 @@ class PanelPlacement(
          * 42: details panel elevated higher (y=0.58m).
          * 43: default height updated to eye-level (y=1.60m) and pose clamping added.
          * 44: eye-level arc kept, details back below the transport (y=0.55m).
+         * 45: the anchor carries the head yaw, so a saved pose from before this
+         * change sits in a frame that was never rotated.
          */
-        const val LAYOUT_VERSION = 44
+        const val LAYOUT_VERSION = 45
     }
 }

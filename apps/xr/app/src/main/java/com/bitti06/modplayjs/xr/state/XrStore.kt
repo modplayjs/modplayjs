@@ -177,6 +177,8 @@ object XrStore {
                 sessionId = p?.sessionId() ?: 0,
                 reverbWet = p?.spatialWet() ?: 25,
                 sourceSpread = p?.spatialSpread() ?: 0f,
+                ringFollowsHead = p?.isRingFollowsHead() ?: false,
+                ringTilts = p?.isRingTilts() ?: false,
             )
     }
 
@@ -249,6 +251,18 @@ object XrStore {
 
     fun setSpatialSpread(degrees: Float) {
         player?.setSpatialSpread(degrees)
+        refresh()
+    }
+
+    /** "Mitwandern": ring follows the listener instead of staying in the room. */
+    fun setRingFollowsHead(on: Boolean) {
+        player?.setRingFollowsHead(on)
+        refresh()
+    }
+
+    /** "Bühne kippt mit": the ring plane follows the head pitch. */
+    fun setRingTilts(on: Boolean) {
+        player?.setRingTilts(on)
         refresh()
     }
 

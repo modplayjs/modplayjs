@@ -61,4 +61,8 @@ data class XrState(
     val reverbWet: Int = 25,
     /** Point width of every source, degrees; 0 is a point source. */
     val sourceSpread: Float = 0f,
+    /** The bus ring follows the listener instead of staying in the room. */
+    val ringFollowsHead: Boolean = false,
+    /** The ring plane follows the head pitch, for reclined listening. */
+    val ringTilts: Boolean = false,
 )

@@ -63,6 +63,11 @@
     <string name="xr_pan">Pan</string>
     <string name="xr_passthrough">Passthrough</string>
     <string name="xr_ring">Ring</string>
+    <string name="xr_ring_follow">Ring follows you</string>
+    <string name="xr_ring_follow_hint">The stage stays around your body: turning and walking do not move the mix.</string>
+    <string name="xr_ring_world_hint">The stage stays where it is in the room: walking carries you between the channels.</string>
+    <string name="xr_ring_tilt">Tilt with head</string>
+    <string name="xr_ring_tilt_hint">In a reclined posture the ring follows your gaze, so the front channels stay in front of your eyes. Turn off for a stage fixed to the floor.</string>
     <string name="xr_room_wet">Room reverb</string>
     <string name="xr_source_width">Source width</string>
     <string name="xr_auto">Auto</string>

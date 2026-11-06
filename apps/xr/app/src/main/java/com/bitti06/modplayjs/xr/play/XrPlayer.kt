@@ -176,6 +176,9 @@ class XrPlayer(
     private var placedRadius = -1f
     private var placedX = Float.NaN
     private var placedZ = Float.NaN
+    private var placedY = Float.NaN
+    private var placedTilt = Float.NaN
+    private var placedYaw = Float.NaN
 
     /** Listener and panel boxes arrive from the activity, read by the mixer. */
     @Volatile private var listenerPos = Vector3(0f, RING_Y, 0f)
@@ -209,6 +212,70 @@ class XrPlayer(
     private var ringRadius = prefs.getFloat(KEY_RADIUS, 1.0f)
     private var ringCenterX = 0f
     private var ringCenterZ = 0f
+
+    /**
+     * Height of the ring plane. It is the ear height read from the head pose,
+     * not a constant: with the ring fixed at 1.40 m a listener lying down (head
+     * around 0.60 m) had all 32 buses 80 cm above their ears, which put every
+     * channel overhead and made the distance gains quiet.
+     */
+    private var ringY = RING_Y
+
+    /**
+     * Ear-relative ring ("mitwandern").
+     *
+     * When on, the ring centre follows the listener, so the stage stays around
+     * the body and turning or walking does not move the mix; the buses are
+     * re-placed whenever the listener moves more than [RING_FOLLOW_STEP].
+     * When off, the ring stays anchored in world coordinates at the point it
+     * was last built, so walking through the room carries you between the
+     * channels.
+     */
+    @Volatile
+    private var ringFollowsHead = prefs.getBoolean(KEY_RING_FOLLOW, false)
+
+    /** Set once a real head pose has been applied, so (0,0) is never assumed. */
+    private var ringAnchored = false
+
+    /**
+     * "Bühne kippt mit": in a reclined posture the ring plane follows the head
+     * pitch instead of staying horizontal.
+     *
+     * Lying on your back and looking at the ceiling, the visual forward is up.
+     * A horizontal ring then puts every channel beside or behind the head, and
+     * the front channels are the ones you are not looking at. With this option
+     * the ring rotates about the listener's right axis by the head pitch, so
+     * azimuth 0 ends up in front of the eyes. Off by default: the horizontal
+     * ring is the right thing for sitting and standing, and a tilted ring is
+     * head-relative, so "walk between the channels" no longer works.
+     */
+    @Volatile
+    private var ringTilts = prefs.getBoolean(KEY_RING_TILT, false)
+
+    /**
+     * Yaw of the ring itself, radians: where the user faced when the stage was
+     * built. It turns the whole bus ring with the user instead of leaving
+     * azimuth 0 pointing at world +Z, and it is the axis the recline tilt
+     * rotates about.
+     */
+    @Volatile
+    private var ringYawRad = 0f
+
+    /** Head yaw/pitch of the last listener update, radians. */
+    @Volatile
+    private var headYaw = 0f
+
+    @Volatile
+    private var headPitch = 0f
+
+    /** Smoothed applied tilt, radians. Keeps the plane from snapping. */
+    private var tiltApplied = 0f
+
+    /** Where the tilt is heading; [tiltApplied] eases towards it. */
+    @Volatile
+    private var tiltTarget = 0f
+
+    private var lastTiltPlaceNs = 0L
 
     private var playing = false
     private var loaded = false
@@ -285,9 +352,61 @@ class XrPlayer(
             if (!radiusManual) ringRadius = radius.coerceIn(0.5f, 2.5f)
             ringCenterX = centerX
             ringCenterZ = centerZ
+            ringAnchored = true
             applyPositions()
         }
     }
+
+    /**
+     * Rebuild the ring from a fresh head pose: height from the ear, centre from
+     * the listener, radius unchanged unless it is on auto.
+     *
+     * This is what a recenter needs. The LOCAL_FLOOR origin moves, every entity
+     * keeps its coordinates, so a ring placed before the recenter sits at the
+     * wrong distance and the wrong height afterwards.
+     */
+    fun recenterRing(x: Float, y: Float, z: Float, yaw: Float) {
+        submit {
+            ringYawRad = yaw
+            ringY = y.coerceIn(0.2f, 2.4f)
+            ringCenterX = x
+            ringCenterZ = z
+            ringAnchored = true
+            applyPositions()
+        }
+    }
+
+    /**
+     * Follow the listener ("mitwandern") or stay in the world.
+     *
+     * Switching to follow pulls the ring under the current head at once;
+     * switching off leaves it where it is, which is the point of the mode.
+     */
+    fun setRingFollowsHead(on: Boolean) {
+        ringFollowsHead = on
+        prefs.edit { putBoolean(KEY_RING_FOLLOW, on) }
+        if (on) {
+            submit {
+                ringCenterX = listenerPos.x
+                ringCenterZ = listenerPos.z
+                ringY = listenerPos.y.coerceIn(0.2f, 2.4f)
+                applyPositions()
+            }
+        }
+    }
+
+    fun isRingFollowsHead(): Boolean = ringFollowsHead
+
+    /** Tilt the ring plane with the head when the listener reclines. */
+    fun setRingTilts(on: Boolean) {
+        ringTilts = on
+        prefs.edit { putBoolean(KEY_RING_TILT, on) }
+        submit {
+            applyPositions()
+        }
+    }
+
+    fun isRingTilts(): Boolean = ringTilts
 
     fun resetRadiusAuto() {
         submit {
@@ -297,6 +416,10 @@ class XrPlayer(
     }
 
     fun isRadiusManual(): Boolean = radiusManual
+
+    fun ringCenterX(): Float = ringCenterX
+
+    fun ringCenterZ(): Float = ringCenterZ
 
     fun ringRadius(): Float = ringRadius
 
@@ -744,6 +867,13 @@ class XrPlayer(
         engine?.setSpatialWet(wetPercent)
         engine?.setSpatialRoom(roomWidth, roomDepth, roomHeight, ROOM_ABSORPTION)
 
+        // Snapshot the geometry: the bus entities must be created on the same
+        // ring the mixer is already using, and the fields may move before the
+        // posted job runs.
+        val radius = ringRadius
+        val cx = ringCenterX
+        val cz = ringCenterZ
+        val cy = ringY
         val generation = busGraphGeneration
         mainHandler.post {
             if (generation != busGraphGeneration) return@post
@@ -751,7 +881,7 @@ class XrPlayer(
                 feature.registerAudioSessionId(BUS_BASE + i, tracks[i].audioSessionId)
                 busEntities +=
                     Entity.create(
-                        Transform(Pose(busPosition(i))),
+                        Transform(Pose(busPositionOf(i, radius, cx, cz, cy))),
                         AudioSessionId(BUS_BASE + i, AudioType.MONO),
                     )
             }
@@ -759,14 +889,17 @@ class XrPlayer(
                 feature.registerAudioSessionId(REVERB_ID, it.audioSessionId)
                 reverbEntity =
                     Entity.create(
-                        Transform(Pose(Vector3(ringCenterX, RING_Y, ringCenterZ))),
+                        Transform(Pose(Vector3(cx, cy, cz))),
                         AudioSessionId(REVERB_ID, AudioType.AMBISONIC_ORDER_1),
                         SoundfieldOrientation(SoundfieldOrientationType.POSITION_Y_LOCKED),
                     )
             }
-            placedRadius = ringRadius
-            placedX = ringCenterX
-            placedZ = ringCenterZ
+            placedRadius = radius
+            placedX = cx
+            placedZ = cz
+            placedY = cy
+            placedTilt = tiltApplied
+            placedYaw = ringYawRad
             busGraphReady = true
             if (outputMode == 2) startBuses()
         }
@@ -784,22 +917,83 @@ class XrPlayer(
     /** Put the buses on the ring again after a radius or centre change. */
     private fun placeBuses() {
         if (busEntities.isEmpty()) return
-        if (placedRadius == ringRadius && placedX == ringCenterX && placedZ == ringCenterZ) return
+        if (placedRadius == ringRadius &&
+            placedX == ringCenterX &&
+            placedZ == ringCenterZ &&
+            placedY == ringY &&
+            placedTilt == tiltApplied &&
+            placedYaw == ringYawRad
+        ) {
+            return
+        }
         placedRadius = ringRadius
         placedX = ringCenterX
         placedZ = ringCenterZ
+        placedY = ringY
+        placedTilt = tiltApplied
+        placedYaw = ringYawRad
+        val radius = ringRadius
+        val cx = ringCenterX
+        val cz = ringCenterZ
+        val cy = ringY
         onMain {
+            // Positions are computed here, from the snapshot taken above: the
+            // audio thread may already be building the next ring while this
+            // job is still queued.
             for (i in busEntities.indices) {
-                busEntities[i].setComponent(Transform(Pose(busPosition(i))))
+                busEntities[i].setComponent(Transform(Pose(busPositionOf(i, radius, cx, cz, cy))))
             }
-            reverbEntity?.setComponent(
-                Transform(Pose(Vector3(ringCenterX, RING_Y, ringCenterZ))),
-            )
+            reverbEntity?.setComponent(Transform(Pose(Vector3(cx, cy, cz))))
         }
     }
 
-    private fun busPosition(index: Int): Vector3 =
-        positionFor(-180f + 360f * index / BUS_COUNT)
+    /** Ring point for a bus, from explicit geometry instead of live fields. */
+    private fun busPositionOf(index: Int, radius: Float, cx: Float, cz: Float, cy: Float): Vector3 =
+        ringPoint(-180f + 360f * index / BUS_COUNT, radius, cx, cz, cy)
+
+    /**
+     * A point on the ring, optionally tilted about the listener's right axis.
+     *
+     * With [tiltApplied] = 0 this is the horizontal ring: azimuth 0 towards +Z,
+     * +90 towards +X. A non-zero tilt rotates that plane so its forward
+     * direction follows the head pitch - in a reclined posture azimuth 0 is
+     * then in front of the eyes instead of above the forehead. The rotation
+     * axis is the head yaw's right vector, so it works whichever way the user
+     * is facing.
+     */
+    private fun ringPoint(
+        azimuthDeg: Float,
+        radius: Float,
+        cx: Float,
+        cz: Float,
+        cy: Float,
+    ): Vector3 {
+        // The ring's own yaw: azimuth 0 points where the user faced when the
+        // stage was built, so the arc and the sound share one forward.
+        val ringYaw = ringYawRad
+        val rad = Math.toRadians(azimuthDeg.toDouble()).toFloat() + ringYaw
+        val vx = (Math.sin(rad.toDouble()) * radius).toFloat()
+        val vz = (Math.cos(rad.toDouble()) * radius).toFloat()
+        val tilt = tiltApplied
+        if (tilt == 0f) return Vector3(cx + vx, cy, cz + vz)
+
+        // Rotation about the ring's right axis, (cos ringYaw, 0, -sin ringYaw).
+        // Only the cross product gains a Y component, because the axis has no
+        // Y. The sign is chosen so a positive pitch lifts azimuth 0 towards the
+        // ceiling: reclined and looking up, the front channels end up in front
+        // of the eyes and the back channels towards the pillow.
+        val kx = Math.cos(ringYaw.toDouble()).toFloat()
+        val kz = -Math.sin(ringYaw.toDouble()).toFloat()
+        val c = Math.cos(tilt.toDouble()).toFloat()
+        val s = Math.sin(tilt.toDouble()).toFloat()
+        val kkv = kx * vx + kz * vz
+        val crossY = kx * vz - kz * vx
+        val rx = vx * c + kx * kkv * (1f - c)
+        val rz = vz * c + kz * kkv * (1f - c)
+        val ry = crossY * s
+        return Vector3(cx + rx, cy + ry, cz + rz)
+    }
+
 
     /**
      * One streaming track.
@@ -904,16 +1098,6 @@ class XrPlayer(
         outChannels = 0
     }
 
-    private fun positionFor(degrees: Float): Vector3 {
-        val rad = Math.toRadians(degrees.toDouble())
-        val r = ringRadius
-        return Vector3(
-            ringCenterX + (Math.sin(rad) * r).toFloat(),
-            RING_Y,
-            ringCenterZ + (Math.cos(rad) * r).toFloat(),
-        )
-    }
-
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     /**
@@ -946,7 +1130,7 @@ class XrPlayer(
      * 12 cm above the sound for the rest of the session after every rebuild.
      */
     private fun markerPositionFor(degrees: Float): Vector3 {
-        val p = positionFor(degrees)
+        val p = ringPoint(degrees, ringRadius, ringCenterX, ringCenterZ, ringY)
         return Vector3(p.x, p.y - MARKER_DROP, p.z)
     }
 
@@ -991,7 +1175,11 @@ class XrPlayer(
         val params = sourceParams
         for (i in 0 until channels) {
             val azimuth = spatialInfo.azimuths.getOrElse(i) { 0f }
-            val position = positionFor(azimuth)
+            // The audible point, not the un-rotated ring point: with a ring yaw
+            // or a recline tilt the bus for this azimuth sits somewhere else,
+            // and distance plus occlusion have to be measured to where the
+            // sound actually comes from.
+            val position = ringPoint(azimuth, ringRadius, ringCenterX, ringCenterZ, ringY)
             val dx = position.x - listener.x
             val dy = position.y - listener.y
             val dz = position.z - listener.z
@@ -1070,8 +1258,109 @@ class XrPlayer(
 
     // ---- listener, occluders, room (from the activity) -------------------
 
-    fun setListener(x: Float, y: Float, z: Float) {
+    /**
+     * The ear position, published at 10 Hz by the activity.
+     *
+     * Two things follow from it. The ring height always tracks the ears, so a
+     * listener lying down is not surrounded by buses 80 cm above their head.
+     * The ring centre follows the listener only when the "mitwandern" option is
+     * on; otherwise the stage stays anchored in the room and walking carries
+     * you between the channels.
+     */
+    fun setListener(x: Float, y: Float, z: Float, yaw: Float, pitch: Float) {
         listenerPos = Vector3(x, y, z)
+        headYaw = yaw
+        headPitch = pitch
+        val targetY = y.coerceIn(0.2f, 2.4f)
+        val movedX = x - ringCenterX
+        val movedZ = z - ringCenterZ
+        val moved = kotlin.math.sqrt(movedX * movedX + movedZ * movedZ)
+
+        if (!ringAnchored) {
+            // The very first pose: never fall back to the world origin.
+            submit {
+                ringY = targetY
+                ringCenterX = x
+                ringCenterZ = z
+                ringYawRad = yaw
+                ringAnchored = true
+                applyPositions()
+            }
+            return
+        }
+
+        if (ringFollowsHead) {
+            if (moved > RING_FOLLOW_STEP || kotlin.math.abs(targetY - ringY) > RING_FOLLOW_STEP) {
+                submit {
+                    ringCenterX = x
+                    ringCenterZ = z
+                    ringY = targetY
+                    applyPositions()
+                }
+            }
+        } else if (kotlin.math.abs(targetY - ringY) > RING_HEIGHT_STEP) {
+            // World-anchored, but the plane still has to sit on the ears: lying
+            // down changes the height without moving the stage.
+            submit {
+                ringY = targetY
+                applyPositions()
+            }
+        }
+
+        // A recline changes the plane, not the centre. Only when the option is
+        // on; the applied tilt eases towards this on the render tick, so the
+        // stage rotates instead of stepping in 10 Hz jumps.
+        tiltTarget = if (ringTilts) pitch.coerceIn(-1.2f, 1.2f) else 0f
+
+        // "Mitwandern" means the stage keeps azimuth 0 in front of the face, so
+        // the ring yaw follows the head as well. A world-anchored ring keeps
+        // the yaw it was built with, which is what makes turning your head
+        // reveal the side channels.
+        if (ringFollowsHead) {
+            val d = wrapPi(yaw - ringYawRad)
+            if (kotlin.math.abs(d) > FOLLOW_YAW_STEP) {
+                submit {
+                    ringYawRad = yaw
+                    applyPositions()
+                }
+            }
+        }
+    }
+
+    /** Shortest signed angle between two angles, in radians. */
+    private fun wrapPi(a: Float): Float {
+        var v = a
+        while (v > Math.PI) v -= (2.0 * Math.PI).toFloat()
+        while (v < -Math.PI) v += (2.0 * Math.PI).toFloat()
+        return v
+    }
+
+    /**
+     * Ease the tilt and move the bus entities while it changes.
+     *
+     * Only the ring is touched here: re-pushing the source parameters every
+     * block would send 128 JNI rows at 50 Hz for a movement the mixer already
+     * smooths.
+     */
+    private fun stepTilt() {
+        val target = tiltTarget
+        val diff = target - tiltApplied
+        if (kotlin.math.abs(diff) < TILT_EPSILON) {
+            if (tiltApplied != target) {
+                tiltApplied = target
+                placeBuses()
+            }
+            return
+        }
+        // ~0.5 s to close the gap at 50 blocks per second.
+        tiltApplied += diff * TILT_SMOOTH
+        // 32 Transform writes are cheap but not free; 30 Hz is smooth enough
+        // for a slow recline and keeps the main thread free for the panels.
+        val now = System.nanoTime()
+        if (now - lastTiltPlaceNs >= TILT_PLACE_NS) {
+            lastTiltPlaceNs = now
+            placeBuses()
+        }
     }
 
     /** Seven floats per occluding panel: centre, yaw, half extents. */
@@ -1229,6 +1518,10 @@ class XrPlayer(
             spatialSettled = true
             runCatching { refreshSpatial(rebuild = settle) }
         }
+
+        // The recline tilt eases here, at block rate, so the ring rotates
+        // smoothly instead of stepping with the 10 Hz listener feed.
+        if (tiltApplied != tiltTarget) stepTilt()
 
         // Distance, occlusion and spread change with the listener and the
         // panels, not with the module. 10 Hz is enough for both: the mixer
@@ -1669,6 +1962,23 @@ class XrPlayer(
         private const val MARKER_DROP = 0.12f
         private const val KEY_RADIUS = "radius"
         private const val KEY_RADIUS_MANUAL = "radiusManual"
+        private const val KEY_RING_FOLLOW = "ringFollowsHead"
+        private const val KEY_RING_TILT = "ringTiltsWithHead"
+
+        /** Below this the ring is not re-placed; 5 cm is inaudible. */
+        private const val RING_FOLLOW_STEP = 0.05f
+        private const val RING_HEIGHT_STEP = 0.05f
+
+        /** Below this the tilt counts as settled and the ring stops moving. */
+        private const val TILT_EPSILON = 0.004f
+
+        /** Per 20 ms block: closes ~90 % of the gap in half a second. */
+        private const val TILT_SMOOTH = 0.09f
+
+        private const val TILT_PLACE_NS = 33_000_000L
+
+        /** ~5.7 degrees of head yaw before the following ring is re-placed. */
+        private const val FOLLOW_YAW_STEP = 0.10f
         private const val KEY_SPATIAL = "spatialEnabled"
         private const val KEY_WET = "reverbWet"
         private const val KEY_SPREAD = "sourceSpread"
