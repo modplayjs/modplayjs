@@ -184,6 +184,7 @@ class XrPlayer(
     private var cachedPatternIndex = -1
     private var cachedPattern: PatternData? = null
     private var cachedTrackDetail: TrackDetail? = null
+    private var cachedDetailKey: Pair<Boolean, Boolean>? = null
     private var cachedDetails: List<Pair<String, String>> = emptyList()
     private var cachedMessage: String = ""
     private var cachedCaps: CapsInfo = CapsInfo()
@@ -293,9 +294,21 @@ class XrPlayer(
         }, "modplay-xr-audio").apply { start() }
     }
 
+    /**
+     * Stop the render thread, then release the outputs.
+     *
+     * The order matters: releasing an AudioTrack while the audio thread is
+     * inside `write(..., WRITE_BLOCKING)` on it is undefined. The loop wakes
+     * from its idle poll within 50 ms and a blocking write returns after at
+     * most one buffer (40 ms), so a short join is enough and keeps teardown
+     * from racing the writer.
+     */
     fun stop() {
         running.set(false)
         queue.clear()
+        if (::thread.isInitialized && Thread.currentThread() !== thread) {
+            runCatching { thread.join(STOP_JOIN_MS) }
+        }
         releaseOutputs()
     }
 
@@ -306,6 +319,7 @@ class XrPlayer(
                 cachedPatternIndex = -1
                 cachedPattern = null
                 cachedTrackDetail = null
+                cachedDetailKey = null
                 cachedDetails = emptyList()
                 cachedMessage = ""
                 cachedCaps = CapsInfo()
@@ -327,6 +341,7 @@ class XrPlayer(
                 cachedPatternIndex = -1
                 cachedPattern = null
                 cachedTrackDetail = null
+                cachedDetailKey = null
                 cachedDetails = emptyList()
                 cachedMessage = ""
                 cachedCaps = CapsInfo()
@@ -627,8 +642,28 @@ class XrPlayer(
         Log.i(TAG, "spatial output: ${info.channels} objects, layout ${info.layout}")
     }
 
+    /**
+     * One streaming track.
+     *
+     * The buffer holds two render blocks. The audio thread writes exactly one
+     * [BLOCK] (960 frames, 20 ms) per pass with WRITE_BLOCKING, so a buffer of
+     * one block has no headroom at all: any preemption between two passes runs
+     * the track dry and the next write waits for a whole block. Two blocks are
+     * 40 ms of audio and 20 ms of slack, which is what a music player needs;
+     * nothing here is monitoring input.
+     *
+     * The session id must be positive. `AudioManager.generateAudioSessionId()`
+     * returns `AudioManager.ERROR` (-1) when allocation fails, and
+     * `AudioTrack.Builder.setSessionId` rejects anything outside
+     * `AUDIO_SESSION_ID_GENERATE` (0) and the positive range. Passing -1 threw
+     * and took the whole output rebuild down with it.
+     */
     private fun newTrack(channelMask: Int, sessionId: Int?): AudioTrack {
-        val minBuf = AudioTrack.getMinBufferSize(SAMPLE_RATE, channelMask, AudioFormat.ENCODING_PCM_16BIT)
+        val minBuf =
+            AudioTrack.getMinBufferSize(SAMPLE_RATE, channelMask, AudioFormat.ENCODING_PCM_16BIT)
+                .takeIf { it > 0 } ?: 0
+        val frames = BLOCK * 2
+        val twoBlocks = frames * BYTES_PER_SAMPLE
         val builder = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -645,8 +680,8 @@ class XrPlayer(
             )
             .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
             .setTransferMode(AudioTrack.MODE_STREAM)
-            .setBufferSizeInBytes(maxOf(minBuf, 192 * 2 * 2))
-        if (sessionId != null && sessionId != 0) builder.setSessionId(sessionId)
+            .setBufferSizeInBytes(maxOf(minBuf, twoBlocks))
+        if (sessionId != null && sessionId > 0) builder.setSessionId(sessionId)
         return builder.build()
     }
 
@@ -859,13 +894,7 @@ class XrPlayer(
         publish(playing)
     }
 
-    /**
-     * Cheap update of just the playhead.
-     *
-     * A row change publishes on [playhead] only. The shared [State] is touched
-     * when the order moves to another pattern, because that is when the cells
-     * change too.
-     */
+    /** Reads `row` and `pattern` out of the cheap playhead JSON. */
     private fun parsePlayhead(raw: String): Pair<Int, Int>? {
         val rowIdx = raw.indexOf("\"row\":")
         if (rowIdx < 0) return null
@@ -971,9 +1000,16 @@ class XrPlayer(
                 }
             }
         }
-        if (rawAzimuths.size >= channels && layout != "panned" && layout != "front180") {
+        // "Pan (Dynamic)" is the engine's own pan, not a spread. The engine
+        // reports one azimuth per channel from the module's channel pan times
+        // the pan separation (rounded to 0.1 degree), and that is what this
+        // mode is named after. Falling through to the even spread below made
+        // the most dynamic layout the most static one and discarded the
+        // separation the settings slider sets.
+        if (layout == "panned" && rawAzimuths.size >= channels) {
             return rawAzimuths.take(channels)
         }
+        // 180 degrees in front: even spacing, both edges included.
         return List(channels) { i ->
             -90f + (i * 180f / (channels - 1))
         }
@@ -1036,8 +1072,16 @@ class XrPlayer(
         val track = snap?.get("track") as? JsonObject
         val caps = snap?.get("capabilities") as? JsonObject
 
-        if (cachedTrackDetail == null && track != null) {
-            cachedTrackDetail = readTrackDetail(track, settings.view)
+        if (track != null) {
+            // The sample list is the expensive part of the track object, so it
+            // is only reformatted when a view option that shapes it changes.
+            // Without this key, toggling "sample lengths" or "loop marker" left
+            // the panel on the old text until the next module loaded.
+            val detailKey = settings.view.sampleLengths to settings.view.sampleLoopFlags
+            if (cachedTrackDetail == null || cachedDetailKey != detailKey) {
+                cachedTrackDetail = readTrackDetail(track, settings.view)
+                cachedDetailKey = detailKey
+            }
             cachedDetails = track.entries
                 .filterNot { (k, v) ->
                     k in setOf("instrumentList", "sampleList", "orderList", "artwork") ||
@@ -1045,14 +1089,18 @@ class XrPlayer(
                 }
                 .map { (k, v) -> k to v.toString().trim('"').take(80) }
             cachedMessage = track["message"]?.jsonPrimitive?.content ?: ""
-            cachedCaps = CapsInfo(
+        }
+        // Capabilities follow the module *and* the mixer layout (`panSeparation`
+        // is only offered for the panned layout), so they are read every time.
+        // Caching them until the next track left the layout controls stale.
+        cachedCaps =
+            CapsInfo(
                 canMute = caps?.get("channelMute")?.jsonPrimitive?.content == "true",
                 canPattern = caps?.get("patternView")?.jsonPrimitive?.content == "true",
                 canMixer = caps?.get("mixer")?.jsonPrimitive?.content == "true",
                 canPan = caps?.get("panSeparation")?.jsonPrimitive?.content == "true",
                 seekable = caps?.get("seekable")?.jsonPrimitive?.content == "true",
             )
-        }
 
         val current = _state.value
         val newPos = state?.get("positionMs")?.jsonPrimitive?.content?.toLongOrNull()
@@ -1092,8 +1140,8 @@ class XrPlayer(
                     }.getOrDefault(current.muted)
                 } ?: current.muted,
             pattern = newPattern,
-            details = cachedDetails.ifEmpty { current.details },
-            message = cachedMessage.ifBlank { current.message },
+            details = cachedDetails,
+            message = cachedMessage,
             canMute = cachedCaps.canMute,
             canPattern = cachedCaps.canPattern,
             canMixer = cachedCaps.canMixer,
@@ -1188,6 +1236,8 @@ class XrPlayer(
         private const val TAG = "modplay-xr"
         const val SAMPLE_RATE = 48000
         const val BLOCK = 960
+        /** PCM 16-bit: the only encoding this player creates. */
+        private const val BYTES_PER_SAMPLE = 2
         private const val REGISTER_BASE = 1000
         private const val SNAPSHOT_ACTIVE_MS = 500L
         private const val SNAPSHOT_IDLE_MS = 1000L
@@ -1203,6 +1253,8 @@ class XrPlayer(
         /** How often the channel azimuths are re-read while playing. */
         private const val SPATIAL_MS = 1000L
         private const val IDLE_POLL_MS = 50L
+        /** Waits out one idle poll plus one blocking write at most. */
+        private const val STOP_JOIN_MS = 250L
         private const val RING_Y = 1.4f
         private const val MARKER_MIN = 0.02f
         private const val MARKER_RANGE = 0.10f
