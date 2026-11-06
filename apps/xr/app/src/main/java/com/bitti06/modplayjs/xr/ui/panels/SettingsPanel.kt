@@ -87,6 +87,7 @@ fun SettingsPanel() {
                         stringResource(R.string.xr_layout),
                         listOf(
                             Option(stringResource(R.string.xr_pan), "panned"),
+                            Option("360°", "full360"),
                             Option("LR·LR", "lrlr"),
                             Option("LR·RL", "lrrl"),
                         ),

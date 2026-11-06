@@ -4,15 +4,20 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,8 +69,7 @@ fun LibraryPanel() {
     var sort by remember { mutableStateOf(Sort.Name) }
     var query by remember { mutableStateOf("") }
     var scanId by remember { mutableIntStateOf(0) }
-    // Favourites live in SharedPreferences, so a star tap has to rebuild the
-    // filtered list even though the library itself did not change.
+    var selectedFolder by remember { mutableStateOf<String?>(null) }
     var favoritesVersion by remember { mutableIntStateOf(0) }
     val favorites = remember(version, favoritesVersion) { XrStore.favorites() }
 
@@ -73,11 +77,21 @@ fun LibraryPanel() {
         result = withContext(Dispatchers.IO) { XrStore.scan() } ?: result
     }
 
+    val foldersList = remember(result.tracks) {
+        result.tracks.map { it.folder }.distinct().sorted()
+    }
+
     val shown: List<TrackFile> =
-        remember(result, filter, sort, query, favorites) {
+        remember(result, filter, sort, query, favorites, selectedFolder) {
             val filtered =
                 when (filter) {
-                    Filter.All -> result.tracks
+                    Filter.All -> {
+                        if (selectedFolder != null) {
+                            result.tracks.filter { it.folder == selectedFolder }
+                        } else {
+                            result.tracks
+                        }
+                    }
                     Filter.Favorites -> result.tracks.filter { it.uri.toString() in favorites }
                     Filter.Recent -> {
                         val byUri = result.tracks.associateBy { it.uri.toString() }
@@ -98,125 +112,227 @@ fun LibraryPanel() {
         subtitle = stringResource(R.string.home_tagline),
         headerActions = { SettingsButton() },
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm)) {
-            StatCard(
-                count = result.tracks.size.toString(),
-                label = stringResource(R.string.stat_tracks),
-                color = PanelTokens.Accent,
-                modifier = Modifier.weight(1f),
-                onClick = { filter = Filter.All },
-            )
-            StatCard(
-                count = result.folders.size.toString(),
-                label = stringResource(R.string.stat_folders),
-                color = PanelTokens.AccentAlt,
-                modifier = Modifier.weight(1f),
-                onClick = { XrStore.pickFolder() },
-            )
-            StatCard(
-                count = result.tracks.count { it.uri.toString() in favorites }.toString(),
-                label = stringResource(R.string.stat_favorites),
-                color = PanelTokens.AccentWarm,
-                modifier = Modifier.weight(1f),
-                onClick = { filter = Filter.Favorites },
-            )
-        }
-
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapXs),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
         ) {
-            Filter.entries.forEach { entry ->
-                Chip(stringResource(entry.label), selected = entry == filter) { filter = entry }
-            }
-            Spacer(Modifier.weight(1f))
-            Chip(stringResource(R.string.xr_folders)) { XrStore.pickFolder() }
-            Chip(stringResource(R.string.xr_files)) { XrStore.pickFiles() }
-            Chip(stringResource(R.string.xr_sort, stringResource(sort.label))) {
-                sort = Sort.entries[(sort.ordinal + 1) % Sort.entries.size]
-            }
-            Chip(stringResource(R.string.xr_rescan)) { scanId++ }
-        }
+            // Left Tree / Folder Navigation Sidebar
+            Column(
+                modifier = Modifier
+                    .width(180.dp)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(PanelTokens.Radius))
+                    .background(PanelTokens.SurfaceSunken)
+                    .padding(PanelTokens.GapSm)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(PanelTokens.GapXs),
+            ) {
+                Text(
+                    "LIBRARY",
+                    fontSize = PanelTokens.Meta,
+                    fontWeight = FontWeight.Bold,
+                    color = PanelTokens.TextFaint,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                )
 
-        BasicTextField(
-            value = query,
-            onValueChange = { query = it },
-            singleLine = true,
-            textStyle =
-                TextStyle(
-                    color = PanelTokens.Text,
-                    fontSize = PanelTokens.Body,
-                    fontFamily = FontFamily.Monospace,
-                ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(PanelTokens.RadiusSmall))
-                .background(PanelTokens.SurfaceSunken)
-                .padding(horizontal = PanelTokens.Gap, vertical = PanelTokens.GapSm),
-            decorationBox = { inner ->
-                if (query.isEmpty()) {
+                NavItem(
+                    label = stringResource(R.string.xr_filter_all),
+                    icon = "📁",
+                    count = result.tracks.size,
+                    selected = filter == Filter.All && selectedFolder == null,
+                    onClick = {
+                        filter = Filter.All
+                        selectedFolder = null
+                    },
+                )
+
+                NavItem(
+                    label = stringResource(R.string.xr_filter_favorites),
+                    icon = "★",
+                    count = result.tracks.count { it.uri.toString() in favorites },
+                    selected = filter == Filter.Favorites,
+                    onClick = {
+                        filter = Filter.Favorites
+                        selectedFolder = null
+                    },
+                )
+
+                NavItem(
+                    label = stringResource(R.string.xr_filter_recent),
+                    icon = "🕒",
+                    count = XrStore.recents().size,
+                    selected = filter == Filter.Recent,
+                    onClick = {
+                        filter = Filter.Recent
+                        selectedFolder = null
+                    },
+                )
+
+                if (foldersList.isNotEmpty()) {
                     Text(
-                        stringResource(R.string.xr_search_hint),
-                        fontSize = PanelTokens.Body,
+                        "FOLDERS",
+                        fontSize = PanelTokens.Meta,
+                        fontWeight = FontWeight.Bold,
                         color = PanelTokens.TextFaint,
+                        modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 2.dp),
                     )
-                }
-                inner()
-            },
-        )
 
-        if (result.folders.isNotEmpty()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm)) {
-                result.folders.forEach { folder ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "${folder.name} ${folder.files}",
-                            fontSize = PanelTokens.Mono,
-                            fontFamily = FontFamily.Monospace,
-                            color = PanelTokens.TextDim,
+                    foldersList.forEach { folderName ->
+                        val trackCount = result.tracks.count { it.folder == folderName }
+                        NavItem(
+                            label = folderName,
+                            icon = "📂",
+                            count = trackCount,
+                            selected = filter == Filter.All && selectedFolder == folderName,
+                            onClick = {
+                                filter = Filter.All
+                                selectedFolder = folderName
+                            },
                         )
-                        Text(
-                            " ×",
-                            fontSize = PanelTokens.Mono,
-                            color = PanelTokens.AccentWarm,
-                            modifier = Modifier
-                                .clickable { XrStore.removeTree(folder.uri) }
-                                .padding(horizontal = 2.dp),
-                        )
+                    }
+                }
+
+                Spacer(Modifier.weight(1f))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(50))
+                            .background(PanelTokens.SurfaceRaised)
+                            .clickable { XrStore.pickFolder() }
+                            .padding(vertical = PanelTokens.GapXs),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("+ Folder", fontSize = PanelTokens.ChipText, color = PanelTokens.TextDim)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(50))
+                            .background(PanelTokens.SurfaceRaised)
+                            .clickable { XrStore.pickFiles() }
+                            .padding(vertical = PanelTokens.GapXs),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("+ File", fontSize = PanelTokens.ChipText, color = PanelTokens.TextDim)
+                    }
+                }
+            }
+
+            // Right File List & Search View
+            Column(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapXs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        textStyle =
+                            TextStyle(
+                                color = PanelTokens.Text,
+                                fontSize = PanelTokens.Body,
+                                fontFamily = FontFamily.Monospace,
+                            ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(PanelTokens.RadiusSmall))
+                            .background(PanelTokens.SurfaceSunken)
+                            .padding(horizontal = PanelTokens.Gap, vertical = PanelTokens.GapSm),
+                        decorationBox = { inner ->
+                            if (query.isEmpty()) {
+                                Text(
+                                    stringResource(R.string.xr_search_hint),
+                                    fontSize = PanelTokens.Body,
+                                    color = PanelTokens.TextFaint,
+                                )
+                            }
+                            inner()
+                        },
+                    )
+
+                    Chip(stringResource(R.string.xr_sort, stringResource(sort.label))) {
+                        sort = Sort.entries[(sort.ordinal + 1) % Sort.entries.size]
+                    }
+                    Chip(stringResource(R.string.xr_rescan)) { scanId++ }
+                }
+
+                if (shown.isEmpty()) {
+                    EmptyNote(
+                        when (filter) {
+                            Filter.Favorites -> stringResource(R.string.xr_empty_favorites)
+                            Filter.Recent -> stringResource(R.string.xr_empty_recent)
+                            else -> stringResource(R.string.xr_empty_library)
+                        },
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        items(shown, key = { it.uri.toString() }) { track ->
+                            TrackRow(
+                                track = track,
+                                favorite = track.uri.toString() in favorites,
+                                onPlay = { XrStore.playAt(shown, shown.indexOf(track)) },
+                                onIgnore = { XrStore.ignore(track.uri) },
+                                onFavorite = {
+                                    XrStore.toggleFavorite(track.uri)
+                                    favoritesVersion++
+                                },
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
 
-        if (shown.isEmpty()) {
-            EmptyNote(
-                when (filter) {
-                    Filter.Favorites -> stringResource(R.string.xr_empty_favorites)
-                    Filter.Recent -> stringResource(R.string.xr_empty_recent)
-                    else -> stringResource(R.string.xr_empty_library)
-                },
+@Composable
+private fun NavItem(
+    label: String,
+    icon: String,
+    count: Int,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(PanelTokens.RadiusSmall))
+            .background(if (selected) PanelTokens.SurfaceRaised else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = PanelTokens.GapSm, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(icon, fontSize = PanelTokens.Body)
+        Text(
+            label,
+            fontSize = PanelTokens.Body,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) PanelTokens.Accent else PanelTokens.Text,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        if (count > 0) {
+            Text(
+                count.toString(),
+                fontSize = PanelTokens.Meta,
+                fontFamily = FontFamily.Monospace,
+                color = if (selected) PanelTokens.AccentAlt else PanelTokens.TextFaint,
             )
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                items(shown, key = { it.uri.toString() }) { track ->
-                    TrackRow(
-                        track = track,
-                        favorite = track.uri.toString() in favorites,
-                        onPlay = { XrStore.playAt(shown, shown.indexOf(track)) },
-                        onIgnore = { XrStore.ignore(track.uri) },
-                        onFavorite = {
-                            XrStore.toggleFavorite(track.uri)
-                            favoritesVersion++
-                        },
-                    )
-                }
-            }
         }
-
     }
 }
 
@@ -280,25 +396,5 @@ private fun TrackRow(
             color = if (favorite) PanelTokens.Accent else PanelTokens.TextDim,
             modifier = Modifier.clickable(onClick = onFavorite).padding(horizontal = 2.dp),
         )
-    }
-}
-
-@Composable
-private fun StatCard(
-    count: String,
-    label: String,
-    color: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(PanelTokens.Radius))
-            .background(PanelTokens.SurfaceRaised)
-            .clickable(onClick = onClick)
-            .padding(horizontal = PanelTokens.Gap, vertical = PanelTokens.GapSm),
-    ) {
-        Text(count, fontSize = PanelTokens.Stat, fontWeight = FontWeight.Bold, color = color)
-        Text(label, fontSize = PanelTokens.Meta, color = PanelTokens.TextDim)
     }
 }

@@ -52,8 +52,25 @@ private const val NOTE_EMPTY = "..."
 private const val FIELD_EMPTY = ".."
 private const val EMPTY_CELL = "... .. .. ..."
 
-/** Compiled once: the dot-run test runs for every cell of every visible row. */
-private val DOT_RUN = Regex("\\.+")
+/** Fast replacement of dot sequences without regex allocations. */
+private fun stripDotsFast(raw: String): String {
+    if (!raw.contains('.')) return raw
+    val sb = StringBuilder(raw.length)
+    var inDots = false
+    for (i in raw.indices) {
+        val c = raw[i]
+        if (c == '.') {
+            if (!inDots) {
+                sb.append("...")
+                inDots = true
+            }
+        } else {
+            inDots = false
+            sb.append(c)
+        }
+    }
+    return sb.toString()
+}
 
 /**
  * The playing pattern the way a tracker shows it: one row per line, one column
@@ -76,17 +93,22 @@ fun PatternPanel() {
     val palette = patternPalette(state.player.patternColors)
 
     // Follow the playhead three rows down from the top edge instead of pinned
-    // to it, and only scroll when the row left the window: the playhead arrives
-    // many times a second, and scrolling on every emit would fight the user.
-    LaunchedEffect(playhead.row, pattern.pattern, pattern.rows, state.player.follow) {
-        if (!state.player.follow) return@LaunchedEffect
-        if (pattern.rows <= 0 || playhead.row !in 0 until pattern.rows) return@LaunchedEffect
-        val visible = listState.layoutInfo.visibleItemsInfo
-        if (visible.isEmpty()) return@LaunchedEffect
-        val first = visible.first().index
-        val last = visible.last().index
-        if (playhead.row < first || playhead.row > last - 2) {
-            listState.scrollToItem((playhead.row - 3).coerceIn(0, (pattern.rows - 1).coerceAtLeast(0)))
+    // to it, and only scroll when the row left the window: collecting the flow
+    // in a single long-lived effect avoids cancelling and restarting coroutines
+    // on every rapid row tick at high BPM.
+    LaunchedEffect(pattern.pattern, pattern.rows, state.player.follow) {
+        if (!state.player.follow || pattern.rows <= 0) return@LaunchedEffect
+        XrStore.playhead.collect { ph ->
+            val row = ph.row
+            if (row !in 0 until pattern.rows) return@collect
+            val visible = listState.layoutInfo.visibleItemsInfo
+            if (visible.isEmpty()) return@collect
+            val first = visible.first().index
+            val last = visible.last().index
+            if (row < first || row > last - 2) {
+                val target = (row - 3).coerceIn(0, (pattern.rows - 1).coerceAtLeast(0))
+                listState.scrollToItem(target)
+            }
         }
     }
 
@@ -94,7 +116,7 @@ fun PatternPanel() {
         title = stringResource(R.string.xr_pattern, pattern.pattern.toString().padStart(2, '0')),
         subtitle =
             if (pattern.rows > 0) {
-                stringResource(R.string.xr_pattern_meta, pattern.channels, playhead.row)
+                "${pattern.channels} ch · ${pattern.rows} rows"
             } else {
                 "—"
             },
@@ -202,8 +224,10 @@ private fun PatternRow(
         )
         for (ch in 0 until channels) {
             val raw = cells.getOrElse(row * channels + ch) { EMPTY_CELL }
-            val cell = if (stripDots) DOT_RUN.replace(raw, "...") else raw
-            val text = remember(cell, palette) { annotatedCell(cell, palette) }
+            val text = remember(raw, stripDots, palette) {
+                val cell = if (stripDots) stripDotsFast(raw) else raw
+                annotatedCell(cell, palette)
+            }
             Text(
                 text,
                 fontSize = CELL_TEXT,

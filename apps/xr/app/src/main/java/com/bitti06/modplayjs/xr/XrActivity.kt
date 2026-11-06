@@ -9,6 +9,9 @@ import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import androidx.compose.ui.platform.ComposeView
 import com.bitti06.modplayjs.xr.input.ControllerInputSystem
 import com.bitti06.modplayjs.xr.library.Library
@@ -635,6 +638,9 @@ class XrActivity : AppSystemActivity(), XrHost {
  */
 @Composable
 private fun PanelContent(spec: PanelSpec) {
-    val state by XrStore.state.collectAsState()
-    if (spec.id in visiblePanels(state)) spec.content()
+    val isVisible by remember(spec.id) {
+        XrStore.state.map { spec.id in visiblePanels(it) }.distinctUntilChanged()
+    }.collectAsState(initial = spec.id in visiblePanels(XrStore.state.value))
+
+    if (isVisible) spec.content()
 }

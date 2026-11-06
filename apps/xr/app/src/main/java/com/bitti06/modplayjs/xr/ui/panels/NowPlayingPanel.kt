@@ -97,6 +97,7 @@ fun NowPlayingPanel() {
             horizontalArrangement = Arrangement.spacedBy(PanelTokens.Gap),
         ) {
             CircleButton("■") { XrStore.stop() }
+            CircleButton("⏮") { XrStore.seek(0L) }
             CircleButton("|◀") { XrStore.previous() }
             CircleButton(if (playback.playing) "❚❚" else "▶", primary = true) { XrStore.playPause() }
             CircleButton("▶|") { XrStore.next() }
@@ -208,6 +209,8 @@ fun NowPlayingPanel() {
     }
 }
 
+private val FALLBACK_BARS = intArrayOf(8, 16, 24, 12, 20, 7, 22, 11, 17, 6, 19, 13, 9, 15, 21, 10)
+
 /**
  * Channel levels. The engine reports one level per channel, so "spectrum" and
  * "waveform" both draw the same data; a real FFT would be new engine output.
@@ -228,7 +231,7 @@ private fun Visualizer(
         val bars = maxOf(channels, 1).coerceAtMost(16)
         repeat(bars) { i ->
             val level = levels.getOrElse(i) { 0f }.coerceIn(0f, 1f)
-            val fallback = listOf(8, 16, 24, 12, 20, 7, 22, 11, 17, 6, 19, 13, 9, 15, 21, 10)[i % 16]
+            val fallback = FALLBACK_BARS[i % 16]
             val barHeight =
                 when {
                     mode == "waveform" -> if (active) fallback else fallback / 3

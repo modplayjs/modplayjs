@@ -260,7 +260,8 @@ class PanelPlacement(
          * at the head anchor, so poses saved under 39 hold the old position.
          * 41: details moved below now playing, so poses saved under 40 hold
          * the old overlap.
+         * 42: details panel elevated higher (y=0.58m).
          */
-        const val LAYOUT_VERSION = 41
+        const val LAYOUT_VERSION = 42
     }
 }

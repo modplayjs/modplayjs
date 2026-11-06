@@ -6,6 +6,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.util.Log
+import androidx.core.content.edit
 import androidx.core.net.toUri
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.xr.state.Playhead
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -171,7 +173,19 @@ class XrPlayer(
     private var lastSpatialAt = 0L
     private var cachedPatternIndex = -1
     private var cachedPattern: PatternData? = null
+    private var cachedTrackDetail: TrackDetail? = null
+    private var cachedDetails: List<Pair<String, String>> = emptyList()
+    private var cachedMessage: String = ""
+    private var cachedCaps: CapsInfo = CapsInfo()
     private var markerSizes = FloatArray(0)
+
+    private data class CapsInfo(
+        val canMute: Boolean = false,
+        val canPattern: Boolean = false,
+        val canMixer: Boolean = false,
+        val canPan: Boolean = false,
+        val seekable: Boolean = false,
+    )
 
     private val scratchShort = ShortArray(BLOCK * 2)
 
@@ -208,10 +222,10 @@ class XrPlayer(
             ringRadius = clamped
             ringCenterX = centerX
             ringCenterZ = centerZ
-            prefs.edit()
-                .putFloat(KEY_RADIUS, ringRadius)
-                .putBoolean(KEY_RADIUS_MANUAL, true)
-                .apply()
+            prefs.edit {
+                putFloat(KEY_RADIUS, ringRadius)
+                putBoolean(KEY_RADIUS_MANUAL, true)
+            }
             applyPositions()
         }
     }
@@ -228,7 +242,7 @@ class XrPlayer(
     fun resetRadiusAuto() {
         submit {
             radiusManual = false
-            prefs.edit().putBoolean(KEY_RADIUS_MANUAL, false).apply()
+            prefs.edit { putBoolean(KEY_RADIUS_MANUAL, false) }
         }
     }
 
@@ -274,6 +288,10 @@ class XrPlayer(
                 val eng = engine ?: error("V8 engine unavailable")
                 cachedPatternIndex = -1
                 cachedPattern = null
+                cachedTrackDetail = null
+                cachedDetails = emptyList()
+                cachedMessage = ""
+                cachedCaps = CapsInfo()
                 eng.setSampleRate(SAMPLE_RATE)
                 eng.load(bytes, name)
                 pushSettings()
@@ -291,6 +309,10 @@ class XrPlayer(
                 Log.e(TAG, "Failed to load module '$name'", t)
                 cachedPatternIndex = -1
                 cachedPattern = null
+                cachedTrackDetail = null
+                cachedDetails = emptyList()
+                cachedMessage = ""
+                cachedCaps = CapsInfo()
                 loaded = false
                 playing = false
                 _state.value = _state.value.copy(
@@ -377,7 +399,7 @@ class XrPlayer(
 
     fun setSpatialEnabled(enabled: Boolean) {
         spatialPreferred = enabled
-        prefs.edit().putBoolean(KEY_SPATIAL, enabled).apply()
+        prefs.edit { putBoolean(KEY_SPATIAL, enabled) }
         submit {
             engine?.command("""{"type":"setSpatial","enabled":$enabled}""")
             spatialInfo = spatialInfo.copy(enabled = enabled)
@@ -558,20 +580,26 @@ class XrPlayer(
         }
         outChannels = info.channels
         outputMode = 2
-        entities.clear()
+        val positions = List(info.channels) { i ->
+            positionFor(info.azimuths.getOrElse(i) { 0f })
+        }
         for (i in 0 until info.channels) {
             val sessionId = audioManager?.generateAudioSessionId() ?: 0
             val track = newTrack(AudioFormat.CHANNEL_OUT_MONO, sessionId)
             val registerId = REGISTER_BASE + i
             feature.registerAudioSessionId(registerId, track.audioSessionId)
             outputs += TrackOut(i, track.audioSessionId, track)
-            val p = positionFor(info.azimuths.getOrElse(i) { 0f })
-            val entity = Entity.create(
-                Transform(Pose(p)),
-                AudioSessionId(registerId, AudioType.MONO),
-            )
-            entities += entity
             track.play()
+        }
+        mainHandler.post {
+            for (i in 0 until info.channels) {
+                val registerId = REGISTER_BASE + i
+                val p = positions.getOrElse(i) { Vector3(0f, RING_Y, 0f) }
+                entities += Entity.create(
+                    Transform(Pose(p)),
+                    AudioSessionId(registerId, AudioType.MONO),
+                )
+            }
         }
         if (debugVisible) rebuildMarkers()
         Log.i(TAG, "spatial output: ${info.channels} objects, layout ${info.layout}")
@@ -593,8 +621,9 @@ class XrPlayer(
                     .setChannelMask(channelMask)
                     .build(),
             )
+            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
             .setTransferMode(AudioTrack.MODE_STREAM)
-            .setBufferSizeInBytes(maxOf(minBuf, BLOCK * 2 * 12))
+            .setBufferSizeInBytes(maxOf(minBuf, 192 * 2 * 2))
         if (sessionId != null && sessionId != 0) builder.setSessionId(sessionId)
         return builder.build()
     }
@@ -605,8 +634,15 @@ class XrPlayer(
             runCatching { out.track.release() }
         }
         outputs.clear()
-        for (e in entities) runCatching { e?.destroy() }
+        val toDestroy = ArrayList(entities)
         entities.clear()
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            for (e in toDestroy) runCatching { e?.destroy() }
+        } else {
+            mainHandler.post {
+                for (e in toDestroy) runCatching { e?.destroy() }
+            }
+        }
         destroyMarkers()
         outputMode = 0
         outChannels = 0
@@ -800,24 +836,44 @@ class XrPlayer(
      * when the order moves to another pattern, because that is when the cells
      * change too.
      */
+    private fun parsePlayhead(raw: String): Pair<Int, Int>? {
+        val rowIdx = raw.indexOf("\"row\":")
+        if (rowIdx < 0) return null
+        var rowStart = rowIdx + 6
+        while (rowStart < raw.length && raw[rowStart].isWhitespace()) rowStart++
+        var rowEnd = rowStart
+        while (rowEnd < raw.length && (raw[rowEnd].isDigit() || raw[rowEnd] == '-')) rowEnd++
+        val row = raw.substring(rowStart, rowEnd).toIntOrNull() ?: return null
+
+        val patIdx = raw.indexOf("\"pattern\":")
+        if (patIdx < 0) return null
+        var patStart = patIdx + 10
+        while (patStart < raw.length && raw[patStart].isWhitespace()) patStart++
+        var patEnd = patStart
+        while (patEnd < raw.length && (raw[patEnd].isDigit() || raw[patEnd] == '-')) patEnd++
+        val pattern = raw.substring(patStart, patEnd).toIntOrNull() ?: 0
+
+        return row to pattern
+    }
+
+    /**
+     * Cheap update of just the playhead.
+     *
+     * A row change publishes on [playhead] only. The shared [State] is touched
+     * when the order moves to another pattern, because that is when the cells
+     * change too.
+     */
     private fun publishPlayhead() {
         if (!loaded) return
         val eng = engine ?: return
         val raw = runCatching { eng.playhead() }.getOrNull() ?: return
-        val obj = runCatching { Json.parseToJsonElement(raw) as? JsonObject }.getOrNull() ?: return
-        val row = obj["row"]?.jsonPrimitive?.content?.toIntOrNull() ?: return
-        val pattern = obj["pattern"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+        val parsed = parsePlayhead(raw) ?: return
+        val row = parsed.first
+        val pattern = parsed.second
         if (_playhead.value.row == row && _playhead.value.pattern == pattern) return
 
-        // The order moved on: the cells belong to the old pattern, so fetch the
-        // new one now instead of showing the previous grid for up to a snapshot
-        // interval. readPattern caches by index, so this costs one V8 call per
-        // pattern change, not per poll, and only a pattern change touches the
-        // shared state.
         val current = _state.value
         if (current.pattern.pattern != pattern) {
-            // Keep the old grid if the fetch came back empty: a blank panel
-            // mid-song reads as a crash.
             val data = readPattern(pattern).takeIf { it.cells.isNotEmpty() } ?: current.pattern
             if (data.pattern != current.pattern.pattern) {
                 _state.value = current.copy(pattern = data)
@@ -840,8 +896,6 @@ class XrPlayer(
             for (i in markers.indices) {
                 val lvl = snapshot.getOrElse(i) { 0f }
                 val size = MARKER_MIN + lvl * MARKER_RANGE
-                // A jumping 2 cm sphere is unreadable and each setComponent
-                // dirties the entity; 5 mm of hysteresis keeps it steady.
                 val shown = markerSizes.getOrElse(i) { -1f }
                 if (kotlin.math.abs(size - shown) < MARKER_STEP) continue
                 markers[i].setComponent(Scale(Vector3(size, size, size)))
@@ -850,20 +904,43 @@ class XrPlayer(
         }
     }
 
+    private fun effectiveAzimuths(
+        channels: Int,
+        layout: String,
+        rawAzimuths: List<Float>,
+    ): List<Float> {
+        if (channels <= 0) return emptyList()
+        if (layout == "full360") {
+            return List(channels) { i ->
+                val angle = (i * 360f / channels) - 180f
+                if (angle > 180f) angle - 360f else angle
+            }
+        }
+        if (rawAzimuths.size >= channels && layout != "panned" && layout != "front180") {
+            return rawAzimuths.take(channels)
+        }
+        if (channels == 1) return listOf(0f)
+        return List(channels) { i ->
+            -90f + (i * 180f / (channels - 1))
+        }
+    }
+
     private fun readSpatialInfo(): SpatialInfo {
         val eng = engine ?: return SpatialInfo()
         val raw = runCatching { eng.spatialInfo() }.getOrNull() ?: return SpatialInfo()
         return runCatching {
             val obj = Json.parseToJsonElement(raw) as? JsonObject ?: return SpatialInfo()
+            val ch = obj["channels"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+            val layout = obj["layout"]?.jsonPrimitive?.content ?: "panned"
+            val rawAz = (obj["azimuths"] as? kotlinx.serialization.json.JsonArray)
+                ?.mapNotNull { it.jsonPrimitive.content.toFloatOrNull() } ?: emptyList()
+            val azimuths = effectiveAzimuths(ch, layout, rawAz)
             SpatialInfo(
                 enabled = obj["enabled"]?.jsonPrimitive?.content == "true",
                 available = obj["available"]?.jsonPrimitive?.content == "true",
-                layout = obj["layout"]?.jsonPrimitive?.content ?: "panned",
-                channels = obj["channels"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
-                azimuths = obj["azimuths"]?.let { arr ->
-                    arr.toString().trim('[', ']').split(',').filter { it.isNotBlank() }
-                        .map { it.trim().toFloatOrNull() ?: 0f }
-                } ?: emptyList(),
+                layout = layout,
+                channels = ch,
+                azimuths = azimuths,
             )
         }.getOrElse { SpatialInfo() }
     }
@@ -872,9 +949,6 @@ class XrPlayer(
 
     private fun readPattern(pattern: Int): PatternData {
         if (pattern < 0) return PatternData()
-        // cells/rows/channels only change with the module, not with the
-        // playhead: cache the last pattern instead of re-parsing every tick.
-        // `load` clears the cache, so an order index is enough as a key.
         cachedPattern?.let { if (cachedPatternIndex == pattern) return it }
         val eng = engine ?: return PatternData()
         val raw = runCatching { eng.command("""{"type":"getPattern","pattern":$pattern}""") }.getOrNull()
@@ -883,9 +957,8 @@ class XrPlayer(
             val obj = Json.parseToJsonElement(raw) as? JsonObject ?: return PatternData()
             val rows = obj["rows"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             val channels = obj["channels"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-            val cells = obj["cells"]?.let { arr ->
-                arr.toString().trim('[', ']').split(',').map { it.trim().trim('"') }
-            } ?: emptyList()
+            val cells = (obj["cells"] as? kotlinx.serialization.json.JsonArray)
+                ?.map { it.jsonPrimitive.content } ?: emptyList()
             PatternData(
                 pattern = obj["pattern"]?.jsonPrimitive?.content?.toIntOrNull() ?: pattern,
                 rows = rows,
@@ -908,25 +981,48 @@ class XrPlayer(
         val state = snap?.get("state") as? JsonObject
         val track = snap?.get("track") as? JsonObject
         val caps = snap?.get("capabilities") as? JsonObject
+
+        if (cachedTrackDetail == null && track != null) {
+            cachedTrackDetail = readTrackDetail(track, settings.view)
+            cachedDetails = track.entries
+                .filterNot { (k, v) ->
+                    k in setOf("instrumentList", "sampleList", "orderList", "artwork") ||
+                        (k == "streamed" && (v is JsonNull || v.toString() == "null"))
+                }
+                .map { (k, v) -> k to v.toString().trim('"').take(80) }
+            cachedMessage = track["message"]?.jsonPrimitive?.content ?: ""
+            cachedCaps = CapsInfo(
+                canMute = caps?.get("channelMute")?.jsonPrimitive?.content == "true",
+                canPattern = caps?.get("patternView")?.jsonPrimitive?.content == "true",
+                canMixer = caps?.get("mixer")?.jsonPrimitive?.content == "true",
+                canPan = caps?.get("panSeparation")?.jsonPrimitive?.content == "true",
+                seekable = caps?.get("seekable")?.jsonPrimitive?.content == "true",
+            )
+        }
+
         val current = _state.value
+        val newPos = state?.get("positionMs")?.jsonPrimitive?.content?.toLongOrNull()
+            ?.let { it / 1000L * 1000L } ?: 0L
+        val newPattern = if (loaded) {
+            readPattern(state?.get("pattern")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
+                .copy(row = state?.get("row")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
+        } else {
+            PatternData()
+        }
+
         _state.value = current.copy(
             loaded = loaded,
             title = track?.get("title")?.jsonPrimitive?.content ?: current.title,
             format = track?.get("format")?.jsonPrimitive?.content ?: current.format,
             channels = track?.get("channels")?.jsonPrimitive?.content?.toIntOrNull() ?: current.channels,
             playing = isPlaying,
-            // Whole seconds only: the label shows seconds, and a state that
-            // does not change is not re-emitted, so the panels skip a
-            // recompose on every tick that lands inside the same second.
-            positionMs = state?.get("positionMs")?.jsonPrimitive?.content?.toLongOrNull()
-                ?.let { it / 1000L * 1000L } ?: 0L,
+            positionMs = newPos,
             durationMs = state?.get("durationMs")?.jsonPrimitive?.content?.toLongOrNull() ?: durationMs,
             spatialAvailable = spatialInfo.available,
             spatialEnabled = spatialInfo.enabled,
             layout = spatialInfo.layout,
             azimuths = spatialInfo.azimuths,
             debugSources = debugVisible,
-            // Only the debug markers read this; skip the copy otherwise.
             levels = if (debugVisible) levels.toList() else emptyList(),
             volume = settings.transport.volume,
             solo = snap?.get("soloChannel")?.jsonPrimitive?.content?.toIntOrNull() ?: -1,
@@ -941,22 +1037,14 @@ class XrPlayer(
                         }?.toSet()
                     }.getOrDefault(current.muted)
                 } ?: current.muted,
-            pattern = if (loaded) {
-                readPattern(state?.get("pattern")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
-                    .copy(row = state?.get("row")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
-            } else {
-                PatternData()
-            },
-            details = track?.entries
-                ?.filterNot { (k, _) -> k in setOf("instrumentList", "sampleList", "orderList", "artwork") }
-                ?.map { (k, v) -> k to v.toString().trim('"').take(80) }
-                ?: current.details,
-            message = track?.get("message")?.jsonPrimitive?.content ?: current.message,
-            canMute = caps?.get("channelMute")?.jsonPrimitive?.content == "true",
-            canPattern = caps?.get("patternView")?.jsonPrimitive?.content == "true",
-            canMixer = caps?.get("mixer")?.jsonPrimitive?.content == "true",
-            canPan = caps?.get("panSeparation")?.jsonPrimitive?.content == "true",
-            seekable = caps?.get("seekable")?.jsonPrimitive?.content == "true",
+            pattern = newPattern,
+            details = cachedDetails.ifEmpty { current.details },
+            message = cachedMessage.ifBlank { current.message },
+            canMute = cachedCaps.canMute,
+            canPattern = cachedCaps.canPattern,
+            canMixer = cachedCaps.canMixer,
+            canPan = cachedCaps.canPan,
+            seekable = cachedCaps.seekable,
             follow = settings.view.follow,
             visualizer = settings.view.visualizer,
             showChannelStrip = settings.view.showChannelStrip,
@@ -964,14 +1052,12 @@ class XrPlayer(
             sampleLengths = settings.view.sampleLengths,
             sampleLoopFlags = settings.view.sampleLoopFlags,
             patternColors = settings.view.patternColors,
-            trackDetail = readTrackDetail(track, settings.view),
+            trackDetail = cachedTrackDetail ?: current.trackDetail,
         )
-        // A snapshot is the cheap truth: keep the row in step after a seek or a
-        // track change without a second poll.
+
         _playhead.value =
             Playhead(row = _state.value.pattern.row, pattern = _state.value.pattern.pattern)
 
-        // Only log transitions, not every tick.
         if (previous.loaded != _state.value.loaded) {
             Log.i(TAG, "state: loaded=${_state.value.loaded}")
         }
@@ -1053,12 +1139,10 @@ class XrPlayer(
         private const val SNAPSHOT_IDLE_MS = 1000L
 
         /**
-         * 16 polls per second, matching the phone app, which drops its snapshot
-         * interval to 60 ms while the pattern view is open
-         * (PlaybackSession.FAST_REFRESH_MS). At 60 ms even a speed-1 module
-         * cannot outrun the poll.
+         * Smooth playhead polling (~28 Hz) so high BPM tracks step smoothly
+         * without multi-row jumps or coroutine cancellation stalls.
          */
-        private const val PLAYHEAD_MS = 60L
+        private const val PLAYHEAD_MS = 35L
 
         /** Marker levels: fast enough to follow the music, slow enough to be cheap. */
         private const val MARKER_MS = 100L

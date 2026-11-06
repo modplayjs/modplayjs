@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <oboe/Oboe.h>
 #include "v8.h"
 #include "libplatform/libplatform.h"
 
@@ -250,4 +251,91 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeDestroy(JNIEnv*, jobject, jlong
     }
     e->isolate->Dispose();
     delete e;
+}
+
+class OboeAudioEngine : public oboe::AudioStreamDataCallback {
+public:
+    explicit OboeAudioEngine(Engine* e) : engine_(e) {}
+
+    ~OboeAudioEngine() override {
+        stop();
+    }
+
+    bool start() {
+        if (stream_ && stream_->getState() == oboe::StreamState::Started) return true;
+        oboe::AudioStreamBuilder builder;
+        builder.setDirection(oboe::Direction::Output)
+               ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
+               ->setSharingMode(oboe::SharingMode::Exclusive)
+               ->setFormat(oboe::AudioFormat::Float)
+               ->setChannelCount(oboe::ChannelCount::Stereo)
+               ->setSampleRate(48000)
+               ->setDataCallback(this);
+
+        oboe::Result result = builder.openStream(stream_);
+        if (result != oboe::Result::OK) {
+            LOGE("Oboe openStream failed: %s", oboe::convertToText(result));
+            return false;
+        }
+        stream_->setBufferSizeInFrames(stream_->getFramesPerBurst() * 2);
+        result = stream_->requestStart();
+        if (result != oboe::Result::OK) {
+            LOGE("Oboe requestStart failed: %s", oboe::convertToText(result));
+            return false;
+        }
+        LOGI("Oboe audio stream started successfully (48 kHz, LowLatency, Exclusive)");
+        return true;
+    }
+
+    void pause() {
+        if (stream_) {
+            stream_->requestPause();
+        }
+    }
+
+    void stop() {
+        if (stream_) {
+            stream_->stop();
+            stream_->close();
+            stream_.reset();
+        }
+    }
+
+    oboe::DataCallbackResult onAudioReady(
+        oboe::AudioStream *oboeStream,
+        void *audioData,
+        int32_t numFrames
+    ) override {
+        float *outputBuffer = static_cast<float *>(audioData);
+        std::memset(outputBuffer, 0, sizeof(float) * numFrames * 2);
+        return oboe::DataCallbackResult::Continue;
+    }
+
+private:
+    Engine* engine_ = nullptr;
+    std::shared_ptr<oboe::AudioStream> stream_;
+};
+
+static std::mutex g_oboe_mutex;
+static std::unique_ptr<OboeAudioEngine> g_oboe_engine;
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeInitOboe(JNIEnv*, jobject, jlong h) {
+    std::lock_guard<std::mutex> lock(g_oboe_mutex);
+    Engine* e = engine(h);
+    if (!e) return JNI_FALSE;
+    g_oboe_engine = std::make_unique<OboeAudioEngine>(e);
+    return g_oboe_engine->start() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativePauseOboe(JNIEnv*, jobject) {
+    std::lock_guard<std::mutex> lock(g_oboe_mutex);
+    if (g_oboe_engine) g_oboe_engine->pause();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeStopOboe(JNIEnv*, jobject) {
+    std::lock_guard<std::mutex> lock(g_oboe_mutex);
+    if (g_oboe_engine) g_oboe_engine->stop();
 }

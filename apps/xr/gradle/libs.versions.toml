@@ -10,6 +10,7 @@ coroutines = "1.11.0"
 serialization = "1.12.0"
 spatialsdk = "0.15.0"
 metavros = "207"
+oboe = "1.11.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -33,6 +34,7 @@ meta-spatial-sdk-mruk = { module = "com.meta.spatial:meta-spatial-sdk-mruk", ver
 meta-spatial-sdk-isdk = { module = "com.meta.spatial:meta-spatial-sdk-isdk", version.ref = "spatialsdk" }
 # Build-time only: the runtime implementation lives in Horizon OS.
 metavr-os-jsdk = { module = "com.meta.metavr:metavr-os-jsdk", version.ref = "metavros" }
+oboe = { module = "com.google.oboe:oboe", version.ref = "oboe" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

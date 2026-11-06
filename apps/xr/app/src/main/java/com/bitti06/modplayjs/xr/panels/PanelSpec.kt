@@ -107,19 +107,15 @@ val PANELS: List<PanelSpec> =
             resolutionScale = 0.9f,
             pose = at(-2.0f, 0.52f, 1.70f),
         ) { PatternPanel() },
-        // The details shelf sits below now playing, not behind it: at 2.2 m it
-        // is wider than the transport, and at eye height it covered the main
-        // panel completely.
+        // The details shelf sits below now playing, elevated to 0.58 m so it is
+        // comfortable to read without overlapping the main panel.
         PanelSpec(
             id = PanelId.DETAILS,
             androidId = R.id.panel_details,
             width = 2.2f,
             height = 0.75f,
             transparent = true,
-            // 0.75 m tall so its top edge stays below the transport's bottom
-            // edge in the view: at 0.95 m and this distance the shelf slid
-            // behind now playing and lost its header.
-            pose = at(0f, 0.40f, 1.95f),
+            pose = at(0f, 0.58f, 1.95f),
         ) { DetailsPanel() },
         PanelSpec(
             id = PanelId.DEBUG,
