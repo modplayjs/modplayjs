@@ -62,6 +62,32 @@ fun onPath(name: String): Boolean =
 
 val engineBundle = file("src/main/assets/engine/engine.js")
 
+/**
+ * The modular asset tree. Each monorepo package becomes its own ES module
+ * under assets/modules, so the V8 loader can pull in one format at a time
+ * instead of shipping one bundle that contains every decoder.
+ */
+val modulesDir = file("src/main/assets/modules")
+
+val buildModules =
+    tasks.register<Exec>("buildModules") {
+        group = "build"
+        description = "Partitions the monorepo packages into assets/modules"
+        workingDir = rootProject.projectDir
+        commandLine(nodeCommand, "scripts/build-modules.mjs")
+        inputs.files(
+            fileTree(rootProject.file("../../packages")) { include("*/src/**") },
+            file("scripts/build-modules.mjs"),
+        ).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("moduleSources")
+        outputs.dir(modulesDir)
+        onlyIf("node on PATH") { onPath(nodeCommand) }
+        doFirst {
+            if (!onPath(nodeCommand)) {
+                logger.warn("node not found: keeping the existing assets/modules (may be stale)")
+            }
+        }
+    }
+
 val buildEngine =
     tasks.register<Exec>("buildEngine") {
         group = "build"
@@ -81,7 +107,7 @@ val buildEngine =
         }
     }
 
-tasks.named("preBuild").configure { dependsOn(buildEngine) }
+tasks.named("preBuild").configure { dependsOn(buildEngine, buildModules) }
 
 // V8 prebuilt: fetch it when missing, then verify. Fetching happens before
 // CMake configures, so a build that downloads V8 reports that it must run

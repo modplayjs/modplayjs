@@ -1,0 +1,354 @@
+{
+  "generated": "2026-11-06T19:04:41.719Z",
+  "layout": "modules/<name>/index.js",
+  "always": [
+    "modplayjs-core",
+    "modplayjs-effects-shared",
+    "modplayjs-dsp-softmixer",
+    "modplayjs-dsp-paula",
+    "modplayjs-out-android"
+  ],
+  "packages": {
+    "modplayjs-core": {
+      "specifier": "@modplayjs/core",
+      "asset": "modplayjs-core/index.js",
+      "bytes": 250222,
+      "imports": []
+    },
+    "modplayjs-dsp-paula": {
+      "specifier": "@modplayjs/dsp-paula",
+      "asset": "modplayjs-dsp-paula/index.js",
+      "bytes": 4801,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-dsp-softmixer": {
+      "specifier": "@modplayjs/dsp-softmixer",
+      "asset": "modplayjs-dsp-softmixer/index.js",
+      "bytes": 97217,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-effects-shared": {
+      "specifier": "@modplayjs/effects-shared",
+      "asset": "modplayjs-effects-shared/index.js",
+      "bytes": 79,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-fmt-669": {
+      "specifier": "@modplayjs/fmt-669",
+      "asset": "modplayjs-fmt-669/index.js",
+      "bytes": 6980,
+      "imports": [
+        "@modplayjs/core",
+        "@modplayjs/fmt-mod"
+      ]
+    },
+    "modplayjs-fmt-asylum": {
+      "specifier": "@modplayjs/fmt-asylum",
+      "asset": "modplayjs-fmt-asylum/index.js",
+      "bytes": 5828,
+      "imports": [
+        "@modplayjs/core",
+        "@modplayjs/fmt-mod"
+      ]
+    },
+    "modplayjs-fmt-digi": {
+      "specifier": "@modplayjs/fmt-digi",
+      "asset": "modplayjs-fmt-digi/index.js",
+      "bytes": 7104,
+      "imports": [
+        "@modplayjs/core",
+        "@modplayjs/fmt-mod"
+      ]
+    },
+    "modplayjs-fmt-fc": {
+      "specifier": "@modplayjs/fmt-fc",
+      "asset": "modplayjs-fmt-fc/index.js",
+      "bytes": 83767,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-fmt-ice": {
+      "specifier": "@modplayjs/fmt-ice",
+      "asset": "modplayjs-fmt-ice/index.js",
+      "bytes": 5669,
+      "imports": [
+        "@modplayjs/core",
+        "@modplayjs/fmt-mod"
+      ]
+    },
+    "modplayjs-fmt-it": {
+      "specifier": "@modplayjs/fmt-it",
+      "asset": "modplayjs-fmt-it/index.js",
+      "bytes": 47088,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-fmt-med": {
+      "specifier": "@modplayjs/fmt-med",
+      "asset": "modplayjs-fmt-med/index.js",
+      "bytes": 87300,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-fmt-mo3": {
+      "specifier": "@modplayjs/fmt-mo3",
+      "asset": "modplayjs-fmt-mo3/index.js",
+      "bytes": 103916,
+      "imports": [
+        "@modplayjs/core",
+        "@modplayjs/fmt-mod",
+        "@modplayjs/stb-vorbis"
+      ]
+    },
+    "modplayjs-fmt-mod": {
+      "specifier": "@modplayjs/fmt-mod",
+      "asset": "modplayjs-fmt-mod/index.js",
+      "bytes": 61947,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-fmt-mtm": {
+      "specifier": "@modplayjs/fmt-mtm",
+      "asset": "modplayjs-fmt-mtm/index.js",
+      "bytes": 9081,
+      "imports": [
+        "@modplayjs/core",
+        "@modplayjs/fmt-mod"
+      ]
+    },
+    "modplayjs-fmt-prowizard": {
+      "specifier": "@modplayjs/fmt-prowizard",
+      "asset": "modplayjs-fmt-prowizard/index.js",
+      "bytes": 99106,
+      "imports": [
+        "@modplayjs/core",
+        "@modplayjs/fmt-mod"
+      ]
+    },
+    "modplayjs-fmt-s3m": {
+      "specifier": "@modplayjs/fmt-s3m",
+      "asset": "modplayjs-fmt-s3m/index.js",
+      "bytes": 25004,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-fmt-sfx": {
+      "specifier": "@modplayjs/fmt-sfx",
+      "asset": "modplayjs-fmt-sfx/index.js",
+      "bytes": 7245,
+      "imports": [
+        "@modplayjs/core",
+        "@modplayjs/fmt-mod"
+      ]
+    },
+    "modplayjs-fmt-sid": {
+      "specifier": "@modplayjs/fmt-sid",
+      "asset": "modplayjs-fmt-sid/index.js",
+      "bytes": 276645,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-fmt-st": {
+      "specifier": "@modplayjs/fmt-st",
+      "asset": "modplayjs-fmt-st/index.js",
+      "bytes": 10984,
+      "imports": [
+        "@modplayjs/core",
+        "@modplayjs/fmt-mod"
+      ]
+    },
+    "modplayjs-fmt-stm": {
+      "specifier": "@modplayjs/fmt-stm",
+      "asset": "modplayjs-fmt-stm/index.js",
+      "bytes": 11887,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-fmt-xm": {
+      "specifier": "@modplayjs/fmt-xm",
+      "asset": "modplayjs-fmt-xm/index.js",
+      "bytes": 34037,
+      "imports": [
+        "@modplayjs/core",
+        "@modplayjs/fmt-it",
+        "@modplayjs/stb-vorbis"
+      ]
+    },
+    "modplayjs-out-android": {
+      "specifier": "@modplayjs/out-android",
+      "asset": "modplayjs-out-android/index.js",
+      "bytes": 3336,
+      "imports": []
+    },
+    "modplayjs-out-pcm": {
+      "specifier": "@modplayjs/out-pcm",
+      "asset": "modplayjs-out-pcm/index.js",
+      "bytes": 2814,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-out-webaudio": {
+      "specifier": "@modplayjs/out-webaudio",
+      "asset": "modplayjs-out-webaudio/index.js",
+      "bytes": 13980,
+      "imports": [
+        "@modplayjs/core"
+      ]
+    },
+    "modplayjs-playhead": {
+      "specifier": "@modplayjs/playhead",
+      "asset": "modplayjs-playhead/index.js",
+      "bytes": 5631,
+      "imports": []
+    },
+    "modplayjs-stb-vorbis": {
+      "specifier": "@modplayjs/stb-vorbis",
+      "asset": "modplayjs-stb-vorbis/index.js",
+      "bytes": 61452,
+      "imports": []
+    },
+    "modplayjs-stream-audio": {
+      "specifier": "@modplayjs/stream-audio",
+      "asset": "modplayjs-stream-audio/index.js",
+      "bytes": 13091,
+      "imports": [
+        "@modplayjs/fmt-mo3",
+        "@modplayjs/stb-vorbis"
+      ]
+    }
+  },
+  "formats": {
+    "669": {
+      "package": "modplayjs-fmt-669",
+      "install": "install/669.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "mod": {
+      "package": "modplayjs-fmt-mod",
+      "install": "install/mod.js",
+      "exports": [
+        "plugin",
+        "hmnPlugin",
+        "fltPlugin"
+      ]
+    },
+    "s3m": {
+      "package": "modplayjs-fmt-s3m",
+      "install": "install/s3m.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "xm": {
+      "package": "modplayjs-fmt-xm",
+      "install": "install/xm.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "it": {
+      "package": "modplayjs-fmt-it",
+      "install": "install/it.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "mtm": {
+      "package": "modplayjs-fmt-mtm",
+      "install": "install/mtm.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "stm": {
+      "package": "modplayjs-fmt-stm",
+      "install": "install/stm.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "sfx": {
+      "package": "modplayjs-fmt-sfx",
+      "install": "install/sfx.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "digi": {
+      "package": "modplayjs-fmt-digi",
+      "install": "install/digi.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "asylum": {
+      "package": "modplayjs-fmt-asylum",
+      "install": "install/asylum.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "ice": {
+      "package": "modplayjs-fmt-ice",
+      "install": "install/ice.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "med": {
+      "package": "modplayjs-fmt-med",
+      "install": "install/med.js",
+      "exports": [
+        "plugin",
+        "mmd3Plugin",
+        "med2Plugin",
+        "med3Plugin",
+        "med4Plugin"
+      ]
+    },
+    "st": {
+      "package": "modplayjs-fmt-st",
+      "install": "install/st.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "sid": {
+      "package": "modplayjs-fmt-sid",
+      "install": "install/sid.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "fc": {
+      "package": "modplayjs-fmt-fc",
+      "install": "install/fc.js",
+      "exports": [
+        "plugin"
+      ]
+    },
+    "prowizard": {
+      "package": "modplayjs-fmt-prowizard",
+      "install": "install/prowizard.js",
+      "exports": [
+        "pwPlugin"
+      ]
+    }
+  }
+}
