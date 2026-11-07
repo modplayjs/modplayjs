@@ -210,9 +210,9 @@ class PanelPlacement(
         if (!prefs.contains(key)) return null
         return Pose(
             Vector3(
-                prefs.getFloat(key, 0f).coerceIn(-3.5f, 3.5f),
-                prefs.getFloat("y${id.name}", 1.60f).coerceIn(0.4f, 2.5f),
-                prefs.getFloat("z${id.name}", 1.75f).coerceIn(0.8f, 3.5f),
+                prefs.getFloat(key, 0f).coerceIn(-5.0f, 5.0f),
+                prefs.getFloat("y${id.name}", 1.60f).coerceIn(0.1f, 3.5f),
+                prefs.getFloat("z${id.name}", 1.75f).coerceIn(0.2f, 8.0f),
             ),
             Quaternion(
                 w = prefs.getFloat("qw${id.name}", 1f),
@@ -286,8 +286,8 @@ class PanelPlacement(
             Grabbable(
                 enabled = true,
                 type = GrabbableType.PIVOT_Y,
-                minHeight = 0.3f,
-                maxHeight = 3.0f,
+                minHeight = 0.1f,
+                maxHeight = 4.0f,
             ),
         )
     }

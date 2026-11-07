@@ -1204,29 +1204,14 @@ class XrPlayer(
      */
     private fun applyPositions() {
         placeBuses()
-        val channels = spatialInfo.channels
-        val markerPositions =
-            List(channels) { i ->
-                markerPositionFor(spatialInfo.azimuths.getOrElse(i) { 0f }, i)
-            }
-        onMain {
-            for (i in markerPositions.indices) {
-                val pos = markerPositions[i]
-                markers.getOrNull(i)?.setComponent(Transform(Pose(pos)))
-                markerLabels.getOrNull(i)?.setComponent(Transform(Pose(Vector3(pos.x, pos.y + 0.14f, pos.z))))
-            }
-        }
         pushSources()
     }
 
     /**
      * Hand the mixer one parameter row per channel.
      *
-     * Azimuth comes from the layout mapping (panned, front180, full360, lrlr,
-     * lrrl all end up as an angle in -180..180), distance from the listener to
-     * the channel's ring position, occlusion from the panel boxes the activity
-     * publishes. All five values are already computed here; the native side
-     * only turns them into gains, filters and bus taps.
+     * Reads live marker transforms if spheres have been grabbed/moved in VR space,
+     * or falls back to dome geometry. Sends 3D distance, azimuth, and occlusion.
      */
     private fun pushSources() {
         val eng = engine ?: return
@@ -1238,19 +1223,37 @@ class XrPlayer(
         val boxes = occluders
         val params = sourceParams
         for (i in 0 until channels) {
-            val azimuth = spatialInfo.azimuths.getOrElse(i) { 0f }
-            val angles = channelSpatialAngles(i, channels)
-            val position = domePoint(azimuth, angles.elevationDeg, ringRadius, ringCenterX, ringCenterZ, ringY)
+            val markerEntity = markers.getOrNull(i)
+            val markerTransform = markerEntity?.let { runCatching { it.getComponent<Transform>() }.getOrNull() }
+            val position = if (markerTransform != null) {
+                val t = markerTransform.transform.t
+                runCatching { markerTransform.recycle() }
+                Vector3(t.x, t.y + MARKER_DROP, t.z)
+            } else {
+                val azimuth = spatialInfo.azimuths.getOrElse(i) { 0f }
+                val angles = channelSpatialAngles(i, channels)
+                domePoint(azimuth, angles.elevationDeg, ringRadius, ringCenterX, ringCenterZ, ringY)
+            }
+
             val dx = position.x - listener.x
             val dy = position.y - listener.y
             val dz = position.z - listener.z
             val distance = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
+
+            val rawAz = Math.toDegrees(kotlin.math.atan2(dx.toDouble(), dz.toDouble())).toFloat()
+            val azimuth = rawAz - Math.toDegrees(ringYawRad.toDouble()).toFloat()
+
             val base = i * 5
             params[base] = azimuth
             params[base + 1] = distance
             params[base + 2] = 1f
             params[base + 3] = spreadDeg
             params[base + 4] = occlusion(listener, position, boxes)
+
+            val labelEntity = markerLabels.getOrNull(i)
+            if (labelEntity != null && markerTransform != null) {
+                labelEntity.setComponent(Transform(Pose(Vector3(position.x, position.y + 0.02f, position.z))))
+            }
         }
         eng.setSpatialSources(params, channels)
     }
