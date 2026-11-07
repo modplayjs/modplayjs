@@ -1,5 +1,6 @@
 package com.bitti06.modplayjs.media
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
@@ -96,6 +97,10 @@ class StickyMediaNotificationProvider(
      * memory per session, and Media3 stops posting while the player is idle, so
      * the app has to hand the notification back itself.
      */
+    // Media-session notifications are exempt from the POST_NOTIFICATIONS
+    // runtime permission, which lint cannot see:
+    // https://developer.android.com/develop/ui/views/notifications/notification-permission#exemptions
+    @SuppressLint("MissingPermission")
     fun repost() {
         val notification = lastBuilt ?: return
         runCatching {

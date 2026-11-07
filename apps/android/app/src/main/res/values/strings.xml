@@ -406,4 +406,10 @@
     <string name="spatial_head_tracking_none_hint">The system reports no tracker. Either the headset has none, or head tracking for it is switched off in Bluetooth settings — the platform does not tell the two apart.</string>
     <string name="spatial_refresh">Check again</string>
     <string name="audio_stalls">Silent-sink recoveries</string>
+    <string name="diag_audio_focus">Audio focus</string>
+    <string name="diag_foreground_service">Playback foreground service</string>
+    <string name="diag_state_held">held</string>
+    <string name="diag_state_not_held">not held</string>
+    <string name="diag_state_running">running</string>
+    <string name="diag_state_not_running">not running</string>
 </resources>

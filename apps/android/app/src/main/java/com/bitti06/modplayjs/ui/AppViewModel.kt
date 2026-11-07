@@ -76,6 +76,8 @@ class AppViewModel(
     override val underruns: Int get() = session.underruns
 
     override val stalls: Int get() = session.stalls
+    override val audioFocusGranted: Boolean get() = session.audioFocusGranted
+    override val foregroundServiceActive: Boolean get() = session.foregroundServiceActive
     override val sampleRate: Int get() = session.sampleRate
     override val audioSessionId: Int get() = session.audioSessionId
     override val audioInfo: AudioOutputInfo get() = session.audioInfo

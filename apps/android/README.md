@@ -133,6 +133,23 @@ debug APK, and verifies 16 KB ELF segment alignment.
   a dead object. What still ends playback, by design: swiping the app out of
   recents, an app update, and the system reclaiming the process under real
   memory pressure.
+- Audio focus is requested before the first frame is written, with delayed gain
+  accepted (a call locks focus instead of refusing it) and pause-on-duck off, so
+  a notification sound ducks the music through the system's automatic ducking
+  and no callback is involved. A lost focus pauses; a regained one resumes only
+  if it was playing when it was interrupted. The engine may not start output on
+  its own: `PlaybackSession.audioFocusHeld` is a gate the service installs, so
+  the `AudioTrack` stays paused until focus is granted, which is also what
+  Android 17 checks before it lets a process be audible.
+- One `MediaSession` lives for the whole service lifetime. Rebuilding it per
+  track (the old way to bring a swiped-away card back) makes Media3 remove the
+  last session, which cancels the notification and stops the foreground
+  service; the next track then re-enters the foreground from the background,
+  which Android 12+ may refuse and which on Android 17 yields a foreground
+  service without while-in-use capability. Background audio hardening then
+  silences `AudioTrack.write` with no error, no underrun and no dead object.
+  The card is restored by the provider instead, which does not touch the
+  session.
 - The header opens a realtime pattern view: rows x channels of tracker text
   ("C-4 01 40 A0F"), the playing row highlighted and followed, columns scrolling
   sideways. The engine answers it on demand; the snapshot speeds up to 16 Hz
@@ -150,8 +167,9 @@ debug APK, and verifies 16 KB ELF segment alignment.
   is marked ongoing while playing (StickyMediaNotificationProvider) so it cannot
   be swiped away mid-track.
 - Diagnostics screen reports the engine, the audio path (buffer frames and
-  time, framework minimum, play state, device burst, effects panel) and the
-  capabilities the engine reports for the loaded track.
+  time, framework minimum, play state, device burst, effects panel), whether
+  audio focus is held and whether the playback foreground service is running,
+  and the capabilities the engine reports for the loaded track.
 - UI in English and German, chosen in Settings → Language; the same list is
   declared in `res/xml/locales_config.xml` for Android's per-app language
   settings.

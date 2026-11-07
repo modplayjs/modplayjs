@@ -64,6 +64,12 @@ interface UiActions {
     /** Recoveries from a sink that stopped consuming. */
     val stalls: Int get() = 0
 
+    /** Whether the service holds audio focus right now. */
+    val audioFocusGranted: Boolean get() = false
+
+    /** Whether the mediaPlayback foreground service is running. */
+    val foregroundServiceActive: Boolean get() = false
+
     val sampleRate: Int get() = 48_000
 
     val audioSessionId: Int get() = 0

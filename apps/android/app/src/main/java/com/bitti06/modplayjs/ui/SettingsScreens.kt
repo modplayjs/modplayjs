@@ -769,6 +769,21 @@ fun DiagnosticsScreen(
         // was playing. Noticing that here is how "no sound but the bar moves"
         // stops being invisible.
         InfoRow(stringResource(R.string.audio_stalls), actions.stalls.toString())
+        // Android 17 refuses audio focus, and silences output, unless the app is
+        // visible or running a foreground service with while-in-use capability.
+        // Both are invisible from the engine, so they are reported here.
+        InfoRow(
+            stringResource(R.string.diag_audio_focus),
+            stringResource(
+                if (actions.audioFocusGranted) R.string.diag_state_held else R.string.diag_state_not_held,
+            ),
+        )
+        InfoRow(
+            stringResource(R.string.diag_foreground_service),
+            stringResource(
+                if (actions.foregroundServiceActive) R.string.diag_state_running else R.string.diag_state_not_running,
+            ),
+        )
 
         // What the samples actually travel through, from the engine's float32
         // ring to the AudioTrack the platform mixes.

@@ -109,6 +109,24 @@ class PlaybackSession(
 
     @Volatile private var playing = false
 
+    /**
+     * Asked before any output starts. The service owns audio focus; the engine
+     * is not allowed to decide on its own that it may be audible. Null means
+     * no service has installed a gate yet (nothing is playing), which is the
+     * same as "allowed" - there is no output at that point anyway.
+     */
+    @Volatile var audioFocusHeld: (() -> Boolean)? = null
+
+    /**
+     * What the service reports about the two conditions Android 17 checks
+     * before it lets a process be audible: audio focus, and a mediaPlayback
+     * foreground service with while-in-use capability. Written by the service,
+     * read by the diagnostics screen - silence caused by either is otherwise
+     * indistinguishable from silence caused by the engine.
+     */
+    @Volatile var audioFocusGranted = false
+    @Volatile var foregroundServiceActive = false
+
     @Volatile private var paused = false
 
     @Volatile private var advancing = AtomicBoolean(false)
@@ -128,6 +146,12 @@ class PlaybackSession(
     private val awaitingOutput = MutableStateFlow(0)
     val awaitingStart: StateFlow<Int> = awaitingOutput.asStateFlow()
     private val outputPending = AtomicBoolean(false)
+
+    /**
+     * Set while a start is being held back for audio focus, so the reason is
+     * logged once instead of on every snapshot (the service retries 4x/s).
+     */
+    private val waitingForFocus = AtomicBoolean(false)
 
     val v8Available: Boolean get() = engine?.available == true
     val v8Error: String? get() = engine?.initError
@@ -310,15 +334,29 @@ class PlaybackSession(
      * loaded track. Safe to call when nothing is pending.
      */
     fun startOutputAfterUi() {
+        if (!outputPending.get()) return
+        // Focus is locked (a call, an exclusive app) or was refused. Keep the
+        // start pending so the focus-gain callback finishes it; starting anyway
+        // gets this process muted by the system for the whole call.
+        if (!hasFocus()) {
+            if (waitingForFocus.compareAndSet(false, true)) {
+                Log.i(TAG, "output held back until audio focus is granted")
+            }
+            return
+        }
         if (!outputPending.compareAndSet(true, false)) return
         scope.launch {
             if (!playing || paused) return@launch
             primeOutput()
             if (!playing || paused) return@launch
             audio.resume()
+            waitingForFocus.set(false)
             Log.i(TAG, "output started")
         }
     }
+
+    /** Whether the service says this process may be audible. */
+    private fun hasFocus(): Boolean = audioFocusHeld?.invoke() ?: true
 
     private fun cancelPendingOutput() {
         outputPending.set(false)
@@ -341,9 +379,20 @@ class PlaybackSession(
             if (paused || !playing) primeOutput()
             // A pause or stop arrived while priming; leave audio alone.
             if (transportGeneration.get() != generation) return@launch
+            // The intent is "playing" from here on, whether or not output may
+            // start yet: the UI and the service both read this state, and a
+            // focus retry has to see a pending start to finish it.
             paused = false
             playing = true
+            if (!hasFocus()) {
+                outputPending.set(true)
+                if (waitingForFocus.compareAndSet(false, true)) {
+                    Log.i(TAG, "play held back until audio focus is granted")
+                }
+                return@launch
+            }
             audio.resume()
+            waitingForFocus.set(false)
         }
     }
 

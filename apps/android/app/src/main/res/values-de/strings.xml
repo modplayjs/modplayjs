@@ -393,4 +393,10 @@
     <string name="spatial_head_tracking_none_hint">Das System meldet keinen Tracker. Entweder hat das Headset keinen, oder Kopf-Tracking ist dafür in den Bluetooth-Einstellungen ausgeschaltet — die Plattform unterscheidet das nicht.</string>
     <string name="spatial_refresh">Erneut prüfen</string>
     <string name="audio_stalls">Stille Ausgabe, neu geöffnet</string>
+    <string name="diag_audio_focus">Audio-Fokus</string>
+    <string name="diag_foreground_service">Wiedergabe-Vordergrunddienst</string>
+    <string name="diag_state_held">gehalten</string>
+    <string name="diag_state_not_held">nicht gehalten</string>
+    <string name="diag_state_running">läuft</string>
+    <string name="diag_state_not_running">läuft nicht</string>
 </resources>
