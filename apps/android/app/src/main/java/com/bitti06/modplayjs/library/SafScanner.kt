@@ -84,6 +84,49 @@ class SafScanner(
 
     fun canWrite(uri: Uri): Boolean = resolver.persistedUriPermissions.any { it.uri == uri && it.isWritePermission }
 
+    /**
+     * One document's metadata, for files picked with ACTION_OPEN_DOCUMENT.
+     *
+     * A picked file has no tree to walk, so the row cannot come from [scan];
+     * this is the single-row equivalent. Returns null when the grant is gone
+     * or the document no longer exists.
+     */
+    fun documentInfo(uri: Uri): DocumentEntry? =
+        runCatching {
+            resolver.query(
+                uri,
+                arrayOf(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE,
+                    DocumentsContract.Document.COLUMN_SIZE,
+                    DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+                ),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                if (!cursor.moveToFirst()) return@use null
+                val id = cursor.getString(0) ?: return@use null
+                val name = cursor.getString(1) ?: return@use null
+                if (!isSupported(name)) return@use null
+                DocumentEntry(
+                    documentId = id,
+                    documentUri = uri.toString(),
+                    name = name,
+                    mime = cursor.getString(2) ?: "application/octet-stream",
+                    size = cursor.getLong(3),
+                    lastModified = cursor.getLong(4),
+                    // A picked file sits at the top of its own "folder".
+                    relativePath = name,
+                )
+            }
+        }.getOrNull()
+
+    /** True while the app still holds a read grant for [uri]. */
+    fun hasReadGrant(uri: Uri): Boolean =
+        resolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+
     fun delete(documentUri: Uri): Boolean = runCatching { DocumentsContract.deleteDocument(resolver, documentUri) }.getOrDefault(false)
 
     companion object {

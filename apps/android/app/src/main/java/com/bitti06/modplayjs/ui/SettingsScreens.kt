@@ -556,6 +556,7 @@ fun LibrarySettingsScreen(
     ignoredCount: Int,
     scanProgress: ScanProgress?,
     onAddFolder: () -> Unit,
+    onAddFile: () -> Unit,
     onOpenIgnored: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -565,6 +566,11 @@ fun LibrarySettingsScreen(
                 Icon(AppIcons.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.common_add_folder))
+            }
+            OutlinedButton(onClick = onAddFile, modifier = Modifier.weight(1f)) {
+                Icon(AppIcons.MusicNote, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.common_add_file))
             }
             OutlinedButton(onClick = { actions.rescan() }) {
                 Icon(AppIcons.Refresh, contentDescription = null)
@@ -921,6 +927,7 @@ private fun LibrarySettingsPreview() {
             ignoredCount = 2,
             scanProgress = ScanProgress("Modules", 1, 2, 640, 1280),
             onAddFolder = {},
+            onAddFile = {},
             onOpenIgnored = {},
             onBack = {},
         )

@@ -123,6 +123,14 @@ private fun AppRoot(vm: AppViewModel) {
             if (uri != null) vm.addFolder(uri)
         }
 
+    // Single documents, not a tree: a file has no folder to walk, so the
+    // repository gives each one its own row. MIME filter is the SAF hint only;
+    // SafScanner decides by extension, which is what the engine can open.
+    val filePicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isNotEmpty()) vm.addFiles(uris)
+        }
+
     // Never stack the same destination twice: a double tap on a settings
     // button would push two identical keys, and NavDisplay resolves scenes by
     // key, so popping one would leave the same screen on top.
@@ -180,6 +188,7 @@ private fun AppRoot(vm: AppViewModel) {
                     ignoredCount = ignored.size,
                     scanProgress = scanProgress,
                     onAddFolder = { folderPicker.launch(null) },
+                    onAddFile = { filePicker.launch(arrayOf("*/*")) },
                     onOpenIgnored = { navigate(IgnoredKey) },
                     onBack = back,
                 )
@@ -309,6 +318,7 @@ private fun AppRoot(vm: AppViewModel) {
                             onPlay = playTrack,
                             onPlayList = playList,
                             onAddFolder = { folderPicker.launch(null) },
+                            onAddFile = { filePicker.launch(arrayOf("*/*")) },
                             onOpenSettings = { navigate(SettingsKey) },
                         )
 
@@ -626,6 +636,7 @@ private fun FolderSheet(
         playingTrackId = playingTrackId,
         rootId = rootId,
         path = path,
+        onAddFile = {},
         onNavigate = { root, next ->
             rootId = root
             path = next

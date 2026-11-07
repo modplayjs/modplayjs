@@ -39,6 +39,13 @@ class Library(private val context: Context) {
 
     private val prefs = context.getSharedPreferences("library", Context.MODE_PRIVATE)
 
+    /**
+     * Shown for a tree whose grant is gone. A constant, not a translated
+     * string: the folder name is stored data, not UI copy, and a locale change
+     * must not rename a folder that is still there.
+     */
+    private val unavailableLabel = "unavailable"
+
     fun roots(): List<File> =
         listOfNotNull(
             File(context.getExternalFilesDir(null), "modules"),
@@ -172,13 +179,24 @@ class Library(private val context: Context) {
             onProgress?.invoke(out.size, name)
         }
 
-        for (root in roots()) {
+        // Both roots are called "modules" on disk. Without a label of their own,
+        // a "live" subfolder in each would collapse into one entry in the
+        // sidebar and the two sets of files would look like one folder.
+        for ((root, label) in roots().map { it to localRootLabel(it) }) {
             if (!root.isDirectory) continue
+            val base = root.toPath()
             root.walkTopDown()
                 .filter { it.isFile && !it.name.startsWith(".") && it.length() > 0 }
                 .forEach { file ->
-                    val relFolder = file.parentFile?.name ?: root.name
-                    add(Uri.fromFile(file), file.name, file.length(), relFolder)
+                    // The path relative to the root, not the immediate parent:
+                    // two subfolders both called "live" are still two folders,
+                    // and losing the parent chain made them collapse into one.
+                    val relative =
+                        runCatching { base.relativize(file.parentFile.toPath()).toString() }
+                            .getOrNull()
+                            .orEmpty()
+                    val folder = if (relative.isEmpty()) label else "$label/$relative"
+                    add(Uri.fromFile(file), file.name, file.length(), folder)
                 }
         }
 
@@ -192,12 +210,16 @@ class Library(private val context: Context) {
         for (treeUri in treeUris()) {
             val root = runCatching { DocumentFile.fromTreeUri(context, treeUri) }.getOrNull()
             if (root == null || !root.isDirectory) {
-                folders += FolderEntry(treeUri, "nicht verfügbar", 0)
+                folders += FolderEntry(treeUri, unavailableLabel, 0)
                 continue
             }
             val before = out.size
-            walk(root, root.name ?: "Ordner", 0, ::add)
-            folders += FolderEntry(treeUri, root.name ?: "Ordner", out.size - before)
+            // The tree's own name prefixes everything inside it: two trees that
+            // both contain a folder called "live" are still two folders, and the
+            // sidebar must not merge them.
+            val rootName = root.name ?: unavailableLabel
+            walk(root, rootName, 0, ::add)
+            folders += FolderEntry(treeUri, rootName, out.size - before)
         }
 
         return ScanResult(
@@ -216,14 +238,25 @@ class Library(private val context: Context) {
         if (depth > MAX_DEPTH) return
         for (child in dir.listFiles()) {
             if (child.isDirectory) {
-                val subName = child.name ?: folderName
-                val currentFolder = if (folderName.isNotBlank() && folderName != "Ordner") "$folderName/$subName" else subName
-                walk(child, currentFolder, depth + 1, add)
+                val subName = child.name ?: continue
+                walk(child, "$folderName/$subName", depth + 1, add)
             } else {
                 child.name?.let { add(child.uri, it, child.length(), folderName) }
             }
         }
     }
+
+    /**
+     * Distinguishes the two local roots, which share the folder name "modules".
+     * The external one survives an uninstall; the internal one is what a debug
+     * push targets. Which is which is what the user needs to see.
+     */
+    private fun localRootLabel(root: File): String =
+        if (root.absolutePath.startsWith(context.filesDir.absolutePath)) {
+            "internal"
+        } else {
+            "external"
+        }
 
     fun read(track: TrackFile): ByteArray {
         val uri = track.uri

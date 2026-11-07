@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapNotNull
@@ -94,8 +95,8 @@ class AppViewModel(
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val recent: StateFlow<List<TrackEntity>> =
-        allTracks
-            .map { list -> list.sortedByDescending { it.addedAt }.take(12) }
+        repo.recent
+            .map { list -> list.take(12) }
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -169,6 +170,16 @@ class AppViewModel(
                     if (queue.isNotEmpty()) playback.saveQueue(queue.map { it.id }, index)
                 }
         }
+        // "Recently played" is a play history, so it has to be written wherever
+        // the current item changes - not only when a tap started it. Auto
+        // advance, next/previous and a restored session all move the index
+        // without going through playList.
+        viewModelScope.launch {
+            session.queue
+                .combine(session.queueIndex) { queue, index -> queue.getOrNull(index) }
+                .distinctUntilChanged()
+                .collect { item -> item?.let { repo.markPlayed(it.id) } }
+        }
         viewModelScope.launch {
             var lastSaved = 0L
             session.snapshot.collect { snap ->
@@ -205,6 +216,11 @@ class AppViewModel(
 
     fun addFolder(uri: Uri) = viewModelScope.launch { runCatching { repo.addFolder(uri) } }
 
+    override fun addFiles(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        viewModelScope.launch { runCatching { repo.addFiles(uris) } }
+    }
+
     override fun rescan(folderId: String?) {
         viewModelScope.launch { runCatching { repo.rescan(folderId) } }
     }
@@ -229,7 +245,6 @@ class AppViewModel(
         session.setQueue(items.map { QueueItem(it.id, it.name, it.documentUri, it.format) }, start)
         PlaybackService.start(context)
         session.playIndex(start)
-        viewModelScope.launch { repo.markPlayed(items[start]) }
     }
 
     /** Pattern cells for an order position, for the pattern screen. */

@@ -27,6 +27,20 @@ interface LibraryDao {
     @Query("SELECT * FROM tracks WHERE ignoredAt IS NOT NULL ORDER BY ignoredAt DESC")
     fun ignoredTracks(): Flow<List<TrackEntity>>
 
+    /**
+     * Actually played, newest first.
+     *
+     * `visibleTracks()` is ordered by `addedAt`, which is when a file was
+     * indexed - a rescan of the same folder would reorder the "recent" list
+     * without a single track being played. `lastPlayed` is written on every
+     * start; this is the query that reads it.
+     */
+    @Query(
+        "SELECT * FROM tracks WHERE lastPlayed IS NOT NULL AND ignoredAt IS NULL " +
+            "ORDER BY lastPlayed DESC",
+    )
+    fun recentTracks(): Flow<List<TrackEntity>>
+
     @Query("SELECT * FROM tracks WHERE folderId = :folderId")
     suspend fun tracksInFolder(folderId: String): List<TrackEntity>
 

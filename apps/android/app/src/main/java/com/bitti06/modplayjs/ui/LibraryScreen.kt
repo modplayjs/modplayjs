@@ -72,6 +72,7 @@ private val SORT_LABELS =
         "size" to R.string.sort_size,
         "added" to R.string.sort_added,
         "modified" to R.string.sort_modified,
+        "folder" to R.string.sort_folder,
     )
 
 /** Folder status is stored as a key; only "ok" has a translation. */
@@ -135,6 +136,7 @@ fun LibraryScreen(
     onPlay: (TrackEntity) -> Unit,
     onPlayList: (List<TrackEntity>, Int) -> Unit,
     onAddFolder: () -> Unit,
+    onAddFile: () -> Unit,
     onOpenSettings: () -> Unit,
     /** Live rescan state; the banner sits under the search field. */
     scanProgress: ScanProgress? = null,
@@ -194,6 +196,9 @@ fun LibraryScreen(
             // A pushed folder view is for picking the next track, not for
             // adding folders or opening settings.
             if (onBack == null) {
+                IconButton(onClick = onAddFile) {
+                    Icon(AppIcons.MusicNote, contentDescription = stringResource(R.string.common_add_file))
+                }
                 IconButton(onClick = onAddFolder) {
                     Icon(AppIcons.CreateNewFolder, contentDescription = stringResource(R.string.common_add_folder))
                 }
@@ -270,6 +275,7 @@ fun LibraryScreen(
                     onOpen = { onNavigate(it, emptyList()) },
                     onAll = { onNavigate(ALL_ROOTS, emptyList()) },
                     onAddFolder = onAddFolder,
+                    onAddFile = onAddFile,
                     onFolderMenu = { folderMenu = it },
                 )
             filters.search.isNotBlank() ->
@@ -295,6 +301,7 @@ fun LibraryScreen(
                 onOpen = { onNavigate(it, emptyList()) },
                 onAll = { onNavigate(ALL_ROOTS, emptyList()) },
                 onAddFolder = onAddFolder,
+                onAddFile = onAddFile,
                 onFolderMenu = { folderMenu = it },
             )
             else -> Browser(
@@ -420,6 +427,7 @@ private fun RootList(
     onOpen: (String) -> Unit,
     onAll: () -> Unit,
     onAddFolder: () -> Unit,
+    onAddFile: () -> Unit,
     onFolderMenu: (FolderEntity) -> Unit,
 ) {
     // Counted once for every folder row instead of once per row.
@@ -923,6 +931,7 @@ private fun LibraryContentPreview(rootId: String?) {
         onPlay = {},
         onPlayList = { _, _ -> },
         onAddFolder = {},
+        onAddFile = {},
         onOpenSettings = {},
     )
 }

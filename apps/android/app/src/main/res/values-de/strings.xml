@@ -8,6 +8,8 @@
     <string name="common_reset">Zurücksetzen</string>
     <string name="common_rescan">Neu scannen</string>
     <string name="common_add_folder">Ordner hinzufügen</string>
+    <string name="common_add_file">Datei hinzufügen</string>
+    <string name="common_add_files">Dateien hinzufügen</string>
     <string name="common_browse_library">Bibliothek durchsuchen</string>
     <string name="common_missing">Fehlt</string>
     <string name="common_play">Abspielen</string>
@@ -46,8 +48,8 @@
     <string name="stat_favorites">Favoriten</string>
     <string name="home_empty_title">Keine Musik indexiert</string>
     <string name="home_empty_body">Wähle einen Ordner. Der Scanner indexiert Tracker-Module, SID-Tunes und Audiodateien, auch Unterordner.</string>
-    <string name="home_recent">Zuletzt hinzugefügt</string>
-    <string name="home_nothing_yet">Noch nichts</string>
+    <string name="home_recent">Zuletzt gespielt</string>
+    <string name="home_nothing_yet">Noch nichts gespielt</string>
     <string name="home_open_library">Bibliothek öffnen</string>
 
     <!-- Favorites -->
@@ -136,6 +138,7 @@
     <string name="sort_size">Größe</string>
     <string name="sort_added">Hinzugefügt</string>
     <string name="sort_modified">Geändert</string>
+    <string name="sort_folder">Ordner</string>
     <string name="filter_descending">Absteigend</string>
     <string name="cd_folder_options">Ordneroptionen</string>
     <string name="cd_rescan_folder">%1$s neu scannen</string>

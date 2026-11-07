@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-06T22:37:56.057Z",
+  "generated": "2026-11-07T14:17:51.591Z",
   "layout": "modules/<name>/index.js",
   "always": [
     "modplayjs-core",
@@ -465,8 +465,8 @@
   },
   "engine": {
     "asset": "engine-core/index.js",
-    "bytes": 23166,
-    "sha256": "2c801ef33c96a19a0bdaf918e1493ef437093514d90bd8799cdfcce76623857f",
+    "bytes": 23615,
+    "sha256": "9dd72720e04eb19c5ad9c2090a72a790fc928f149dc2028f2cd12ba72ed2fc1a",
     "version": "0.2.1",
     "imports": [
       "@modplayjs/core",

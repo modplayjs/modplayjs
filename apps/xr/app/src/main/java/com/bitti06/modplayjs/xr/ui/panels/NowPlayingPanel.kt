@@ -152,11 +152,21 @@ fun NowPlayingPanel() {
             MetaText(formatTime(playback.positionMs), color = PanelTokens.TextFaint)
         }
 
-        val totalDuration = if (playback.durationMs > 0) playback.durationMs else 180_000L
+        // No invented length. A module that reports no duration has none, and
+        // a slider scaled to a guessed 3 minutes lands the playhead in the wrong
+        // place: at 1/3 of a 40 s tune it seeks to 60 s, i.e. past the end. The
+        // engine says whether a seek is possible; when it is not, the slider is
+        // disabled and the position is still shown.
+        val knownDuration = playback.durationMs > 0
         var seekingProgress by remember { mutableFloatStateOf(-1f) }
-        val currentProgress = if (seekingProgress >= 0f) seekingProgress else {
-            (playback.positionMs.toFloat() / totalDuration).coerceIn(0f, 1f)
-        }
+        val currentProgress =
+            if (seekingProgress >= 0f) {
+                seekingProgress
+            } else if (knownDuration) {
+                (playback.positionMs.toFloat() / playback.durationMs).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -168,13 +178,13 @@ fun NowPlayingPanel() {
                 value = currentProgress,
                 onValueChange = { seekingProgress = it },
                 onValueChangeFinished = {
-                    if (seekingProgress >= 0f) {
-                        XrStore.seek((seekingProgress * totalDuration).toLong())
+                    if (knownDuration && seekingProgress >= 0f) {
+                        XrStore.seek((seekingProgress * playback.durationMs).toLong())
                     }
                     seekingProgress = -1f
                 },
                 valueRange = 0f..1f,
-                enabled = playback.loaded,
+                enabled = playback.loaded && playback.seekable && knownDuration,
                 colors = SliderDefaults.colors(
                     thumbColor = PanelTokens.AccentAlt,
                     activeTrackColor = PanelTokens.Accent,
@@ -182,7 +192,7 @@ fun NowPlayingPanel() {
                 ),
                 modifier = Modifier.weight(1f).height(26.dp),
             )
-            MetaText(formatTime(totalDuration), color = PanelTokens.TextDim)
+            MetaText(if (knownDuration) formatTime(playback.durationMs) else "—", color = PanelTokens.TextDim)
         }
 
         Row(

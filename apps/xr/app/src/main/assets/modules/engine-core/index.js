@@ -255,7 +255,13 @@ function buildCapabilities() {
     streamed: isStreamed(),
     sid,
     endless: sid || mod?.endless === true,
-    seekable: loaded && !(sid || mod?.endless === true),
+    // A tracker module seeks by time whether or not its length is known -
+    // `core.seekTime` does not need one, and some modules legitimately report
+    // zero. A streamed file is different: without a duration there is nothing
+    // to seek within, and `streamed.seek` lands nowhere. Only that case is
+    // excluded here, instead of letting the UI offer a slider that cannot move
+    // the playhead.
+    seekable: loaded && !(sid || mod?.endless === true) && (!isStreamed() || durationMs() > 0),
     patternView: tracker,
     mixer: tracker,
     mixerMode: tracker && mod.format === "mod" && mod.chn === 4,

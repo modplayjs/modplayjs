@@ -1,5 +1,6 @@
 package com.bitti06.modplayjs.ui
 
+import android.net.Uri
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.AudioOutputInfo
 import com.bitti06.modplayjs.library.FolderEntity
@@ -23,6 +24,8 @@ interface UiActions {
     fun rescan(folderId: String? = null) {}
 
     fun removeFolder(folder: FolderEntity) {}
+
+    fun addFiles(uris: List<Uri>) {}
 
     fun togglePlay() {}
 
