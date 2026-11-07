@@ -37,11 +37,59 @@ jobs:
       - name: Fetch prebuilt V8
         run: node apps/android/scripts/fetch-v8.mjs arm64-v8a
       - uses: gradle/actions/setup-gradle@v6
+
+      # A debug APK is signed with `~/.android/debug.keystore`, which Gradle
+      # creates per machine and per user. A fresh runner therefore produces a
+      # *different* debug identity on every run, and Android refuses to update an
+      # installed app whose signing certificate differs:
+      #
+      #   INSTALL_FAILED_UPDATE_INCOMPATIBLE: ... signatures do not match
+      #
+      # Restoring the maintainer's own keystore makes CI artifacts interchangeable
+      # with local builds - and with each other. It is a debug key, never the
+      # upload key: debug builds carry the .debug package suffix.
+      #
+      # Create the secret once, on the machine that builds locally:
+      #
+      #   base64 -w0 ~/.android/debug.keystore        # Linux/macOS
+      #   [Convert]::ToBase64String([IO.File]::ReadAllBytes(
+      #     "$env:USERPROFILE\.android\debug.keystore"))   # Windows PowerShell
+      #
+      # and store it as the repository secret ANDROID_DEBUG_KEYSTORE. Without it
+      # (a pull request from a fork, or an unconfigured repository) the build still
+      # runs, with a warning and an unshareable identity.
+      - name: Restore the debug keystore
+        env:
+          DEBUG_KEYSTORE: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+        run: |
+          set -eu
+          if [ -z "${DEBUG_KEYSTORE:-}" ]; then
+            echo "::warning::ANDROID_DEBUG_KEYSTORE is not set; this build gets a fresh debug key, so its APK cannot update an install made elsewhere"
+            exit 0
+          fi
+          mkdir -p "$HOME/.android"
+          printf '%s' "$DEBUG_KEYSTORE" | base64 -d > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
+          # Print the identity, so a wrong secret is visible in the log instead of
+          # turning into a mysterious install failure on someone's phone.
+          keytool -list -v -keystore "$HOME/.android/debug.keystore" \
+            -storepass android -alias androiddebugkey 2>/dev/null \
+            | grep -E "Owner:|SHA256:" || true
+
       - name: Assemble debug
         working-directory: apps/android
         run: |
           ./gradlew :app:assembleDebug \
             -Pv8Dir="$GITHUB_WORKSPACE/build/v8-prebuilt/android-arm64-v8a"
+
+      # The same identity the keystore step printed above. If these two do not
+      # match, the APK cannot update a local build and the reason is here.
+      - name: Show the APK signature
+        run: |
+          set -eu
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$apksigner" verify --print-certs apps/android/app/build/outputs/apk/debug/*.apk \
+            | grep -E "certificate (DN|SHA-256 digest)" || true
       - name: 16 KB check
         run: |
           python3 - <<'PY'
