@@ -70,6 +70,8 @@
     <string name="xr_layout_full360">360° Surround</string>
     <string name="xr_layout_lrlr">Amiga (L-R-L-R)</string>
     <string name="xr_layout_lrrl">Amiga (L-R-R-L)</string>
+    <string name="xr_dome_3d">3D-Kuppel Staffelung</string>
+    <string name="xr_grab_sources">Greifbare Audio-Kugeln</string>
     <string name="xr_pan">Panorama</string>
     <string name="xr_passthrough">Passthrough</string>
     <string name="xr_ring">Ring</string>

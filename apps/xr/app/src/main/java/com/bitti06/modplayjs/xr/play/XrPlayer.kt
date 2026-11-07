@@ -25,6 +25,8 @@ import com.meta.spatial.spatialaudio.AudioType
 import com.meta.spatial.spatialaudio.SoundfieldOrientation
 import com.meta.spatial.spatialaudio.SoundfieldOrientationType
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
+import com.meta.spatial.toolkit.Grabbable
+import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
 import com.meta.spatial.toolkit.MeshCollision
@@ -32,6 +34,7 @@ import com.meta.spatial.toolkit.Scale
 import com.meta.spatial.toolkit.Sphere
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.Visible
+import com.meta.spatial.core.ComponentBase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -985,8 +988,12 @@ class XrPlayer(
     }
 
     /** Ring point for a bus, from explicit geometry instead of live fields. */
-    private fun busPositionOf(index: Int, radius: Float, cx: Float, cz: Float, cy: Float): Vector3 =
-        ringPoint(-180f + 360f * index / BUS_COUNT, radius, cx, cz, cy)
+    private fun busPositionOf(index: Int, radius: Float, cx: Float, cz: Float, cy: Float): Vector3 {
+        val elevation = if (settings.view.dome3D) {
+            if (index % 2 == 1) 0.25f else -0.25f
+        } else 0f
+        return ringPoint(-180f + 360f * index / BUS_COUNT, radius, cx, cz, cy + elevation)
+    }
 
     /**
      * A point on the ring, optionally tilted about the listener's right axis.
@@ -1166,8 +1173,11 @@ class XrPlayer(
      * [refreshSpatial] returns early when no azimuth changed. The markers were
      * 12 cm above the sound for the rest of the session after every rebuild.
      */
-    private fun markerPositionFor(degrees: Float): Vector3 {
-        val p = ringPoint(degrees, ringRadius, ringCenterX, ringCenterZ, ringY)
+    private fun markerPositionFor(degrees: Float, index: Int = 0): Vector3 {
+        val elevation = if (settings.view.dome3D) {
+            if (index % 2 == 1) 0.25f else -0.25f
+        } else 0f
+        val p = ringPoint(degrees, ringRadius, ringCenterX, ringCenterZ, ringY + elevation)
         return Vector3(p.x, p.y - MARKER_DROP, p.z)
     }
 
@@ -1456,35 +1466,38 @@ class XrPlayer(
     private fun rebuildMarkers() {
         destroyMarkers()
         if (!debugVisible || outputMode != 2) return
-        // `spatialInfo` is refreshed before every caller runs (rebuildOutputs,
-        // refreshSpatial, setDebugSources), so it is the same list the audio
-        // objects were placed from. Re-reading the engine here used to cost a
-        // second command and could hand the markers a newer list than the
-        // objects had - two positions for the same channel.
         val channels = spatialInfo.channels
         if (channels <= 0) return
         val positions = List(channels) { i ->
-            markerPositionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
+            markerPositionFor(spatialInfo.azimuths.getOrElse(i) { 0f }, i)
         }
         val colors = List(channels) { channelColor(it) }
+        val grab = settings.view.grabSources
         mainHandler.post {
-            // The switch may have gone off again while this was queued.
             if (!debugVisible || outputMode != 2) return@post
             if (markerSizes.size < positions.size) {
                 markerSizes = FloatArray(positions.size) { -1f }
             }
             for (i in positions.indices) {
-                markers += Entity.create(
-                    Mesh("mesh://sphere".toUri(), MeshCollision.NoCollision),
-                    Sphere(MARKER_SPHERE_RADIUS),
-                    Transform(Pose(positions[i])),
-                    Scale(Vector3(MARKER_MIN, MARKER_MIN, MARKER_MIN)),
-                    Material().apply {
-                        baseColor = colors[i]
-                        unlit = true
-                    },
-                    Visible(true),
-                )
+                val components = ArrayList<ComponentBase>()
+                components += Mesh("mesh://sphere".toUri(), MeshCollision.NoCollision)
+                components += Sphere(MARKER_SPHERE_RADIUS)
+                components += Transform(Pose(positions[i]))
+                components += Scale(Vector3(MARKER_MIN, MARKER_MIN, MARKER_MIN))
+                components += Material().apply {
+                    baseColor = colors[i]
+                    unlit = true
+                }
+                components += Visible(true)
+                if (grab) {
+                    components += Grabbable(
+                        enabled = true,
+                        type = GrabbableType.PIVOT_Y,
+                        minHeight = 0.3f,
+                        maxHeight = 3.0f,
+                    )
+                }
+                markers += Entity.create(components)
             }
         }
     }

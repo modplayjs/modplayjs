@@ -157,6 +157,9 @@ fun SettingsPanel() {
                     ) { step ->
                         XrStore.setSpatialSpread(state.sourceSpread + if (step > 0) 5f else -5f)
                     }
+                    ToggleRow(stringResource(R.string.xr_dome_3d), settings.view.dome3D) {
+                        set { s -> s.copy(view = s.view.copy(dome3D = !s.view.dome3D)) }
+                    }
                     ToggleRow(stringResource(R.string.xr_free_layout), state.freeLayout) {
                         XrStore.setFreeLayout(!state.freeLayout)
                     }
@@ -170,6 +173,11 @@ fun SettingsPanel() {
                     }
                     ToggleRow(stringResource(R.string.xr_source_markers), playback.debugSources) {
                         XrStore.setDebugSources(!playback.debugSources)
+                    }
+                    if (playback.debugSources) {
+                        ToggleRow(stringResource(R.string.xr_grab_sources), settings.view.grabSources) {
+                            set { s -> s.copy(view = s.view.copy(grabSources = !s.view.grabSources)) }
+                        }
                     }
                     if (playback.azimuths.isNotEmpty()) {
                         MetaText(

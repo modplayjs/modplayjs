@@ -71,6 +71,8 @@ data class ViewSettings(
     val sampleLengths: Boolean = true,
     /** Show the trailing "L" for looping samples. */
     val sampleLoopFlags: Boolean = true,
+    val dome3D: Boolean = false,
+    val grabSources: Boolean = false,
     val patternColors: PatternColors = PatternColors(),
 )
 
