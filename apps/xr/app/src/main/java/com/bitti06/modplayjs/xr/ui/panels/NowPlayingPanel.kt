@@ -152,9 +152,10 @@ fun NowPlayingPanel() {
             MetaText(formatTime(playback.positionMs), color = PanelTokens.TextFaint)
         }
 
+        val totalDuration = if (playback.durationMs > 0) playback.durationMs else 180_000L
         var seekingProgress by remember { mutableFloatStateOf(-1f) }
         val currentProgress = if (seekingProgress >= 0f) seekingProgress else {
-            if (playback.durationMs > 0) (playback.positionMs.toFloat() / playback.durationMs).coerceIn(0f, 1f) else 0f
+            (playback.positionMs.toFloat() / totalDuration).coerceIn(0f, 1f)
         }
 
         Row(
@@ -167,13 +168,13 @@ fun NowPlayingPanel() {
                 value = currentProgress,
                 onValueChange = { seekingProgress = it },
                 onValueChangeFinished = {
-                    if (playback.durationMs > 0 && seekingProgress >= 0f) {
-                        XrStore.seek((seekingProgress * playback.durationMs).toLong())
+                    if (seekingProgress >= 0f) {
+                        XrStore.seek((seekingProgress * totalDuration).toLong())
                     }
                     seekingProgress = -1f
                 },
                 valueRange = 0f..1f,
-                enabled = playback.loaded && playback.durationMs > 0,
+                enabled = playback.loaded,
                 colors = SliderDefaults.colors(
                     thumbColor = PanelTokens.AccentAlt,
                     activeTrackColor = PanelTokens.Accent,
@@ -181,7 +182,7 @@ fun NowPlayingPanel() {
                 ),
                 modifier = Modifier.weight(1f).height(26.dp),
             )
-            MetaText(formatTime(playback.durationMs), color = PanelTokens.TextDim)
+            MetaText(formatTime(totalDuration), color = PanelTokens.TextDim)
         }
 
         Row(
