@@ -59,6 +59,7 @@ private enum class Sort(@get:StringRes val label: Int) {
 
 @Composable
 fun LibraryPanel() {
+    val state by XrStore.state.collectAsState()
     val version by XrStore.libraryVersion.collectAsState()
     val recentsVersion by XrStore.recentsVersion.collectAsState()
     val result by XrStore.libraryTracks.collectAsState()
@@ -118,76 +119,80 @@ fun LibraryPanel() {
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(PanelTokens.Radius))
                     .background(PanelTokens.SurfaceSunken)
-                    .padding(PanelTokens.GapSm)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(PanelTokens.GapXs),
+                    .padding(PanelTokens.GapSm),
             ) {
-                Text(
-                    stringResource(R.string.xr_library_heading).uppercase(),
-                    fontSize = PanelTokens.Meta,
-                    fontWeight = FontWeight.Bold,
-                    color = PanelTokens.TextFaint,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                )
-
-                NavItem(
-                    label = stringResource(R.string.xr_filter_all),
-                    icon = "📁",
-                    count = result.tracks.size,
-                    selected = filter == Filter.All && selectedFolder == null,
-                    onClick = {
-                        filter = Filter.All
-                        selectedFolder = null
-                    },
-                )
-
-                NavItem(
-                    label = stringResource(R.string.xr_filter_favorites),
-                    icon = "★",
-                    count = result.tracks.count { it.uri.toString() in favorites },
-                    selected = filter == Filter.Favorites,
-                    onClick = {
-                        filter = Filter.Favorites
-                        selectedFolder = null
-                    },
-                )
-
-                NavItem(
-                    label = stringResource(R.string.xr_filter_recent),
-                    icon = "🕒",
-                    count = XrStore.recents().size,
-                    selected = filter == Filter.Recent,
-                    onClick = {
-                        filter = Filter.Recent
-                        selectedFolder = null
-                    },
-                )
-
-                if (foldersList.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(PanelTokens.GapXs),
+                ) {
                     Text(
-                        stringResource(R.string.xr_folders_heading).uppercase(),
+                        stringResource(R.string.xr_library_heading).uppercase(),
                         fontSize = PanelTokens.Meta,
                         fontWeight = FontWeight.Bold,
                         color = PanelTokens.TextFaint,
-                        modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 2.dp),
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                     )
 
-                    foldersList.forEach { folderName ->
-                        val trackCount = result.tracks.count { it.folder == folderName }
-                        NavItem(
-                            label = folderName,
-                            icon = "📂",
-                            count = trackCount,
-                            selected = filter == Filter.All && selectedFolder == folderName,
-                            onClick = {
-                                filter = Filter.All
-                                selectedFolder = folderName
-                            },
+                    NavItem(
+                        label = stringResource(R.string.xr_filter_all),
+                        icon = "📁",
+                        count = result.tracks.size,
+                        selected = filter == Filter.All && selectedFolder == null,
+                        onClick = {
+                            filter = Filter.All
+                            selectedFolder = null
+                        },
+                    )
+
+                    NavItem(
+                        label = stringResource(R.string.xr_filter_favorites),
+                        icon = "★",
+                        count = result.tracks.count { it.uri.toString() in favorites },
+                        selected = filter == Filter.Favorites,
+                        onClick = {
+                            filter = Filter.Favorites
+                            selectedFolder = null
+                        },
+                    )
+
+                    NavItem(
+                        label = stringResource(R.string.xr_filter_recent),
+                        icon = "🕒",
+                        count = XrStore.recents().size,
+                        selected = filter == Filter.Recent,
+                        onClick = {
+                            filter = Filter.Recent
+                            selectedFolder = null
+                        },
+                    )
+
+                    if (foldersList.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.xr_folders_heading).uppercase(),
+                            fontSize = PanelTokens.Meta,
+                            fontWeight = FontWeight.Bold,
+                            color = PanelTokens.TextFaint,
+                            modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 2.dp),
                         )
+
+                        foldersList.forEach { folderName ->
+                            val trackCount = result.tracks.count { it.folder == folderName }
+                            NavItem(
+                                label = folderName,
+                                icon = "📂",
+                                count = trackCount,
+                                selected = filter == Filter.All && selectedFolder == folderName,
+                                onClick = {
+                                    filter = Filter.All
+                                    selectedFolder = folderName
+                                },
+                            )
+                        }
                     }
                 }
-
-                Spacer(Modifier.weight(1f))
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -197,7 +202,7 @@ fun LibraryPanel() {
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(50))
-                            .background(PanelTokens.SurfaceRaised)
+                            .background(PanelTokens.Accent)
                             .clickable { XrStore.pickFolder() }
                             .padding(vertical = PanelTokens.GapXs),
                         contentAlignment = Alignment.Center,
@@ -205,7 +210,7 @@ fun LibraryPanel() {
                         Text(
                             stringResource(R.string.xr_add_folder_short),
                             fontSize = PanelTokens.ChipText,
-                            color = PanelTokens.TextDim,
+                            color = PanelTokens.OnAccent,
                         )
                     }
                     Box(
@@ -220,7 +225,7 @@ fun LibraryPanel() {
                         Text(
                             stringResource(R.string.xr_add_file_short),
                             fontSize = PanelTokens.ChipText,
-                            color = PanelTokens.TextDim,
+                            color = PanelTokens.Text,
                         )
                     }
                 }
@@ -320,15 +325,18 @@ fun LibraryPanel() {
                         },
                     )
                 } else {
+                    val currentPlayingUri = state.queue.tracks.getOrNull(state.queue.index)?.uriString
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         items(shown, key = { it.uriString }) { track ->
                             val isFav = remember(favorites, track.uriString) { track.uriString in favorites }
+                            val isPlaying = track.uriString == currentPlayingUri
                             TrackRow(
                                 track = track,
                                 favorite = isFav,
+                                isPlaying = isPlaying,
                                 onPlay = { XrStore.playAt(shown, shown.indexOf(track)) },
                                 onIgnore = { XrStore.ignore(track.uri) },
                                 onFavorite = {
@@ -386,6 +394,7 @@ private fun NavItem(
 private fun TrackRow(
     track: TrackFile,
     favorite: Boolean,
+    isPlaying: Boolean,
     onPlay: () -> Unit,
     onIgnore: () -> Unit,
     onFavorite: () -> Unit,
@@ -394,12 +403,24 @@ private fun TrackRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(PanelTokens.RadiusSmall))
-            .background(PanelTokens.SurfaceRaised)
+            .background(if (isPlaying) PanelTokens.Highlight else PanelTokens.SurfaceRaised)
             .clickable(onClick = onPlay)
             .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
     ) {
+        if (isPlaying) {
+            Text(
+                "▶ PLAYING",
+                fontSize = PanelTokens.Meta,
+                fontWeight = FontWeight.Bold,
+                color = PanelTokens.OnAccent,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(PanelTokens.AccentAlt)
+                    .padding(horizontal = 4.dp, vertical = 1.dp),
+            )
+        }
         Text(
             track.format,
             fontSize = PanelTokens.Meta,
@@ -413,7 +434,8 @@ private fun TrackRow(
         Text(
             track.title,
             fontSize = PanelTokens.Body,
-            color = PanelTokens.Text,
+            fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
+            color = if (isPlaying) PanelTokens.Accent else PanelTokens.Text,
             maxLines = 1,
             modifier = Modifier.weight(1f),
         )

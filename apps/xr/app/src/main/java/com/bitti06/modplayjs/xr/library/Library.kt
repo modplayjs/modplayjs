@@ -177,7 +177,8 @@ class Library(private val context: Context) {
             root.walkTopDown()
                 .filter { it.isFile && !it.name.startsWith(".") && it.length() > 0 }
                 .forEach { file ->
-                    add(Uri.fromFile(file), file.name, file.length(), root.name)
+                    val relFolder = file.parentFile?.name ?: root.name
+                    add(Uri.fromFile(file), file.name, file.length(), relFolder)
                 }
         }
 
@@ -215,7 +216,9 @@ class Library(private val context: Context) {
         if (depth > MAX_DEPTH) return
         for (child in dir.listFiles()) {
             if (child.isDirectory) {
-                walk(child, folderName, depth + 1, add)
+                val subName = child.name ?: folderName
+                val currentFolder = if (folderName.isNotBlank() && folderName != "Ordner") "$folderName/$subName" else subName
+                walk(child, currentFolder, depth + 1, add)
             } else {
                 child.name?.let { add(child.uri, it, child.length(), folderName) }
             }

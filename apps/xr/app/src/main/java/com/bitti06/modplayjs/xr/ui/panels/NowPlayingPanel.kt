@@ -47,13 +47,30 @@ import com.bitti06.modplayjs.xr.ui.panel.SettingsButton
 @Composable
 fun NowPlayingPanel() {
     val state by XrStore.state.collectAsState()
+    val libraryVersion by XrStore.libraryVersion.collectAsState()
     val playback = state.player
     var volume by remember { mutableFloatStateOf(playback.volume.toFloat()) }
+    val currentTrack = state.queue.tracks.getOrNull(state.queue.index)
 
     PanelScaffold(
         title = stringResource(R.string.xr_now_playing),
         subtitle = if (playback.loaded) playback.format else null,
         headerActions = {
+            if (currentTrack != null) {
+                val favorites = remember(libraryVersion) { XrStore.favorites() }
+                val isFav = currentTrack.uriString in favorites
+                Text(
+                    if (isFav) "★" else "☆",
+                    fontSize = PanelTokens.ChipText,
+                    color = if (isFav) PanelTokens.Accent else PanelTokens.TextDim,
+                    modifier = Modifier
+                        .padding(start = PanelTokens.GapSm)
+                        .clip(RoundedCornerShape(50))
+                        .background(PanelTokens.SurfaceSunken)
+                        .clickable { XrStore.toggleFavorite(currentTrack.uri) }
+                        .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
+                )
+            }
             LibraryButton()
             DetailsButton()
             SettingsButton()
