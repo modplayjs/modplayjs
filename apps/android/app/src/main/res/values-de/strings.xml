@@ -376,7 +376,7 @@
     <string name="spatial_layout_other">Anderes Layout</string>
     <string name="spatial_head_tracking">Kopf-Tracking</string>
     <string name="spatial_head_tracking_available">Verfügbar</string>
-    <string name="spatial_head_tracking_none">Kein Headset mit Kopf-Tracking</string>
+    <string name="spatial_head_tracking_none">Nicht gemeldet</string>
     <string name="spatial_system_settings">System-Raumklang</string>
     <string name="spatial_system_settings_summary">Raumklang und Kopf-Tracking werden pro Headset in den Bluetooth-Einstellungen gesetzt</string>
     <string name="spatial_system_setting">Systemeinstellung</string>
@@ -390,4 +390,6 @@
     <string name="spatial_head_tracking_not_used_none">Nein — kein Tracker</string>
     <string name="spatial_head_tracking_not_used_stereo">Nein — die App gibt noch Stereo aus</string>
     <string name="spatial_head_tracking_used_yes">Ja</string>
+    <string name="spatial_head_tracking_none_hint">Das System meldet keinen Tracker. Entweder hat das Headset keinen, oder Kopf-Tracking ist dafür in den Bluetooth-Einstellungen ausgeschaltet — die Plattform unterscheidet das nicht.</string>
+    <string name="spatial_refresh">Erneut prüfen</string>
 </resources>

@@ -50,6 +50,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
@@ -224,8 +227,22 @@ private fun SpatialAudioSection(
     settings: AndroidSettings,
 ) {
     val context = LocalContext.current
+    val owner = LocalLifecycleOwner.current
     val spatial = remember { SpatialAudio(context) }
-    DisposableEffect(spatial) { onDispose { spatial.close() } }
+    // Re-read on every resume, not only on the platform callbacks: the user
+    // leaves this screen to flip the system switches, and the head-tracker state
+    // does not always arrive as a listener callback. Coming back has to be enough.
+    DisposableEffect(spatial, owner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) spatial.refresh()
+            }
+        owner.lifecycle.addObserver(observer)
+        onDispose {
+            owner.lifecycle.removeObserver(observer)
+            spatial.close()
+        }
+    }
     val caps by spatial.capabilities.collectAsState()
 
     SectionTitle(stringResource(R.string.spatial_audio))
@@ -295,6 +312,17 @@ private fun SpatialAudioSection(
             },
         ),
     )
+    if (!caps.headTracker) {
+        // The platform does not say *why* it reports no tracker, and the two
+        // reasons need different fixes: no head-tracking headset, or the switch
+        // for this headset is off. Saying "no headset" when the buds are on the
+        // ears is what makes this row look broken.
+        Text(
+            stringResource(R.string.spatial_head_tracking_none_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     InfoRow(
         stringResource(R.string.spatial_head_tracking_used),
         stringResource(
@@ -309,6 +337,9 @@ private fun SpatialAudioSection(
         stringResource(R.string.spatial_system_settings),
         stringResource(R.string.spatial_system_settings_summary),
     ) { openBluetoothSettings(context) }
+    TextButton(onClick = { spatial.refresh() }) {
+        Text(stringResource(R.string.spatial_refresh))
+    }
 }
 
 /**

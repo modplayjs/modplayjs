@@ -389,7 +389,7 @@
     <string name="spatial_layout_other">Other layout</string>
     <string name="spatial_head_tracking">Head tracking</string>
     <string name="spatial_head_tracking_available">Available</string>
-    <string name="spatial_head_tracking_none">No head-tracking headset</string>
+    <string name="spatial_head_tracking_none">Not reported</string>
     <string name="spatial_system_settings">System spatial audio</string>
     <string name="spatial_system_settings_summary">Spatial audio and head tracking are set per headset in Bluetooth settings</string>
     <string name="spatial_system_setting">System setting</string>
@@ -403,4 +403,6 @@
     <string name="spatial_head_tracking_not_used_none">No — no tracker</string>
     <string name="spatial_head_tracking_not_used_stereo">No — the app still outputs stereo</string>
     <string name="spatial_head_tracking_used_yes">Yes</string>
+    <string name="spatial_head_tracking_none_hint">The system reports no tracker. Either the headset has none, or head tracking for it is switched off in Bluetooth settings — the platform does not tell the two apart.</string>
+    <string name="spatial_refresh">Check again</string>
 </resources>

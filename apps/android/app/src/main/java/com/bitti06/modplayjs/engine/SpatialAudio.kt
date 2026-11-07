@@ -9,6 +9,7 @@ import android.media.Spatializer
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -121,9 +122,11 @@ class SpatialAudio(
     }
 
     private fun read(): SpatialCapabilities {
-        val sp = spatializer ?: return SpatialCapabilities()
+        val sp = spatializer ?: return SpatialCapabilities().also { log(it) }
         val level = runCatching { sp.immersiveAudioLevel }.getOrNull() ?: return SpatialCapabilities()
-        if (level == Spatializer.SPATIALIZER_IMMERSIVE_LEVEL_NONE) return SpatialCapabilities()
+        if (level == Spatializer.SPATIALIZER_IMMERSIVE_LEVEL_NONE) {
+            return SpatialCapabilities().also { log(it) }
+        }
         return SpatialCapabilities(
             supported = true,
             available = runCatching { sp.isAvailable }.getOrDefault(false),
@@ -138,6 +141,23 @@ class SpatialAudio(
                 } else {
                     emptyList()
                 },
+        ).also { log(it) }
+    }
+
+    /**
+     * One line per probe.
+     *
+     * A head tracker that the platform refuses to report looks identical from
+     * inside the app to a headset that has none, so the log has to carry the
+     * facts: what the effect claims, and which beds it says it places. That turns
+     * "it does not work" into either an app question or a system one.
+     */
+    private fun log(caps: SpatialCapabilities) {
+        Log.i(
+            TAG,
+            "spatial: supported=${caps.supported} available=${caps.available} " +
+                "enabled=${caps.enabled} headTracker=${caps.headTracker} " +
+                "layouts=${caps.layouts.joinToString(",") { it.name ?: "${it.channels}ch" }}",
         )
     }
 }
@@ -151,6 +171,8 @@ class SpatialAudio(
  * screen stops claiming "not used" the moment the bed renderer lands.
  */
 internal const val SPATIAL_BED_RENDERED = false
+
+private const val TAG = "SpatialAudio"
 
 /** The mask to render into: the stored one if this device still reports it. */
 internal fun effectiveLayout(
