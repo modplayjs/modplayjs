@@ -121,6 +121,12 @@ debug APK, and verifies 16 KB ELF segment alignment.
   entry and the position are stored a few seconds apart, and on launch the track
   is loaded, seeked back and either resumed or left paused, whichever it was.
   Rows that no longer exist in the library are dropped.
+- Playback continues with the screen off: a media foreground service, a partial
+  wake lock held only while playing, and a drain loop that notices when the
+  framework invalidated its `AudioTrack` and reopens it instead of writing into
+  a dead object. What still ends playback, by design: swiping the app out of
+  recents, an app update, and the system reclaiming the process under real
+  memory pressure.
 - The header opens a realtime pattern view: rows x channels of tracker text
   ("C-4 01 40 A0F"), the playing row highlighted and followed, columns scrolling
   sideways. The engine answers it on demand; the snapshot speeds up to 16 Hz

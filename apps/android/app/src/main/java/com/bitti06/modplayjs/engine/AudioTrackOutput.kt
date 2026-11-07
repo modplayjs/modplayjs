@@ -27,7 +27,8 @@ class AudioTrackOutput(
             ?.toIntOrNull()
             ?.takeIf { it in 8000..192000 } ?: 48000
 
-    private var track: AudioTrack? = null
+    /** Replaced from the drain thread when the framework invalidates it. */
+    @Volatile private var track: AudioTrack? = null
     private val running = AtomicBoolean(false)
     private val paused = AtomicBoolean(false)
     private var ring: PcmRing? = null
@@ -163,7 +164,7 @@ class AudioTrackOutput(
 
     private fun loop() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
-        val t = track ?: return
+        var t = track ?: return
         while (running.get()) {
             if (paused.get()) {
                 Thread.sleep(10)
@@ -175,14 +176,63 @@ class AudioTrackOutput(
                 Thread.sleep(2)
                 continue
             }
-            try {
-                t.write(scratch, 0, n * 2, AudioTrack.WRITE_BLOCKING)
-                firstWrite?.countDown()
-            } catch (t2: Throwable) {
-                if (running.get()) Log.e(TAG, "write failed", t2)
-                Thread.sleep(5)
+            // write() reports failures by returning a negative error code, it
+            // does not throw. The old code ignored the result, so a track that
+            // the framework invalidated - which is what a screen-off output
+            // switch or a route change does - left this loop writing into a
+            // dead object forever: the card said "playing" and nothing came
+            // out. ERROR_DEAD_OBJECT is recoverable by rebuilding.
+            var attempt = 0
+            while (running.get() && !paused.get()) {
+                val written =
+                    try {
+                        t.write(scratch, 0, n * 2, AudioTrack.WRITE_BLOCKING)
+                    } catch (t2: Throwable) {
+                        if (running.get()) Log.e(TAG, "write failed", t2)
+                        Thread.sleep(5)
+                        break
+                    }
+                if (written >= 0) {
+                    if (written < n * 2) {
+                        // write() returns floats, not frames. A blocking write
+                        // should be complete; a short one dropped the tail.
+                        Log.w(TAG, "short write: ${written / 2} of $n frames")
+                    }
+                    firstWrite?.countDown()
+                    break
+                }
+                if (!shouldRebuild(written, attempt)) {
+                    Log.e(TAG, "write returned $written, dropping $n frames")
+                    Thread.sleep(5)
+                    break
+                }
+                attempt++
+                val fresh = rebuild(t)
+                if (fresh == null) {
+                    // Could not reopen the output. Give the device a moment and
+                    // try again rather than ending the only drain thread.
+                    Thread.sleep(REBUILD_RETRY_MS)
+                    break
+                }
+                t = fresh
             }
         }
+    }
+
+    /**
+     * Replace a track the framework invalidated, and start it again.
+     *
+     * The ring keeps the audio that has not been consumed yet, so the only gap
+     * is the frames that were in the dead track's buffer.
+     */
+    private fun rebuild(old: AudioTrack): AudioTrack? {
+        Log.w(TAG, "audio track died, rebuilding")
+        runCatching { old.pause() }
+        runCatching { old.release() }
+        val fresh = buildTrack(minBufferBytes) ?: return null
+        track = fresh
+        if (!paused.get()) runCatching { fresh.play() }
+        return fresh
     }
 
     fun pause() {
@@ -217,6 +267,9 @@ class AudioTrackOutput(
 
         /** Buffer size in hardware bursts requested on the low-latency path. */
         const val LOW_LATENCY_BURSTS = 4
+
+        /** Wait before trying to reopen a dead output. */
+        const val REBUILD_RETRY_MS = 250L
     }
 }
 
@@ -225,6 +278,21 @@ enum class OutputPlayState {
     PAUSED,
     PLAYING,
 }
+
+/**
+ * Whether a failed write means "the track is gone, build another".
+ *
+ * Only `ERROR_DEAD_OBJECT` is recoverable that way, and only twice per block:
+ * if a fresh track also reports it, the output is genuinely unusable and the
+ * drain thread should drop the block instead of spinning on rebuilds.
+ */
+internal fun shouldRebuild(
+    error: Int,
+    attempt: Int,
+): Boolean = error == AudioTrack.ERROR_DEAD_OBJECT && attempt < MAX_REBUILD_ATTEMPTS
+
+/** Rebuilds allowed per block before giving up. */
+internal const val MAX_REBUILD_ATTEMPTS = 2
 
 /**
  * Diagnostics for the audio path: the AudioTrack that plays the engine's

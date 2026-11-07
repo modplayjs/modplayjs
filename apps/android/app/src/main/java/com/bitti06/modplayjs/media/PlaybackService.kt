@@ -42,6 +42,7 @@ class PlaybackService : MediaSessionService() {
     private lateinit var notificationProvider: StickyMediaNotificationProvider
     private lateinit var player: ModplayPlayer
     private lateinit var audioManager: AudioManager
+    private lateinit var wakeLock: PlaybackWakeLock
     private var focusRequest: AudioFocusRequest? = null
     private var resumeOnFocus = false
     private var transientLoss = false
@@ -63,6 +64,7 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         audioManager = getSystemService(AudioManager::class.java)
+        wakeLock = PlaybackWakeLock(this)
         player = ModplayPlayer(Looper.getMainLooper(), AppGraph.session)
         // Media3 updates the notification on its own events; a short delay puts
         // the re-attach after that, so it shows the new track, not the old one.
@@ -138,10 +140,17 @@ class PlaybackService : MediaSessionService() {
             AppGraph.session.snapshot.collectLatest { snap ->
                 player.onSnapshot(snap)
                 if (snap?.state?.playing == true) {
-                    if (transientLoss) return@collectLatest
-                    requestFocus()
-                } else if (!transientLoss) {
-                    abandonFocus()
+                    // Hold the CPU for the render thread before asking for
+                    // focus: with the screen off the scheduler is otherwise free
+                    // to park the Java thread that fills the ring, which is the
+                    // silence-with-a-progress-bar case.
+                    wakeLock.acquire()
+                    if (!transientLoss) requestFocus()
+                } else {
+                    // Also on a transient focus loss: the player is paused then,
+                    // and a held lock would keep the CPU up for nothing.
+                    wakeLock.release()
+                    if (!transientLoss) abandonFocus()
                 }
             }
         }
@@ -367,6 +376,7 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         mainHandler.removeCallbacks(nudgeNotification)
         scope.cancel()
+        wakeLock.release()
         focusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
         runCatching { unregisterReceiver(noisyReceiver) }
         runCatching { unregisterReceiver(restoreReceiver) }
