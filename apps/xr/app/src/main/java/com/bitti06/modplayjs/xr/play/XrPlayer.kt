@@ -995,10 +995,12 @@ class XrPlayer(
 
     /** Ring point for a bus, from explicit geometry instead of live fields. */
     private fun busPositionOf(index: Int, radius: Float, cx: Float, cz: Float, cy: Float): Vector3 {
+        val azimuth = -180f + 360f * index / BUS_COUNT
         val elevation = if (settings.view.dome3D) {
-            if (index % 2 == 1) 0.25f else -0.25f
+            val rad = Math.toRadians(azimuth.toDouble())
+            (kotlin.math.cos(rad) * 0.45f - 0.10f).toFloat()
         } else 0f
-        return ringPoint(-180f + 360f * index / BUS_COUNT, radius, cx, cz, cy + elevation)
+        return ringPoint(azimuth, radius, cx, cz, cy + elevation)
     }
 
     /**
@@ -1181,7 +1183,8 @@ class XrPlayer(
      */
     private fun markerPositionFor(degrees: Float, index: Int = 0): Vector3 {
         val elevation = if (settings.view.dome3D) {
-            if (index % 2 == 1) 0.25f else -0.25f
+            val rad = Math.toRadians(degrees.toDouble())
+            (kotlin.math.cos(rad) * 0.45f - 0.10f).toFloat()
         } else 0f
         val p = ringPoint(degrees, ringRadius, ringCenterX, ringCenterZ, ringY + elevation)
         return Vector3(p.x, p.y - MARKER_DROP, p.z)
