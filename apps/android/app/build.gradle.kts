@@ -141,6 +141,7 @@ dependencies {
     // Layout previews in Android Studio (the Compose equivalent of the layout
     // editor); only the debug build carries the tooling UI itself.
     debugImplementation(libs.androidx.compose.ui.tooling)
+    testImplementation(libs.junit)
 }
 
 // A release build always needs the real engine: the stub JNI plays nothing, so

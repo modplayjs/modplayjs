@@ -91,6 +91,10 @@
         <item quantity="one">%1$d channel</item>
         <item quantity="other">%1$d channels</item>
     </plurals>
+    <plurals name="spatial_channels">
+        <item quantity="one">%1$d channel</item>
+        <item quantity="other">%1$d channels</item>
+    </plurals>
     <string name="pattern_row_label" translatable="false">#</string>
     <string name="pattern_empty_title">No pattern</string>
     <string name="pattern_empty_body">Start a tracker module to follow its pattern here.</string>
@@ -372,4 +376,21 @@
     <string name="licenses_note">This app ships the modplayjs core, V8 and AndroidX libraries. Ported code keeps its original license.</string>
     <string name="project_page">Project page</string>
     <string name="public_domain_note">This component is released into the public domain; no license text is required.</string>
+    <string name="spatial_audio">Spatial audio</string>
+    <string name="spatial_status">Status</string>
+    <string name="spatial_unsupported">Not supported by this device</string>
+    <string name="spatial_available">Available for the current output</string>
+    <string name="spatial_unavailable">Not available for the current output</string>
+    <string name="spatial_layouts">Layouts</string>
+    <string name="spatial_layouts_unknown">Not reported by this Android version</string>
+    <string name="spatial_layout_other">Other layout</string>
+    <string name="spatial_head_tracking">Head tracking</string>
+    <string name="spatial_head_tracking_available">Available</string>
+    <string name="spatial_head_tracking_none">No head-tracking headset</string>
+    <string name="spatial_system_settings">System spatial audio</string>
+    <string name="spatial_system_settings_summary">Spatial audio and head tracking are set per headset in Bluetooth settings</string>
+    <string name="spatial_system_setting">System setting</string>
+    <string name="spatial_on">On</string>
+    <string name="spatial_off">Off</string>
+    <string name="spatial_output">Current output</string>
 </resources>

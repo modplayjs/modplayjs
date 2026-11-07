@@ -79,6 +79,10 @@
         <item quantity="one">%1$d Kanal</item>
         <item quantity="other">%1$d Kanäle</item>
     </plurals>
+    <plurals name="spatial_channels">
+        <item quantity="one">%1$d Kanal</item>
+        <item quantity="other">%1$d Kanäle</item>
+    </plurals>
     <string name="pattern_empty_title">Kein Muster</string>
     <string name="pattern_empty_body">Starte ein Tracker-Modul, um sein Muster hier zu sehen.</string>
 
@@ -359,4 +363,21 @@
     <string name="licenses_note">Diese App enthält den modplayjs-Kern, V8 und AndroidX-Bibliotheken. Portierter Code behält seine ursprüngliche Lizenz.</string>
     <string name="project_page">Projektseite</string>
     <string name="public_domain_note">Diese Komponente ist gemeinfrei; es ist kein Lizenztext erforderlich.</string>
+    <string name="spatial_audio">Raumklang</string>
+    <string name="spatial_status">Status</string>
+    <string name="spatial_unsupported">Von diesem Gerät nicht unterstützt</string>
+    <string name="spatial_available">Für die aktuelle Ausgabe verfügbar</string>
+    <string name="spatial_unavailable">Für die aktuelle Ausgabe nicht verfügbar</string>
+    <string name="spatial_layouts">Layouts</string>
+    <string name="spatial_layouts_unknown">Von dieser Android-Version nicht gemeldet</string>
+    <string name="spatial_layout_other">Anderes Layout</string>
+    <string name="spatial_head_tracking">Kopf-Tracking</string>
+    <string name="spatial_head_tracking_available">Verfügbar</string>
+    <string name="spatial_head_tracking_none">Kein Headset mit Kopf-Tracking</string>
+    <string name="spatial_system_settings">System-Raumklang</string>
+    <string name="spatial_system_settings_summary">Raumklang und Kopf-Tracking werden pro Headset in den Bluetooth-Einstellungen gesetzt</string>
+    <string name="spatial_system_setting">Systemeinstellung</string>
+    <string name="spatial_on">Ein</string>
+    <string name="spatial_off">Aus</string>
+    <string name="spatial_output">Aktuelle Ausgabe</string>
 </resources>

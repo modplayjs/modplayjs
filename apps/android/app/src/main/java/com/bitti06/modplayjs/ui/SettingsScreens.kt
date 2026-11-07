@@ -1,7 +1,10 @@
 package com.bitti06.modplayjs.ui
 
 import android.app.LocaleManager
+import android.content.Context
+import android.content.Intent
 import android.os.LocaleList
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,6 +37,8 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +61,7 @@ import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.engine.OutputPlayState
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.PatternColors
+import com.bitti06.modplayjs.engine.SpatialAudio
 import com.bitti06.modplayjs.library.FolderEntity
 import com.bitti06.modplayjs.library.ScanProgress
 import com.bitti06.modplayjs.ui.icons.AppIcons
@@ -131,6 +137,7 @@ fun AudioSettingsScreen(
 ) {
     SettingsPage(stringResource(R.string.settings_audio), onBack) {
         AudioSettingsContent(actions, settings, capabilities)
+        SpatialAudioSection()
     }
 }
 
@@ -192,6 +199,78 @@ fun AudioSettingsContent(
     }
     if (showEffectsDialog) {
         SystemEffectsUnavailableDialog { showEffectsDialog = false }
+    }
+}
+
+/**
+ * What the platform says about spatial audio on the current output.
+ *
+ * A separate section from the audio controls on purpose: the audio drawer in
+ * the player shows [AudioSettingsContent], and registering platform listeners
+ * every time a drawer opens would be waste. This lives on the settings page.
+ */
+@Composable
+private fun SpatialAudioSection() {
+    val context = LocalContext.current
+    val spatial = remember { SpatialAudio(context) }
+    DisposableEffect(spatial) { onDispose { spatial.close() } }
+    val caps by spatial.capabilities.collectAsState()
+
+    SectionTitle(stringResource(R.string.spatial_audio))
+    if (!caps.supported) {
+        InfoRow(stringResource(R.string.spatial_status), stringResource(R.string.spatial_unsupported))
+        return
+    }
+    // Two different questions, and they are not the same one: whether the user
+    // switched spatial audio on (a system setting per headset) and whether the
+    // effect can process the output that is plugged in right now.
+    InfoRow(
+        stringResource(R.string.spatial_system_setting),
+        stringResource(if (caps.enabled) R.string.spatial_on else R.string.spatial_off),
+    )
+    InfoRow(
+        stringResource(R.string.spatial_output),
+        stringResource(if (caps.available) R.string.spatial_available else R.string.spatial_unavailable),
+    )
+    if (caps.layouts.isEmpty()) {
+        InfoRow(
+            stringResource(R.string.spatial_layouts),
+            stringResource(R.string.spatial_layouts_unknown),
+        )
+    } else {
+        for (layout in caps.layouts) {
+            InfoRow(
+                layout.name ?: stringResource(R.string.spatial_layout_other),
+                pluralStringResource(R.plurals.spatial_channels, layout.channels, layout.channels),
+            )
+        }
+    }
+    InfoRow(
+        stringResource(R.string.spatial_head_tracking),
+        stringResource(
+            if (caps.headTracker) {
+                R.string.spatial_head_tracking_available
+            } else {
+                R.string.spatial_head_tracking_none
+            },
+        ),
+    )
+    SettingsRow(
+        stringResource(R.string.spatial_system_settings),
+        stringResource(R.string.spatial_system_settings_summary),
+    ) { openBluetoothSettings(context) }
+}
+
+/**
+ * The spatial audio and head tracking switches live in the Bluetooth device
+ * page, one pair per headset. There is no public API to set either, so the app
+ * can only take the user there.
+ */
+private fun openBluetoothSettings(context: Context) {
+    runCatching {
+        context.startActivity(
+            Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 }
 

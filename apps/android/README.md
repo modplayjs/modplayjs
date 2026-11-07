@@ -101,6 +101,13 @@ debug APK, and verifies 16 KB ELF segment alignment.
 - Plays through the JS core in V8: float32 stereo into an `AudioTrack`, a
   queue with repeat/shuffle/auto-advance, channel mute/solo, per-format accent
   colours and an AudioEffect panel entry.
+- Settings → Audio reports what the platform says about spatial audio on the
+  current output: whether it is supported, whether the user switched it on,
+  whether the effect can process the device that is plugged in, which channel
+  beds it renders with individual positions, and whether a head tracker is
+  present. All of it is read-only — Android has no API to enable spatial audio
+  or head tracking, they are per-headset system settings — so the section ends
+  with a link to Bluetooth settings, where both switches live.
 - Swiping on the player slides in a panel over it: left for the folder the
   playing file lives in, at that file's directory; right for the audio controls
   (volume, pan, interpolation, voices, tempo and the mixer). Neither is a
