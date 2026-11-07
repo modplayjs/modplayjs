@@ -56,8 +56,8 @@ fun SettingsPanel() {
     val playback = state.player
     val settings = state.settings
     val libraryVersion by XrStore.libraryVersion.collectAsState()
-    var radius by remember { mutableFloatStateOf(state.radius) }
-    var radiusManual by remember { mutableStateOf(state.radiusManual) }
+    var radius by remember(state.radius) { mutableFloatStateOf(state.radius) }
+    var radiusManual by remember(state.radiusManual) { mutableStateOf(state.radiusManual) }
     var treeCount by remember(libraryVersion) { mutableIntStateOf(XrStore.treeUris().size) }
     var pickedCount by remember(libraryVersion) { mutableIntStateOf(XrStore.pickedCount()) }
     var favoriteCount by remember(libraryVersion) { mutableIntStateOf(XrStore.favorites().size) }
@@ -112,8 +112,8 @@ fun SettingsPanel() {
                             ),
                         )
                     }
-                    StepperRow(stringResource(R.string.xr_ring), String.format("%.1f m", radius)) { step ->
-                        radius = (radius + step).coerceIn(0.4f, 3.0f)
+                    StepperRow(stringResource(R.string.xr_ring), String.format(Locale.US, "%.1f m", radius)) { step ->
+                        radius = (radius + step).coerceIn(0.8f, 5.0f)
                         radiusManual = true
                         XrStore.setRadius(radius)
                     }

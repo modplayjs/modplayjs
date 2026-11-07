@@ -220,7 +220,7 @@ class XrPlayer(
     private var markerPositionsCache: Array<Vector3?> = arrayOfNulls(32)
     private var levels = FloatArray(0)
     private var radiusManual = prefs.getBoolean(KEY_RADIUS_MANUAL, false)
-    private var ringRadius = prefs.getFloat(KEY_RADIUS, 1.0f)
+    private var ringRadius = prefs.getFloat(KEY_RADIUS, 1.8f)
     private var ringCenterX = 0f
     private var ringCenterZ = 0f
 
@@ -342,7 +342,7 @@ class XrPlayer(
      */
     fun setRing(radius: Float, centerX: Float, centerZ: Float) {
         submit {
-            val clamped = radius.coerceIn(0.4f, 3.0f)
+            val clamped = radius.coerceIn(0.8f, 5.0f)
             if (clamped == ringRadius && centerX == ringCenterX && centerZ == ringCenterZ && radiusManual) {
                 return@submit
             }
@@ -355,16 +355,19 @@ class XrPlayer(
                 putBoolean(KEY_RADIUS_MANUAL, true)
             }
             applyPositions()
+            if (debugVisible) rebuildMarkers()
         }
     }
 
     fun setRingAuto(radius: Float, centerX: Float, centerZ: Float) {
         submit {
-            if (!radiusManual) ringRadius = radius.coerceIn(0.5f, 2.5f)
+            val oldR = ringRadius
+            if (!radiusManual) ringRadius = radius.coerceIn(1.0f, 4.0f)
             ringCenterX = centerX
             ringCenterZ = centerZ
             ringAnchored = true
             applyPositions()
+            if (debugVisible && oldR != ringRadius) rebuildMarkers()
         }
     }
 
@@ -423,6 +426,8 @@ class XrPlayer(
         submit {
             radiusManual = false
             prefs.edit { putBoolean(KEY_RADIUS_MANUAL, false) }
+            applyPositions()
+            if (debugVisible) rebuildMarkers()
         }
     }
 

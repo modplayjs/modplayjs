@@ -164,7 +164,7 @@ object XrStore {
                 queue = QueueState(playlist?.tracks.orEmpty(), playlist?.index ?: -1),
                 freeLayout = free,
                 passthrough = passthrough,
-                radius = p?.ringRadius() ?: 1f,
+                radius = p?.ringRadius() ?: 1.8f,
                 radiusManual = p?.isRadiusManual() ?: false,
                 engineAvailable = p?.engineAvailable() == true,
                 sessionId = p?.sessionId() ?: 0,

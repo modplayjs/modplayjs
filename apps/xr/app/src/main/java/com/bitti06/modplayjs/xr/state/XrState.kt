@@ -53,7 +53,7 @@ data class XrState(
     val queue: QueueState = QueueState(),
     val freeLayout: Boolean = true,
     val passthrough: Boolean = false,
-    val radius: Float = 1.0f,
+    val radius: Float = 1.8f,
     val radiusManual: Boolean = false,
     val engineAvailable: Boolean = false,
     val sessionId: Int = 0,
