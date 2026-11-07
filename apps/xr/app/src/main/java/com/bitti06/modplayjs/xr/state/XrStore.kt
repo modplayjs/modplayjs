@@ -140,7 +140,7 @@ object XrStore {
                 _scanItem.value = ""
             }
         }
-        scope.launch { _libraryVersion.collect { requests.trySend(Unit) } }
+        rescan()
     }
 
     /** Re-read every source with the values the state already carries. */
@@ -360,31 +360,42 @@ object XrStore {
 
     fun ignore(uri: Uri) {
         library?.ignore(uri)
+        val uriStr = uri.toString()
+        val current = _libraryTracks.value
+        _libraryTracks.value = current.copy(
+            tracks = current.tracks.filterNot { it.uriString == uriStr || it.uri.toString() == uriStr },
+            ignored = current.ignored + 1,
+        )
         libraryChanged()
     }
 
     fun restore(uri: Uri) {
         library?.restore(uri)
         libraryChanged()
+        rescan()
     }
 
     fun removeTree(uri: Uri) {
         library?.removeTree(uri)
         libraryChanged()
+        rescan()
     }
 
     fun clearIgnored() {
         library?.clearIgnored()
         libraryChanged()
+        rescan()
     }
 
     fun addTree(uri: Uri) {
         library?.addTree(uri)
         libraryChanged()
+        rescan()
     }
 
     fun addUris(uris: List<Uri>) {
         library?.addUris(uris)
         libraryChanged()
+        rescan()
     }
 }
