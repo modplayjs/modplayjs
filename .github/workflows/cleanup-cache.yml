@@ -21,7 +21,7 @@ jobs:
     steps:
       - name: Cleanup caches older than 5 days
         if: github.event_name == 'schedule'
-        uses: MyAlbum/purge-cache@v2
+        uses: MyAlbum/purge-cache@v3
         with:
           max-age: 5d
 
