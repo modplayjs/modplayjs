@@ -1486,7 +1486,7 @@ class XrPlayer(
             }
             for (i in positions.indices) {
                 val components = ArrayList<ComponentBase>()
-                components += Mesh("mesh://sphere".toUri(), MeshCollision.NoCollision)
+                components += Mesh("mesh://sphere".toUri(), MeshCollision.LineTest)
                 components += Sphere(MARKER_SPHERE_RADIUS)
                 components += Transform(Pose(positions[i]))
                 components += Scale(Vector3(MARKER_MIN, MARKER_MIN, MARKER_MIN))
@@ -2003,16 +2003,16 @@ class XrPlayer(
         /** Waits out one idle poll plus one blocking write at most. */
         private const val STOP_JOIN_MS = 250L
         private const val RING_Y = 1.4f
-        private const val MARKER_MIN = 0.02f
-        private const val MARKER_RANGE = 0.10f
-        private const val MARKER_STEP = 0.005f
+        private const val MARKER_MIN = 0.8f
+        private const val MARKER_RANGE = 0.8f
+        private const val MARKER_STEP = 0.02f
 
         /**
          * `Sphere` carries the radius that `mesh://sphere` builds from; the
-         * diameter on screen is the radius times twice `Scale`. With 0.5 and a
-         * base scale of MARKER_MIN the smallest marker is 2 cm across.
+         * diameter on screen is the radius times twice `Scale`. With 0.08 m (8 cm)
+         * and a base scale of 0.8 the marker is ~13 cm across, easily visible and grabbable.
          */
-        private const val MARKER_SPHERE_RADIUS = 0.5f
+        private const val MARKER_SPHERE_RADIUS = 0.08f
 
         /** Markers sit a little below the audio objects so they do not z-fight. */
         private const val MARKER_DROP = 0.12f
