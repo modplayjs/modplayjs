@@ -8,5 +8,36 @@
     <item name="panel_details" type="id" />
     <item name="panel_queue" type="id" />
     <item name="panel_ignored" type="id" />
-    <item name="panel_channel_label_base" type="id" />
+    <item name="panel_channel_label_0" type="id" />
+    <item name="panel_channel_label_1" type="id" />
+    <item name="panel_channel_label_2" type="id" />
+    <item name="panel_channel_label_3" type="id" />
+    <item name="panel_channel_label_4" type="id" />
+    <item name="panel_channel_label_5" type="id" />
+    <item name="panel_channel_label_6" type="id" />
+    <item name="panel_channel_label_7" type="id" />
+    <item name="panel_channel_label_8" type="id" />
+    <item name="panel_channel_label_9" type="id" />
+    <item name="panel_channel_label_10" type="id" />
+    <item name="panel_channel_label_11" type="id" />
+    <item name="panel_channel_label_12" type="id" />
+    <item name="panel_channel_label_13" type="id" />
+    <item name="panel_channel_label_14" type="id" />
+    <item name="panel_channel_label_15" type="id" />
+    <item name="panel_channel_label_16" type="id" />
+    <item name="panel_channel_label_17" type="id" />
+    <item name="panel_channel_label_18" type="id" />
+    <item name="panel_channel_label_19" type="id" />
+    <item name="panel_channel_label_20" type="id" />
+    <item name="panel_channel_label_21" type="id" />
+    <item name="panel_channel_label_22" type="id" />
+    <item name="panel_channel_label_23" type="id" />
+    <item name="panel_channel_label_24" type="id" />
+    <item name="panel_channel_label_25" type="id" />
+    <item name="panel_channel_label_26" type="id" />
+    <item name="panel_channel_label_27" type="id" />
+    <item name="panel_channel_label_28" type="id" />
+    <item name="panel_channel_label_29" type="id" />
+    <item name="panel_channel_label_30" type="id" />
+    <item name="panel_channel_label_31" type="id" />
 </resources>

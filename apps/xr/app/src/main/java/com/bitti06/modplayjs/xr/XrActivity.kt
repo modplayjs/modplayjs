@@ -19,6 +19,7 @@ import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.library.Playlist
 import com.bitti06.modplayjs.xr.layout.PanelAnimator
 import com.bitti06.modplayjs.xr.layout.PanelPlacement
+import com.bitti06.modplayjs.xr.panels.CHANNEL_LABEL_IDS
 import com.bitti06.modplayjs.xr.panels.PANELS
 import com.bitti06.modplayjs.xr.panels.PanelId
 import com.bitti06.modplayjs.xr.panels.PanelSpec
@@ -130,7 +131,7 @@ class XrActivity : AppSystemActivity(), XrHost {
 
         // Register 32 channel label panel registrations for floating VR labels
         for (ch in 0 until 32) {
-            val regId = R.id.panel_channel_label_base + ch
+            val regId = CHANNEL_LABEL_IDS[ch]
             list += ComposeViewPanelRegistration(
                 regId,
                 composeViewCreator = { _, ctx ->

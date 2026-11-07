@@ -27,6 +27,17 @@ enum class PanelId {
     IGNORED,
 }
 
+val CHANNEL_LABEL_IDS: List<Int> = listOf(
+    R.id.panel_channel_label_0, R.id.panel_channel_label_1, R.id.panel_channel_label_2, R.id.panel_channel_label_3,
+    R.id.panel_channel_label_4, R.id.panel_channel_label_5, R.id.panel_channel_label_6, R.id.panel_channel_label_7,
+    R.id.panel_channel_label_8, R.id.panel_channel_label_9, R.id.panel_channel_label_10, R.id.panel_channel_label_11,
+    R.id.panel_channel_label_12, R.id.panel_channel_label_13, R.id.panel_channel_label_14, R.id.panel_channel_label_15,
+    R.id.panel_channel_label_16, R.id.panel_channel_label_17, R.id.panel_channel_label_18, R.id.panel_channel_label_19,
+    R.id.panel_channel_label_20, R.id.panel_channel_label_21, R.id.panel_channel_label_22, R.id.panel_channel_label_23,
+    R.id.panel_channel_label_24, R.id.panel_channel_label_25, R.id.panel_channel_label_26, R.id.panel_channel_label_27,
+    R.id.panel_channel_label_28, R.id.panel_channel_label_29, R.id.panel_channel_label_30, R.id.panel_channel_label_31,
+)
+
 /**
  * Everything the activity needs to create one panel: where it stands, how big
  * it is and what draws inside it. Sizes used to live in the activity and poses

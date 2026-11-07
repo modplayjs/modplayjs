@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-07T16:33:56.704Z",
+  "generated": "2026-11-07T21:43:06.476Z",
   "layout": "modules/<name>/index.js",
   "always": [
     "modplayjs-core",
@@ -114,8 +114,8 @@
     "modplayjs-fmt-med": {
       "specifier": "@modplayjs/fmt-med",
       "asset": "modplayjs-fmt-med/index.js",
-      "bytes": 87325,
-      "sha256": "3d226b032713cf795390845d466ed6871659f6ac3fa13d38db4afb3affd80e14",
+      "bytes": 87300,
+      "sha256": "15e6fe50096ed300ca7448085df33bd619b7a27125e43e26dfe7f345e1e81f7c",
       "version": "0.2.1",
       "imports": [
         "@modplayjs/core"

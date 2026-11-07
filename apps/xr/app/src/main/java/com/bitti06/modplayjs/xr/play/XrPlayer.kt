@@ -36,6 +36,7 @@ import com.meta.spatial.toolkit.Sphere
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.Visible
 import com.bitti06.modplayjs.xr.R
+import com.bitti06.modplayjs.xr.panels.CHANNEL_LABEL_IDS
 import com.meta.spatial.core.ComponentBase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -1229,7 +1230,7 @@ class XrPlayer(
         val total = spatialInfo.channels.coerceAtLeast(1)
         val angles = channelSpatialAngles(index, total)
         val p = domePoint(degrees, angles.elevationDeg, ringRadius, ringCenterX, ringCenterZ, ringY)
-        return Vector3(p.x, p.y - MARKER_DROP, p.z)
+        return Vector3(p.x, p.y + 0.35f - MARKER_DROP, p.z)
     }
 
     /**
@@ -1555,7 +1556,7 @@ class XrPlayer(
                 val labelComponents = ArrayList<ComponentBase>()
                 val labelPos = Vector3(positions[i].x, positions[i].y + 0.14f, positions[i].z)
                 labelComponents += Transform(Pose(labelPos))
-                labelComponents += Panel(R.id.panel_channel_label_base + (i % 32), MeshCollision.NoCollision)
+                labelComponents += Panel(CHANNEL_LABEL_IDS[i % 32], MeshCollision.NoCollision)
                 labelComponents += Visible(true)
                 markerLabels += Entity.create(labelComponents)
             }

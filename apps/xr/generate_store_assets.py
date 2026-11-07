@@ -1,6 +1,6 @@
 import os
 import math
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 OUTPUT_DIR = "D:/StudioProjects/modplayjs/apps/xr/store_assets"
 ARTIFACTS_DIR = "C:/Users/bitti/AppData/Local/Google/AndroidStudio2026.2.2/projects/xr.67eded61/.artifacts/3c6c6185-2196-45fa-b2e8-cd7d091fea76"
@@ -55,7 +55,7 @@ def draw_official_background(w, h):
             b = int(COLOR_BG_MID[2] * (1 - t) + COLOR_BG_END[2] * t)
         draw.line([(0, y), (w, y)], fill=(r, g, b, 255))
 
-    # 2. Radial Halos (Periwinkle & Mint)
+    # 2. Soft Radial Halos (Periwinkle & Mint)
     halo_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     halo_draw = ImageDraw.Draw(halo_layer)
 
@@ -71,7 +71,7 @@ def draw_official_background(w, h):
 
     img = Image.alpha_composite(img, halo_layer)
 
-    # 3. Perspective Grid Lines (Spatial VR motif)
+    # 3. Perspective Grid Lines
     grid_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     grid_draw = ImageDraw.Draw(grid_layer)
     horizon_y = int(h * 0.55)
@@ -105,17 +105,29 @@ def draw_official_logo_tile(size, radius_ratio=0.24):
     draw.polygon(scaled_m, fill=(*COLOR_PERIWINKLE, 255))
     return tile
 
-def draw_spatial_sphere(draw, cx, cy, radius, color):
-    for r in range(int(radius * 1.6), int(radius), -3):
-        alpha = int(45 * (1.0 - (r - radius) / (radius * 0.6)))
-        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(*color, alpha), width=2)
+def draw_spatial_sphere(img, cx, cy, radius, color):
+    """
+    Renders a glossy 3D sphere with a smooth Gaussian-blurred volumetric glow.
+    NO concentric target lines or moire artifacts!
+    """
+    # Soft Gaussian Glow
+    glow_img = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow_img)
+    glow_radius = int(radius * 1.6)
+    glow_draw.ellipse([cx - glow_radius, cy - glow_radius, cx + glow_radius, cy + glow_radius], fill=(*color, 120))
+    glow_img = glow_img.filter(ImageFilter.GaussianBlur(radius=int(radius * 0.4)))
 
+    img.paste(glow_img, (0, 0), glow_img)
+
+    # Core Sphere
+    draw = ImageDraw.Draw(img)
     draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], fill=(*color, 255))
 
+    # Glossy Highlight
     hr = int(radius * 0.32)
-    hx = cx - int(radius * 0.3)
-    hy = cy - int(radius * 0.3)
-    draw.ellipse([hx - hr, hy - hr, hx + hr, hy + hr], fill=(255, 255, 255, 180))
+    hx = cx - int(radius * 0.28)
+    hy = cy - int(radius * 0.28)
+    draw.ellipse([hx - hr, hy - hr, hx + hr, hy + hr], fill=(255, 255, 255, 200))
 
 def draw_tracker_preview_panel(w, h, font_mono):
     panel = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -147,16 +159,15 @@ def draw_tracker_preview_panel(w, h, font_mono):
     return panel
 
 def generate_universal_base():
-    """
-    Generates universal_base_2560x1440.png with all title & text elements
-    strictly placed within the 960px central Safe Zone (X in [800, 1760]).
-    This guarantees 100% perfect crops in Meta's auto-cropper for Landscape (16:9),
-    Square (1:1), and Portrait (1008x1440 / 7:10) without ANY clipping!
-    """
     w, h = 2560, 1440
     img = draw_official_background(w, h)
-    draw = ImageDraw.Draw(img, "RGBA")
 
+    # 3D Spheres
+    draw_spatial_sphere(img, 380, 420, 65, COLOR_PERIWINKLE)
+    draw_spatial_sphere(img, 2220, 380, 75, COLOR_MINT)
+    draw_spatial_sphere(img, 300, 1020, 55, (234, 179, 8))
+
+    draw = ImageDraw.Draw(img, "RGBA")
     f_title = get_font(FONT_TITLE_PATH, 115)
     f_sub1  = get_font(FONT_TEXT_PATH, 34)
     f_sub2  = get_font(FONT_TEXT_PATH, 28)
@@ -164,8 +175,6 @@ def generate_universal_base():
     f_mono  = get_font(FONT_MONO_PATH, 16)
 
     center_x = 1280
-
-    # 1. Logo + Wordmark Block (Centered)
     tile_size = 170
     logo_tile = draw_official_logo_tile(tile_size)
 
@@ -177,11 +186,9 @@ def generate_universal_base():
     total_brand_w = tile_size + gap + modplay_w + js_w + gap + badge_w
     start_x = center_x - (total_brand_w / 2.0)
 
-    # Paste Logo Tile
     ty = 480
     img.paste(logo_tile, (int(start_x), ty), logo_tile)
 
-    # Wordmark
     wx = start_x + tile_size + gap
     wy = ty + 18
     draw.text((wx, wy), "modplay", fill=(*COLOR_TEXT_WHITE, 255), font=f_title)
@@ -194,7 +201,6 @@ def generate_universal_base():
     draw.rounded_rectangle([xrx, xry, xrx + badge_w, xry + 88], radius=16, fill=(*COLOR_PERIWINKLE, 255))
     draw.text((xrx + 18, xry + 6), "XR", fill=(12, 10, 24, 255), font=get_font(FONT_TITLE_PATH, 80))
 
-    # 2. Subtitles (Centered)
     sy = ty + tile_size + 35
     sub1_text = "SPATIAL CHIPTUNE & TRACKER PLAYER"
     sub1_w = draw.textlength(sub1_text, font=f_sub1)
@@ -204,7 +210,6 @@ def generate_universal_base():
     sub2_w = draw.textlength(sub2_text, font=f_sub2)
     draw.text((center_x - sub2_w / 2, sy + 45), sub2_text, fill=(*COLOR_TEXT_SUB, 255), font=f_sub2)
 
-    # 3. Format Badges (Centered)
     formats = ["MOD", "XM", "S3M", "IT", "MO3"]
     badge_width = 88
     badge_gap = 14
@@ -217,16 +222,7 @@ def generate_universal_base():
         draw.text((fx + 16, fy + 6), fmt, fill=(*COLOR_TEXT_WHITE, 255), font=f_badge)
         fx += badge_width + badge_gap
 
-    # 4. Outer Decorative Elements (outside Safe Zone for Landscape richness)
-    # Left & Right 3D Spheres
-    draw_spatial_sphere(draw, 350, 420, 70, COLOR_PERIWINKLE)
-    draw_spatial_sphere(draw, 2210, 380, 80, COLOR_MINT)
-    draw_spatial_sphere(draw, 280, 1020, 60, (234, 179, 8))
-
-    # Left & Right Floating Pattern Previews
-    panel_left = draw_tracker_preview_panel(420, 150, f_mono)
-    img.paste(panel_left, (220, 680), panel_left)
-
+    # Tracker Panel Right
     panel_right = draw_tracker_preview_panel(420, 150, f_mono)
     img.paste(panel_right, (1920, 680), panel_right)
 
@@ -236,65 +232,83 @@ def generate_universal_base():
     img.save(p1, "PNG")
     img.save(p2, "PNG")
     img.save(os.path.join(ARTIFACTS_DIR, "universal_base_2560x1440.png"), "PNG")
-    print("Saved Safe-Zone Optimized 2560x1440 Base Asset.")
+    print("Saved Smooth 2560x1440 Base Asset.")
 
 def generate_hero_cover():
     w, h = 3000, 900
     img = draw_official_background(w, h)
+
+    # Smooth Gaussian Spheres
+    draw_spatial_sphere(img, 380, 450, 65, COLOR_PERIWINKLE)
+    draw_spatial_sphere(img, 2620, 420, 75, COLOR_MINT)
+
     draw = ImageDraw.Draw(img, "RGBA")
+    f_title = get_font(FONT_TITLE_PATH, 110)
+    f_sub1  = get_font(FONT_TEXT_PATH, 32)
+    f_sub2  = get_font(FONT_TEXT_PATH, 24)
+    f_mono  = get_font(FONT_MONO_PATH, 16)
 
-    f_title = get_font(FONT_TITLE_PATH, 140)
-    f_sub1  = get_font(FONT_TEXT_PATH, 38)
-    f_sub2  = get_font(FONT_TEXT_PATH, 30)
-    f_mono  = get_font(FONT_MONO_PATH, 18)
-
-    tile_size = 210
-    tx, ty = 420, 280
+    center_x = 1500
+    tile_size = 150
     logo_tile = draw_official_logo_tile(tile_size)
-    img.paste(logo_tile, (tx, ty), logo_tile)
 
-    wx = tx + tile_size + 35
-    wy = ty + 30
+    modplay_w = draw.textlength("modplay", font=f_title)
+    js_w      = draw.textlength("js", font=f_title)
+    badge_w   = 120
+    gap = 18
+
+    total_brand_w = tile_size + gap + modplay_w + js_w + gap + badge_w
+    start_x = center_x - (total_brand_w / 2.0)
+
+    ty = 270
+    img.paste(logo_tile, (int(start_x), ty), logo_tile)
+
+    wx = start_x + tile_size + gap
+    wy = ty + 15
     draw.text((wx, wy), "modplay", fill=(*COLOR_TEXT_WHITE, 255), font=f_title)
 
-    mw = draw.textlength("modplay", font=f_title)
-    jsx = wx + int(mw)
+    jsx = wx + modplay_w
     draw.text((jsx, wy), "js", fill=(*COLOR_MINT, 255), font=f_title)
 
-    jsw = draw.textlength("js", font=f_title)
-    xrx = jsx + int(jsw) + 25
-    xry = wy + 12
-    draw.rounded_rectangle([xrx, xry, xrx + 150, xry + 105], radius=18, fill=(*COLOR_PERIWINKLE, 255))
-    draw.text((xrx + 20, xry + 8), "XR", fill=(12, 10, 24, 255), font=get_font(FONT_TITLE_PATH, 95))
+    xrx = jsx + js_w + gap
+    xry = wy + 10
+    draw.rounded_rectangle([xrx, xry, xrx + badge_w, xry + 82], radius=16, fill=(*COLOR_PERIWINKLE, 255))
+    draw.text((xrx + 18, xry + 6), "XR", fill=(12, 10, 24, 255), font=get_font(FONT_TITLE_PATH, 75))
 
     sy = ty + tile_size + 25
-    draw.text((tx, sy), "SPATIAL CHIPTUNE & TRACKER PLAYER", fill=(*COLOR_MINT, 255), font=f_sub1)
-    draw.text((tx, sy + 50), "Meta Quest 3 • Interactive 3D Audio Vault & Modular UI", fill=(*COLOR_TEXT_SUB, 255), font=f_sub2)
+    sub1_text = "SPATIAL CHIPTUNE & TRACKER PLAYER"
+    sub1_w = draw.textlength(sub1_text, font=f_sub1)
+    draw.text((center_x - sub1_w / 2, sy), sub1_text, fill=(*COLOR_MINT, 255), font=f_sub1)
 
-    draw_spatial_sphere(draw, 220, 450, 70, COLOR_PERIWINKLE)
-    draw_spatial_sphere(draw, 2680, 420, 80, COLOR_MINT)
+    sub2_text = "Meta Quest 3 • Interactive 3D Audio Vault & Modular UI"
+    sub2_w = draw.textlength(sub2_text, font=f_sub2)
+    draw.text((center_x - sub2_w / 2, sy + 42), sub2_text, fill=(*COLOR_TEXT_SUB, 255), font=f_sub2)
 
-    panel = draw_tracker_preview_panel(560, 210, f_mono)
-    img.paste(panel, (2060, 345), panel)
+    panel = draw_tracker_preview_panel(460, 150, f_mono)
+    img.paste(panel, (2080, 320), panel)
 
     p = os.path.join(OUTPUT_DIR, "hero_cover_3000x900.png")
     img.save(p, "PNG")
     img.save(os.path.join(ARTIFACTS_DIR, "hero_cover_3000x900.png"), "PNG")
-    print("Saved 3000x900 Hero Cover.")
+    print("Saved Smooth 3000x900 Hero Cover.")
 
 def generate_app_icon():
     w, h = 512, 512
     img = draw_official_background(w, h)
+
+    # Smooth Gaussian Sphere in Background
+    draw_spatial_sphere(img, 256, 190, 75, COLOR_PERIWINKLE)
+
     draw = ImageDraw.Draw(img, "RGBA")
 
-    tile_size = 230
+    tile_size = 210
     tx = (w - tile_size) // 2
-    ty = 90
+    ty = 85
     logo_tile = draw_official_logo_tile(tile_size)
     img.paste(logo_tile, (tx, ty), logo_tile)
 
     f_word = get_font(FONT_TITLE_PATH, 54)
-    wy = 350
+    wy = 345
 
     draw.text((45, wy), "modplay", fill=(*COLOR_TEXT_WHITE, 255), font=f_word)
     mw = draw.textlength("modplay", font=f_word)
@@ -308,14 +322,14 @@ def generate_app_icon():
     draw.text((xrx + 10, xry + 2), "XR", fill=(12, 10, 24, 255), font=get_font(FONT_TITLE_PATH, 38))
 
     f_sub = get_font(FONT_TEXT_PATH, 20)
-    draw.text((125, 425), "SPATIAL CHIPTUNE PLAYER", fill=(*COLOR_MINT, 255), font=f_sub)
+    draw.text((125, 420), "SPATIAL CHIPTUNE PLAYER", fill=(*COLOR_MINT, 255), font=f_sub)
 
     p1 = os.path.join(OUTPUT_DIR, "app_icon_512x512.png")
     p2 = os.path.join(OUTPUT_DIR, "app_icon.png")
     img.save(p1, "PNG")
     img.save(p2, "PNG")
     img.save(os.path.join(ARTIFACTS_DIR, "app_icon_512x512.png"), "PNG")
-    print("Saved 512x512 App Icon.")
+    print("Saved Smooth 512x512 App Icon.")
 
 if __name__ == "__main__":
     generate_universal_base()
