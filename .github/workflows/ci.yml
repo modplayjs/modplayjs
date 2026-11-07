@@ -51,6 +51,75 @@ jobs:
       - name: Build & typecheck
         run: npx turbo run build typecheck
 
+  # A .gitignore cannot help once a file is tracked: the rule has no effect on
+  # files already in the index, which is exactly how the XR upload keystore
+  # ended up in this repository. This job looks at what git actually tracks,
+  # not at what is ignored, and also rejects a private key that slipped into
+  # an APK asset directory.
+  secrets-guard:
+    name: No tracked key material
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reject tracked key material
+        run: |
+          set -eu
+          tracked=$(git ls-files | grep -Ei '\.(pem|key|p12|pfx|jks|keystore)$|(^|/)keystore\.properties$|(^|/)engine-keys/' || true)
+          if [ -n "$tracked" ]; then
+            echo "::error::key material is tracked by git:"
+            echo "$tracked"
+            exit 1
+          fi
+          echo "no tracked key material"
+
+      - name: Reject keys inside app assets
+        run: |
+          set -eu
+          assets=$(git ls-files 'apps/*/app/src/main/assets/*' | grep -Ei '\.(pem|key|p12|pfx|jks)$' || true)
+          if [ -n "$assets" ]; then
+            echo "::error::key material inside app assets (it would ship in the APK):"
+            echo "$assets"
+            exit 1
+          fi
+          echo "no key material in assets"
+
+      # The tracked-file check above cannot see the case this guards against: a
+      # key injected into the workspace at run time is untracked, and once it is
+      # on disk an artifact or cache step can take it. Signing belongs on the
+      # publishing machine, so no workflow may reference the private key at all.
+      # Adding it here is a deliberate decision that has to remove this step.
+      - name: Reject signing-key use in CI
+        run: |
+          set -eu
+          # Split literals so this step's own text cannot match itself.
+          pat='MODPLAY_ENGINE_SIGNIN''G_KEY=|engine-keys''/private'
+          hits=$(grep -rnE "$pat" .github/workflows/ || true)
+          if [ -n "$hits" ]; then
+            echo "::error::a workflow references the engine signing key:"
+            echo "$hits"
+            echo "Sign the catalog on the publishing machine; CI builds with the public key only."
+            exit 1
+          fi
+          echo "no workflow uses the engine signing key"
+
+      # An artifact path that covers apps/xr/build/ also covers
+      # build/engine-keys/ if anyone ever injects one there.
+      - name: Reject artifact paths over the XR build tree
+        run: |
+          set -eu
+          bad=$(grep -rn 'path:.*apps/xr/build' .github/workflows/ | grep -v 'engine-catalog' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::artifact path covers the whole XR build tree:"
+            echo "$bad"
+            echo "Upload apps/xr/build/engine-catalog instead."
+            exit 1
+          fi
+          echo "no artifact path covers the XR build tree"
+
   # A version bump may only enter main through a PR (the bump is applied
   # in the feature PR itself, or via the changesets "version packages"
   # merge). This job fails direct pushes to main that bump versions
