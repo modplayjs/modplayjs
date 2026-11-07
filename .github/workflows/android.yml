@@ -67,14 +67,19 @@ jobs:
             echo "::warning::ANDROID_DEBUG_KEYSTORE is not set; this build gets a fresh debug key, so its APK cannot update an install made elsewhere"
             exit 0
           fi
-          mkdir -p "$HOME/.android"
-          printf '%s' "$DEBUG_KEYSTORE" | base64 -d > "$HOME/.android/debug.keystore"
-          chmod 600 "$HOME/.android/debug.keystore"
+          # Outside the workspace, so no artifact path can ever pick it up.
+          keystore="$RUNNER_TEMP/modplay-debug.keystore"
+          printf '%s' "$DEBUG_KEYSTORE" | base64 -d > "$keystore"
+          chmod 600 "$keystore"
+          echo "MODPLAY_DEBUG_KEYSTORE=$keystore" >> "$GITHUB_ENV"
           # Print the identity, so a wrong secret is visible in the log instead of
           # turning into a mysterious install failure on someone's phone.
-          keytool -list -v -keystore "$HOME/.android/debug.keystore" \
+          keytool -list -v -keystore "$keystore" \
             -storepass android -alias androiddebugkey 2>/dev/null \
             | grep -E "Owner:|SHA256:" || true
+          sha=$(keytool -list -v -keystore "$keystore" -storepass android -alias androiddebugkey 2>/dev/null \
+            | sed -n 's/.*SHA256: //p' | tr -d ':' | tr 'A-F' 'a-f')
+          echo "MODPLAY_DEBUG_SHA256=$sha" >> "$GITHUB_ENV"
 
       - name: Assemble debug
         working-directory: apps/android
@@ -84,12 +89,24 @@ jobs:
 
       # The same identity the keystore step printed above. If these two do not
       # match, the APK cannot update a local build and the reason is here.
+      # The identity the keystore step printed, from the APK this time. If the two
+      # differ the build was signed by some other key and the artifact cannot
+      # update an install - so the build fails here instead of on a phone.
       - name: Show the APK signature
         run: |
           set -eu
           apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
           "$apksigner" verify --print-certs apps/android/app/build/outputs/apk/debug/*.apk \
             | grep -E "certificate (DN|SHA-256 digest)" || true
+          if [ -n "${MODPLAY_DEBUG_SHA256:-}" ]; then
+            apk_sha=$("$apksigner" verify --print-certs apps/android/app/build/outputs/apk/debug/*.apk \
+              | grep -oE 'certificate SHA-256 digest: [0-9a-f]+' | head -1 | awk '{print $NF}')
+            if [ "$apk_sha" != "$MODPLAY_DEBUG_SHA256" ]; then
+              echo "::error::the APK is signed by $apk_sha, not by the restored debug key $MODPLAY_DEBUG_SHA256"
+              exit 1
+            fi
+            echo "APK signature matches the debug keystore"
+          fi
       - name: 16 KB check
         run: |
           python3 - <<'PY'

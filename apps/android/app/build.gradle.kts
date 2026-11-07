@@ -85,6 +85,19 @@ android {
                 keyPassword = keyPasswordValue
             }
         }
+        // AGP creates the debug keystore under the *Android user home*, which on
+        // a CI runner is not necessarily $HOME/.android - so restoring a file
+        // there signed nothing, and the build quietly generated a new key
+        // instead. Pointing the config at an explicit path removes the guess.
+        // Locally the variable is unset and AGP keeps its default.
+        System.getenv("MODPLAY_DEBUG_KEYSTORE")?.let { path ->
+            getByName("debug") {
+                storeFile = file(path)
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
     }
 
     buildTypes {
