@@ -93,7 +93,7 @@ fun HomeButton() {
             .clip(RoundedCornerShape(50))
             .background(PanelTokens.SurfaceSunken)
             .clickable { XrStore.goHome() }
-            .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
+            .padding(horizontal = 10.dp, vertical = 5.dp),
     )
 }
 
@@ -111,7 +111,7 @@ fun LibraryButton() {
             .clip(RoundedCornerShape(50))
             .background(if (active) PanelTokens.SurfaceRaised else PanelTokens.SurfaceSunken)
             .clickable { XrStore.toggleLibrary() }
-            .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
+            .padding(horizontal = 10.dp, vertical = 5.dp),
     )
 }
 
@@ -130,7 +130,7 @@ fun DetailsButton() {
             .clip(RoundedCornerShape(50))
             .background(PanelTokens.SurfaceSunken)
             .clickable { XrStore.toggleDetails() }
-            .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
+            .padding(horizontal = 10.dp, vertical = 5.dp),
     )
 }
 
@@ -145,7 +145,7 @@ fun SettingsButton() {
             .clip(RoundedCornerShape(50))
             .background(PanelTokens.Accent)
             .clickable { XrStore.toggleSettings() }
-            .padding(horizontal = PanelTokens.Gap, vertical = PanelTokens.GapXs),
+            .padding(horizontal = 10.dp, vertical = 5.dp),
     )
 }
 
@@ -284,7 +284,7 @@ fun Chip(
             .clip(RoundedCornerShape(50))
             .background(if (selected) PanelTokens.Accent else PanelTokens.SurfaceRaised)
             .clickable(onClick = onClick)
-            .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
+            .padding(horizontal = 10.dp, vertical = 5.dp),
     )
 }
 

@@ -68,7 +68,7 @@ fun NowPlayingPanel() {
                         .clip(RoundedCornerShape(50))
                         .background(PanelTokens.SurfaceSunken)
                         .clickable { XrStore.toggleFavorite(currentTrack.uri) }
-                        .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
                 )
             }
             LibraryButton()
@@ -311,7 +311,7 @@ private fun CircleButton(
 ) {
     Box(
         Modifier
-            .size(if (primary) 42.dp else 34.dp)
+            .size(if (primary) 44.dp else 36.dp)
             .clip(CircleShape)
             .background(if (primary) PanelTokens.Accent else PanelTokens.SurfaceRaised)
             .clickable(onClick = onClick),
