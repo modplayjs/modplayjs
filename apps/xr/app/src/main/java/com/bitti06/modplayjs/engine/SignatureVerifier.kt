@@ -88,10 +88,10 @@ object SignatureVerifier {
                 KeyFactory.getInstance(ALGORITHM).generatePublic(X509EncodedKeySpec(der))
             }.getOrElse { error("catalog public key is unusable: ${it.message}") }
 
-        val verifier = Signature.getInstance(ALGORITHM)
-        verifier.initVerify(publicKey)
-        verifier.update(canonicalText(catalog).toByteArray(Charsets.UTF_8))
-        if (!verifier.verify(signature)) {
+        val sig = Signature.getInstance(ALGORITHM)
+        sig.initVerify(publicKey)
+        sig.update(canonicalText(catalog).toByteArray(Charsets.UTF_8))
+        if (!sig.verify(signature)) {
             error("catalog signature does not match")
         }
         Log.i(TAG, "catalog signature verified (${catalog.packages.size} packages)")
