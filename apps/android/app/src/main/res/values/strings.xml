@@ -396,4 +396,11 @@
     <string name="spatial_on">On</string>
     <string name="spatial_off">Off</string>
     <string name="spatial_output">Current output</string>
+    <string name="spatial_layout_auto">Automatic (widest)</string>
+    <string name="spatial_layout_used">Used layout</string>
+    <string name="spatial_layout_fallback">The selected layout is not reported by this device any more; the widest reported one is used.</string>
+    <string name="spatial_head_tracking_used">Used</string>
+    <string name="spatial_head_tracking_not_used_none">No — no tracker</string>
+    <string name="spatial_head_tracking_not_used_stereo">No — the app still outputs stereo</string>
+    <string name="spatial_head_tracking_used_yes">Yes</string>
 </resources>

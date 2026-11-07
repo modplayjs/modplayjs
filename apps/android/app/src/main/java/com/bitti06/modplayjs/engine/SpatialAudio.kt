@@ -143,6 +143,30 @@ class SpatialAudio(
 }
 
 /**
+ * Whether the app feeds the spatializer a multichannel bed yet.
+ *
+ * It does not: the engine renders stereo and the platform only spatializes
+ * multichannel content, so head tracking is available but never applied to our
+ * audio. Kept as one flag instead of a sentence duplicated in the UI, so the
+ * screen stops claiming "not used" the moment the bed renderer lands.
+ */
+internal const val SPATIAL_BED_RENDERED = false
+
+/** The mask to render into: the stored one if this device still reports it. */
+internal fun effectiveLayout(
+    stored: Int,
+    reported: List<SpatialLayout>,
+): SpatialLayout? {
+    if (reported.isEmpty()) return null
+    if (stored != 0) {
+        reported.firstOrNull { it.mask == stored }?.let { return it }
+        // The headset changed and the stored bed is gone. Fall back to the
+        // widest reported one instead of rendering a mask the platform folds.
+    }
+    return reported.last()
+}
+
+/**
  * Turn reported masks into displayable, ordered layouts.
  *
  * Sorted by channel count so 5.1 comes before 7.1.4. Quad is the floor because

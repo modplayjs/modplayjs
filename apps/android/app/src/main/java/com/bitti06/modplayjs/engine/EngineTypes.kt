@@ -75,6 +75,19 @@ data class ViewSettings(
 )
 
 @Serializable
+data class SpatialSettings(
+    /**
+     * Preferred channel bed, as an `AudioFormat.CHANNEL_OUT_*` mask, or 0 for
+     * "the widest the device reports".
+     *
+     * A stored mask the device no longer reports falls back to 0 at the point of
+     * use, not here: the setting must survive unplugging a headset without being
+     * silently rewritten.
+     */
+    val layoutMask: Int = 0,
+)
+
+@Serializable
 data class AndroidSettings(
     val schemaVersion: Int = 1,
     val transport: TransportSettings = TransportSettings(),
@@ -82,6 +95,7 @@ data class AndroidSettings(
     val sid: SidSettings = SidSettings(),
     val playback: PlaybackSettings = PlaybackSettings(),
     val view: ViewSettings = ViewSettings(),
+    val spatial: SpatialSettings = SpatialSettings(),
 )
 
 @Serializable

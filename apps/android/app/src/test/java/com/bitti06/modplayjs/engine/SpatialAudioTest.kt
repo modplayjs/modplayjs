@@ -73,4 +73,47 @@ class SpatialAudioTest {
     fun `an empty report stays empty instead of inventing a default layout`() {
         assertEquals(emptyList<SpatialLayout>(), spatialLayouts(emptyList()))
     }
+
+    @Test
+    fun `automatic picks the widest reported layout`() {
+        val reported =
+            spatialLayouts(
+                listOf(
+                    AudioFormat.CHANNEL_OUT_5POINT1,
+                    AudioFormat.CHANNEL_OUT_7POINT1POINT4,
+                ),
+            )
+        assertEquals(AudioFormat.CHANNEL_OUT_7POINT1POINT4, effectiveLayout(0, reported)?.mask)
+    }
+
+    @Test
+    fun `a stored layout the device still reports wins`() {
+        val reported =
+            spatialLayouts(
+                listOf(
+                    AudioFormat.CHANNEL_OUT_5POINT1,
+                    AudioFormat.CHANNEL_OUT_7POINT1POINT4,
+                ),
+            )
+        assertEquals(
+            AudioFormat.CHANNEL_OUT_5POINT1,
+            effectiveLayout(AudioFormat.CHANNEL_OUT_5POINT1, reported)?.mask,
+        )
+    }
+
+    @Test
+    fun `a stored layout the device no longer reports falls back to the widest`() {
+        // The headset changed. Rendering the stored mask anyway would let the
+        // framework fold the channels, which is worse than the widest intact bed.
+        val reported = spatialLayouts(listOf(AudioFormat.CHANNEL_OUT_5POINT1))
+        assertEquals(
+            AudioFormat.CHANNEL_OUT_5POINT1,
+            effectiveLayout(AudioFormat.CHANNEL_OUT_7POINT1POINT4, reported)?.mask,
+        )
+    }
+
+    @Test
+    fun `nothing reported means nothing to render into`() {
+        assertEquals(null, effectiveLayout(0, emptyList()))
+    }
 }

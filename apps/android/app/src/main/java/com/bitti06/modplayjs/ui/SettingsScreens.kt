@@ -61,7 +61,9 @@ import com.bitti06.modplayjs.engine.AndroidSnapshot
 import com.bitti06.modplayjs.engine.OutputPlayState
 import com.bitti06.modplayjs.engine.AndroidSettings
 import com.bitti06.modplayjs.engine.PatternColors
+import com.bitti06.modplayjs.engine.SPATIAL_BED_RENDERED
 import com.bitti06.modplayjs.engine.SpatialAudio
+import com.bitti06.modplayjs.engine.effectiveLayout
 import com.bitti06.modplayjs.library.FolderEntity
 import com.bitti06.modplayjs.library.ScanProgress
 import com.bitti06.modplayjs.ui.icons.AppIcons
@@ -137,7 +139,7 @@ fun AudioSettingsScreen(
 ) {
     SettingsPage(stringResource(R.string.settings_audio), onBack) {
         AudioSettingsContent(actions, settings, capabilities)
-        SpatialAudioSection()
+        SpatialAudioSection(actions, settings)
     }
 }
 
@@ -203,14 +205,24 @@ fun AudioSettingsContent(
 }
 
 /**
- * What the platform says about spatial audio on the current output.
+ * What the platform says about spatial audio, and which bed the app will use.
  *
- * A separate section from the audio controls on purpose: the audio drawer in
- * the player shows [AudioSettingsContent], and registering platform listeners
- * every time a drawer opens would be waste. This lives on the settings page.
+ * The list is selectable, but it is a ceiling per family: 5.1 is the widest
+ * 5.1 mask the device renders with individual positions, 7.1.4 the widest 7.1
+ * one. Anything at or below the stored ceiling keeps its positions; a wider mask
+ * is accepted by `canBeSpatialized` and then folded. Deliberately not offering
+ * "7.1.4" on a phone that reports only 5.1.
+ *
+ * Head tracking is shown twice on purpose: whether a tracker is available, and
+ * whether it is used for our audio. Today the second is no - the engine emits
+ * stereo and the platform only spatializes multichannel content - and saying so
+ * is better than letting the user believe the stage rotates.
  */
 @Composable
-private fun SpatialAudioSection() {
+private fun SpatialAudioSection(
+    actions: UiActions,
+    settings: AndroidSettings,
+) {
     val context = LocalContext.current
     val spatial = remember { SpatialAudio(context) }
     DisposableEffect(spatial) { onDispose { spatial.close() } }
@@ -232,19 +244,47 @@ private fun SpatialAudioSection() {
         stringResource(R.string.spatial_output),
         stringResource(if (caps.available) R.string.spatial_available else R.string.spatial_unavailable),
     )
+
     if (caps.layouts.isEmpty()) {
         InfoRow(
             stringResource(R.string.spatial_layouts),
             stringResource(R.string.spatial_layouts_unknown),
         )
     } else {
-        for (layout in caps.layouts) {
-            InfoRow(
-                layout.name ?: stringResource(R.string.spatial_layout_other),
-                pluralStringResource(R.plurals.spatial_channels, layout.channels, layout.channels),
+        val stored = settings.spatial.layoutMask
+        val effective = effectiveLayout(stored, caps.layouts)
+        val options =
+            listOf("0" to stringResource(R.string.spatial_layout_auto)) +
+                caps.layouts.map { layout ->
+                    layout.mask.toString() to (
+                        layout.name ?: stringResource(R.string.spatial_layout_other)
+                    )
+                }
+        ChoiceRow(
+            stringResource(R.string.spatial_layouts),
+            options,
+            stored.toString(),
+        ) { value ->
+            actions.updateSettings { s ->
+                s.copy(spatial = s.spatial.copy(layoutMask = value.toIntOrNull() ?: 0))
+            }
+        }
+        InfoRow(
+            stringResource(R.string.spatial_layout_used),
+            effective?.let { layout ->
+                layout.name ?: stringResource(R.string.spatial_layout_other)
+            } ?: stringResource(R.string.spatial_layouts_unknown),
+        )
+        if (stored != 0 && effective?.mask != stored) {
+            // The headset changed. Keep the stored wish, but say what happens now.
+            Text(
+                stringResource(R.string.spatial_layout_fallback),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
             )
         }
     }
+
     InfoRow(
         stringResource(R.string.spatial_head_tracking),
         stringResource(
@@ -252,6 +292,16 @@ private fun SpatialAudioSection() {
                 R.string.spatial_head_tracking_available
             } else {
                 R.string.spatial_head_tracking_none
+            },
+        ),
+    )
+    InfoRow(
+        stringResource(R.string.spatial_head_tracking_used),
+        stringResource(
+            when {
+                !caps.headTracker -> R.string.spatial_head_tracking_not_used_none
+                !SPATIAL_BED_RENDERED -> R.string.spatial_head_tracking_not_used_stereo
+                else -> R.string.spatial_head_tracking_used_yes
             },
         ),
     )

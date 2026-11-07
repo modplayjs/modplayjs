@@ -383,4 +383,11 @@
     <string name="spatial_on">Ein</string>
     <string name="spatial_off">Aus</string>
     <string name="spatial_output">Aktuelle Ausgabe</string>
+    <string name="spatial_layout_auto">Automatisch (größtes)</string>
+    <string name="spatial_layout_used">Genutztes Layout</string>
+    <string name="spatial_layout_fallback">Das gewählte Layout meldet dieses Gerät nicht mehr; es wird das größte gemeldete verwendet.</string>
+    <string name="spatial_head_tracking_used">Genutzt</string>
+    <string name="spatial_head_tracking_not_used_none">Nein — kein Tracker</string>
+    <string name="spatial_head_tracking_not_used_stereo">Nein — die App gibt noch Stereo aus</string>
+    <string name="spatial_head_tracking_used_yes">Ja</string>
 </resources>

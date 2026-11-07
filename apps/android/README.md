@@ -105,9 +105,15 @@ debug APK, and verifies 16 KB ELF segment alignment.
   current output: whether it is supported, whether the user switched it on,
   whether the effect can process the device that is plugged in, which channel
   beds it renders with individual positions, and whether a head tracker is
-  present. All of it is read-only — Android has no API to enable spatial audio
-  or head tracking, they are per-headset system settings — so the section ends
-  with a link to Bluetooth settings, where both switches live.
+  present. The bed list is selectable: "Automatic" takes the widest the device
+  reports, and a stored choice falls back to that widest one when the headset
+  changes — a mask the device no longer places would only be folded. Head
+  tracking appears twice, because "available" and "used" are different: the
+  engine still emits stereo, and the platform only spatializes multichannel
+  content, so a tracker is available but not applied to our audio until the bed
+  renderer lands. The switches themselves are read-only — Android has no API to
+  enable spatial audio or head tracking, they are per-headset system settings —
+  so the section ends with a link to Bluetooth settings, where both live.
 - Swiping on the player slides in a panel over it: left for the folder the
   playing file lives in, at that file's directory; right for the audio controls
   (volume, pan, interpolation, voices, tempo and the mixer). Neither is a
