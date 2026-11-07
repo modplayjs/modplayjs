@@ -216,10 +216,11 @@ const fmtTime = (ms: number): string => {
 };
 
 function moduleDuration(): number {
-  if (streamed) return streamed.duration;
+  if (streamed) return streamed.durationMs;
   const mod = core.module;
   if (!mod) return 0;
-  if (mod.endless) return 0; // endless engine (SID): no declared length
+  // No `endless` early return: a SID loops forever but its runtime is known
+  // from the HVSC database the loader fills in, which is what a seekbar needs.
   let total = 0;
   for (const seq of mod.sequences) total += seq.duration;
   return total;
@@ -234,7 +235,7 @@ function renderInfoStreamed(src: StreamedSource, fmt: StreamedFormat): void {
     ['format', fmt.toUpperCase() + ' (streamed)'],
     ['channels', String(src.channels)],
     ['sample rate', src.sampleRate + ' Hz'],
-    ['duration', fmtTime(src.duration)],
+    ['duration', fmtTime(src.durationMs)],
   ];
   infoEl.textContent = '';
   const grid = document.createElement('div');
@@ -846,12 +847,12 @@ async function loadTrack(file: Blob): Promise<void> {
       seek.value = '0';
       seek.style.setProperty('--fill', '0%');
       timeCur.textContent = '0:00';
-      timeRem.textContent = '-' + fmtTime(streamed.duration);
+      timeRem.textContent = '-' + fmtTime(streamed.durationMs);
       curPattern = -1;
       curRow = -1;
       renderInfoStreamed(src, fmt2);
       show('loaded | format: ' + fmt2.toUpperCase() + ' (streamed) | ' +
-        src.channels + 'ch | ' + src.sampleRate + ' Hz | ' + fmtTime(src.duration));
+        src.channels + 'ch | ' + src.sampleRate + ' Hz | ' + fmtTime(src.durationMs));
       return;
     }
   }
