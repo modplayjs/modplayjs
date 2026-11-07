@@ -158,7 +158,7 @@ fun visiblePanels(state: XrState): Set<PanelId> {
     return buildSet {
         add(PanelId.MAIN)
         if (state.overlays.library) add(PanelId.LIBRARY)
-        if (playing.loaded && playing.canPattern) add(PanelId.PATTERN)
+        if (playing.loaded && playing.canPattern && state.settings.view.patternView) add(PanelId.PATTERN)
         if (playing.loaded && state.overlays.details) add(PanelId.DETAILS)
         if (state.overlays.settings) add(PanelId.SETTINGS)
         if (state.overlays.queue) add(PanelId.QUEUE)

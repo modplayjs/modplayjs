@@ -151,13 +151,6 @@ object XrStore {
 
     private fun refresh(free: Boolean, passthrough: Boolean) {
         val p = player
-        // Playback owns the view: the library steps aside for the pattern and
-        // comes back when the transport stops. Home reopens it at any time.
-        val playing = p?.state?.value?.playing == true
-        if (playing != wasPlaying) {
-            wasPlaying = playing
-            overlays.value = overlays.value.copy(library = !playing)
-        }
         val loaded = p?.state?.value?.loaded == true
         if (loaded && !wasLoaded) {
             overlays.value = overlays.value.copy(details = true)
@@ -293,6 +286,10 @@ object XrStore {
     }
 
     // ---- Overlays --------------------------------------------------------
+
+    fun toggleLibrary() {
+        toggle(overlays.value.copy(library = !overlays.value.library))
+    }
 
     fun toggleSettings() {
         toggle(overlays.value.copy(settings = !overlays.value.settings))

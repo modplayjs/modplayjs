@@ -4,7 +4,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.bitti06.modplayjs.xr.R
 import com.bitti06.modplayjs.xr.state.XrStore
 import com.bitti06.modplayjs.xr.ui.panel.DetailsButton
+import com.bitti06.modplayjs.xr.ui.panel.LibraryButton
 import com.bitti06.modplayjs.xr.ui.panel.MetaText
 import com.bitti06.modplayjs.xr.ui.panel.PanelScaffold
 import com.bitti06.modplayjs.xr.ui.panel.PanelTokens
@@ -54,6 +54,7 @@ fun NowPlayingPanel() {
         title = stringResource(R.string.xr_now_playing),
         subtitle = if (playback.loaded) playback.format else null,
         headerActions = {
+            LibraryButton()
             DetailsButton()
             SettingsButton()
         },
@@ -134,47 +135,36 @@ fun NowPlayingPanel() {
             MetaText(formatTime(playback.positionMs), color = PanelTokens.TextFaint)
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm)) {
-            Column(
-                Modifier
-                    .weight(1f)
-                    .height(16.dp)
-                    .pointerInput(playback.durationMs) {
-                        detectTapGestures { offset ->
-                            if (playback.durationMs > 0 && size.width > 0) {
-                                val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                                XrStore.seek((fraction * playback.durationMs).toLong())
-                            }
-                        }
-                    },
-            ) {
-                val progress =
-                    if (playback.durationMs > 0) {
-                        (playback.positionMs.toFloat() / playback.durationMs).coerceIn(0f, 1f)
-                    } else {
-                        0f
+        var seekingProgress by remember { mutableFloatStateOf(-1f) }
+        val currentProgress = if (seekingProgress >= 0f) seekingProgress else {
+            if (playback.durationMs > 0) (playback.positionMs.toFloat() / playback.durationMs).coerceIn(0f, 1f) else 0f
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            MetaText(formatTime(playback.positionMs), color = PanelTokens.TextDim)
+            Slider(
+                value = currentProgress,
+                onValueChange = { seekingProgress = it },
+                onValueChangeFinished = {
+                    if (playback.durationMs > 0 && seekingProgress >= 0f) {
+                        XrStore.seek((seekingProgress * playback.durationMs).toLong())
                     }
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(PanelTokens.SurfaceSunken),
-                ) {
-                    Column(
-                        Modifier
-                            .fillMaxWidth(progress)
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(PanelTokens.Accent, PanelTokens.AccentAlt),
-                                ),
-                            ),
-                    ) {}
-                }
-            }
-            MetaText(formatTime(playback.durationMs), color = PanelTokens.TextFaint)
+                    seekingProgress = -1f
+                },
+                valueRange = 0f..1f,
+                enabled = playback.loaded && playback.durationMs > 0,
+                colors = SliderDefaults.colors(
+                    thumbColor = PanelTokens.AccentAlt,
+                    activeTrackColor = PanelTokens.Accent,
+                    inactiveTrackColor = PanelTokens.SurfaceSunken,
+                ),
+                modifier = Modifier.weight(1f).height(26.dp),
+            )
+            MetaText(formatTime(playback.durationMs), color = PanelTokens.TextDim)
         }
 
         Row(

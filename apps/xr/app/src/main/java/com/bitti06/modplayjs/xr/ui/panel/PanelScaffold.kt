@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.ScrollIndicatorState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,6 +93,24 @@ fun HomeButton() {
             .clip(RoundedCornerShape(50))
             .background(PanelTokens.SurfaceSunken)
             .clickable { XrStore.goHome() }
+            .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
+    )
+}
+
+/** Toggle the library panel in the arc. */
+@Composable
+fun LibraryButton() {
+    val state by XrStore.state.collectAsState()
+    val active = state.overlays.library
+    Text(
+        "📁",
+        fontSize = PanelTokens.ChipText,
+        color = if (active) PanelTokens.Accent else PanelTokens.TextDim,
+        modifier = Modifier
+            .padding(start = PanelTokens.GapSm)
+            .clip(RoundedCornerShape(50))
+            .background(if (active) PanelTokens.SurfaceRaised else PanelTokens.SurfaceSunken)
+            .clickable { XrStore.toggleLibrary() }
             .padding(horizontal = PanelTokens.GapSm, vertical = PanelTokens.GapXs),
     )
 }
