@@ -216,6 +216,8 @@ class XrPlayer(
     /** Marker entities are created and mutated on the main thread only. */
     private val markers = ArrayList<Entity>()
     private val markerLabels = ArrayList<Entity>()
+    @Volatile
+    private var markerPositionsCache: Array<Vector3?> = arrayOfNulls(32)
     private var levels = FloatArray(0)
     private var radiusManual = prefs.getBoolean(KEY_RADIUS_MANUAL, false)
     private var ringRadius = prefs.getFloat(KEY_RADIUS, 1.0f)
@@ -1245,9 +1247,32 @@ class XrPlayer(
     }
 
     /**
+     * Reads live marker transforms strictly on the Main Thread and updates
+     * [markerPositionsCache] and label positions.
+     */
+    private fun updateMarkerPositionsCache() {
+        onMain {
+            val channels = minOf(spatialInfo.channels, MAX_SOURCES)
+            for (i in 0 until channels) {
+                val markerEntity = markers.getOrNull(i)
+                val transform = markerEntity?.let { runCatching { it.getComponent<Transform>() }.getOrNull() }
+                if (transform != null) {
+                    val t = transform.transform.t
+                    runCatching { transform.recycle() }
+                    val pos = Vector3(t.x, t.y + MARKER_DROP, t.z)
+                    markerPositionsCache[i] = pos
+                    markerLabels.getOrNull(i)?.setComponent(Transform(Pose(Vector3(t.x, t.y + 0.16f, t.z))))
+                } else {
+                    markerPositionsCache[i] = null
+                }
+            }
+        }
+    }
+
+    /**
      * Hand the mixer one parameter row per channel.
      *
-     * Reads live marker transforms if spheres have been grabbed/moved in VR space,
+     * Reads live marker positions from [markerPositionsCache] (updated on Main Thread),
      * or falls back to dome geometry. Sends 3D distance, azimuth, and occlusion.
      */
     private fun pushSources() {
@@ -1256,17 +1281,15 @@ class XrPlayer(
         val channels = minOf(spatialInfo.channels, MAX_SOURCES)
         if (channels <= 0) return
 
+        if (debugVisible && markers.isNotEmpty()) {
+            updateMarkerPositionsCache()
+        }
+
         val listener = listenerPos
         val boxes = occluders
         val params = sourceParams
         for (i in 0 until channels) {
-            val markerEntity = markers.getOrNull(i)
-            val markerTransform = markerEntity?.let { runCatching { it.getComponent<Transform>() }.getOrNull() }
-            val position = if (markerTransform != null) {
-                val t = markerTransform.transform.t
-                runCatching { markerTransform.recycle() }
-                Vector3(t.x, t.y + MARKER_DROP, t.z)
-            } else {
+            val position = markerPositionsCache.getOrNull(i) ?: run {
                 val azimuth = spatialInfo.azimuths.getOrElse(i) { 0f }
                 val angles = channelSpatialAngles(i, channels)
                 domePoint(azimuth, angles.elevationDeg, ringRadius, ringCenterX, ringCenterZ, ringY)
@@ -1286,11 +1309,6 @@ class XrPlayer(
             params[base + 2] = 1f
             params[base + 3] = spreadDeg
             params[base + 4] = occlusion(listener, position, boxes)
-
-            val labelEntity = markerLabels.getOrNull(i)
-            if (labelEntity != null && markerTransform != null) {
-                labelEntity.setComponent(Transform(Pose(Vector3(position.x, position.y + 0.02f, position.z))))
-            }
         }
         eng.setSpatialSources(params, channels)
     }
@@ -1582,6 +1600,7 @@ class XrPlayer(
         markers.clear()
         for (l in markerLabels) runCatching { l.destroy() }
         markerLabels.clear()
+        markerPositionsCache.fill(null)
         markerSizes.fill(-1f)
     }
 
