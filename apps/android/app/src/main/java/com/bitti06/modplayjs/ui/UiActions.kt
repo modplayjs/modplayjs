@@ -61,6 +61,9 @@ interface UiActions {
 
     val underruns: Int get() = 0
 
+    /** Recoveries from a sink that stopped consuming. */
+    val stalls: Int get() = 0
+
     val sampleRate: Int get() = 48_000
 
     val audioSessionId: Int get() = 0

@@ -132,6 +132,9 @@ class PlaybackSession(
     val v8Available: Boolean get() = engine?.available == true
     val v8Error: String? get() = engine?.initError
     val underruns: Int get() = audio.underruns
+
+    /** Times the sink stopped consuming and had to be rebuilt. */
+    val stalls: Int get() = audio.info.stalls
     val audioSessionId: Int get() = audio.audioSessionId
 
     /** Audio stack details for the diagnostics screen. */

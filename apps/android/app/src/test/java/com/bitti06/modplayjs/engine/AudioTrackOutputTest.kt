@@ -1,6 +1,7 @@
 package com.bitti06.modplayjs.engine
 
 import android.media.AudioTrack
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,6 +27,25 @@ class AudioTrackOutputTest {
         assertFalse(shouldRebuild(AudioTrack.ERROR_INVALID_OPERATION, 0))
         assertFalse(shouldRebuild(AudioTrack.ERROR_BAD_VALUE, 0))
         assertFalse(shouldRebuild(AudioTrack.ERROR, 0))
+    }
+
+    @Test
+    fun `a positive write is progress`() {
+        assertEquals(WriteOutcome.PROGRESS, writeOutcome(2048, 0))
+        assertEquals(WriteOutcome.PROGRESS, writeOutcome(8, 0))
+    }
+
+    @Test
+    fun `zero written means the buffer is full, not an error`() {
+        // This is the case a blocking write would hide by never returning: the
+        // track is full and nobody drains it, so the loop has to keep looking.
+        assertEquals(WriteOutcome.BLOCKED, writeOutcome(0, 0))
+    }
+
+    @Test
+    fun `error codes split into rebuild and drop`() {
+        assertEquals(WriteOutcome.REBUILD, writeOutcome(AudioTrack.ERROR_DEAD_OBJECT, 0))
+        assertEquals(WriteOutcome.DROP, writeOutcome(AudioTrack.ERROR_INVALID_OPERATION, 0))
     }
 
     @Test

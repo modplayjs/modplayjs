@@ -7,6 +7,7 @@ import android.media.AudioManager
 import android.media.AudioTrack
 import android.os.Build
 import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -33,6 +34,9 @@ class AudioTrackOutput(
     private val paused = AtomicBoolean(false)
     private var ring: PcmRing? = null
     private var scratch = FloatArray(0)
+
+    /** Recoveries from a silent sink. One is a hiccup; a growing count is a bug. */
+    @Volatile private var stalls = 0
 
     /**
      * Released by the drain thread after its first write following [resume].
@@ -99,6 +103,7 @@ class AudioTrackOutput(
                     },
                 deviceFramesPerBuffer = deviceFramesPerBuffer,
                 lowLatencyRequested = true,
+                stalls = stalls,
                 writtenFrames =
                     if (Build.VERSION.SDK_INT >= 37) {
                         runCatching { t?.writtenFramesCount }.getOrNull()
@@ -165,10 +170,23 @@ class AudioTrackOutput(
     private fun loop() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
         var t = track ?: return
+        var lastAcceptedAt = SystemClock.elapsedRealtime()
         while (running.get()) {
             if (paused.get()) {
                 Thread.sleep(10)
                 continue
+            }
+            // The framework pauses a track on its own - a route change, a call
+            // taking the output, an output that was invalidated and re-created.
+            // Nothing tells the app, and a *blocking* write into a paused track
+            // never returns: the buffer is full and nobody drains it, so the
+            // drain thread wedges and the ring backs up into the render loop.
+            // The app then reports "playing" with no sound, forever. Both halves
+            // are addressed here: never block on a write, and resume a track the
+            // framework paused.
+            if (t.playState != AudioTrack.PLAYSTATE_PLAYING) {
+                Log.w(TAG, "track is ${t.playState}, not playing: resuming")
+                runCatching { t.play() }
             }
             val r = ring ?: break
             val n = r.read(scratch, scratch.size / 2)
@@ -177,44 +195,68 @@ class AudioTrackOutput(
                 continue
             }
             // write() reports failures by returning a negative error code, it
-            // does not throw. The old code ignored the result, so a track that
-            // the framework invalidated - which is what a screen-off output
-            // switch or a route change does - left this loop writing into a
-            // dead object forever: the card said "playing" and nothing came
-            // out. ERROR_DEAD_OBJECT is recoverable by rebuilding.
+            // does not throw; 0 means the buffer is full. Read the three cases
+            // apart instead of assuming a write always consumes everything.
+            var offset = 0
+            val total = n * 2
             var attempt = 0
-            while (running.get() && !paused.get()) {
+            while (running.get() && !paused.get() && offset < total) {
                 val written =
                     try {
-                        t.write(scratch, 0, n * 2, AudioTrack.WRITE_BLOCKING)
-                    } catch (t2: Throwable) {
-                        if (running.get()) Log.e(TAG, "write failed", t2)
+                        t.write(scratch, offset, total - offset, AudioTrack.WRITE_NON_BLOCKING)
+                    } catch (e: Throwable) {
+                        if (running.get()) Log.e(TAG, "write failed", e)
                         Thread.sleep(5)
+                        offset = total
                         break
                     }
-                if (written >= 0) {
-                    if (written < n * 2) {
-                        // write() returns floats, not frames. A blocking write
-                        // should be complete; a short one dropped the tail.
-                        Log.w(TAG, "short write: ${written / 2} of $n frames")
+                when (writeOutcome(written, attempt)) {
+                    WriteOutcome.PROGRESS -> {
+                        offset += written
+                        lastAcceptedAt = SystemClock.elapsedRealtime()
+                        firstWrite?.countDown()
                     }
-                    firstWrite?.countDown()
-                    break
+
+                    WriteOutcome.BLOCKED -> {
+                        // A full buffer is normal for a moment; a full buffer
+                        // that never drains is a stalled sink. Rebuilding is the
+                        // only recovery that does not depend on the framework
+                        // telling us what went wrong.
+                        val stalled = SystemClock.elapsedRealtime() - lastAcceptedAt
+                        if (stalled >= STALL_MS) {
+                            stalls++
+                            Log.e(TAG, "no progress for ${stalled} ms, rebuilding the track (${stalls} stalls)")
+                            val fresh = rebuild(t)
+                            if (fresh == null) {
+                                Thread.sleep(REBUILD_RETRY_MS)
+                                offset = total
+                            } else {
+                                t = fresh
+                                lastAcceptedAt = SystemClock.elapsedRealtime()
+                            }
+                        } else {
+                            Thread.sleep(2)
+                        }
+                    }
+
+                    WriteOutcome.REBUILD -> {
+                        attempt++
+                        val fresh = rebuild(t)
+                        if (fresh == null) {
+                            Thread.sleep(REBUILD_RETRY_MS)
+                            offset = total
+                        } else {
+                            t = fresh
+                            lastAcceptedAt = SystemClock.elapsedRealtime()
+                        }
+                    }
+
+                    WriteOutcome.DROP -> {
+                        Log.e(TAG, "write returned $written, dropping ${total / 2} frames")
+                        Thread.sleep(5)
+                        offset = total
+                    }
                 }
-                if (!shouldRebuild(written, attempt)) {
-                    Log.e(TAG, "write returned $written, dropping $n frames")
-                    Thread.sleep(5)
-                    break
-                }
-                attempt++
-                val fresh = rebuild(t)
-                if (fresh == null) {
-                    // Could not reopen the output. Give the device a moment and
-                    // try again rather than ending the only drain thread.
-                    Thread.sleep(REBUILD_RETRY_MS)
-                    break
-                }
-                t = fresh
             }
         }
     }
@@ -270,6 +312,13 @@ class AudioTrackOutput(
 
         /** Wait before trying to reopen a dead output. */
         const val REBUILD_RETRY_MS = 250L
+
+        /**
+         * How long a full buffer may stay full before the sink is considered
+         * stalled. Generous on purpose: a full buffer for a few milliseconds is
+         * ordinary, a full buffer for two seconds means nothing is consuming.
+         */
+        const val STALL_MS = 2_000L
     }
 }
 
@@ -278,6 +327,33 @@ enum class OutputPlayState {
     PAUSED,
     PLAYING,
 }
+
+/** What one non-blocking write result means for the drain loop. */
+internal enum class WriteOutcome {
+    /** Some floats were accepted; the buffer is draining. */
+    PROGRESS,
+
+    /** Zero accepted: the buffer is full right now. */
+    BLOCKED,
+
+    /** The track is gone and a new one may work. */
+    REBUILD,
+
+    /** Anything else: log it and drop this block. */
+    DROP,
+}
+
+/** Classify a `write()` result. Pure, so the three cases stay pinned. */
+internal fun writeOutcome(
+    written: Int,
+    attempt: Int,
+): WriteOutcome =
+    when {
+        written > 0 -> WriteOutcome.PROGRESS
+        written == 0 -> WriteOutcome.BLOCKED
+        shouldRebuild(written, attempt) -> WriteOutcome.REBUILD
+        else -> WriteOutcome.DROP
+    }
 
 /**
  * Whether a failed write means "the track is gone, build another".
@@ -305,6 +381,8 @@ data class AudioOutputInfo(
     val playState: OutputPlayState = OutputPlayState.STOPPED,
     val deviceFramesPerBuffer: Int = 0,
     val lowLatencyRequested: Boolean = false,
+    /** Recoveries from a sink that stopped consuming while we believed we played. */
+    val stalls: Int = 0,
     /** AudioTrack.getWrittenFramesCount(), Android 17+ only. */
     val writtenFrames: Long? = null,
 )

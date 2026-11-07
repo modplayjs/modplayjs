@@ -765,6 +765,10 @@ fun DiagnosticsScreen(
         InfoRow(stringResource(R.string.output_rate), "${actions.sampleRate} Hz")
         InfoRow(stringResource(R.string.audio_session), actions.audioSessionId.toString())
         InfoRow(stringResource(R.string.underruns), actions.underruns.toString())
+        // A recovery means the sink went silent while the app still believed it
+        // was playing. Noticing that here is how "no sound but the bar moves"
+        // stops being invisible.
+        InfoRow(stringResource(R.string.audio_stalls), actions.stalls.toString())
 
         // What the samples actually travel through, from the engine's float32
         // ring to the AudioTrack the platform mixes.

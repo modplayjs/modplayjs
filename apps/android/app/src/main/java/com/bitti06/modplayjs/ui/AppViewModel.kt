@@ -74,6 +74,8 @@ class AppViewModel(
     override val v8Available: Boolean get() = session.v8Available
     override val v8Error: String? get() = session.v8Error
     override val underruns: Int get() = session.underruns
+
+    override val stalls: Int get() = session.stalls
     override val sampleRate: Int get() = session.sampleRate
     override val audioSessionId: Int get() = session.audioSessionId
     override val audioInfo: AudioOutputInfo get() = session.audioInfo
