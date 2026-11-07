@@ -355,6 +355,7 @@ object XrStore {
 
     fun toggleFavorite(uri: Uri) {
         library?.toggleFavorite(uri)
+        libraryChanged()
     }
 
     fun ignore(uri: Uri) {
