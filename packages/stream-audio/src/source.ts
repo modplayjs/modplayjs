@@ -16,7 +16,14 @@ export interface StreamedSource {
   seek(ms: number): void;
   readonly channels: number;
   readonly sampleRate: number;
-  readonly duration: number;
+  /**
+   * Length in milliseconds, or 0 when the file gave no usable header.
+   *
+   * Milliseconds, not seconds: every consumer is a UI that formats mm:ss, and
+   * the previous `duration` was seconds while callers treated it as ms - a
+   * three-minute file advertised itself as 180 ms.
+   */
+  readonly durationMs: number;
 }
 
 export type StreamedFormat = 'wav' | 'mp3' | 'ogg';
@@ -134,7 +141,7 @@ export function createStreamedSource(bytes: Uint8Array, format: StreamedFormat, 
   return {
     channels: decoded.channels,
     sampleRate: outputRate,
-    duration: total / (decoded.channels * outputRate),
+    durationMs: Math.round((total / (decoded.channels * outputRate)) * 1000),
     playBuffer,
     seek,
   };

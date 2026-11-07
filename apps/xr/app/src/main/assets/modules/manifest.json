@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-07T14:17:51.591Z",
+  "generated": "2026-11-07T15:43:44.299Z",
   "layout": "modules/<name>/index.js",
   "always": [
     "modplayjs-core",
@@ -276,8 +276,8 @@
     "modplayjs-stream-audio": {
       "specifier": "@modplayjs/stream-audio",
       "asset": "modplayjs-stream-audio/index.js",
-      "bytes": 13091,
-      "sha256": "4a95dad44d70d7a1cec9ac091b02d828a5c712703fca220143c32cf7d12f346a",
+      "bytes": 13111,
+      "sha256": "2aad67db0e4c17e5d4f51cd177fdec14d8873122cb80f6adf42eac5bcdbb5350",
       "version": "0.2.1",
       "imports": [
         "@modplayjs/fmt-mo3",
@@ -465,8 +465,8 @@
   },
   "engine": {
     "asset": "engine-core/index.js",
-    "bytes": 23615,
-    "sha256": "9dd72720e04eb19c5ad9c2090a72a790fc928f149dc2028f2cd12ba72ed2fc1a",
+    "bytes": 23503,
+    "sha256": "ffd7eb023d1c5857bd0589861e1fd6445fad3b70aaf304561837825f3b72f209",
     "version": "0.2.1",
     "imports": [
       "@modplayjs/core",

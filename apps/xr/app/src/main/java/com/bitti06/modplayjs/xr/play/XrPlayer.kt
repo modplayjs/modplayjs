@@ -45,6 +45,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.LinkedBlockingQueue
@@ -474,6 +475,36 @@ class XrPlayer(
         releaseAll()
     }
 
+    /** True once the HVSC database went to the SID service. */
+    private var sidLengthsLoaded = false
+
+    /**
+     * Give the SID service its tune lengths.
+     *
+     * A SID file has no runtime of its own; the number comes from HVSC's
+     * `Songlengths.md5`, keyed by the MD5 of the file. Without it the engine
+     * reports 0 and the seekbar has nothing to scale against. Returns false when
+     * the asset is missing, so a later attempt can retry.
+     */
+    private fun loadSongLengths(eng: V8Engine): Boolean {
+        val text =
+            runCatching {
+                context.assets.open("Songlengths.md5").bufferedReader().use { it.readText() }
+            }.getOrNull()
+        if (text.isNullOrBlank()) {
+            android.util.Log.w("modplay-xr", "no Songlengths.md5 asset: SID lengths stay unknown")
+            return false
+        }
+        val json =
+            kotlinx.serialization.json.buildJsonObject {
+                put("type", "loadSidSongLengths")
+                put("text", text)
+            }.toString()
+        return runCatching { eng.command(json) }.isSuccess.also { ok ->
+            android.util.Log.i("modplay-xr", "song lengths ${if (ok) "loaded" else "failed"}")
+        }
+    }
+
     fun load(bytes: ByteArray, name: String, format: String, autoPlay: Boolean = true) {
         submit {
             try {
@@ -486,6 +517,11 @@ class XrPlayer(
                 val bridge = ModuleCatalog.formatFor(name)
                 if (bridge != null && !eng.installFormat(bridge)) {
                     error("format '$bridge' could not be installed")
+                }
+                // Installing the SID bridge is what creates the service that
+                // owns the HVSC database, so the lengths have to arrive after it.
+                if (bridge == "sid" && !sidLengthsLoaded) {
+                    sidLengthsLoaded = loadSongLengths(eng)
                 }
                 cachedPatternIndex = -1
                 cachedPattern = null

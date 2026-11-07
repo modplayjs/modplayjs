@@ -66734,7 +66734,7 @@
     return {
       channels: decoded.channels,
       sampleRate: outputRate,
-      duration: total / (decoded.channels * outputRate),
+      durationMs: Math.round(total / (decoded.channels * outputRate) * 1e3),
       playBuffer,
       seek: seek2
     };
@@ -66875,9 +66875,9 @@
   var isStreamed = () => streamed !== null;
   var isSid = () => core.module?.format === "sid";
   function durationMs() {
-    if (streamed) return streamed.duration;
+    if (streamed) return streamed.durationMs;
     const mod = core.module;
-    if (!mod || mod.endless) return 0;
+    if (!mod) return 0;
     let total = 0;
     for (const seq of mod.sequences) total += seq.duration;
     return total;
@@ -66950,13 +66950,13 @@
         restart: 0,
         globalVolume: 0,
         globalVolumeBase: 0,
-        durationMs: streamed.duration,
+        durationMs: streamed.durationMs,
         endless: false,
         streamed: {
           format: streamedFormat ?? "audio",
           channels: streamed.channels,
           sampleRate: streamed.sampleRate,
-          durationMs: streamed.duration
+          durationMs: streamed.durationMs
         },
         artwork: null
       };
@@ -67035,13 +67035,12 @@
       streamed: isStreamed(),
       sid,
       endless: sid || mod?.endless === true,
-      // A tracker module seeks by time whether or not its length is known -
-      // `core.seekTime` does not need one, and some modules legitimately report
-      // zero. A streamed file is different: without a duration there is nothing
-      // to seek within, and `streamed.seek` lands nowhere. Only that case is
-      // excluded here, instead of letting the UI offer a slider that cannot move
-      // the playhead.
-      seekable: loaded && !(sid || mod?.endless === true) && (!isStreamed() || durationMs() > 0),
+      // The slider scales the position by the duration, so a length is the
+      // precondition, not a nicety: without one the UI can only show "infinity"
+      // and a dead handle. All three paths can seek - trackers by `seekTime`, a
+      // stream by its decoded buffer, SID by fast-forwarding the emulation - so
+      // the rule is just "we know how long it is".
+      seekable: loaded && durationMs() > 0,
       patternView: tracker,
       mixer: tracker,
       mixerMode: tracker && mod.format === "mod" && mod.chn === 4,

@@ -47,7 +47,41 @@ class PlaybackSession(
     val sampleRate: Int get() = audio.sampleRate
 
     init {
-        v8Exec.execute { engine = V8Engine(context) }
+        v8Exec.execute {
+            val created = V8Engine(context)
+            engine = created
+            // Same executor, before anything can be played: the SID loader reads
+            // the runtime out of this database while it parses the tune, so
+            // loading it later would leave the first tune with no length.
+            loadSongLengths(created)
+        }
+    }
+
+    /**
+     * Hand the HVSC song-length database to the SID service.
+     *
+     * A SID file contains no runtime - it is a machine that plays until stopped.
+     * The lengths come from HVSC's `Songlengths.md5`, keyed by the MD5 of the
+     * file, and without it the engine reports 0 and the seekbar has nothing to
+     * scale against. Costs a few hundred milliseconds once, on the V8 thread.
+     */
+    private fun loadSongLengths(engine: V8Engine) {
+        val text =
+            runCatching {
+                context.assets.open("Songlengths.md5").bufferedReader().use { it.readText() }
+            }.getOrNull()
+        if (text.isNullOrBlank()) {
+            Log.w(TAG, "no Songlengths.md5 asset: SID tune lengths stay unknown")
+            return
+        }
+        val json =
+            buildJsonObject {
+                put("type", "loadSidSongLengths")
+                put("text", text)
+            }.toString()
+        runCatching { engine.command(json) }
+            .onSuccess { Log.i(TAG, "song lengths loaded: ${text.length} chars") }
+            .onFailure { Log.w(TAG, "song lengths not loaded", it) }
     }
 
     private val _snapshot = MutableStateFlow<AndroidSnapshot?>(null)

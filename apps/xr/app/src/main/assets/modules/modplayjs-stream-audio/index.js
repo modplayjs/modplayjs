@@ -417,7 +417,7 @@ function createStreamedSource(bytes, format, outputRate) {
   return {
     channels: decoded.channels,
     sampleRate: outputRate,
-    duration: total / (decoded.channels * outputRate),
+    durationMs: Math.round(total / (decoded.channels * outputRate) * 1e3),
     playBuffer,
     seek
   };
