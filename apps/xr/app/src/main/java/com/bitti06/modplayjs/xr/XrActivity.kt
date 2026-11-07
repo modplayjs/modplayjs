@@ -547,30 +547,12 @@ class XrActivity : AppSystemActivity(), XrHost {
      */
     override fun onRecenter(isUserInitiated: Boolean) {
         super.onRecenter(isUserInitiated)
-        // onRecenter fires more than once with a stale head pose; collapsing
-        // repeats avoids double-writing every Transform in one frame.
         val now = System.nanoTime()
         if (now - lastRecenterNs < RECENTER_DEBOUNCE_NS) return
         lastRecenterNs = now
 
-        // A recenter moves and rotates the LOCAL_FLOOR origin. Every entity
-        // keeps its coordinates and the user gets a new frame, so an anchor
-        // taken before the recenter puts the arc metres away. Re-read the head
-        // and rebuild both the arc and the ring from it. Free placements are
-        // left alone: the user put those in the world on purpose.
-        val head = readHeadPose()
-        if (head != null && ::placement.isInitialized) {
-            placement.setAnchor(head)
-            if (!placement.free) placement.apply(panels, force = true)
-            if (::player.isInitialized) {
-                player.recenterRing(head.t.x, head.t.y, head.t.z, yawOf(head.q))
-            }
-            Log.i(
-                TAG,
-                "recenter: head at (${head.t.x}, ${head.t.y}, ${head.t.z}) " +
-                    "free=${placement.free}",
-            )
-        }
+        anchoredToHead = false
+        anchorArcToHead()
         XrScene.reapply()
     }
 
@@ -785,7 +767,7 @@ class XrActivity : AppSystemActivity(), XrHost {
 private fun PanelContent(spec: PanelSpec) {
     val isVisible by remember(spec.id) {
         XrStore.state.map { spec.id in visiblePanels(it) }.distinctUntilChanged()
-    }.collectAsState(initial = spec.id in visiblePanels(XrStore.state.value))
+    }.collectAsState(initial = false)
 
     if (isVisible) spec.content()
 }
