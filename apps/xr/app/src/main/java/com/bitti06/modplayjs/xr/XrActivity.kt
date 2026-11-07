@@ -27,6 +27,7 @@ import com.bitti06.modplayjs.xr.play.XrPlayer
 import com.bitti06.modplayjs.xr.state.XrHost
 import com.bitti06.modplayjs.xr.state.XrState
 import com.bitti06.modplayjs.xr.state.XrStore
+import com.bitti06.modplayjs.xr.ui.ChannelLabelBadge
 import com.bitti06.modplayjs.xr.ui.XrTheme
 import com.meta.spatial.compose.ComposeFeature
 import com.meta.spatial.compose.ComposeViewPanelRegistration
@@ -112,8 +113,9 @@ class XrActivity : AppSystemActivity(), XrHost {
         )
     }
 
-    override fun registerPanels(): List<PanelRegistration> =
-        PANELS.map { spec ->
+    override fun registerPanels(): List<PanelRegistration> {
+        val list = ArrayList<PanelRegistration>()
+        list += PANELS.map { spec ->
             ComposeViewPanelRegistration(
                 spec.androidId,
                 composeViewCreator = { _, ctx ->
@@ -125,6 +127,35 @@ class XrActivity : AppSystemActivity(), XrHost {
                 settingsCreator = { panelSettings(spec) },
             )
         }
+
+        // Register 32 channel label panel registrations for floating VR labels
+        for (ch in 0 until 32) {
+            val regId = R.id.panel_channel_label_base + ch
+            list += ComposeViewPanelRegistration(
+                regId,
+                composeViewCreator = { _, ctx ->
+                    ComposeView(ctx).apply {
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        setContent { XrTheme { ChannelLabelBadge(ch) } }
+                    }
+                },
+                settingsCreator = { channelLabelPanelSettings() },
+            )
+        }
+        return list
+    }
+
+    private fun channelLabelPanelSettings(): PanelSettings =
+        UIPanelSettings(
+            shape = QuadShapeOptions(width = 0.16f, height = 0.07f),
+            style = PanelStyleOptions(themeResourceId = R.style.PanelAppThemeTransparent),
+            display = DpPerMeterDisplayOptions(dpPerMeter = 600f, resolutionScale = 1.0f),
+            rendering = UIPanelRenderOptions(
+                renderMode = PanelRenderMode.Layer(
+                    layerBlendType = PanelShapeLayerBlendType.ALPHA_BLEND,
+                )
+            )
+        )
 
     private fun panelSettings(spec: PanelSpec): PanelSettings {
         val base =

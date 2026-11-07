@@ -30,10 +30,12 @@ import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
 import com.meta.spatial.toolkit.MeshCollision
+import com.meta.spatial.toolkit.Panel
 import com.meta.spatial.toolkit.Scale
 import com.meta.spatial.toolkit.Sphere
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.Visible
+import com.bitti06.modplayjs.xr.R
 import com.meta.spatial.core.ComponentBase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -211,6 +213,7 @@ class XrPlayer(
 
     /** Marker entities are created and mutated on the main thread only. */
     private val markers = ArrayList<Entity>()
+    private val markerLabels = ArrayList<Entity>()
     private var levels = FloatArray(0)
     private var radiusManual = prefs.getBoolean(KEY_RADIUS_MANUAL, false)
     private var ringRadius = prefs.getFloat(KEY_RADIUS, 1.0f)
@@ -993,47 +996,52 @@ class XrPlayer(
         }
     }
 
+    private data class SpatialAngles(val azimuthDeg: Float, val elevationDeg: Float)
+
+    private fun channelSpatialAngles(index: Int, totalChannels: Int): SpatialAngles {
+        val az = -180f + (360f * index / totalChannels)
+        if (!settings.view.dome3D) {
+            return SpatialAngles(az, 0f)
+        }
+        val elev = when (index % 3) {
+            0 -> 10f
+            1 -> 38f
+            else -> 64f
+        }
+        return SpatialAngles(az, elev)
+    }
+
     /** Ring point for a bus, from explicit geometry instead of live fields. */
     private fun busPositionOf(index: Int, radius: Float, cx: Float, cz: Float, cy: Float): Vector3 {
-        val azimuth = -180f + 360f * index / BUS_COUNT
-        val elevation = if (settings.view.dome3D) {
-            val rad = Math.toRadians(azimuth.toDouble())
-            (kotlin.math.cos(rad) * 0.45f - 0.10f).toFloat()
-        } else 0f
-        return ringPoint(azimuth, radius, cx, cz, cy + elevation)
+        val angles = channelSpatialAngles(index, BUS_COUNT)
+        return domePoint(angles.azimuthDeg, angles.elevationDeg, radius, cx, cz, cy)
     }
 
     /**
-     * A point on the ring, optionally tilted about the listener's right axis.
-     *
-     * With [tiltApplied] = 0 this is the horizontal ring: azimuth 0 towards +Z,
-     * +90 towards +X. A non-zero tilt rotates that plane so its forward
-     * direction follows the head pitch - in a reclined posture azimuth 0 is
-     * then in front of the eyes instead of above the forehead. The rotation
-     * axis is the head yaw's right vector, so it works whichever way the user
-     * is facing.
+     * A point on the 3D dome, optionally tilted about the listener's right axis.
      */
-    private fun ringPoint(
+    private fun domePoint(
         azimuthDeg: Float,
+        elevationDeg: Float,
         radius: Float,
         cx: Float,
         cz: Float,
         cy: Float,
     ): Vector3 {
-        // The ring's own yaw: azimuth 0 points where the user faced when the
-        // stage was built, so the arc and the sound share one forward.
         val ringYaw = ringYawRad
-        val rad = Math.toRadians(azimuthDeg.toDouble()).toFloat() + ringYaw
-        val vx = (Math.sin(rad.toDouble()) * radius).toFloat()
-        val vz = (Math.cos(rad.toDouble()) * radius).toFloat()
-        val tilt = tiltApplied
-        if (tilt == 0f) return Vector3(cx + vx, cy, cz + vz)
+        val azRad = Math.toRadians(azimuthDeg.toDouble()).toFloat() + ringYaw
+        val elRad = Math.toRadians(elevationDeg.toDouble()).toFloat()
 
-        // Rotation about the ring's right axis, (cos ringYaw, 0, -sin ringYaw).
-        // Only the cross product gains a Y component, because the axis has no
-        // Y. The sign is chosen so a positive pitch lifts azimuth 0 towards the
-        // ceiling: reclined and looking up, the front channels end up in front
-        // of the eyes and the back channels towards the pillow.
+        val cosEl = Math.cos(elRad.toDouble()).toFloat()
+        val sinEl = Math.sin(elRad.toDouble()).toFloat()
+
+        val vx = (Math.sin(azRad.toDouble()).toFloat() * radius * cosEl)
+        val vz = (Math.cos(azRad.toDouble()).toFloat() * radius * cosEl)
+        val vy = radius * sinEl
+
+        val tilt = tiltApplied
+        if (tilt == 0f) return Vector3(cx + vx, cy + vy, cz + vz)
+
         val kx = Math.cos(ringYaw.toDouble()).toFloat()
         val kz = -Math.sin(ringYaw.toDouble()).toFloat()
         val c = Math.cos(tilt.toDouble()).toFloat()
@@ -1042,7 +1050,7 @@ class XrPlayer(
         val crossY = kx * vz - kz * vx
         val rx = vx * c + kx * kkv * (1f - c)
         val rz = vz * c + kz * kkv * (1f - c)
-        val ry = crossY * s
+        val ry = crossY * s + vy * c
         return Vector3(cx + rx, cy + ry, cz + rz)
     }
 
@@ -1182,11 +1190,9 @@ class XrPlayer(
      * 12 cm above the sound for the rest of the session after every rebuild.
      */
     private fun markerPositionFor(degrees: Float, index: Int = 0): Vector3 {
-        val elevation = if (settings.view.dome3D) {
-            val rad = Math.toRadians(degrees.toDouble())
-            (kotlin.math.cos(rad) * 0.45f - 0.10f).toFloat()
-        } else 0f
-        val p = ringPoint(degrees, ringRadius, ringCenterX, ringCenterZ, ringY + elevation)
+        val total = spatialInfo.channels.coerceAtLeast(1)
+        val angles = channelSpatialAngles(index, total)
+        val p = domePoint(degrees, angles.elevationDeg, ringRadius, ringCenterX, ringCenterZ, ringY)
         return Vector3(p.x, p.y - MARKER_DROP, p.z)
     }
 
@@ -1201,11 +1207,13 @@ class XrPlayer(
         val channels = spatialInfo.channels
         val markerPositions =
             List(channels) { i ->
-                markerPositionFor(spatialInfo.azimuths.getOrElse(i) { 0f })
+                markerPositionFor(spatialInfo.azimuths.getOrElse(i) { 0f }, i)
             }
         onMain {
             for (i in markerPositions.indices) {
-                markers.getOrNull(i)?.setComponent(Transform(Pose(markerPositions[i])))
+                val pos = markerPositions[i]
+                markers.getOrNull(i)?.setComponent(Transform(Pose(pos)))
+                markerLabels.getOrNull(i)?.setComponent(Transform(Pose(Vector3(pos.x, pos.y + 0.14f, pos.z))))
             }
         }
         pushSources()
@@ -1231,15 +1239,12 @@ class XrPlayer(
         val params = sourceParams
         for (i in 0 until channels) {
             val azimuth = spatialInfo.azimuths.getOrElse(i) { 0f }
-            // The audible point, not the un-rotated ring point: with a ring yaw
-            // or a recline tilt the bus for this azimuth sits somewhere else,
-            // and distance plus occlusion have to be measured to where the
-            // sound actually comes from.
-            val position = ringPoint(azimuth, ringRadius, ringCenterX, ringCenterZ, ringY)
+            val angles = channelSpatialAngles(i, channels)
+            val position = domePoint(azimuth, angles.elevationDeg, ringRadius, ringCenterX, ringCenterZ, ringY)
             val dx = position.x - listener.x
             val dy = position.y - listener.y
             val dz = position.z - listener.z
-            val distance = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+            val distance = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
             val base = i * 5
             params[base] = azimuth
             params[base + 1] = distance
@@ -1507,6 +1512,13 @@ class XrPlayer(
                     )
                 }
                 markers += Entity.create(components)
+
+                val labelComponents = ArrayList<ComponentBase>()
+                val labelPos = Vector3(positions[i].x, positions[i].y + 0.14f, positions[i].z)
+                labelComponents += Transform(Pose(labelPos))
+                labelComponents += Panel(R.id.panel_channel_label_base + (i % 32), MeshCollision.NoCollision)
+                labelComponents += Visible(true)
+                markerLabels += Entity.create(labelComponents)
             }
         }
     }
@@ -1528,6 +1540,8 @@ class XrPlayer(
     private fun destroyMarkersNow() {
         for (m in markers) runCatching { m.destroy() }
         markers.clear()
+        for (l in markerLabels) runCatching { l.destroy() }
+        markerLabels.clear()
         markerSizes.fill(-1f)
     }
 
