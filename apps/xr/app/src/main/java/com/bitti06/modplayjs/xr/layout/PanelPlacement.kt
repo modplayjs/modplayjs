@@ -156,15 +156,10 @@ class PanelPlacement(
         }
     }
 
-    /** Deliberate wipe: back to the arc and forget the saved arrangement. */
-    fun reset(entities: Map<PanelId, Entity>) {
-        for ((id, entity) in entities) {
-            val spec = specs[id] ?: continue
-            place(entity, anchored(spec.pose), animate = false)
-            setGrabbable(entity, free)
-        }
+    fun clearSavedPoses() {
         val edit = prefs.edit()
-        for (id in entities.keys) {
+        for (spec in PANELS) {
+            val id = spec.id
             edit.remove("x${id.name}")
             edit.remove("y${id.name}")
             edit.remove("z${id.name}")
@@ -174,6 +169,16 @@ class PanelPlacement(
             edit.remove("qw${id.name}")
         }
         edit.apply()
+    }
+
+    /** Deliberate wipe: back to the arc and forget the saved arrangement. */
+    fun reset(entities: Map<PanelId, Entity>) {
+        clearSavedPoses()
+        for ((id, entity) in entities) {
+            val spec = specs[id] ?: continue
+            place(entity, anchored(spec.pose), animate = false)
+            setGrabbable(entity, free)
+        }
     }
 
     /**

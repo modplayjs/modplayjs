@@ -551,6 +551,9 @@ class XrActivity : AppSystemActivity(), XrHost {
         if (now - lastRecenterNs < RECENTER_DEBOUNCE_NS) return
         lastRecenterNs = now
 
+        if (::placement.isInitialized) {
+            placement.clearSavedPoses()
+        }
         anchoredToHead = false
         anchorArcToHead()
         XrScene.reapply()
