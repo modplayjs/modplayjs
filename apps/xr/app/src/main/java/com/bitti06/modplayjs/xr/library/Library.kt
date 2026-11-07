@@ -92,10 +92,26 @@ class Library(private val context: Context) {
         }
     }
 
-    fun treeUris(): List<Uri> =
-        prefs.getStringSet(KEY_TREES, emptySet()).orEmpty().mapNotNull {
-            runCatching { Uri.parse(it) }.getOrNull()
+    fun treeUris(): List<Uri> {
+        val persisted = runCatching {
+            context.contentResolver.persistedUriPermissions.map { it.uri.toString() }.toSet()
+        }.getOrDefault(emptySet())
+
+        return prefs.getStringSet(KEY_TREES, emptySet()).orEmpty().mapNotNull { raw ->
+            runCatching {
+                val uri = Uri.parse(raw)
+                if (raw !in persisted) {
+                    runCatching {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                        )
+                    }
+                }
+                uri
+            }.getOrNull()
         }
+    }
 
     fun pickedCount(): Int = prefs.getStringSet(KEY_PICKED, emptySet()).orEmpty().size
 
@@ -222,11 +238,83 @@ class Library(private val context: Context) {
             folders += FolderEntry(treeUri, rootName, out.size - before)
         }
 
-        return ScanResult(
+        val res = ScanResult(
             tracks = out.values.sortedWith(compareBy({ it.format }, { it.title.lowercase() })),
             folders = folders,
             ignored = skipped,
         )
+        saveCachedScan(res)
+        return res
+    }
+
+    fun loadCachedScan(): ScanResult? {
+        val raw = prefs.getString(KEY_CACHED_SCAN, null) ?: return null
+        return runCatching {
+            val root = org.json.JSONObject(raw)
+            val ignored = root.optInt("ignored", 0)
+
+            val tracksArray = root.optJSONArray("tracks") ?: org.json.JSONArray()
+            val tracks = ArrayList<TrackFile>(tracksArray.length())
+            for (i in 0 until tracksArray.length()) {
+                val o = tracksArray.getJSONObject(i)
+                val uriStr = o.getString("uri")
+                tracks += TrackFile(
+                    uri = Uri.parse(uriStr),
+                    filename = o.optString("filename"),
+                    title = o.optString("title"),
+                    format = o.optString("format"),
+                    size = o.optLong("size", 0L),
+                    folder = o.optString("folder"),
+                    uriString = uriStr,
+                )
+            }
+
+            val foldersArray = root.optJSONArray("folders") ?: org.json.JSONArray()
+            val folders = ArrayList<FolderEntry>(foldersArray.length())
+            for (i in 0 until foldersArray.length()) {
+                val o = foldersArray.getJSONObject(i)
+                val uriStr = o.getString("uri")
+                folders += FolderEntry(
+                    uri = Uri.parse(uriStr),
+                    name = o.optString("name"),
+                    files = o.optInt("files", 0),
+                )
+            }
+
+            ScanResult(tracks, folders, ignored)
+        }.getOrNull()
+    }
+
+    private fun saveCachedScan(result: ScanResult) {
+        runCatching {
+            val root = org.json.JSONObject()
+            root.put("ignored", result.ignored)
+
+            val tracksArray = org.json.JSONArray()
+            for (t in result.tracks) {
+                val o = org.json.JSONObject()
+                o.put("uri", t.uriString)
+                o.put("filename", t.filename)
+                o.put("title", t.title)
+                o.put("format", t.format)
+                o.put("size", t.size)
+                o.put("folder", t.folder)
+                tracksArray.put(o)
+            }
+            root.put("tracks", tracksArray)
+
+            val foldersArray = org.json.JSONArray()
+            for (f in result.folders) {
+                val o = org.json.JSONObject()
+                o.put("uri", f.uri.toString())
+                o.put("name", f.name)
+                o.put("files", f.files)
+                foldersArray.put(o)
+            }
+            root.put("folders", foldersArray)
+
+            prefs.edit().putString(KEY_CACHED_SCAN, root.toString()).apply()
+        }
     }
 
     private fun walk(
@@ -308,6 +396,7 @@ class Library(private val context: Context) {
         private const val KEY_IGNORED = "ignored"
         private const val KEY_FAVORITES = "favorites"
         private const val KEY_RECENTS = "recents"
+        private const val KEY_CACHED_SCAN = "cachedScan"
         private const val MAX_RECENTS = 24
         private const val MAX_DEPTH = 12
 

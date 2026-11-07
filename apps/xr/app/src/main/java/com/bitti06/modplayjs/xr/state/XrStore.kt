@@ -108,6 +108,10 @@ object XrStore {
         this.player = player
         this.playlist = playlist
         this.library = library
+        val cachedScan = library.loadCachedScan()
+        if (cachedScan != null && cachedScan.tracks.isNotEmpty()) {
+            _libraryTracks.value = cachedScan
+        }
         refresh(freeLayout.value, passthrough.value)
 
         scope.launch { player.state.collect { refresh(freeLayout.value, passthrough.value) } }
