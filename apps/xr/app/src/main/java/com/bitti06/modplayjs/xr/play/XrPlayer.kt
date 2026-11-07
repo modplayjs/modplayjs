@@ -586,9 +586,15 @@ class XrPlayer(
 
     fun update(transform: (AndroidSettings) -> AndroidSettings) {
         submit {
+            val oldDome = settings.view.dome3D
+            val oldGrab = settings.view.grabSources
             settings = transform(settings)
             pushSettings()
             settingsStore.save(settings)
+            if (settings.view.dome3D != oldDome || settings.view.grabSources != oldGrab) {
+                applyPositions()
+                if (debugVisible) rebuildMarkers()
+            }
             publish(playing)
         }
     }
