@@ -1,5 +1,8 @@
 node_modules/
 dist/
+
+# The marketing site is its own repository; see webpage/README.md.
+/webpage/
 *.tsbuildinfo
 reference/
 *.wav
