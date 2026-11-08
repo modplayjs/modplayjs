@@ -233,12 +233,6 @@ class AppViewModel(
         viewModelScope.launch { repo.removeFolder(folder) }
     }
 
-    fun play(track: TrackEntity) {
-        val list = tracks.value.ifEmpty { listOf(track) }
-        val index = list.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-        playList(list, index)
-    }
-
     /** Replaces the queue with [items] and starts at [index]. */
     fun playList(
         items: List<TrackEntity>,

@@ -133,7 +133,6 @@ fun LibraryScreen(
     rootId: String?,
     path: List<String>,
     onNavigate: (String?, List<String>) -> Unit,
-    onPlay: (TrackEntity) -> Unit,
     onPlayList: (List<TrackEntity>, Int) -> Unit,
     onAddFolder: () -> Unit,
     onAddFile: () -> Unit,
@@ -147,7 +146,9 @@ fun LibraryScreen(
     onBack: (() -> Unit)? = null,
 ) {
     var showFilters by remember { mutableStateOf(false) }
-    var showTrackActions by remember { mutableStateOf<TrackEntity?>(null) }
+    // The sheet remembers the list its row came from, so "play" from the
+    // sheet queues the same list the row would have queued.
+    var showTrackActions by remember { mutableStateOf<Pair<TrackEntity, List<TrackEntity>>?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<TrackEntity?>(null) }
     var folderMenu by remember { mutableStateOf<FolderEntity?>(null) }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -282,16 +283,16 @@ fun LibraryScreen(
                 SearchResults(
                     tracks = tracks,
                     playingId = playingTrackId,
-                    onPlay = onPlay,
-                    onMore = { showTrackActions = it },
+                    onPlayList = onPlayList,
+                    onMore = { track, list -> showTrackActions = track to list },
                     onToggleFavorite = { actions.toggleFavorite(it) },
                 )
             rootId == ALL_ROOTS ->
                 AllTracks(
                     tracks = tracks,
                     playingId = playingTrackId,
-                    onPlay = onPlay,
-                    onMore = { showTrackActions = it },
+                    onPlayList = onPlayList,
+                    onMore = { track, list -> showTrackActions = track to list },
                     onToggleFavorite = { actions.toggleFavorite(it) },
                     onExit = { onNavigate(null, emptyList()) },
                 )
@@ -312,9 +313,8 @@ fun LibraryScreen(
                 path = path,
                 onNavigate = { newPath -> onNavigate(rootId, newPath) },
                 onExit = { onNavigate(null, emptyList()) },
-                onPlay = onPlay,
                 onPlayList = onPlayList,
-                onMore = { showTrackActions = it },
+                onMore = { track, list -> showTrackActions = track to list },
                 onToggleFavorite = { actions.toggleFavorite(it) },
             )
         }
@@ -337,7 +337,7 @@ fun LibraryScreen(
         }
     }
 
-    showTrackActions?.let { track ->
+    showTrackActions?.let { (track, list) ->
         ModalBottomSheet(
             onDismissRequest = { showTrackActions = null },
             sheetState = rememberBottomSheetState(
@@ -349,7 +349,7 @@ fun LibraryScreen(
                 track = track,
                 onPlay = {
                     showTrackActions = null
-                    onPlay(track)
+                    onPlayList(list, queuePosition(list, track))
                 },
                 onToggleFavorite = { actions.toggleFavorite(track) },
                 onIgnore = {
@@ -494,8 +494,8 @@ private fun RootList(
 private fun SearchResults(
     tracks: List<TrackEntity>,
     playingId: String?,
-    onPlay: (TrackEntity) -> Unit,
-    onMore: (TrackEntity) -> Unit,
+    onPlayList: (List<TrackEntity>, Int) -> Unit,
+    onMore: (TrackEntity, List<TrackEntity>) -> Unit,
     onToggleFavorite: (TrackEntity) -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
@@ -515,12 +515,12 @@ private fun SearchResults(
                 items(tracks, key = { it.id }) { track ->
                     TrackRow(
                         track,
-                        onClick = { onPlay(track) },
-                        onLongClick = { onMore(track) },
+                        onClick = { onPlayList(tracks, queuePosition(tracks, track)) },
+                        onLongClick = { onMore(track, tracks) },
                         onToggleFavorite = { onToggleFavorite(track) },
                         playing = track.id == playingId,
                         trailing = {
-                            IconButton(onClick = { onMore(track) }) {
+                            IconButton(onClick = { onMore(track, tracks) }) {
                                 Icon(
                                     AppIcons.MoreVert,
                                     contentDescription = stringResource(R.string.common_track_options),
@@ -538,8 +538,8 @@ private fun SearchResults(
 private fun AllTracks(
     tracks: List<TrackEntity>,
     playingId: String?,
-    onPlay: (TrackEntity) -> Unit,
-    onMore: (TrackEntity) -> Unit,
+    onPlayList: (List<TrackEntity>, Int) -> Unit,
+    onMore: (TrackEntity, List<TrackEntity>) -> Unit,
     onToggleFavorite: (TrackEntity) -> Unit,
     onExit: () -> Unit,
 ) {
@@ -572,12 +572,12 @@ private fun AllTracks(
                 items(tracks, key = { it.id }) { track ->
                     TrackRow(
                         track,
-                        onClick = { onPlay(track) },
-                        onLongClick = { onMore(track) },
+                        onClick = { onPlayList(tracks, queuePosition(tracks, track)) },
+                        onLongClick = { onMore(track, tracks) },
                         onToggleFavorite = { onToggleFavorite(track) },
                         playing = track.id == playingId,
                         trailing = {
-                            IconButton(onClick = { onMore(track) }) {
+                            IconButton(onClick = { onMore(track, tracks) }) {
                                 Icon(
                                     AppIcons.MoreVert,
                                     contentDescription = stringResource(R.string.common_track_options),
@@ -600,9 +600,8 @@ private fun Browser(
     path: List<String>,
     onNavigate: (List<String>) -> Unit,
     onExit: () -> Unit,
-    onPlay: (TrackEntity) -> Unit,
     onPlayList: (List<TrackEntity>, Int) -> Unit,
-    onMore: (TrackEntity) -> Unit,
+    onMore: (TrackEntity, List<TrackEntity>) -> Unit,
     onToggleFavorite: (TrackEntity) -> Unit,
 ) {
     val base = path.joinToString("/")
@@ -688,12 +687,14 @@ private fun Browser(
                 items(direct, key = { it.id }) { track ->
                     TrackRow(
                         track,
-                        onClick = { onPlay(track) },
-                        onLongClick = { onMore(track) },
+                        // The playlist is what this folder shows, not the
+                        // whole library: "next" stays in the open folder.
+                        onClick = { onPlayList(direct, queuePosition(direct, track)) },
+                        onLongClick = { onMore(track, direct) },
                         onToggleFavorite = { onToggleFavorite(track) },
                         playing = track.id == playingId,
                         trailing = {
-                            IconButton(onClick = { onMore(track) }) {
+                            IconButton(onClick = { onMore(track, direct) }) {
                                 Icon(
                                     AppIcons.MoreVert,
                                     contentDescription = stringResource(R.string.common_track_options),
@@ -928,7 +929,6 @@ private fun LibraryContentPreview(rootId: String?) {
         rootId = rootId,
         path = emptyList(),
         onNavigate = { _, _ -> },
-        onPlay = {},
         onPlayList = { _, _ -> },
         onAddFolder = {},
         onAddFile = {},

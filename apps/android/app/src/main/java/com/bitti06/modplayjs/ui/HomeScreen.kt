@@ -45,7 +45,7 @@ fun HomeScreen(
     onOpenLibrary: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenFolder: (String) -> Unit,
-    onPlay: (TrackEntity) -> Unit,
+    onPlayList: (List<TrackEntity>, Int) -> Unit,
     onToggleFavorite: (TrackEntity) -> Unit,
 ) {
     // One pass over the library instead of a count per folder row.
@@ -138,7 +138,9 @@ fun HomeScreen(
                 items(recent, key = { "recent:${it.id}" }) { track ->
                     TrackRow(
                         track,
-                        onClick = { onPlay(track) },
+                        // Recents are their own playlist: the next entry is the
+                        // next recent, not the next track of the library.
+                        onClick = { onPlayList(recent, queuePosition(recent, track)) },
                         onToggleFavorite = { onToggleFavorite(track) },
                     )
                 }
@@ -188,7 +190,7 @@ private fun HomeScreenContentPreview() {
         onOpenLibrary = {},
         onOpenFavorites = {},
         onOpenFolder = {},
-        onPlay = {},
+        onPlayList = { _, _ -> },
         onToggleFavorite = {},
     )
 }

@@ -140,10 +140,6 @@ private fun AppRoot(vm: AppViewModel) {
     val back: () -> Unit = {
         if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex)
     }
-    val playTrack: (TrackEntity) -> Unit = {
-        vm.play(it)
-        tabName = Tab.Playing.name
-    }
     val playList: (List<TrackEntity>, Int) -> Unit = { list, index ->
         vm.playList(list, index)
         tabName = Tab.Playing.name
@@ -290,7 +286,7 @@ private fun AppRoot(vm: AppViewModel) {
                                 libraryPath = arrayListOf()
                                 tabName = Tab.Library.name
                             },
-                            onPlay = playTrack,
+                            onPlayList = playList,
                             onToggleFavorite = { vm.toggleFavorite(it) },
                         )
 
@@ -315,7 +311,6 @@ private fun AppRoot(vm: AppViewModel) {
                                 libraryRoot = root
                                 libraryPath = ArrayList(path)
                             },
-                            onPlay = playTrack,
                             onPlayList = playList,
                             onAddFolder = { folderPicker.launch(null) },
                             onAddFile = { filePicker.launch(arrayOf("*/*")) },
@@ -374,10 +369,6 @@ private fun AppRoot(vm: AppViewModel) {
                 filters = filters,
                 scanProgress = scanProgress,
                 playingTrackId = nowPlayingTrack?.id,
-                onPlay = { track ->
-                    folderSheetOpen = false
-                    playTrack(track)
-                },
                 onPlayList = { list, index ->
                     folderSheetOpen = false
                     playList(list, index)
@@ -607,7 +598,6 @@ private fun FolderSheet(
     filters: Filters,
     scanProgress: ScanProgress?,
     playingTrackId: String?,
-    onPlay: (TrackEntity) -> Unit,
     onPlayList: (List<TrackEntity>, Int) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -640,7 +630,6 @@ private fun FolderSheet(
             rootId = root
             path = next
         },
-        onPlay = onPlay,
         onPlayList = onPlayList,
         onAddFolder = {},
         onOpenSettings = {},
