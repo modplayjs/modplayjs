@@ -51,6 +51,22 @@ jobs:
       - name: Build & typecheck
         run: npx turbo run build typecheck
 
+      # The engine bundles and the XR module tree are committed, so a build
+      # without node still ships the last generated version. That only holds
+      # if regenerating them reproduces the committed bytes: a tool bump or a
+      # source change that was not rebuilt leaves the APK and the catalog
+      # disagreeing. Rebuild and fail on any difference, including new files.
+      - name: Generated engine assets are current
+        run: |
+          set -eu
+          (cd apps/android && npm run build:engine)
+          (cd apps/xr && npm run build:engine && npm run build:modules)
+          if [ -n "$(git status --porcelain -- apps/android/app/src/main/assets apps/xr/app/src/main/assets)" ]; then
+            git status --short -- apps/android/app/src/main/assets apps/xr/app/src/main/assets
+            echo "::error::generated engine assets are stale; rebuild and commit them"
+            exit 1
+          fi
+
   # A .gitignore cannot help once a file is tracked: the rule has no effect on
   # files already in the index, which is exactly how the XR upload keystore
   # ended up in this repository. This job looks at what git actually tracks,

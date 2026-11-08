@@ -181,15 +181,52 @@ function kb(bytes) {
   return `${Math.round(bytes / 1024)}K`;
 }
 
+/**
+ * Build stamp for the manifest.
+ *
+ * `generated` is part of a tracked file *and* the app's downgrade guard, so it
+ * must move forward when the content changes and stay put when it does not.
+ * A wall-clock timestamp did the opposite: it changed on every build and on
+ * every machine, so the tracked manifest never matched a fresh build. Keeping
+ * the previous value while the rest of the document is byte-identical gives
+ * both properties - a rebuild that changes nothing produces no diff, and a
+ * rebuild that changes something gets a fresh stamp.
+ */
+function readManifest(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    // First build, or an unreadable file.
+    return null;
+  }
+}
+
+function stampFor(manifest, previous) {
+  const withoutStamp = (value) => {
+    if (value === null || typeof value !== 'object') return 'null';
+    const { generated, ...rest } = value;
+    return JSON.stringify(rest);
+  };
+  if (previous !== null && withoutStamp(previous) === withoutStamp(manifest)) {
+    return typeof previous.generated === 'string' ? previous.generated : '';
+  }
+  return new Date().toISOString();
+}
+
 async function main() {
   const packages = packageDirs();
   if (packages.length === 0) throw new Error(`no packages found in ${packagesRoot}`);
+
+  // Read the previous manifest before the output tree is wiped: it holds the
+  // stamp this build should keep when nothing else changed.
+  const previous = readManifest(join(outRoot, 'manifest.json'));
 
   rmSync(outRoot, { recursive: true, force: true });
   mkdirSync(join(outRoot, 'install'), { recursive: true });
 
   const manifest = {
-    generated: new Date().toISOString(),
+    // Filled in by stampFor() once everything else is known.
+    generated: '',
     layout: 'modules/<name>/index.js',
     always: ALWAYS.map(assetName),
     packages: {},
@@ -296,6 +333,7 @@ async function main() {
   };
   console.log(`  ${'engine-core'.padEnd(24)} ${kb(engineBytes).padStart(6)}`);
 
+  manifest.generated = stampFor(manifest, previous);
   writeFileSync(join(outRoot, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 
   // Every cross-package import has to exist as its own asset, or the native
