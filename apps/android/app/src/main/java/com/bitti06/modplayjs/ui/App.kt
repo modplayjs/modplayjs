@@ -326,7 +326,6 @@ private fun AppRoot(vm: AppViewModel) {
                         FavoritesScreen(
                             actions = vm,
                             favorites = favorites,
-                            onPlay = playTrack,
                             onPlayList = playList,
                             onBrowseLibrary = { tabName = Tab.Library.name },
                         )

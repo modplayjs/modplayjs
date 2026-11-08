@@ -337,7 +337,14 @@ fun LibraryPanel() {
                                 track = track,
                                 favorite = isFav,
                                 isPlaying = isPlaying,
-                                onPlay = { XrStore.playAt(shown, shown.indexOf(track)) },
+                                // The visible list is the playlist: with the
+                                // Favorites filter that is the favourites and
+                                // nothing else, so "next" stays inside them
+                                // instead of walking the track's folder.
+                                onPlay = {
+                                    val index = shown.indexOfFirst { it.uriString == track.uriString }
+                                    XrStore.playAt(shown, index.coerceAtLeast(0))
+                                },
                                 onIgnore = { XrStore.ignore(track.uri) },
                                 onFavorite = {
                                     XrStore.toggleFavorite(track.uri)

@@ -49,7 +49,6 @@ import com.bitti06.modplayjs.ui.icons.AppIcons
 fun FavoritesScreen(
     actions: UiActions,
     favorites: List<TrackEntity>,
-    onPlay: (TrackEntity) -> Unit,
     onPlayList: (List<TrackEntity>, Int) -> Unit,
     onBrowseLibrary: () -> Unit,
 ) {
@@ -109,7 +108,15 @@ fun FavoritesScreen(
                 items(favorites, key = { it.id }) { track ->
                     TrackRow(
                         track,
-                        onClick = { onPlay(track) },
+                        // The favourites tab is one playlist: tapping a row
+                        // queues the visible list and starts at that row, so
+                        // "next" is the next favourite. Building the queue from
+                        // the library here made it the next track of the
+                        // track's folder instead.
+                        onClick = {
+                            val index = favorites.indexOfFirst { it.id == track.id }
+                            onPlayList(favorites, index.coerceAtLeast(0))
+                        },
                         onLongClick = { showTrackActions = track },
                         onToggleFavorite = { actions.toggleFavorite(track) },
                         trailing = {
@@ -139,7 +146,8 @@ fun FavoritesScreen(
                 track = track,
                 onPlay = {
                     showTrackActions = null
-                    onPlay(track)
+                    val index = favorites.indexOfFirst { it.id == track.id }
+                    onPlayList(favorites, index.coerceAtLeast(0))
                 },
                 onToggleFavorite = {
                     actions.toggleFavorite(track)
@@ -184,7 +192,6 @@ private fun FavoritesScreenPreview() {
         FavoritesScreen(
             actions = PreviewActions,
             favorites = previewTracks().filter { it.favoriteAt != null },
-            onPlay = {},
             onPlayList = { _, _ -> },
             onBrowseLibrary = {},
         )
