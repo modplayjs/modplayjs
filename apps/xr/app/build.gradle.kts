@@ -236,7 +236,7 @@ tasks.named("preBuild").configure { dependsOn(checkV8Prebuilt) }
 
 apply(plugin = "com.meta.spatial.plugin")
 
-android {
+configure<com.android.build.api.dsl.ApplicationExtension> {
     namespace = "com.bitti06.modplayjs.xr"
     // core-ktx 1.19, lifecycle 2.11 and Compose UI 1.12 (BOM 2026.09.00) all
     // declare minCompileSdk=37, and AGP 9.5 supports up to API 37.
