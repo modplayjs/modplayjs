@@ -2,7 +2,7 @@
   "name": "@modplayjs/xr",
   "private": true,
   "license": "BSD-3-Clause",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "build:engine": "esbuild ../../apps/android/engine/src/engine-monolith.ts --bundle --format=iife --target=es2022 --platform=neutral --legal-comments=none --outfile=app/src/main/assets/engine/engine.js",
