@@ -20,6 +20,12 @@ name: Release
   push:
     branches:
       - main
+    # The version PR is the only thing that rewrites a package version.
+    # A path filter beats matching the commit message: a merge commit and a
+    # squash commit word it differently, and any body quoting the phrase
+    # would trigger a publish.
+    paths:
+      - 'packages/*/package.json'
   workflow_dispatch:
 
 concurrency:
@@ -38,11 +44,6 @@ defaults:
 jobs:
   release:
     name: Build & publish
-    # Unrelated pushes to main are a no-op. The version PR merges with either
-    # a merge commit or a squash commit, so match the message, not a prefix.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.head_commit.message, 'chore: version packages')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -153,8 +154,14 @@ jobs:
           done
           exit "$missing"
 
+      # `changeset git-tag` runs `git tag <name> -m <name>`, an annotated tag.
+      # Without a tagger identity that command fails, and changesets reports
+      # the tag as created anyway, so the push below would be a silent
+      # "Everything up-to-date".
       - name: Push release tags
         run: |
+          git config user.name "Bitti09"
+          git config user.email "Bitti09@users.noreply.github.com"
           npx changeset git-tag
           git push --tags
 
