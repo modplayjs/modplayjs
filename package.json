@@ -11,7 +11,8 @@
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "dev": "turbo run dev --filter=@modplayjs/demo",
-    "version": "changeset version && npm install --package-lock-only --no-audit --no-fund"
+    "version": "changeset version && npm install --package-lock-only --no-audit --no-fund && npm run build:generated",
+    "build:generated": "turbo run build --filter=./packages/* && cd apps/android && npm run build:engine && cd ../xr && npm run build:engine && npm run build:modules"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",

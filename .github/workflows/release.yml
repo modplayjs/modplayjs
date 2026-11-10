@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write # git tags created by `changeset publish`
+  contents: write # git tags created by `changeset git-tag`
   packages: write # npm.pkg.github.com
   id-token: write # npmjs.com trusted publishing
 
@@ -95,16 +95,31 @@ jobs:
           done
           echo "npmjs.com: published $published package(s)"
 
-      # Reads publishConfig.registry (npm.pkg.github.com) and only publishes
-      # versions that registry does not have yet; it also creates the
-      # per-package git tags.
+      # Explicit registry instead of `changeset publish`: it follows each
+      # package's publishConfig.registry and falls back to the default
+      # registry when a package has none, which sent out-android to npmjs.com.
+      # The loop treats both registries the same way.
       - name: Publish to GitHub Packages
-        run: npx changeset publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push release tags
-        run: git push --tags
+        run: |
+          set -euo pipefail
+          published=0
+          for manifest in packages/*/package.json; do
+            name=$(node -p "require('./$manifest').name")
+            version=$(node -p "require('./$manifest').version")
+            if [ "$(node -p "Boolean(require('./$manifest').private)")" = "true" ]; then
+              continue
+            fi
+            if npm view "$name@$version" version --registry https://npm.pkg.github.com/ >/dev/null 2>&1; then
+              echo "GitHub Packages: $name@$version is already published"
+              continue
+            fi
+            echo "GitHub Packages: publishing $name@$version"
+            (cd "$(dirname "$manifest")" && npm publish --tag latest --registry https://npm.pkg.github.com/)
+            published=$((published + 1))
+          done
+          echo "GitHub Packages: published $published package(s)"
 
       # Closing check: the run only counts as released when both registries
       # serve the version, not merely when npm exited 0. Newly published
@@ -137,3 +152,9 @@ jobs:
             done
           done
           exit "$missing"
+
+      - name: Push release tags
+        run: |
+          npx changeset git-tag
+          git push --tags
+
