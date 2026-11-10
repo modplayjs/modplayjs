@@ -1,5 +1,13 @@
 # @modplayjs/fmt-sid
 
+## 0.2.4
+
+### Patch Changes
+
+- [`a1c8128`](https://github.com/modplayjs/modplayjs/commit/a1c8128459b697effbffc075e1a167df5011a2e1) - - Merge pull request [#30](https://github.com/modplayjs/modplayjs/issues/30) from modplayjs/changeset-release/main (direct push)
+- Updated dependencies [[`a1c8128`](https://github.com/modplayjs/modplayjs/commit/a1c8128459b697effbffc075e1a167df5011a2e1)]:
+  - @modplayjs/core@0.2.4
+
 ## 0.2.3
 
 ### Patch Changes

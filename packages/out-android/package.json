@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/out-android",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Headless Android/Tauri player session: settings, transport, capabilities, commands.",
   "type": "module",
   "main": "dist/index.js",

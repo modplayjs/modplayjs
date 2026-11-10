@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-10T14:51:37.763Z",
+  "generated": "2026-11-10T15:04:45.850Z",
   "layout": "modules/<name>/index.js",
   "always": [
     "modplayjs-core",
@@ -14,7 +14,7 @@
       "asset": "modplayjs-core/index.js",
       "bytes": 250222,
       "sha256": "6a335ebcd482b6472da4f977cd33b640cae640082902591dc3b94e1419f70019",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "imports": []
     },
     "modplayjs-dsp-paula": {
@@ -32,7 +32,7 @@
       "asset": "modplayjs-dsp-softmixer/index.js",
       "bytes": 97243,
       "sha256": "abc9708e36f2ba5f1e05efd51a53bc631f70bbdeb1c2379de262aa8574f620ba",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "imports": [
         "@modplayjs/core"
       ]
@@ -85,7 +85,7 @@
       "asset": "modplayjs-fmt-fc/index.js",
       "bytes": 83767,
       "sha256": "74c33e3b53f5b8562b29d98556a07f463b91bdfa2c6f853ba01c7a7403c2302a",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "imports": [
         "@modplayjs/core"
       ]
@@ -191,7 +191,7 @@
       "asset": "modplayjs-fmt-sid/index.js",
       "bytes": 276668,
       "sha256": "aca12ab504c7f0b2ffc45e454db1dec35f4c6d09c11d2a8e5320ee9eb8cd61ef",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "imports": [
         "@modplayjs/core"
       ]
@@ -234,7 +234,7 @@
       "asset": "modplayjs-out-android/index.js",
       "bytes": 3336,
       "sha256": "a3de90709145df3ba34eeac089ac9869bbf9380750a2490eee79a694bf7ee347",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "imports": []
     },
     "modplayjs-out-pcm": {
@@ -429,7 +429,7 @@
       "install": "install/sid.js",
       "bytes": 606,
       "sha256": "1a5f470a382f7b117a179c09bc9a9316ab30ff99590c7605a33daa0c4e0b1237",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "extensions": [
         "sid"
       ],
@@ -440,7 +440,7 @@
       "install": "install/fc.js",
       "bytes": 380,
       "sha256": "e2bc11269c8061fb06edda7b298feaa4f04f49681708711c333bf2842c42d566",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "extensions": [
         "fc13",
         "fc14"
@@ -467,7 +467,7 @@
     "asset": "engine-core/index.js",
     "bytes": 23496,
     "sha256": "d03fcf4db7e41da450f1052e4c65cc4e724624553b42db1283208e11f9c6b598",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "imports": [
       "@modplayjs/core",
       "@modplayjs/dsp-paula",
