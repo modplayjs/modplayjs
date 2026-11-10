@@ -1,7 +1,9 @@
 ---
 '@modplayjs/xr': minor
+'@modplayjs/core': patch
 '@modplayjs/fmt-sid': patch
 '@modplayjs/dsp-softmixer': patch
+'@modplayjs/out-android': patch
 ---
 
 XR shell rewrite and audio fixes.
