@@ -48,7 +48,8 @@ jobs:
        github.event.pull_request.base.ref == 'main' &&
        github.event.pull_request.head.ref != 'chore/version-packages') ||
       (github.event_name == 'push' &&
-       !startsWith(github.event.head_commit.message, 'chore: version packages')) ||
+       !startsWith(github.event.head_commit.message, 'chore: version packages') &&
+       !contains(github.event.head_commit.message, 'changeset-release/main')) ||
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
