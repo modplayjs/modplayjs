@@ -1383,14 +1383,8 @@ class XrPlayer(
         val last = labelYaw.getOrNull(index) ?: Float.NaN
         if (!last.isNaN() && kotlin.math.abs(wrapPi(yaw - last)) < LABEL_YAW_STEP) return
         if (index < labelYaw.size) labelYaw[index] = yaw
-        label.setComponent(
-            Transform(
-                Pose(
-                    point,
-                    Quaternion(0f, Math.toDegrees(yaw.toDouble()).toFloat(), 0f),
-                ),
-            ),
-        )
+        val yawDeg = Math.toDegrees(yaw.toDouble()).toFloat() + LABEL_YAW_OFFSET_DEG
+        label.setComponent(Transform(Pose(point, Quaternion(0f, yawDeg, 0f))))
     }
 
     /** Re-aim every label after the head moved. Main thread only. */
@@ -2168,6 +2162,13 @@ class XrPlayer(
 
         /** Closer than 2 cm the direction is numerical noise. */
         private const val LABEL_MIN_DISTANCE_SQ = 0.0004f
+
+        /**
+         * Turn the label if `Text3D` turns out to face -Z. The mesh is created
+         * from glyphs on the XY plane and is treated as +Z-facing here; a
+         * mirrored label on the headset means this is 180.
+         */
+        private const val LABEL_YAW_OFFSET_DEG = 0f
         private const val KEY_SPATIAL = "spatialEnabled"
         private const val KEY_WET = "reverbWet"
         private const val KEY_SPREAD = "sourceSpread"
