@@ -390,14 +390,16 @@ function stop() {
 }
 function seek(ms) {
   if (!loaded) return;
-  const target = Math.max(0, ms);
+  const requested = Math.max(0, ms);
   if (streamed) {
+    const duration = streamed.durationMs;
+    const target = duration > 0 ? Math.min(requested, duration) : requested;
     streamed.seek(target);
     streamedFrames = target / 1e3 * sampleRate;
   } else if (isSid()) {
-    services.sid?.seek(target / 1e3);
+    services.sid?.seek(requested / 1e3);
   } else {
-    core.seekTime(target);
+    core.seekTime(requested);
   }
 }
 var renderScratch = new Float32Array(0);

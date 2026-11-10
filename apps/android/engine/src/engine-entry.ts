@@ -468,14 +468,18 @@ function stop(): void {
 
 function seek(ms: number): void {
   if (!loaded) return;
-  const target = Math.max(0, ms);
+  const requested = Math.max(0, ms);
   if (streamed) {
+    // Clamp to the decoded length: the slider cannot produce more, but the
+    // ±10 s buttons can, and seeking past the end used to end the track.
+    const duration = streamed.durationMs;
+    const target = duration > 0 ? Math.min(requested, duration) : requested;
     streamed.seek(target);
     streamedFrames = (target / 1000) * sampleRate;
   } else if (isSid()) {
-    services.sid?.seek(target / 1000);
+    services.sid?.seek(requested / 1000);
   } else {
-    core.seekTime(target);
+    core.seekTime(requested);
   }
 }
 

@@ -92,23 +92,40 @@ export function decodeStreamed(bytes: Uint8Array, format: StreamedFormat): { pcm
 export function createStreamedSource(bytes: Uint8Array, format: StreamedFormat, outputRate: number): StreamedSource | null {
   const decoded = decodeStreamed(bytes, format);
   if (!decoded) return null;
-  // Resample to the output rate if needed (linear).
+
+  // The player pulls interleaved stereo (two floats per frame); a mono or
+  // multichannel file would be consumed at the wrong rate and land the seek
+  // on the wrong frame. Normalise here, once, so every reading path below can
+  // assume two channels.
   let pcm = decoded.pcm;
+  if (decoded.channels !== 2) {
+    const srcChannels = decoded.channels;
+    const frames = pcm.length / srcChannels;
+    const stereo = new Float32Array(frames * 2);
+    for (let i = 0; i < frames; i++) {
+      const left = pcm[i * srcChannels]!;
+      const right = srcChannels > 1 ? pcm[i * srcChannels + 1]! : left;
+      stereo[i * 2] = left;
+      stereo[i * 2 + 1] = right;
+    }
+    pcm = stereo;
+  }
+
+  // Resample to the output rate if needed (linear).
   const inRate = decoded.sampleRate;
   if (inRate !== outputRate) {
     const ratio = outputRate / inRate;
-    const frames = decoded.pcm.length / decoded.channels;
+    const frames = pcm.length / 2;
     const outFrames = Math.floor(frames * ratio);
-    const resampled = new Float32Array(outFrames * decoded.channels);
+    const resampled = new Float32Array(outFrames * 2);
     for (let i = 0; i < outFrames; i++) {
       const src = i / ratio;
       const i0 = Math.floor(src);
       const frac = src - i0;
       const i1 = Math.min(i0 + 1, frames - 1);
-      for (let c = 0; c < decoded.channels; c++) {
-        resampled[i * decoded.channels + c] =
-          decoded.pcm[i0 * decoded.channels + c]! * (1 - frac) +
-          decoded.pcm[i1 * decoded.channels + c]! * frac;
+      for (let c = 0; c < 2; c++) {
+        resampled[i * 2 + c] =
+          pcm[i0 * 2 + c]! * (1 - frac) + pcm[i1 * 2 + c]! * frac;
       }
     }
     pcm = resampled;
@@ -132,16 +149,16 @@ export function createStreamedSource(bytes: Uint8Array, format: StreamedFormat, 
       return frames * 2;
   };
   const seek = (ms: number): void => {
-    // ms = the milliseconds into the resampled stream: the playPos = the
-    // interleaved float offset = ms × outputRate × channels / 1000.
-    playPos = Math.floor((ms * outputRate * decoded.channels) / 1000) * 2;
-    if (playPos < 0) playPos = 0;
-    if (playPos > total) playPos = total;
+    // playPos is a float index into interleaved stereo: one frame is two
+    // floats. (The earlier form multiplied by the channel count and then by
+    // two again, so a seek to 50 % landed at the end of the file.)
+    const frame = Math.floor((Math.max(0, ms) / 1000) * outputRate);
+    playPos = Math.min(frame * 2, total);
   };
   return {
-    channels: decoded.channels,
+    channels: 2,
     sampleRate: outputRate,
-    durationMs: Math.round((total / (decoded.channels * outputRate)) * 1000),
+    durationMs: Math.round((total / 2 / outputRate) * 1000),
     playBuffer,
     seek,
   };

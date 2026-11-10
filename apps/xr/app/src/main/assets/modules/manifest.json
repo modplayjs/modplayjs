@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-10T23:01:36.629Z",
+  "generated": "2026-11-10T23:48:28.830Z",
   "layout": "modules/<name>/index.js",
   "always": [
     "modplayjs-core",
@@ -114,8 +114,8 @@
     "modplayjs-fmt-med": {
       "specifier": "@modplayjs/fmt-med",
       "asset": "modplayjs-fmt-med/index.js",
-      "bytes": 87300,
-      "sha256": "15e6fe50096ed300ca7448085df33bd619b7a27125e43e26dfe7f345e1e81f7c",
+      "bytes": 87325,
+      "sha256": "3d226b032713cf795390845d466ed6871659f6ac3fa13d38db4afb3affd80e14",
       "version": "0.2.2",
       "imports": [
         "@modplayjs/core"
@@ -276,8 +276,8 @@
     "modplayjs-stream-audio": {
       "specifier": "@modplayjs/stream-audio",
       "asset": "modplayjs-stream-audio/index.js",
-      "bytes": 13111,
-      "sha256": "2aad67db0e4c17e5d4f51cd177fdec14d8873122cb80f6adf42eac5bcdbb5350",
+      "bytes": 13333,
+      "sha256": "8d4d54b7e0ce2e4f3c481540ceeadff5567170fe9392845ab10d331e5f194efe",
       "version": "0.2.2",
       "imports": [
         "@modplayjs/fmt-mo3",
@@ -465,8 +465,8 @@
   },
   "engine": {
     "asset": "engine-core/index.js",
-    "bytes": 23496,
-    "sha256": "d03fcf4db7e41da450f1052e4c65cc4e724624553b42db1283208e11f9c6b598",
+    "bytes": 23624,
+    "sha256": "994e6a0375c25de9f5ef140c07549ca13cafc4711f334d3390f697d213cf3fe9",
     "version": "0.2.3",
     "imports": [
       "@modplayjs/core",

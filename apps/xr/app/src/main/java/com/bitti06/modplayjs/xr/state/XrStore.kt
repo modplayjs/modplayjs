@@ -108,9 +108,12 @@ object XrStore {
         this.player = player
         this.playlist = playlist
         this.library = library
-        val cachedScan = library.loadCachedScan()
-        if (cachedScan != null && cachedScan.tracks.isNotEmpty()) {
-            _libraryTracks.value = cachedScan
+        // Parsing the cached scan is a JSON decode of every track; on a big
+        // library it is tens of milliseconds of main-thread work during
+        // activity start, which is visible as a hitch in hand tracking.
+        scope.launch(Dispatchers.IO) {
+            val cached = library.loadCachedScan()
+            if (cached != null && cached.tracks.isNotEmpty()) _libraryTracks.value = cached
         }
         refresh(freeLayout.value, passthrough.value)
 
@@ -134,9 +137,18 @@ object XrStore {
                 _scanItem.value = ""
                 val scanned =
                     runCatching {
+                        // The walk reports once per file. Publishing two state
+                        // flows per file recomposes the library panel thousands
+                        // of times a second and makes hand tracking stutter, so
+                        // the counter updates at 10 Hz instead.
+                        var lastProgressNs = 0L
                         lib.scan { count, item ->
-                            _scanCount.value = count
-                            _scanItem.value = item
+                            val now = System.nanoTime()
+                            if (count == 0 || now - lastProgressNs >= PROGRESS_NS) {
+                                lastProgressNs = now
+                                _scanCount.value = count
+                                _scanItem.value = item
+                            }
                         }
                     }.getOrNull()
                 if (scanned != null) _libraryTracks.value = scanned
@@ -403,4 +415,7 @@ object XrStore {
         libraryChanged()
         rescan()
     }
+
+    /** 10 Hz: fast enough to read, slow enough not to recompose per file. */
+    private const val PROGRESS_NS = 100_000_000L
 }

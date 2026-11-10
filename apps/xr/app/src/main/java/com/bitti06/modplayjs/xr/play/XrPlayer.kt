@@ -20,6 +20,7 @@ import com.bitti06.modplayjs.xr.audio.SpatialLayout
 import com.meta.spatial.core.Color4
 import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
+import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.Vector3
 import com.meta.spatial.runtime.Scene
 import com.meta.spatial.spatialaudio.AudioSessionId
@@ -250,6 +251,10 @@ class XrPlayer(
     /** Marker entities are created and mutated on the main thread only. */
     private val markers = ArrayList<Entity>()
     private val markerLabels = ArrayList<Entity>()
+    /** World point of each label, so the billboard pass does not read ECS. */
+    private val labelPoints = ArrayList<Vector3>()
+    /** Last yaw written per label, radians; a still head writes nothing. */
+    private var labelYaw = FloatArray(0)
 
     /** Grabbed marker positions, copied on the main thread for the mixer. */
     @Volatile
@@ -1354,10 +1359,45 @@ class XrPlayer(
             for (i in 0 until minOf(channels, markers.size)) {
                 val p = positions[i]
                 markers[i].setComponent(Transform(Pose(p)))
-                markerLabels.getOrNull(i)?.setComponent(
-                    Transform(Pose(Vector3(p.x, p.y + MARKER_LABEL_OFFSET, p.z))),
-                )
+                val label = Vector3(p.x, p.y + MARKER_LABEL_OFFSET, p.z)
+                if (i < labelPoints.size) labelPoints[i] = label
+                markerLabels.getOrNull(i)?.let { setLabelPose(it, label, i) }
             }
+        }
+    }
+
+    /**
+     * Point one channel label at the listener.
+     *
+     * `Text3D` is an extruded mesh with a fixed orientation: created at
+     * identity it faces world +Z, so walking around the ring left labels
+     * edge-on or mirrored. The billboard is yaw-only, because a full look-at
+     * would tip the text when the listener looks down; a dead band keeps a
+     * still head from writing a Transform thirty times a second.
+     */
+    private fun setLabelPose(label: Entity, point: Vector3, index: Int) {
+        val dx = listenerPos.x - point.x
+        val dz = listenerPos.z - point.z
+        if (dx * dx + dz * dz < LABEL_MIN_DISTANCE_SQ) return
+        val yaw = kotlin.math.atan2(dx, dz)
+        val last = labelYaw.getOrNull(index) ?: Float.NaN
+        if (!last.isNaN() && kotlin.math.abs(wrapPi(yaw - last)) < LABEL_YAW_STEP) return
+        if (index < labelYaw.size) labelYaw[index] = yaw
+        label.setComponent(
+            Transform(
+                Pose(
+                    point,
+                    Quaternion(0f, Math.toDegrees(yaw.toDouble()).toFloat(), 0f),
+                ),
+            ),
+        )
+    }
+
+    /** Re-aim every label after the head moved. Main thread only. */
+    private fun faceLabels() {
+        for (i in markerLabels.indices) {
+            val point = labelPoints.getOrNull(i) ?: continue
+            setLabelPose(markerLabels[i], point, i)
         }
     }
 
@@ -1531,6 +1571,8 @@ class XrPlayer(
         listenerPos = Vector3(x, y, z)
         headYaw = yaw
         headPitch = pitch
+        // The labels are billboards: they follow the head, not the ring.
+        if (markerLabels.isNotEmpty()) faceLabels()
         val targetY = y.coerceIn(0.2f, 2.4f)
 
         if (!ringAnchored) {
@@ -1703,6 +1745,8 @@ class XrPlayer(
             if (markerSizes.size < positions.size) {
                 markerSizes = FloatArray(positions.size) { -1f }
             }
+            labelYaw = FloatArray(positions.size) { Float.NaN }
+            labelPoints.clear()
             for (i in positions.indices) {
                 val components = ArrayList<ComponentBase>()
                 components += Mesh("mesh://sphere".toUri(), collision)
@@ -1738,7 +1782,12 @@ class XrPlayer(
                     unlit = true
                 }
                 labelComponents += Visible(true)
-                markerLabels += Entity.create(labelComponents)
+                val labelPoint =
+                    Vector3(positions[i].x, positions[i].y + MARKER_LABEL_OFFSET, positions[i].z)
+                labelPoints += labelPoint
+                val labelEntity = Entity.create(labelComponents)
+                markerLabels += labelEntity
+                setLabelPose(labelEntity, labelPoint, i)
             }
         }
     }
@@ -2113,6 +2162,12 @@ class XrPlayer(
 
         /** 2 mm: below this the bus entities are not rewritten. */
         private const val FOLLOW_EPSILON = 0.002f
+
+        /** Label billboard: rewrite only past ~1.7 degrees of head turn. */
+        private const val LABEL_YAW_STEP = 0.03f
+
+        /** Closer than 2 cm the direction is numerical noise. */
+        private const val LABEL_MIN_DISTANCE_SQ = 0.0004f
         private const val KEY_SPATIAL = "spatialEnabled"
         private const val KEY_WET = "reverbWet"
         private const val KEY_SPREAD = "sourceSpread"

@@ -7,6 +7,8 @@ import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.Vector3
+import com.meta.spatial.isdk.IsdkGrabState
+import com.meta.spatial.isdk.IsdkGrabbable
 import com.meta.spatial.toolkit.Grabbable
 import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Transform
@@ -199,12 +201,30 @@ class PanelPlacement(
         }
     }
 
+    /**
+     * Whether the input system owns this panel right now.
+     *
+     * The toolkit flag is written by the bridge, but it is only a mirror of the
+     * Interaction SDK's grab state and lags it by a frame; a panel that is
+     * being moved would be re-placed by [apply] in that window and feel stuck.
+     * Both flags are read (never written) and either one is enough.
+     */
     fun isGrabbed(entity: Entity): Boolean {
-        val grab = runCatching { entity.tryGetComponent<Grabbable>() }.getOrNull() ?: return false
+        val grab = runCatching { entity.tryGetComponent<Grabbable>() }.getOrNull()
+        if (grab != null) {
+            val grabbed =
+                try {
+                    grab.isGrabbed
+                } finally {
+                    runCatching { grab.recycle() }
+                }
+            if (grabbed) return true
+        }
+        val isdk = runCatching { entity.tryGetComponent<IsdkGrabbable>() }.getOrNull() ?: return false
         return try {
-            grab.isGrabbed
+            isdk.grabState == IsdkGrabState.Grabbed
         } finally {
-            runCatching { grab.recycle() }
+            runCatching { isdk.recycle() }
         }
     }
 

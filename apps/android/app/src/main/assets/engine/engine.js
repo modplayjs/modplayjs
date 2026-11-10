@@ -66709,19 +66709,31 @@
     const decoded = decodeStreamed(bytes, format);
     if (!decoded) return null;
     let pcm = decoded.pcm;
+    if (decoded.channels !== 2) {
+      const srcChannels = decoded.channels;
+      const frames = pcm.length / srcChannels;
+      const stereo = new Float32Array(frames * 2);
+      for (let i = 0; i < frames; i++) {
+        const left = pcm[i * srcChannels];
+        const right = srcChannels > 1 ? pcm[i * srcChannels + 1] : left;
+        stereo[i * 2] = left;
+        stereo[i * 2 + 1] = right;
+      }
+      pcm = stereo;
+    }
     const inRate = decoded.sampleRate;
     if (inRate !== outputRate) {
       const ratio = outputRate / inRate;
-      const frames = decoded.pcm.length / decoded.channels;
+      const frames = pcm.length / 2;
       const outFrames = Math.floor(frames * ratio);
-      const resampled = new Float32Array(outFrames * decoded.channels);
+      const resampled = new Float32Array(outFrames * 2);
       for (let i = 0; i < outFrames; i++) {
         const src = i / ratio;
         const i0 = Math.floor(src);
         const frac = src - i0;
         const i1 = Math.min(i0 + 1, frames - 1);
-        for (let c = 0; c < decoded.channels; c++) {
-          resampled[i * decoded.channels + c] = decoded.pcm[i0 * decoded.channels + c] * (1 - frac) + decoded.pcm[i1 * decoded.channels + c] * frac;
+        for (let c = 0; c < 2; c++) {
+          resampled[i * 2 + c] = pcm[i0 * 2 + c] * (1 - frac) + pcm[i1 * 2 + c] * frac;
         }
       }
       pcm = resampled;
@@ -66745,14 +66757,13 @@
       return frames * 2;
     };
     const seek2 = (ms) => {
-      playPos = Math.floor(ms * outputRate * decoded.channels / 1e3) * 2;
-      if (playPos < 0) playPos = 0;
-      if (playPos > total) playPos = total;
+      const frame = Math.floor(Math.max(0, ms) / 1e3 * outputRate);
+      playPos = Math.min(frame * 2, total);
     };
     return {
-      channels: decoded.channels,
+      channels: 2,
       sampleRate: outputRate,
-      durationMs: Math.round(total / (decoded.channels * outputRate) * 1e3),
+      durationMs: Math.round(total / 2 / outputRate * 1e3),
       playBuffer,
       seek: seek2
     };
@@ -67188,14 +67199,16 @@
   }
   function seek(ms) {
     if (!loaded) return;
-    const target = Math.max(0, ms);
+    const requested = Math.max(0, ms);
     if (streamed) {
+      const duration = streamed.durationMs;
+      const target = duration > 0 ? Math.min(requested, duration) : requested;
       streamed.seek(target);
       streamedFrames = target / 1e3 * sampleRate;
     } else if (isSid()) {
-      services.sid?.seek(target / 1e3);
+      services.sid?.seek(requested / 1e3);
     } else {
-      core.seekTime(target);
+      core.seekTime(requested);
     }
   }
   var renderScratch = new Float32Array(0);
