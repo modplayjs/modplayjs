@@ -258,18 +258,24 @@ review, debugging, verification and testing by Bitti09.
 
 ## Package registry
 
-> **⚠ All `@modplayjs/*` packages are published to [GitHub Packages](https://github.com/orgs/modplayjs/packages) (`npm.pkg.github.com`), NOT npmjs.com.**
->
-> This is because npm Trusted Publisher OIDC doesn't work for first-time
-> publishes of new packages, and the npmjs.com account's 2FA blocks
-> headless publishing. GitHub Packages uses the workflow token — fully
-> automatic.
->
-> To install, add a GitHub token (with `read:packages` scope) to
-> `~/.npmrc` once:
->
-> ```
-> //npm.pkg.github.com/:_authToken=YOUR_GH_TOKEN
-> ```
->
-> Then `npm install @modplayjs/core` works normally.
+All `@modplayjs/*` packages are published to npmjs.com and mirrored to
+[GitHub Packages](https://github.com/orgs/modplayjs/packages):
+
+```sh
+npm install @modplayjs/core            # npmjs.com, no token
+```
+
+GitHub Packages needs a token with `read:packages` in `~/.npmrc`, plus the
+scope redirect:
+
+```
+//npm.pkg.github.com/:_authToken=YOUR_GH_TOKEN
+@modplayjs:registry=https://npm.pkg.github.com
+```
+
+`.github/workflows/release.yml` does the publishing after the "chore: version
+packages" PR merges. npmjs.com authenticates with OIDC trusted publishing — no
+stored token, and npm adds a provenance attestation; the trusted publisher on
+npmjs.com must name `release.yml` and this repository. GitHub Packages uses the
+workflow's `GITHUB_TOKEN`. A manual dispatch publishes whatever version is
+still missing from either registry.

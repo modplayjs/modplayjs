@@ -9,10 +9,11 @@ name: Version PR
 #   2. This workflow opens/updates the single version PR, applying all
 #      pending bumps + changelogs.
 #   3. Merging that PR lands the "chore: version packages" commit on
-#      main, which publish.yml consumes (scoped build + GitHub Packages).
+#      main, which release.yml consumes (build + npmjs.com and GitHub
+#      Packages).
 #
-# No publish here — publishing lives in publish.yml, triggered only by
-# the version merge, so unrelated pushes to main never touch the registry.
+# No publish here — publishing lives in release.yml, triggered only by
+# the version merge, so unrelated pushes to main never touch a registry.
 
 "on":
   push:
@@ -52,7 +53,7 @@ jobs:
         uses: changesets/action@v1
         with:
           # Updates the rolling PR from current main; publish stays out of
-          # this workflow entirely (see publish.yml).
+          # this workflow entirely (see release.yml).
           version: npm run version
           createGithubReleases: false
           title: 'chore: version packages'

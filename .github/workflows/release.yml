@@ -1,0 +1,139 @@
+name: Release
+
+# Publishes every @modplayjs/* package to npmjs.com and to GitHub Packages.
+#
+# Flow: feature PR → changeset on main (auto-changeset.yml) → version-pr.yml
+# keeps the rolling "chore: version packages" PR current → merging it lands the
+# bumped versions on main → this workflow publishes them.
+#
+# npmjs.com authenticates with OIDC trusted publishing: no token is stored and
+# npm attaches a provenance attestation on its own. The trusted publisher on
+# npmjs.com must name this file (`release.yml`) and this repository, and each
+# package's `repository.url` must point at modplayjs/modplayjs. GitHub Packages
+# authenticates with the workflow's GITHUB_TOKEN.
+#
+# A manual run (workflow_dispatch) publishes whatever version is still missing
+# from either registry, so a run that stopped halfway is finished by
+# dispatching it again.
+
+"on":
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # git tags created by `changeset publish`
+  packages: write # npm.pkg.github.com
+  id-token: write # npmjs.com trusted publishing
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: Build & publish
+    # Unrelated pushes to main are a no-op. The version PR merges with either
+    # a merge commit or a squash commit, so match the message, not a prefix.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, 'chore: version packages')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      # Trusted publishing needs npm >= 11.5.1 and Node >= 22.14.0
+      # (https://docs.npmjs.com/trusted-publishers). Node 24 ships npm 11,
+      # installing it explicitly keeps that independent of the image.
+      - name: Install npm with OIDC support
+        run: |
+          npm install --global npm@11
+          npm --version
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build packages
+        run: npx turbo run build --filter=./packages/*
+
+      # Host-scoped, so the npmjs.com step below has no npmjs.com token and
+      # falls through to OIDC. The variable stays a reference; its value is
+      # supplied by the publish steps.
+      - name: Configure GitHub Packages authentication
+        run: echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> "$HOME/.npmrc"
+
+      - name: Publish to npmjs.com
+        run: |
+          set -euo pipefail
+          published=0
+          for manifest in packages/*/package.json; do
+            name=$(node -p "require('./$manifest').name")
+            version=$(node -p "require('./$manifest').version")
+            if [ "$(node -p "Boolean(require('./$manifest').private)")" = "true" ]; then
+              continue
+            fi
+            if npm view "$name@$version" version --registry https://registry.npmjs.org/ >/dev/null 2>&1; then
+              echo "npmjs.com: $name@$version is already published"
+              continue
+            fi
+            echo "npmjs.com: publishing $name@$version"
+            (cd "$(dirname "$manifest")" && npm publish --access public --tag latest --registry https://registry.npmjs.org/)
+            published=$((published + 1))
+          done
+          echo "npmjs.com: published $published package(s)"
+
+      # Reads publishConfig.registry (npm.pkg.github.com) and only publishes
+      # versions that registry does not have yet; it also creates the
+      # per-package git tags.
+      - name: Publish to GitHub Packages
+        run: npx changeset publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push release tags
+        run: git push --tags
+
+      # Closing check: the run only counts as released when both registries
+      # serve the version, not merely when npm exited 0. Newly published
+      # versions can take a moment to replicate.
+      - name: Verify both registries
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for manifest in packages/*/package.json; do
+            name=$(node -p "require('./$manifest').name")
+            version=$(node -p "require('./$manifest').version")
+            if [ "$(node -p "Boolean(require('./$manifest').private)")" = "true" ]; then
+              continue
+            fi
+            for registry in https://registry.npmjs.org/ https://npm.pkg.github.com/; do
+              found=false
+              for attempt in 1 2 3; do
+                if npm view "$name@$version" version --registry "$registry" >/dev/null 2>&1; then
+                  found=true
+                  break
+                fi
+                sleep 5
+              done
+              if [ "$found" = "false" ]; then
+                echo "::error::$name@$version is missing from $registry"
+                missing=1
+              fi
+            done
+          done
+          exit "$missing"
