@@ -139,12 +139,15 @@ jobs:
             fi
             for registry in https://registry.npmjs.org/ https://npm.pkg.github.com/; do
               found=false
-              for attempt in 1 2 3; do
+              # npmjs.com processes a new version for up to a few minutes before
+              # `npm view` can see it; 18 x 10 s covers replication without
+              # hanging forever on a genuinely missing package.
+              for attempt in $(seq 1 18); do
                 if npm view "$name@$version" version --registry "$registry" >/dev/null 2>&1; then
                   found=true
                   break
                 fi
-                sleep 5
+                sleep 10
               done
               if [ "$found" = "false" ]; then
                 echo "::error::$name@$version is missing from $registry"
