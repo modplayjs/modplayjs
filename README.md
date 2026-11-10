@@ -141,7 +141,7 @@ contracts are documented in [docs/](docs/) —
 | `@modplayjs/out-webaudio` | AudioWorklet output: SAB ring (COOP/COEP) with automatic copy-mode fallback, pause/resume |
 | `@modplayjs/out-pcm` | Offline PCM render + WAV encoder |
 | `@modplayjs/playhead` | Playback clock for UIs: maps sink consumption to the row that is actually audible (pattern-view sync, latency compensation) |
-| `@modplayjs/demo` | Demo page (GitHub Pages): player with transport/seek/volume, channel mute strip, instrument/sample audition, file info, order list, tracker message, realtime pattern view |
+| `@modplayjs/demo` | Playground ([playground.modplayjs.org](https://playground.modplayjs.org), Svelte 5 + Vite on Workers static assets): player with transport/seek/volume, channel mute strip, instrument/sample audition, file info, order list, tracker message, realtime pattern view |
 
 ## Interactive playback API
 
@@ -242,8 +242,8 @@ npm install
 npx turbo run typecheck
 npx turbo run build            # all workspaces
 npx turbo run dev --filter=@modplayjs/demo   # demo page
-# (the dev server sends COOP/COEP; production builds use the bundled
-#  coi-serviceworker so GitHub Pages gets the SAB transport too)
+# (the dev server sends COOP/COEP; the deployed build gets them from
+#  apps/demo/public/_headers on Workers)
 ```
 
 ## License

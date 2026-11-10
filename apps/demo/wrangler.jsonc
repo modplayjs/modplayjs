@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "modplayjs-playground",
+  "compatibility_date": "2026-11-10",
+  // The playground is its own hostname on the modplayjs.org zone; Wrangler
+  // creates the DNS record and the certificate on the first deploy.
+  "routes": [
+    {
+      "pattern": "playground.modplayjs.org",
+      "custom_domain": true
+    }
+  ],
+  "workers_dev": false,
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

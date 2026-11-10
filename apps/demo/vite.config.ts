@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Bitti09 — modplayjs contributors
 // Project-original code.
 import { defineConfig } from 'vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -19,16 +20,20 @@ const GIT_HASH = (() => {
 
 // Workspace packages ship no dist (source-of-truth is packages/*/src), so
 // the demo resolves @modplayjs/* straight to TypeScript sources.
-// Assets load from the site root on `vite dev` and from /modplayjs/ in a
-// production build (project-page deployment).
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/modplayjs/' : '/',
-  plugins: [tailwindcss(), pwaPrecache()],
+// The playground is served from its own domain root
+// (playground.modplayjs.org), so every asset path is root-absolute.
+export default defineConfig({
+  base: '/',
+  plugins: [svelte(), tailwindcss(), pwaPrecache()],
   build: {
+    // The player ships the whole engine in one entry; that chunk is the app,
+    // not an accidental import.
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        studio: resolve(__dirname, 'studio.html'),
+        studio: resolve(__dirname, 'studio/index.html'),
+        notfound: resolve(__dirname, '404.html'),
       },
       output: {
         // core/src is mutually referential (index.ts ↔ core.ts ↔ effects/*:
@@ -96,4 +101,4 @@ export default defineConfig(({ command }) => ({
       { find: 'worklet-url-impl', replacement: resolve(__dirname, 'src/worklet-url-impl.ts') },
     ],
   },
-}));
+});

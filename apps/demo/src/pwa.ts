@@ -47,7 +47,7 @@ export function registerPwa(): void {
 
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('sw.js', { scope: './', updateViaCache: 'none' })
+      .register('/sw.js', { scope: '/', updateViaCache: 'none' })
       .then((reg) => {
         // check for an update on every page load
         void reg.update().catch(() => {});

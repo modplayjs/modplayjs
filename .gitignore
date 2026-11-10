@@ -10,6 +10,9 @@ testfiles/
 .omp/
 .turbo/
 out/
+
+# wrangler local state (wrangler dev / deploy)
+.wrangler/
 testfiles2/
 main.zip
 

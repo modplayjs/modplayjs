@@ -9,7 +9,9 @@
     "privacy": "node scripts/build-privacy.mjs",
     "prebuild": "node scripts/build-privacy.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json",
+    "deploy": "npm run build && wrangler deploy",
+    "preview:worker": "wrangler dev"
   },
   "dependencies": {
     "@modplayjs/core": "^0.2.2",
@@ -19,29 +21,33 @@
     "@modplayjs/fmt-669": "^0.2.2",
     "@modplayjs/fmt-asylum": "^0.2.2",
     "@modplayjs/fmt-digi": "^0.2.2",
-    "@modplayjs/fmt-ice": "^0.2.2",
-    "@modplayjs/fmt-med": "^0.2.2",
-    "@modplayjs/fmt-st": "^0.2.2",
     "@modplayjs/fmt-fc": "^0.2.2",
-    "@modplayjs/stream-audio": "^0.2.2",
+    "@modplayjs/fmt-ice": "^0.2.2",
     "@modplayjs/fmt-it": "^0.2.2",
+    "@modplayjs/fmt-med": "^0.2.2",
     "@modplayjs/fmt-mod": "^0.2.2",
     "@modplayjs/fmt-mtm": "^0.2.2",
     "@modplayjs/fmt-prowizard": "^0.2.2",
     "@modplayjs/fmt-s3m": "^0.2.2",
     "@modplayjs/fmt-sfx": "^0.2.2",
     "@modplayjs/fmt-sid": "^0.2.2",
+    "@modplayjs/fmt-st": "^0.2.2",
     "@modplayjs/fmt-stm": "^0.2.2",
     "@modplayjs/fmt-xm": "^0.2.2",
     "@modplayjs/out-pcm": "^0.2.2",
     "@modplayjs/out-webaudio": "^0.3.0",
-    "@modplayjs/playhead": "^0.3.0"
+    "@modplayjs/playhead": "^0.3.0",
+    "@modplayjs/stream-audio": "^0.2.2"
   },
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tailwindcss/vite": "^4.3.3",
     "daisyui": "^5.7.47",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.8",
     "tailwindcss": "^4.3.3",
-    "vite": "^8.3.5"
+    "vite": "^8.3.5",
+    "wrangler": "^4.159.0"
   },
   "license": "BSD-3-Clause"
 }

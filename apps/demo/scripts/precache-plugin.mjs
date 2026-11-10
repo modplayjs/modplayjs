@@ -8,7 +8,7 @@
 // from disk. The SW derives its cache name from the manifest contents,
 // so any asset change produces a new cache and a clean activate.
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /** @type {import('vite').Plugin} */
@@ -63,14 +63,15 @@ export default function pwaPrecache() {
       } catch {
         return;
       }
-      for (const name of ['index.html', 'studio.html']) {
+      // Every built HTML entry (the player and the studio page). Vite
+      // writes them outside the rollup bundle, so they only exist on disk.
+      const htmlFiles = readdirSync(outDir, { recursive: true })
+        .map((entry) => String(entry).replaceAll('\\', '/'))
+        .filter((entry) => entry.endsWith('.html'))
+        .sort();
+      for (const name of htmlFiles) {
         if (entries.some((/** @type {{url: string}} */ e) => e.url === name)) continue;
-        try {
-          readFileSync(resolve(outDir, name));
-          entries.push({ url: name });
-        } catch {
-          /* html entry not built — skip */
-        }
+        entries.push({ url: name });
       }
       writeFileSync(
         manifestPath,
