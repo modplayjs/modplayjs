@@ -20,6 +20,7 @@ import com.bitti06.modplayjs.xr.panels.PanelId
 import com.bitti06.modplayjs.xr.panels.PanelSpec
 import com.bitti06.modplayjs.xr.panels.visiblePanels
 import com.bitti06.modplayjs.xr.play.XrPlayer
+import com.bitti06.modplayjs.xr.scene.HeadFrames
 import com.bitti06.modplayjs.xr.state.XrHost
 import com.bitti06.modplayjs.xr.state.XrState
 import com.bitti06.modplayjs.xr.state.XrStore
@@ -282,9 +283,9 @@ class XrActivity : AppSystemActivity(), XrHost {
                     if (now - lastSpatialFeedNs >= SPATIAL_FEED_NS) {
                         lastSpatialFeedNs = now
                         readHeadPose()?.let { head ->
-                            val (yaw, pitch) = headYawPitch(head.q)
-                            player.setListener(head.t.x, head.t.y, head.t.z, yaw, pitch)
-                            if (placement.onHead(head, now)) {
+                            val frame = HeadFrames.of(head)
+                            player.setListener(frame.x, frame.y, frame.z, frame.yaw, frame.pitch)
+                            if (placement.onHead(frame.pose, now)) {
                                 // A sustained posture change recaptures the
                                 // stage; rebase the live panels as one body.
                                 panelHost.applyPoses(animate = true)
@@ -320,7 +321,7 @@ class XrActivity : AppSystemActivity(), XrHost {
             boxes[n++] = pose.t.x
             boxes[n++] = pose.t.y
             boxes[n++] = pose.t.z
-            boxes[n++] = yawOf(pose.q)
+            boxes[n++] = HeadFrames.yawOf(pose.q)
             boxes[n++] = spec.width / 2f
             boxes[n++] = spec.height / 2f
             boxes[n++] = PANEL_HALF_THICKNESS
@@ -339,30 +340,6 @@ class XrActivity : AppSystemActivity(), XrHost {
         } finally {
             runCatching { transform.recycle() }
         }
-    }
-
-    /** Yaw of a quaternion that only carries a rotation around Y. */
-    private fun yawOf(q: Quaternion): Float =
-        kotlin.math.atan2(
-            2f * (q.w * q.y + q.x * q.z),
-            1f - 2f * (q.y * q.y + q.z * q.z),
-        )
-
-    /**
-     * Yaw and pitch of a head quaternion, in radians.
-     *
-     * Pitch is positive when looking up. It is derived from the rotated forward
-     * vector rather than from the Euler decomposition, so a roll (which the
-     * runtime reports when the user lies on their side) cannot make the pitch
-     * ambiguous.
-     */
-    private fun headYawPitch(q: Quaternion): Pair<Float, Float> {
-        val yaw = yawOf(q)
-        // Forward is (0,0,-1) in this SDK (a panel's front is its local -Z).
-        // Rotating it by q gives y = 2(w·x - y·z) = sin(pitch), positive when
-        // the user looks up.
-        val fy = 2f * (q.w * q.x - q.y * q.z)
-        return yaw to kotlin.math.asin(fy.coerceIn(-1f, 1f))
     }
 
     /**
@@ -386,12 +363,12 @@ class XrActivity : AppSystemActivity(), XrHost {
             head.t.x,
             head.t.z,
         )
-        player.recenterRing(head.t.x, head.t.y, head.t.z, yawOf(head.q))
+        player.recenterRing(head.t.x, head.t.y, head.t.z, HeadFrames.yawOf(head.q))
         anchoredToHead = true
         Log.i(
             TAG,
             "arc anchored to head at (${head.t.x}, ${head.t.y}, ${head.t.z}) " +
-                "yaw=${Math.toDegrees(yawOf(head.q).toDouble()).toInt()}",
+                "yaw=${Math.toDegrees(HeadFrames.yawOf(head.q).toDouble()).toInt()}",
         )
     }
 

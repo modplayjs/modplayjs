@@ -48,7 +48,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -141,6 +140,7 @@ class XrPlayer(
     /** Settings persistence and snapshot parsing: never on the V8 thread. */
     private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val parseScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val poller = EnginePoller(parseScope)
 
     @Volatile
     private var publishPending = false
@@ -208,6 +208,14 @@ class XrPlayer(
     /** Last ring geometry written to the bus entities. */
     private var placedRadius = -1f
     private var placedLayout = ""
+
+    /**
+     * True while a ring↔dome switch is moving the 32 bus entities. The mixer
+     * would otherwise use the new directions with the old entity positions for
+     * one frame; renderBlock writes silence until the main thread has placed
+     * the entities and the new directions are handed to the panner.
+     */
+    private var layoutSwitchPending = false
     private var placedX = Float.NaN
     private var placedZ = Float.NaN
     private var placedY = Float.NaN
@@ -329,25 +337,16 @@ class XrPlayer(
     private var lastSpatialAt = 0L
     private var cachedPatternIndex = -1
     private var cachedPattern: PatternData? = null
-    private var cachedTrackDetail: TrackDetail? = null
-    private var cachedDetailKey: Pair<Boolean, Boolean>? = null
-    private var cachedDetails: List<Pair<String, String>> = emptyList()
-    private var cachedMessage: String = ""
-    private var cachedCaps: CapsInfo = CapsInfo()
     private var markerSizes = FloatArray(0)
-
-    private data class CapsInfo(
-        val canMute: Boolean = false,
-        val canPattern: Boolean = false,
-        val canMixer: Boolean = false,
-        val canPan: Boolean = false,
-        val seekable: Boolean = false,
-    )
 
     private val scratchShort = ShortArray(BLOCK * 2)
 
     /** Reused destination for the mono stems; no per-block JNI allocation. */
     private val spatialScratch = FloatArray(MAX_SOURCES * BLOCK)
+
+    /** Silence for the bus gate; allocated once. */
+    private val silentBytes = ByteArray(BLOCK * BYTES_PER_SAMPLE)
+    private val silentReverbBytes = ByteArray(BLOCK * 4 * BYTES_PER_SAMPLE)
 
     private data class TrackOut(
         val index: Int,
@@ -355,7 +354,7 @@ class XrPlayer(
         val track: AudioTrack,
     )
 
-    private data class SpatialInfo(
+    data class SpatialInfo(
         val enabled: Boolean = false,
         val available: Boolean = false,
         val layout: String = "panned",
@@ -576,11 +575,6 @@ class XrPlayer(
                 }
                 cachedPatternIndex = -1
                 cachedPattern = null
-                cachedTrackDetail = null
-                cachedDetailKey = null
-                cachedDetails = emptyList()
-                cachedMessage = ""
-                cachedCaps = CapsInfo()
                 eng.setSampleRate(SAMPLE_RATE)
                 eng.load(bytes, name)
                 pushSettings()
@@ -598,11 +592,6 @@ class XrPlayer(
                 Log.e(TAG, "Failed to load module '$name'", t)
                 cachedPatternIndex = -1
                 cachedPattern = null
-                cachedTrackDetail = null
-                cachedDetailKey = null
-                cachedDetails = emptyList()
-                cachedMessage = ""
-                cachedCaps = CapsInfo()
                 loaded = false
                 playing = false
                 _state.value = _state.value.copy(
@@ -783,6 +772,10 @@ class XrPlayer(
     private fun renderBlock() {
         val eng = engine ?: return
         if (outputMode == 2) {
+            if (layoutSwitchPending) {
+                runCatching { writeBusSilence() }
+                return
+            }
             if (!busesReady) {
                 // The fixed graph is being registered on the main thread.
                 // If that already finished while this thread was still opening
@@ -1086,7 +1079,7 @@ class XrPlayer(
         placedYaw = ringYawRad
         placedLayout = layout
         if (layoutChanged) {
-            engine?.setSpatialBuses(busDirectionArray(layout))
+            layoutSwitchPending = true
         }
         val radius = ringRadius
         val cx = ringCenterX
@@ -1100,6 +1093,35 @@ class XrPlayer(
                 busEntities[i].setComponent(Transform(Pose(busPositionOf(i, radius, cx, cz, cy))))
             }
             reverbEntity?.setComponent(Transform(Pose(Vector3(cx, cy, cz))))
+            if (layoutChanged) {
+                // The entities are in the new layout; hand the directions to
+                // the panner on the audio thread and lift the gate.
+                val dirs = busDirectionArray(layout)
+                submit {
+                    engine?.setSpatialBuses(dirs)
+                    layoutSwitchPending = false
+                }
+            }
+        }
+    }
+
+    /** Silence to every bus while a layout switch places the entities. */
+    private fun writeBusSilence() {
+        if (busTracks.isEmpty()) return
+        for (b in busTracks.indices) {
+            val buf = busBuffers[b]
+            buf.clear()
+            buf.put(silentBytes)
+            buf.flip()
+            busTracks[b].write(buf, BLOCK * BYTES_PER_SAMPLE, AudioTrack.WRITE_BLOCKING)
+        }
+        val reverb = reverbTrack
+        val reverbBuf = reverbBuffer
+        if (reverb != null && reverbBuf != null) {
+            reverbBuf.clear()
+            reverbBuf.put(silentReverbBytes)
+            reverbBuf.flip()
+            reverb.write(reverbBuf, BLOCK * 4 * BYTES_PER_SAMPLE, AudioTrack.WRITE_BLOCKING)
         }
     }
 
@@ -1813,8 +1835,7 @@ class XrPlayer(
     private fun pollSpatial(rebuild: Boolean) {
         val eng = engine ?: return
         val raw = runCatching { eng.spatialInfo() }.getOrNull() ?: return
-        parseScope.launch {
-            val info = runCatching { parseSpatialInfo(raw) }.getOrNull() ?: return@launch
+        poller.pollSpatial(raw) { info ->
             submit { runCatching { applySpatialInfo(info, rebuild) } }
         }
     }
@@ -1849,25 +1870,6 @@ class XrPlayer(
     }
 
     /** Reads `row` and `pattern` out of the cheap playhead JSON. */
-    private fun parsePlayhead(raw: String): Pair<Int, Int>? {
-        val rowIdx = raw.indexOf("\"row\":")
-        if (rowIdx < 0) return null
-        var rowStart = rowIdx + 6
-        while (rowStart < raw.length && raw[rowStart].isWhitespace()) rowStart++
-        var rowEnd = rowStart
-        while (rowEnd < raw.length && (raw[rowEnd].isDigit() || raw[rowEnd] == '-')) rowEnd++
-        val row = raw.substring(rowStart, rowEnd).toIntOrNull() ?: return null
-
-        val patIdx = raw.indexOf("\"pattern\":")
-        if (patIdx < 0) return null
-        var patStart = patIdx + 10
-        while (patStart < raw.length && raw[patStart].isWhitespace()) patStart++
-        var patEnd = patStart
-        while (patEnd < raw.length && (raw[patEnd].isDigit() || raw[patEnd] == '-')) patEnd++
-        val pattern = raw.substring(patStart, patEnd).toIntOrNull() ?: 0
-
-        return row to pattern
-    }
 
     /**
      * Cheap update of just the playhead.
@@ -1880,17 +1882,17 @@ class XrPlayer(
         if (!loaded) return
         val eng = engine ?: return
         val raw = runCatching { eng.playhead() }.getOrNull() ?: return
-        parseScope.launch {
-            val parsed = parsePlayhead(raw) ?: return@launch
-            val row = parsed.first
-            val pattern = parsed.second
-            if (_playhead.value.row == row && _playhead.value.pattern == pattern) return@launch
-
-            if (_state.value.pattern.pattern != pattern) {
-                // The cells need a V8 call; hand that back to the render thread.
-                submit { runCatching { refreshPattern(pattern) } }
+        poller.pollPlayhead(raw) { playhead ->
+            if (_playhead.value.row == playhead.row &&
+                _playhead.value.pattern == playhead.pattern
+            ) {
+                return@pollPlayhead
             }
-            _playhead.value = Playhead(row = row, pattern = pattern)
+            if (_state.value.pattern.pattern != playhead.pattern) {
+                // The cells need a V8 call; hand that back to the render thread.
+                submit { runCatching { refreshPattern(playhead.pattern) } }
+            }
+            _playhead.value = playhead
         }
     }
 
@@ -1933,23 +1935,9 @@ class XrPlayer(
     private fun readSpatialInfo(): SpatialInfo {
         val eng = engine ?: return SpatialInfo()
         val raw = runCatching { eng.spatialInfo() }.getOrNull() ?: return SpatialInfo()
-        return runCatching { parseSpatialInfo(raw) }.getOrElse { SpatialInfo() }
+        return runCatching { poller.parseSpatialInfo(raw) }.getOrElse { SpatialInfo() }
     }
 
-    private fun parseSpatialInfo(raw: String): SpatialInfo {
-        val obj = Json.parseToJsonElement(raw) as? JsonObject ?: return SpatialInfo()
-        val ch = obj["channels"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-        val layout = obj["layout"]?.jsonPrimitive?.content ?: "panned"
-        val rawAz = (obj["azimuths"] as? kotlinx.serialization.json.JsonArray)
-            ?.mapNotNull { it.jsonPrimitive.content.toFloatOrNull() } ?: emptyList()
-        return SpatialInfo(
-            enabled = obj["enabled"]?.jsonPrimitive?.content == "true",
-            available = obj["available"]?.jsonPrimitive?.content == "true",
-            layout = layout,
-            channels = ch,
-            directions = SpatialLayout.directions(layout, ch, rawAz),
-        )
-    }
 
     fun engineAvailable(): Boolean = engine?.available == true
 
@@ -1991,177 +1979,34 @@ class XrPlayer(
         publishPending = true
         val raw = runCatching { eng.snapshot() }.getOrNull()
         val pattern = if (loaded) readPattern(_playhead.value.pattern) else PatternData()
-        val settingsNow = settings
-        parseScope.launch {
-            try {
-                parseSnapshot(raw, pattern, isPlaying, settingsNow)
-            } catch (t: Throwable) {
-                Log.e(TAG, "snapshot parse failed", t)
-            } finally {
-                publishPending = false
-            }
-        }
-    }
-
-    private fun parseSnapshot(
-        raw: String?,
-        patternData: PatternData,
-        isPlaying: Boolean,
-        settingsNow: AndroidSettings,
-    ) {
-        val previous = _state.value
-        val snap = raw?.let { runCatching { Json.parseToJsonElement(it) as? JsonObject }.getOrNull() }
-        val state = snap?.get("state") as? JsonObject
-        val track = snap?.get("track") as? JsonObject
-        val caps = snap?.get("capabilities") as? JsonObject
-
-        if (track != null) {
-            // The sample list is the expensive part of the track object, so it
-            // is only reformatted when a view option that shapes it changes.
-            // Without this key, toggling "sample lengths" or "loop marker" left
-            // the panel on the old text until the next module loaded.
-            val detailKey = settingsNow.view.sampleLengths to settingsNow.view.sampleLoopFlags
-            if (cachedTrackDetail == null || cachedDetailKey != detailKey) {
-                cachedTrackDetail = readTrackDetail(track, settingsNow.view)
-                cachedDetailKey = detailKey
-            }
-            cachedDetails = track.entries
-                .filterNot { (k, v) ->
-                    k in setOf("instrumentList", "sampleList", "orderList", "artwork") ||
-                        (k == "streamed" && (v is JsonNull || v.toString() == "null"))
-                }
-                .map { (k, v) -> k to v.toString().trim('"').take(80) }
-            cachedMessage = track["message"]?.jsonPrimitive?.content ?: ""
-        }
-        // Capabilities follow the module *and* the mixer layout (`panSeparation`
-        // is only offered for the panned layout), so they are read every time.
-        // Caching them until the next track left the layout controls stale.
-        cachedCaps =
-            CapsInfo(
-                canMute = caps?.get("channelMute")?.jsonPrimitive?.content == "true",
-                canPattern = caps?.get("patternView")?.jsonPrimitive?.content == "true",
-                canMixer = caps?.get("mixer")?.jsonPrimitive?.content == "true",
-                canPan = caps?.get("panSeparation")?.jsonPrimitive?.content == "true",
-                seekable = caps?.get("seekable")?.jsonPrimitive?.content == "true",
+        val input =
+            EnginePoller.SnapshotInput(
+                raw = raw,
+                pattern = pattern,
+                playing = isPlaying,
+                settings = settings,
+                previous = _state.value,
+                loaded = loaded,
+                durationMs = durationMs,
+                spatialInfo = spatialInfo,
+                debugVisible = debugVisible,
+                levels = levels,
             )
-
-        val current = _state.value
-        val newPos = state?.get("positionMs")?.jsonPrimitive?.content?.toLongOrNull()
-            ?.let { it / 1000L * 1000L } ?: 0L
-        val newPattern = if (loaded) {
-            patternData.copy(row = state?.get("row")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
-        } else {
-            PatternData()
-        }
-
-        _state.value = current.copy(
-            loaded = loaded,
-            title = track?.get("title")?.jsonPrimitive?.content ?: current.title,
-            format = track?.get("format")?.jsonPrimitive?.content ?: current.format,
-            channels = track?.get("channels")?.jsonPrimitive?.content?.toIntOrNull() ?: current.channels,
-            playing = isPlaying,
-            positionMs = newPos,
-            durationMs = state?.get("durationMs")?.jsonPrimitive?.content?.toLongOrNull() ?: durationMs,
-            spatialAvailable = spatialInfo.available,
-            spatialEnabled = spatialInfo.enabled,
-            layout = spatialInfo.layout,
-            azimuths = spatialInfo.azimuths,
-            elevations = spatialInfo.directions.map { it.elevation },
-            debugSources = debugVisible,
-            levels = if (debugVisible) levels.toList() else emptyList(),
-            volume = settingsNow.transport.volume,
-            solo = snap?.get("soloChannel")?.jsonPrimitive?.content?.toIntOrNull() ?: -1,
-            muted = snap?.get("channels")
-                ?.let { element ->
-                    runCatching {
-                        (element as? kotlinx.serialization.json.JsonArray)?.mapNotNull { entry ->
-                            val obj = entry as? JsonObject
-                            val index = obj?.get("index")?.jsonPrimitive?.content?.toIntOrNull()
-                            val muted = obj?.get("muted")?.jsonPrimitive?.content == "true"
-                            if (muted && index != null) index else null
-                        }?.toSet()
-                    }.getOrDefault(current.muted)
-                } ?: current.muted,
-            pattern = newPattern,
-            details = cachedDetails,
-            message = cachedMessage,
-            canMute = cachedCaps.canMute,
-            canPattern = cachedCaps.canPattern,
-            canMixer = cachedCaps.canMixer,
-            canPan = cachedCaps.canPan,
-            seekable = cachedCaps.seekable,
-            follow = settingsNow.view.follow,
-            visualizer = settingsNow.view.visualizer,
-            showChannelStrip = settingsNow.view.showChannelStrip,
-            stripDots = settingsNow.view.stripDots,
-            sampleLengths = settingsNow.view.sampleLengths,
-            sampleLoopFlags = settingsNow.view.sampleLoopFlags,
-            patternColors = settingsNow.view.patternColors,
-            trackDetail = cachedTrackDetail ?: current.trackDetail,
-        )
-
-        _playhead.value =
-            Playhead(row = _state.value.pattern.row, pattern = _state.value.pattern.pattern)
-
-        if (previous.loaded != _state.value.loaded) {
-            Log.i(TAG, "state: loaded=${_state.value.loaded}")
+        poller.pollSnapshot(input) { output ->
+            if (output != null) {
+                _state.value = output.state
+                _playhead.value = output.playhead
+            }
+            publishPending = false
         }
     }
+
 
     /**
      * Details the phone app lists per instrument/sample. The engine already
      * excludes these lists from the flat `details` map (they are big), so they
      * are formatted here instead of shipping raw JSON to the panel.
      */
-    private fun readTrackDetail(
-        track: JsonObject?,
-        view: com.bitti06.modplayjs.engine.ViewSettings,
-    ): TrackDetail {
-        if (track == null) return TrackDetail()
-        fun array(key: String) = track[key] as? kotlinx.serialization.json.JsonArray
-
-        val instruments =
-            array("instrumentList")
-                ?.mapNotNull { element ->
-                    val obj = element as? JsonObject ?: return@mapNotNull null
-                    val index = obj["index"]?.jsonPrimitive?.content?.toIntOrNull() ?: return@mapNotNull null
-                    val name = obj["name"]?.jsonPrimitive?.content ?: ""
-                    (index + 1).toString().padStart(2, '0') + "  " + name
-                }
-                .orEmpty()
-
-        val samples =
-            array("sampleList")
-                ?.mapNotNull { element ->
-                    val obj = element as? JsonObject ?: return@mapNotNull null
-                    val index = obj["index"]?.jsonPrimitive?.content?.toIntOrNull() ?: return@mapNotNull null
-                    val name = obj["name"]?.jsonPrimitive?.content ?: ""
-                    val length = obj["length"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-                    val loop = obj["loop"]?.jsonPrimitive?.content == "true"
-                    buildString {
-                        append((index + 1).toString().padStart(2, '0'))
-                        append("  ")
-                        append(name)
-                        if (view.sampleLengths) {
-                            append("  ")
-                            append(length)
-                        }
-                        if (view.sampleLoopFlags && loop) append(" L")
-                    }
-                }
-                .orEmpty()
-
-        val orders =
-            array("orderList")
-                ?.mapNotNull { it.jsonPrimitive.content.toIntOrNull() }
-                ?.withIndex()
-                ?.joinToString(" ") { (i, pattern) ->
-                    i.toString().padStart(2, '0') + ":" + pattern.toString().padStart(2, '0')
-                }
-                .orEmpty()
-
-        return TrackDetail(instrumentList = instruments, sampleList = samples, orderList = orders)
-    }
 
     private fun pushSettings() {
         val json = EngineJson.encodeToString(AndroidSettings.serializer(), settings)
