@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-10T14:51:37.763Z",
+  "generated": "2026-11-10T18:21:34.429Z",
   "layout": "modules/<name>/index.js",
   "always": [
     "modplayjs-core",
@@ -12,8 +12,8 @@
     "modplayjs-core": {
       "specifier": "@modplayjs/core",
       "asset": "modplayjs-core/index.js",
-      "bytes": 250222,
-      "sha256": "6a335ebcd482b6472da4f977cd33b640cae640082902591dc3b94e1419f70019",
+      "bytes": 250522,
+      "sha256": "ec248d0aaa23613e540ed2079c9d190802fcee66cdff3ad82696cb068e09cdcb",
       "version": "0.2.3",
       "imports": []
     },

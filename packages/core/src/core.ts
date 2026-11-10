@@ -44,6 +44,7 @@ import type {
   OutputPlugin,
   LoadCtx,
 } from './types/index.js';
+import type { CoreContext } from './model/model.js';
 import {
   ModplayError,
   StateError,
@@ -224,9 +225,17 @@ export class Core implements CoreIface {
   get voiceStates(): readonly VoiceState[] { return this.virt.voices; }
   get sampleRate(): number { return this._s.freq; }
   get ticksize(): number { return this._s.ticksize; }
-  get ctx() {
+  /**
+   * The context view is read on every effect call and every mixer tick, so it
+   * is built once per Core instead of allocating a fresh getter object per
+   * access. The getters still read live state; only the wrapper is reused.
+   */
+  private _ctx?: CoreContext;
+
+  get ctx(): CoreContext {
+    if (this._ctx) return this._ctx;
     const self = this;
-    return {
+    return (this._ctx = {
       get p() { return self.internalP; },
       get s() { return self.mixerState; },
       get m() { return self._module!; },
@@ -234,7 +243,7 @@ export class Core implements CoreIface {
       get voiceStates(): readonly VoiceState[] { return self.virt.voices; },
       get state() { return self._state as CoreState; },
       get quirks() { return self.quirks; },
-    };
+    });
   }
 
   // ------------------------------------------------------------------

@@ -42,18 +42,16 @@ class PlaybackSession(
      * of waiting for the compile.
      */
     @Volatile private var engine: V8Engine? = null
+
+    /** True once the HVSC database has been handed to the SID service. */
+    @Volatile private var sidLengthsLoaded = false
     private val audio = AudioTrackOutput(context)
     private val ring = PcmRing(4096)
     val sampleRate: Int get() = audio.sampleRate
 
     init {
         v8Exec.execute {
-            val created = V8Engine(context)
-            engine = created
-            // Same executor, before anything can be played: the SID loader reads
-            // the runtime out of this database while it parses the tune, so
-            // loading it later would leave the first tune with no length.
-            loadSongLengths(created)
+            engine = V8Engine(context)
         }
     }
 
@@ -63,25 +61,37 @@ class PlaybackSession(
      * A SID file contains no runtime - it is a machine that plays until stopped.
      * The lengths come from HVSC's `Songlengths.md5`, keyed by the MD5 of the
      * file, and without it the engine reports 0 and the seekbar has nothing to
-     * scale against. Costs a few hundred milliseconds once, on the V8 thread.
+     * scale against.
+     *
+     * Loaded on the first SID, not at startup: the asset is ~5 MB and its
+     * 117k lines cost a few hundred milliseconds to parse and ~20 MB of heap,
+     * which every launch should not pay for a user who never opens one.
      */
-    private fun loadSongLengths(engine: V8Engine) {
+    private fun loadSongLengths(engine: V8Engine): Boolean {
         val text =
             runCatching {
                 context.assets.open("Songlengths.md5").bufferedReader().use { it.readText() }
             }.getOrNull()
         if (text.isNullOrBlank()) {
             Log.w(TAG, "no Songlengths.md5 asset: SID tune lengths stay unknown")
-            return
+            return false
         }
         val json =
             buildJsonObject {
                 put("type", "loadSidSongLengths")
                 put("text", text)
             }.toString()
-        runCatching { engine.command(json) }
+        return runCatching { engine.command(json) }
             .onSuccess { Log.i(TAG, "song lengths loaded: ${text.length} chars") }
             .onFailure { Log.w(TAG, "song lengths not loaded", it) }
+            .isSuccess
+    }
+
+    /** PSID/RSID header, the same check the demo uses before it fetches the DB. */
+    private fun isSid(bytes: ByteArray): Boolean {
+        if (bytes.size < 4) return false
+        val magic = String(bytes, 0, 4, Charsets.US_ASCII)
+        return magic == "PSID" || magic == "RSID"
     }
 
     private val _snapshot = MutableStateFlow<AndroidSnapshot?>(null)
@@ -272,7 +282,19 @@ class PlaybackSession(
                 val bytes =
                     readBytes(item.uri)
                         ?: throw IllegalStateException("cannot open ${item.uri}")
-                v8Exec.submit { engine?.load(bytes, item.name) }.get(20, TimeUnit.SECONDS)
+                v8Exec
+                    .submit {
+                        val eng = engine
+                        if (eng != null) {
+                            // The SID loader reads the runtime while it parses
+                            // the tune, so the database has to arrive first.
+                            if (!sidLengthsLoaded && isSid(bytes)) {
+                                sidLengthsLoaded = loadSongLengths(eng)
+                            }
+                            eng.load(bytes, item.name)
+                        }
+                    }
+                    .get(20, TimeUnit.SECONDS)
                 if (playGeneration.get() != generation) return@launch
                 ring.clear()
                 check(send(buildJsonObject { put("type", "play") }.toString())) {

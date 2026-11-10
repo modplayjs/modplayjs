@@ -7564,9 +7564,16 @@ var Core = class {
   get ticksize() {
     return this._s.ticksize;
   }
+  /**
+   * The context view is read on every effect call and every mixer tick, so it
+   * is built once per Core instead of allocating a fresh getter object per
+   * access. The getters still read live state; only the wrapper is reused.
+   */
+  _ctx;
   get ctx() {
+    if (this._ctx) return this._ctx;
     const self = this;
-    return {
+    return this._ctx = {
       get p() {
         return self.internalP;
       },

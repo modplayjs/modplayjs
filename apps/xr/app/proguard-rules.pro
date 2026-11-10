@@ -1,5 +1,5 @@
-# Release builds currently run without shrinking (see app/build.gradle.kts), so
-# this file mainly documents what must survive if minification is ever enabled.
+# R8 runs on release builds (app/build.gradle.kts): the dex drops from ~26 MB to
+# ~4 MB. These are the members it cannot see are used.
 #
 # The V8 bridge is called from C++ through JNI method names, which R8 cannot see.
 -keep class com.bitti06.modplayjs.engine.** { *; }
@@ -25,3 +25,7 @@
 -keepclassmembers class com.bitti06.modplayjs.** {
     *** Companion;
 }
+
+# Meta Spatial SDK references the Parcelize annotation at compile time only;
+# the class is not on the app's classpath.
+-dontwarn kotlinx.parcelize.**
