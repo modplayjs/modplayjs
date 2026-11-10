@@ -166,8 +166,10 @@ jobs:
             exit 0
           fi
           # The changesets release merge is the only direct push allowed
-          # to carry version changes.
-          if git log -1 --pretty=%s HEAD | grep -q '^chore: version packages'; then
+          # to carry version changes. A squash merge keeps the PR title; a
+          # merge commit names the source branch in its subject/body.
+          if git log -1 --pretty=%B HEAD \
+            | grep -qE '^(chore: version packages|Merge pull request .*changeset-release/main)'; then
             echo "changesets version-packages merge; bumps allowed"
             exit 0
           fi
