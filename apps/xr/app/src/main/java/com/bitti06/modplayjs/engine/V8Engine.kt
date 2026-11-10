@@ -121,11 +121,14 @@ class V8Engine(
 
     /**
      * Mono stems for the spatial path: layout is [channel][frame] with a
-     * channel stride of [frames]. Empty when the module cannot be split
-     * (SID tunes and streamed audio keep the stereo path).
+     * channel stride of [frames], written into [dest].
+     *
+     * Returns the number of floats written, or 0 at end-of-module. The caller
+     * owns [dest], so the JNI boundary does not allocate a Java array per
+     * audio block.
      */
-    fun renderSpatial(frames: Int): FloatArray =
-        if (handle == 0L) FloatArray(0) else nativeRenderSpatial(handle, frames)
+    fun renderSpatialInto(dest: FloatArray, frames: Int): Int =
+        if (handle == 0L) 0 else nativeRenderSpatialInto(handle, frames, dest)
 
     /**
      * JSON: {playing, paused, ended, positionMs, ord, row, pattern}.
@@ -200,10 +203,11 @@ class V8Engine(
         frames: Int,
     ): FloatArray
 
-    private external fun nativeRenderSpatial(
+    private external fun nativeRenderSpatialInto(
         handle: Long,
         frames: Int,
-    ): FloatArray
+        dest: FloatArray,
+    ): Int
 
     private external fun nativeSnapshot(handle: Long): String
 

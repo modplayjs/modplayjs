@@ -346,6 +346,9 @@ class XrPlayer(
 
     private val scratchShort = ShortArray(BLOCK * 2)
 
+    /** Reused destination for the mono stems; no per-block JNI allocation. */
+    private val spatialScratch = FloatArray(MAX_SOURCES * BLOCK)
+
     private data class TrackOut(
         val index: Int,
         val sessionId: Int,
@@ -663,6 +666,12 @@ class XrPlayer(
     @Volatile
     var onEnded: (() -> Unit)? = null
 
+    /** End-of-module callback: never run it on the render thread. */
+    private fun notifyEnded() {
+        val callback = onEnded ?: return
+        ioScope.launch { runCatching { callback() } }
+    }
+
     fun setJamMode(on: Boolean) {
         submit {
             engine?.command("""{"type":"setJamMode","enabled":$on}""")
@@ -783,18 +792,19 @@ class XrPlayer(
                 if (!busesReady) runCatching { Thread.sleep(4) }
                 return
             }
-            val stems = eng.renderSpatial(BLOCK)
-            if (stems.size >= outChannels * BLOCK) {
+            val stems = spatialScratch
+            val n = eng.renderSpatialInto(stems, BLOCK)
+            if (n >= outChannels * BLOCK) {
                 writeBuses(stems)
                 return
             }
             // A short block is the tail of a module: drop it and let the next
             // pass report the end. Switching to stereo here used to tear down
             // the spatial path for the rest of the session.
-            if (stems.isEmpty()) {
+            if (n <= 0) {
                 playing = false
                 publish(false)
-                onEnded?.invoke()
+                notifyEnded()
             }
             return
         }
@@ -803,7 +813,7 @@ class XrPlayer(
             if (playing) {
                 playing = false
                 publish(false)
-                onEnded?.invoke()
+                notifyEnded()
             }
             return
         }
@@ -1017,11 +1027,12 @@ class XrPlayer(
             placedTilt = tiltApplied
             placedYaw = ringYawRad
             busGraphReady = true
-            if (outputMode == 2) startBuses()
+            // The audio thread starts the tracks when it sees busGraphReady;
+            // the silence prefill must not run on the main thread.
         }
     }
 
-    /** Start (or resume) the fixed graph. Main thread: the tracks are shared. */
+    /** Start (or resume) the fixed graph. Audio thread only. */
     private fun startBuses() {
         if (!busesReady) {
             val silence = ByteBuffer.allocateDirect(BLOCK * BYTES_PER_SAMPLE)
@@ -1777,7 +1788,7 @@ class XrPlayer(
             lastSpatialAt = now
             val settle = !spatialSettled
             spatialSettled = true
-            runCatching { refreshSpatial(rebuild = settle) }
+            pollSpatial(settle)
         }
 
         // The recline tilt eases here, at block rate, so the ring rotates
@@ -1794,14 +1805,28 @@ class XrPlayer(
     }
 
     /**
+     * Fetch the spatial JSON on the V8 thread and parse it off-thread.
+     *
+     * The result is applied back on the render thread, because the bus
+     * entities, the markers and the output rebuild are owned there.
+     */
+    private fun pollSpatial(rebuild: Boolean) {
+        val eng = engine ?: return
+        val raw = runCatching { eng.spatialInfo() }.getOrNull() ?: return
+        parseScope.launch {
+            val info = runCatching { parseSpatialInfo(raw) }.getOrNull() ?: return@launch
+            submit { runCatching { applySpatialInfo(info, rebuild) } }
+        }
+    }
+
+    /**
      * Re-read the azimuths and move (or rebuild) the objects accordingly.
      *
      * [rebuild] also recreates the debug markers, which is what a track change
      * needs: they were built from the pre-tick azimuths and sit in one place
      * until something rebuilds them.
      */
-    private fun refreshSpatial(rebuild: Boolean) {
-        val info = readSpatialInfo()
+    private fun applySpatialInfo(info: SpatialInfo, rebuild: Boolean) {
         if (!info.available || info.channels <= 0) return
         if (info.channels != spatialInfo.channels) {
             // A different module with a different channel count: the objects
@@ -1855,19 +1880,27 @@ class XrPlayer(
         if (!loaded) return
         val eng = engine ?: return
         val raw = runCatching { eng.playhead() }.getOrNull() ?: return
-        val parsed = parsePlayhead(raw) ?: return
-        val row = parsed.first
-        val pattern = parsed.second
-        if (_playhead.value.row == row && _playhead.value.pattern == pattern) return
+        parseScope.launch {
+            val parsed = parsePlayhead(raw) ?: return@launch
+            val row = parsed.first
+            val pattern = parsed.second
+            if (_playhead.value.row == row && _playhead.value.pattern == pattern) return@launch
 
-        val current = _state.value
-        if (current.pattern.pattern != pattern) {
-            val data = readPattern(pattern).takeIf { it.cells.isNotEmpty() } ?: current.pattern
-            if (data.pattern != current.pattern.pattern) {
-                _state.value = current.copy(pattern = data)
+            if (_state.value.pattern.pattern != pattern) {
+                // The cells need a V8 call; hand that back to the render thread.
+                submit { runCatching { refreshPattern(pattern) } }
             }
+            _playhead.value = Playhead(row = row, pattern = pattern)
         }
-        _playhead.value = Playhead(row = row, pattern = pattern)
+    }
+
+    /** Fetch the pattern cells for [pattern] on the V8 thread. */
+    private fun refreshPattern(pattern: Int) {
+        val current = _state.value
+        val data = readPattern(pattern).takeIf { it.cells.isNotEmpty() } ?: current.pattern
+        if (data.pattern != current.pattern.pattern) {
+            _state.value = current.copy(pattern = data)
+        }
     }
 
     /**
@@ -1892,24 +1925,30 @@ class XrPlayer(
         }
     }
 
+    /**
+     * Synchronous read for the output rebuild: the decision whether to open
+     * the spatial path fits in the same block. The 6.7 Hz poll uses
+     * [pollSpatial] instead, which parses off the V8 thread.
+     */
     private fun readSpatialInfo(): SpatialInfo {
         val eng = engine ?: return SpatialInfo()
         val raw = runCatching { eng.spatialInfo() }.getOrNull() ?: return SpatialInfo()
-        return runCatching {
-            val obj = Json.parseToJsonElement(raw) as? JsonObject ?: return SpatialInfo()
-            val ch = obj["channels"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-            val layout = obj["layout"]?.jsonPrimitive?.content ?: "panned"
-            val rawAz = (obj["azimuths"] as? kotlinx.serialization.json.JsonArray)
-                ?.mapNotNull { it.jsonPrimitive.content.toFloatOrNull() } ?: emptyList()
-            val directions = SpatialLayout.directions(layout, ch, rawAz)
-            SpatialInfo(
-                enabled = obj["enabled"]?.jsonPrimitive?.content == "true",
-                available = obj["available"]?.jsonPrimitive?.content == "true",
-                layout = layout,
-                channels = ch,
-                directions = directions,
-            )
-        }.getOrElse { SpatialInfo() }
+        return runCatching { parseSpatialInfo(raw) }.getOrElse { SpatialInfo() }
+    }
+
+    private fun parseSpatialInfo(raw: String): SpatialInfo {
+        val obj = Json.parseToJsonElement(raw) as? JsonObject ?: return SpatialInfo()
+        val ch = obj["channels"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+        val layout = obj["layout"]?.jsonPrimitive?.content ?: "panned"
+        val rawAz = (obj["azimuths"] as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { it.jsonPrimitive.content.toFloatOrNull() } ?: emptyList()
+        return SpatialInfo(
+            enabled = obj["enabled"]?.jsonPrimitive?.content == "true",
+            available = obj["available"]?.jsonPrimitive?.content == "true",
+            layout = layout,
+            channels = ch,
+            directions = SpatialLayout.directions(layout, ch, rawAz),
+        )
     }
 
     fun engineAvailable(): Boolean = engine?.available == true

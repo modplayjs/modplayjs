@@ -59,19 +59,15 @@ data class PatternColors(
 
 @Serializable
 data class ViewSettings(
-    val theme: String = "dark",
-    val artwork: Boolean = false,
     val patternView: Boolean = false,
     val follow: Boolean = true,
     val stripDots: Boolean = false,
-    val reducedMotion: Boolean = false,
     val visualizer: String = "off",
     val showChannelStrip: Boolean = true,
     /** Show the sample length (and with it the loop flag) after the name. */
     val sampleLengths: Boolean = true,
     /** Show the trailing "L" for looping samples. */
     val sampleLoopFlags: Boolean = true,
-    val dome3D: Boolean = false,
     val grabSources: Boolean = false,
     val patternColors: PatternColors = PatternColors(),
 )

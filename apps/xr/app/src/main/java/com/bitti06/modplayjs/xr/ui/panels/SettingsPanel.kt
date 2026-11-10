@@ -334,9 +334,6 @@ fun SettingsPanel() {
             item {
                 Section(stringResource(R.string.xr_section_appearance)) {
                     MetaText(stringResource(R.string.xr_theme_note))
-                    ToggleRow(stringResource(R.string.xr_reduced_motion), settings.view.reducedMotion) {
-                        set { s -> s.copy(view = s.view.copy(reducedMotion = !s.view.reducedMotion)) }
-                    }
                     ToggleRow(stringResource(R.string.xr_channel_strip), settings.view.showChannelStrip) {
                         set { s -> s.copy(view = s.view.copy(showChannelStrip = !s.view.showChannelStrip)) }
                     }

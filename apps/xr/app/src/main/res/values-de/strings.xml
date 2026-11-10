@@ -125,7 +125,6 @@
     <string name="xr_light">Leicht</string>
     <string name="xr_hq">HQ</string>
     <string name="xr_sinc">Sinc</string>
-    <string name="xr_reduced_motion">Bewegung reduzieren</string>
     <string name="xr_channel_strip">Kanal-Strip</string>
     <string name="xr_pattern_view">Pattern-Ansicht</string>
     <string name="xr_follow">Folgen</string>

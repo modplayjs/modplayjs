@@ -19,9 +19,10 @@ extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_bitti06_modplayjs_engine_V8Engine_nativeRender(JNIEnv* env, jobject, jlong, jint) {
     return env->NewFloatArray(0);
 }
-extern "C" JNIEXPORT jfloatArray JNICALL
-Java_com_bitti06_modplayjs_engine_V8Engine_nativeRenderSpatial(JNIEnv* env, jobject, jlong, jint) {
-    return env->NewFloatArray(0);
+extern "C" JNIEXPORT jint JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeRenderSpatialInto(
+        JNIEnv*, jobject, jlong, jint, jfloatArray) {
+    return 0;
 }
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_bitti06_modplayjs_engine_V8Engine_nativeSnapshot(JNIEnv* env, jobject, jlong) {

@@ -255,34 +255,39 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeRender(JNIEnv* env, jobject, jl
     return out;
 }
 
-extern "C" JNIEXPORT jfloatArray JNICALL
-Java_com_bitti06_modplayjs_engine_V8Engine_nativeRenderSpatial(JNIEnv* env, jobject, jlong h, jint frames) {
+extern "C" JNIEXPORT jint JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeRenderSpatialInto(
+        JNIEnv* env, jobject, jlong h, jint frames, jfloatArray dest) {
     Engine* e = engine(h);
-    if (!e) return env->NewFloatArray(0);
+    if (!e || !dest) return -1;
     v8::Isolate::Scope isolate_scope(e->isolate);
     v8::HandleScope handle_scope(e->isolate);
     auto ctx = e->context.Get(e->isolate);
     v8::Context::Scope context_scope(ctx);
     v8::TryCatch try_catch(e->isolate);
     v8::Local<v8::Value> fnv = get_fn(e, "renderSpatial");
-    if (fnv.IsEmpty() || !fnv->IsFunction()) return env->NewFloatArray(0);
+    if (fnv.IsEmpty() || !fnv->IsFunction()) return 0;
     v8::Local<v8::Value> args[1] = { v8::Integer::New(e->isolate, frames) };
     v8::Local<v8::Value> res;
     if (!fnv.As<v8::Function>()->Call(ctx, fnv, 1, args).ToLocal(&res)) {
         if (try_catch.HasCaught()) LOGE("render: %s", to_string(e, try_catch.Exception()).c_str());
-        return env->NewFloatArray(0);
+        return 0;
     }
     if (!res->IsFloat32Array()) {
         LOGE("render returned non-Float32Array");
-        return env->NewFloatArray(0);
+        return 0;
     }
     v8::Local<v8::Float32Array> arr = res.As<v8::Float32Array>();
-    size_t len = arr->Length();
+    const jsize len = static_cast<jsize>(arr->Length());
+    const jsize capacity = env->GetArrayLength(dest);
+    if (len > capacity) {
+        LOGE("spatial block %d floats exceeds the %d-float destination", int(len), int(capacity));
+        return -1;
+    }
     auto store = arr->Buffer()->GetBackingStore();
     const auto* base = static_cast<const float*>(store->Data()) + (arr->ByteOffset() / sizeof(float));
-    jfloatArray out = env->NewFloatArray(static_cast<jsize>(len));
-    if (out) env->SetFloatArrayRegion(out, 0, static_cast<jsize>(len), base);
-    return out;
+    env->SetFloatArrayRegion(dest, 0, len, base);
+    return len;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
