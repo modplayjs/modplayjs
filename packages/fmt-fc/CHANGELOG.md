@@ -1,5 +1,13 @@
 # @modplayjs/fmt-fc
 
+## 0.2.3
+
+### Patch Changes
+
+- [`794091b`](https://github.com/modplayjs/modplayjs/commit/794091b0cc48788d2e611fc7ae6a6cbf4fb5abf5) - - publish to npmjs.com and GitHub Packages (direct push)
+- Updated dependencies [[`d451516`](https://github.com/modplayjs/modplayjs/commit/d45151611ed82f9a4e5558fdddab9e842c2fb52f)]:
+  - @modplayjs/core@0.2.3
+
 ## 0.2.2
 
 ### Patch Changes
