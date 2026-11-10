@@ -395,7 +395,11 @@ export interface MidiConfig {
  */
 export interface ModuleData {
   title: string;
-  format: 'mod' | 's3m' | 'xm' | 'it' | 'mtm' | 'stm' | '669' | 'sfx' | 'digi' | 'amf' | 'ice' | 'med' | 'mo3' | 'sid';
+  /**
+   * Registry key of the format plugin; must equal its `name`. The core looks
+   * the reader up by this string, so a third-party format sets its own name.
+   */
+  format: string;
   /** Comment (S3M/IT). */
   comment: string;
   /** Number of channels. */

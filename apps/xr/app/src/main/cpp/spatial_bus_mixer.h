@@ -47,10 +47,18 @@ public:
 
     /**
      * Per-source parameters, called whenever they may have changed (10 Hz).
-     * Layout per source: azimuthDeg, distanceM, gain, spreadDeg, occlusion01.
-     * Also recomputes every filter coefficient; the sample loop stays untouched.
+     * Layout per source: azimuthDeg, elevationDeg, distanceM, gain, spreadDeg,
+     * occlusion01. Also recomputes every filter coefficient; the sample loop
+     * stays untouched.
      */
     void setSources(const float* params, int count);
+
+    /**
+     * Bus directions in the stage frame, xyz per bus, from the host. The ring
+     * has elevation 0; the 3D dome does not, and switches the panner to the 3D
+     * kernel. Must be called before the first mix for the layout to apply.
+     */
+    void setBuses(const float* xyz, int count);
 
     /**
      * Mix `sources` stems of `frames` into `busOut` ([buses][frames]).
@@ -150,7 +158,10 @@ private:
     static void highPassCoef(Biquad& q, float sampleRate, float hz);
     static void mixOne(const float* src, float* dst, int n, float gain);
 
-    void rebuildPans(int source, float azimuthDeg, float spreadDeg);
+    void rebuildPans(int source, float azimuthDeg, float elevationDeg, float spreadDeg);
+    void rebuildPans2D(int source, float azimuthDeg, float spreadDeg);
+    void rebuildPans3D(int source, float azimuthDeg, float elevationDeg, float spreadDeg);
+    void updateReverbDirections();
     void rebuildReverb();
 
     // --------------------------------------------------------------- state
@@ -172,8 +183,12 @@ private:
     int preDelaySamples_ = 0;
     ReverbChannel reverb_[4];
     std::vector<float> reverbIn_[4];
+    float busDirX_[kMaxBuses] = {};
+    float busDirY_[kMaxBuses] = {};
+    float busDirZ_[kMaxBuses] = {};
     float busSin_[kMaxBuses] = {};
     float busCos_[kMaxBuses] = {};
+    bool dome_ = false;
     float wet_ = 0.25f;
     float send_ = 0.35f;
     float roomWidth_ = 4.f, roomDepth_ = 5.f, roomHeight_ = 2.6f, absorption_ = 0.25f;

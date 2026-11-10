@@ -335,7 +335,7 @@ function buildCapabilities(): AndroidCapabilities {
     mixer: tracker,
     mixerMode: tracker && mod.format === 'mod' && mod.chn === 4,
     amigaFilter: tracker && mod.format === 'mod' && mod.chn === 4,
-    panSeparation: tracker && settings.mixer.layout === 'panned',
+    panSeparation: tracker && (settings.mixer.layout === 'panned' || settings.mixer.layout === 'spatial3d'),
     sidPanel: sid,
     sidStereo: sid && (services.sid?.chipCount() ?? 0) > 1,
     audition: tracker && (mod.ins > 0 || core.samples.size > 0),
@@ -433,7 +433,10 @@ function play(): void {
   ended = false;
   if (!streamed) {
     core.setSampleRate(sampleRate);
-    if (sidBytes && isSid()) services.sid?.startTune(sidBytes, sampleRate, 1);
+    if (sidBytes && isSid()) {
+      services.sid?.applyInitSettings(settings.sid.model, settings.sid.videoStandard);
+      services.sid?.startTune(sidBytes, sampleRate, 1);
+    }
     core.startSmix(4);
     core.startPlayer();
     applySettings();
@@ -513,6 +516,10 @@ function restartSid(): void {
   } catch {
     /* no-op */
   }
+  // Chip model and video standard are init-time only: the C64 setup reads them
+  // while loading the tune, so they have to be set before startTune. Without
+  // this the two settings restarted the tune but changed nothing.
+  services.sid?.applyInitSettings(settings.sid.model, settings.sid.videoStandard);
   services.sid?.startTune(sidBytes, sampleRate, 1);
   core.startPlayer();
   applySidSettings();
@@ -839,12 +846,9 @@ function spatialChannels(): number {
 }
 
 function azimuthFor(i: number): number {
-  const layout = settings.mixer.layout;
-  if (layout !== 'panned' && i < 4) {
-    const left = layout === 'lrlr' ? i % 2 === 0 : i === 0 || i === 3;
-    const magnitude = i < 2 ? 45 : 15;
-    return left ? -magnitude : magnitude;
-  }
+  // Raw channel azimuth only: the module pan times the pan separation. Layout
+  // mapping (Front 180, 360, Amiga pairs) is the host's single table in
+  // SpatialLayout.kt; keeping a second copy here is what made the two disagree.
   const xc = core.channelStates[i];
   const pan = xc ? (xc.info_finalpan - 0x80) / 0x80 : 0;
   return pan * 60 * (settings.transport.panSeparation / 100);

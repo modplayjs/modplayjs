@@ -29644,6 +29644,7 @@ export {
   loadSidSongLengths,
   parseSongLength,
   plugin,
+  setSidInitOverrides,
   sidDsp,
   sidSeek,
   sidStartTune

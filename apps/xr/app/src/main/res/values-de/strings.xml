@@ -68,6 +68,7 @@
     <string name="xr_layout_pan">Pan (Dynamisch)</string>
     <string name="xr_layout_front180">180° Front</string>
     <string name="xr_layout_full360">360° Surround</string>
+    <string name="xr_layout_dome">3D-Kuppel</string>
     <string name="xr_layout_lrlr">Amiga (L-R-L-R)</string>
     <string name="xr_layout_lrrl">Amiga (L-R-R-L)</string>
     <string name="xr_dome_3d">3D-Kuppel Staffelung</string>
@@ -75,8 +76,12 @@
     <string name="xr_pan">Panorama</string>
     <string name="xr_passthrough">Passthrough</string>
     <string name="xr_ring">Ring</string>
-    <string name="xr_ring_follow">Ring wandert mit</string>
+    <string name="xr_ring_follow">Ring folgt</string>
+    <string name="xr_ring_world">Welt</string>
+    <string name="xr_ring_sticky">Klebt (experimentell)</string>
+    <string name="xr_ring_locked">Blickgeführt</string>
     <string name="xr_ring_follow_hint">Die Bühne bleibt um deinen Körper: Drehen und Gehen verschieben den Mix nicht.</string>
+    <string name="xr_ring_sticky_hint">Experimentell: die Bühne folgt beim Gehen live deiner Position, behält aber ihre Weltrichtung. Kopfdrehen zeigt weiterhin die Seitenkanäle.</string>
     <string name="xr_ring_world_hint">Die Bühne bleibt im Raum stehen: beim Gehen wanderst du zwischen den Kanälen hindurch.</string>
     <string name="xr_ring_tilt">Bühne kippt mit</string>
     <string name="xr_ring_tilt_hint">Im Liegen folgt die Ringebene deinem Blick, damit die vorderen Kanäle vor den Augen bleiben. Aus: die Bühne bleibt am Boden ausgerichtet.</string>

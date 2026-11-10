@@ -89,6 +89,15 @@ fun DebugPanel() {
                         color = PanelTokens.TextDim,
                         modifier = Modifier.padding(start = 2.dp),
                     )
+                    val elevation = playback.elevations.getOrElse(ch) { 0f }
+                    if (elevation != 0f) {
+                        Text(
+                            "↑${elevation.toInt()}°",
+                            fontSize = PanelTokens.Mono,
+                            fontFamily = FontFamily.Monospace,
+                            color = PanelTokens.AccentAlt,
+                        )
+                    }
                     Box(
                         Modifier
                             .weight(1f)

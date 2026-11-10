@@ -265,7 +265,7 @@ function buildCapabilities() {
     mixer: tracker,
     mixerMode: tracker && mod.format === "mod" && mod.chn === 4,
     amigaFilter: tracker && mod.format === "mod" && mod.chn === 4,
-    panSeparation: tracker && settings.mixer.layout === "panned",
+    panSeparation: tracker && (settings.mixer.layout === "panned" || settings.mixer.layout === "spatial3d"),
     sidPanel: sid,
     sidStereo: sid && (services.sid?.chipCount() ?? 0) > 1,
     audition: tracker && (mod.ins > 0 || core.samples.size > 0),
@@ -358,7 +358,10 @@ function play() {
   ended = false;
   if (!streamed) {
     core.setSampleRate(sampleRate);
-    if (sidBytes && isSid()) services.sid?.startTune(sidBytes, sampleRate, 1);
+    if (sidBytes && isSid()) {
+      services.sid?.applyInitSettings(settings.sid.model, settings.sid.videoStandard);
+      services.sid?.startTune(sidBytes, sampleRate, 1);
+    }
     core.startSmix(4);
     core.startPlayer();
     applySettings();
@@ -429,6 +432,7 @@ function restartSid() {
     core.stopPlayer();
   } catch {
   }
+  services.sid?.applyInitSettings(settings.sid.model, settings.sid.videoStandard);
   services.sid?.startTune(sidBytes, sampleRate, 1);
   core.startPlayer();
   applySidSettings();
@@ -720,12 +724,6 @@ function spatialChannels() {
   return core.module?.chn ?? 0;
 }
 function azimuthFor(i) {
-  const layout = settings.mixer.layout;
-  if (layout !== "panned" && i < 4) {
-    const left = layout === "lrlr" ? i % 2 === 0 : i === 0 || i === 3;
-    const magnitude = i < 2 ? 45 : 15;
-    return left ? -magnitude : magnitude;
-  }
   const xc = core.channelStates[i];
   const pan = xc ? (xc.info_finalpan - 128) / 128 : 0;
   return pan * 60 * (settings.transport.panSeparation / 100);

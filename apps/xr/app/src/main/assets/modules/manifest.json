@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-10T00:52:50.770Z",
+  "generated": "2026-11-10T11:19:18.524Z",
   "layout": "modules/<name>/index.js",
   "always": [
     "modplayjs-core",
@@ -30,8 +30,8 @@
     "modplayjs-dsp-softmixer": {
       "specifier": "@modplayjs/dsp-softmixer",
       "asset": "modplayjs-dsp-softmixer/index.js",
-      "bytes": 97217,
-      "sha256": "6a8d087582ec1f50ae1d742de7257f5d1fe7b538890a96bf52fc56d86ba6c602",
+      "bytes": 97243,
+      "sha256": "abc9708e36f2ba5f1e05efd51a53bc631f70bbdeb1c2379de262aa8574f620ba",
       "version": "0.3.0",
       "imports": [
         "@modplayjs/core"
@@ -189,8 +189,8 @@
     "modplayjs-fmt-sid": {
       "specifier": "@modplayjs/fmt-sid",
       "asset": "modplayjs-fmt-sid/index.js",
-      "bytes": 276645,
-      "sha256": "c6595bd392be03ba0ce66401f55d139c8a6d84803ef1c37060ea175273220e4e",
+      "bytes": 276668,
+      "sha256": "aca12ab504c7f0b2ffc45e454db1dec35f4c6d09c11d2a8e5320ee9eb8cd61ef",
       "version": "0.2.2",
       "imports": [
         "@modplayjs/core"
@@ -427,8 +427,8 @@
     "sid": {
       "package": "modplayjs-fmt-sid",
       "install": "install/sid.js",
-      "bytes": 543,
-      "sha256": "9a3fa607caabfa4098f795fea7a4572b3ac58ae2c6f1ce8222a7637b6740ad2d",
+      "bytes": 606,
+      "sha256": "1a5f470a382f7b117a179c09bc9a9316ab30ff99590c7605a33daa0c4e0b1237",
       "version": "0.2.2",
       "extensions": [
         "sid"
@@ -465,8 +465,8 @@
   },
   "engine": {
     "asset": "engine-core/index.js",
-    "bytes": 23503,
-    "sha256": "ffd7eb023d1c5857bd0589861e1fd6445fad3b70aaf304561837825f3b72f209",
+    "bytes": 23496,
+    "sha256": "d03fcf4db7e41da450f1052e4c65cc4e724624553b42db1283208e11f9c6b598",
     "version": "0.2.2",
     "imports": [
       "@modplayjs/core",

@@ -21,6 +21,11 @@ export interface SidServices {
     highQualityResampler: boolean;
     stereo: number;
   }): void;
+  /**
+   * Init-time SID overrides, applied on the next startTune: chip model and
+   * video standard are consumed only by the C64 init, not live.
+   */
+  applyInitSettings(model: number, videoStandard: number | null | undefined): void;
   loadSongLengths(text: string): void;
 }
 

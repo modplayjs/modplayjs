@@ -36,6 +36,7 @@ import {
   sidStartTune,
   sidSeek,
   applySidSettingsLive,
+  setSidInitOverrides,
   loadSidSongLengths,
   getSidChipCount,
   getSidPlayTimeSeconds,
@@ -85,6 +86,11 @@ function provide(core: CorePlayer): void {
     playTimeSeconds: getSidPlayTimeSeconds,
     chipCount: getSidChipCount,
     applySettings: applySidSettingsLive,
+    applyInitSettings: (model, videoStandard) =>
+      setSidInitOverrides(
+        model as 0 | 6581 | 8580,
+        videoStandard === 0 || videoStandard === 1 ? videoStandard : undefined,
+      ),
     loadSongLengths: loadSidSongLengths,
   };
   services.fc = {

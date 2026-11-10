@@ -94,6 +94,7 @@ const SERVICE_BRIDGES = {
       'getSidPlayTimeSeconds',
       'getSidChipCount',
       'applySidSettingsLive',
+      'setSidInitOverrides',
       'loadSidSongLengths',
     ],
     wire: {
@@ -103,6 +104,7 @@ const SERVICE_BRIDGES = {
       playTimeSeconds: 'getSidPlayTimeSeconds',
       chipCount: 'getSidChipCount',
       applySettings: 'applySidSettingsLive',
+      applyInitSettings: 'setSidInitOverrides',
       loadSongLengths: 'loadSidSongLengths',
     },
   },

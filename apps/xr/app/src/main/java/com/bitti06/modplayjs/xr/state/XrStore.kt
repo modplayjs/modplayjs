@@ -175,6 +175,7 @@ object XrStore {
                 reverbWet = p?.spatialWet() ?: 25,
                 sourceSpread = p?.spatialSpread() ?: 0f,
                 ringFollowsHead = p?.isRingFollowsHead() ?: false,
+                ringFollowMode = p?.ringFollowMode()?.name ?: "WORLD",
                 ringTilts = p?.isRingTilts() ?: false,
             )
     }
@@ -252,8 +253,8 @@ object XrStore {
     }
 
     /** "Mitwandern": ring follows the listener instead of staying in the room. */
-    fun setRingFollowsHead(on: Boolean) {
-        player?.setRingFollowsHead(on)
+    fun setRingFollow(mode: com.bitti06.modplayjs.xr.play.RingFollow) {
+        player?.setRingFollow(mode)
         refresh()
     }
 

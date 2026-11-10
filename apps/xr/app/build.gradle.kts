@@ -104,6 +104,7 @@ val buildModules =
         commandLine(nodeCommand, "scripts/build-modules.mjs")
         inputs.files(
             fileTree(rootProject.file("../../packages")) { include("*/src/**") },
+            fileTree(rootProject.file("../android/engine/src")) { include("**/*.ts") },
             file("scripts/build-modules.mjs"),
             file("scripts/engine-catalog-sign.mjs"),
         ).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("moduleSources")

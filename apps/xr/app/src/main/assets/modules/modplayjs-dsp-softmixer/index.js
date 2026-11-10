@@ -8542,7 +8542,7 @@ var SoftMixer = class {
         vol = Math.trunc(vol * this.mvol / this.mvolbase);
       }
       let pan = vi.pan;
-      if (this.mode === "paula" && this.layout !== "panned" && pan !== 32768 && vi.chn < 4) {
+      if (this.mode === "paula" && (this.layout === "lrlr" || this.layout === "lrrl") && pan !== 32768 && vi.chn < 4) {
         const hardLeft = this.layout === "lrlr" ? vi.chn % 2 === 0 : vi.chn === 0 || vi.chn === 3;
         pan = hardLeft ? -128 : 127;
       }

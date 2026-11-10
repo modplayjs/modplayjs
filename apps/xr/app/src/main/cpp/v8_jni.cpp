@@ -377,6 +377,17 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeStartSpatialBuses(
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeSetSpatialBuses(
+        JNIEnv* env, jobject, jfloatArray dirs) {
+    if (!g_busMixer || !dirs) return;
+    auto* p = static_cast<jfloat*>(env->GetPrimitiveArrayCritical(dirs, nullptr));
+    if (!p) return;
+    const jsize n = env->GetArrayLength(dirs) / 3;
+    g_busMixer->setBuses(p, n);
+    env->ReleasePrimitiveArrayCritical(dirs, p, JNI_ABORT);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_bitti06_modplayjs_engine_V8Engine_nativeSetSpatialSources(
         JNIEnv* env, jobject, jfloatArray params, jint count) {
     if (!g_busMixer || !params) return;

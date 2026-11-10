@@ -68,6 +68,7 @@
     <string name="xr_layout_pan">Pan (Dynamic)</string>
     <string name="xr_layout_front180">180° Front</string>
     <string name="xr_layout_full360">360° Surround</string>
+    <string name="xr_layout_dome">3D Dome</string>
     <string name="xr_layout_lrlr">Amiga (L-R-L-R)</string>
     <string name="xr_layout_lrrl">Amiga (L-R-R-L)</string>
     <string name="xr_dome_3d">3D dome elevation</string>
@@ -75,8 +76,12 @@
     <string name="xr_pan">Pan</string>
     <string name="xr_passthrough">Passthrough</string>
     <string name="xr_ring">Ring</string>
-    <string name="xr_ring_follow">Ring follows you</string>
+    <string name="xr_ring_follow">Ring follow</string>
+    <string name="xr_ring_world">World</string>
+    <string name="xr_ring_sticky">Sticky (experimental)</string>
+    <string name="xr_ring_locked">Head-locked</string>
     <string name="xr_ring_follow_hint">The stage stays around your body: turning and walking do not move the mix.</string>
+    <string name="xr_ring_sticky_hint">Experimental: the stage follows your position live while walking, but keeps its world direction. Turning your head still reveals the side channels.</string>
     <string name="xr_ring_world_hint">The stage stays where it is in the room: walking carries you between the channels.</string>
     <string name="xr_ring_tilt">Tilt with head</string>
     <string name="xr_ring_tilt_hint">In a reclined posture the ring follows your gaze, so the front channels stay in front of your eyes. Turn off for a stage fixed to the floor.</string>

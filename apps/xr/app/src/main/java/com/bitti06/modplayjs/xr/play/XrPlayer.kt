@@ -15,6 +15,8 @@ import com.bitti06.modplayjs.engine.EngineJson
 import com.bitti06.modplayjs.engine.PatternColors
 import com.bitti06.modplayjs.engine.SettingsStore
 import com.bitti06.modplayjs.engine.V8Engine
+import com.bitti06.modplayjs.xr.audio.Direction
+import com.bitti06.modplayjs.xr.audio.SpatialLayout
 import com.meta.spatial.core.Color4
 import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
@@ -30,14 +32,18 @@ import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
 import com.meta.spatial.toolkit.MeshCollision
-import com.meta.spatial.toolkit.Panel
 import com.meta.spatial.toolkit.Scale
 import com.meta.spatial.toolkit.Sphere
+import com.meta.spatial.toolkit.Text3D
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.Visible
 import com.bitti06.modplayjs.xr.R
-import com.bitti06.modplayjs.xr.panels.CHANNEL_LABEL_IDS
 import com.meta.spatial.core.ComponentBase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,6 +58,16 @@ import java.nio.ByteOrder
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+
+/**
+ * Where the ring sits while the listener moves.
+ *
+ * WORLD keeps the stage in the room (walking carries you between channels).
+ * STICKY is the experimental live mode: the ring follows the head position
+ * continuously but keeps its world yaw, so turning the head still reveals the
+ * side channels. LOCKED also follows the head yaw (the old "ring follows you").
+ */
+enum class RingFollow { WORLD, STICKY, LOCKED }
 
 /**
  * Owns the V8 render thread and AudioTrack streaming.
@@ -74,6 +90,7 @@ class XrPlayer(
         val spatialEnabled: Boolean = false,
         val layout: String = "panned",
         val azimuths: List<Float> = emptyList(),
+        val elevations: List<Float> = emptyList(),
         val muted: Set<Int> = emptySet(),
         val solo: Int = -1,
         val error: String? = null,
@@ -121,6 +138,13 @@ class XrPlayer(
      */
     private val prefs = context.getSharedPreferences("xr", Context.MODE_PRIVATE)
 
+    /** Settings persistence and snapshot parsing: never on the V8 thread. */
+    private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val parseScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    @Volatile
+    private var publishPending = false
+
     /**
      * The user's spatial choice, on by default. It is kept separately from
      * [spatialInfo] because the engine's own default is off: every rebuild
@@ -145,6 +169,7 @@ class XrPlayer(
     @Volatile
     private var engine: V8Engine? = null
     private val settingsStore = SettingsStore(context)
+    @Volatile
     private var settings: AndroidSettings = settingsStore.load()
 
     private val queue = LinkedBlockingQueue<() -> Unit>()
@@ -182,6 +207,7 @@ class XrPlayer(
 
     /** Last ring geometry written to the bus entities. */
     private var placedRadius = -1f
+    private var placedLayout = ""
     private var placedX = Float.NaN
     private var placedZ = Float.NaN
     private var placedY = Float.NaN
@@ -198,8 +224,8 @@ class XrPlayer(
     @Volatile private var wetPercent = prefs.getInt(KEY_WET, 25)
     @Volatile private var spreadDeg = prefs.getFloat(KEY_SPREAD, 0f)
 
-    /** Reused every push; 5 floats per source (azimuth, distance, gain, spread, occlusion). */
-    private val sourceParams = FloatArray(MAX_SOURCES * 5)
+    /** Reused every push; 6 floats per source. */
+    private val sourceParams = FloatArray(MAX_SOURCES * 6)
     private var lastSourceAt = 0L
 
     /** Invalidates a pending create when the outputs are rebuilt again. */
@@ -216,8 +242,11 @@ class XrPlayer(
     /** Marker entities are created and mutated on the main thread only. */
     private val markers = ArrayList<Entity>()
     private val markerLabels = ArrayList<Entity>()
+
+    /** Grabbed marker positions, copied on the main thread for the mixer. */
     @Volatile
-    private var markerPositionsCache: Array<Vector3?> = arrayOfNulls(32)
+    private var grabOverrides: Array<Vector3?> = arrayOfNulls(MAX_SOURCES)
+    @Volatile
     private var levels = FloatArray(0)
     private var radiusManual = prefs.getBoolean(KEY_RADIUS_MANUAL, false)
     private var ringRadius = prefs.getFloat(KEY_RADIUS, 1.8f)
@@ -233,17 +262,14 @@ class XrPlayer(
     private var ringY = RING_Y
 
     /**
-     * Ear-relative ring ("mitwandern").
-     *
-     * When on, the ring centre follows the listener, so the stage stays around
-     * the body and turning or walking does not move the mix; the buses are
-     * re-placed whenever the listener moves more than [RING_FOLLOW_STEP].
-     * When off, the ring stays anchored in world coordinates at the point it
-     * was last built, so walking through the room carries you between the
-     * channels.
+     * Ring follow mode. STICKY is the experimental live mode (position only,
+     * world yaw); LOCKED keeps the old "ring follows you" behaviour (position
+     * and yaw). The stored boolean from older builds migrates to LOCKED.
      */
     @Volatile
-    private var ringFollowsHead = prefs.getBoolean(KEY_RING_FOLLOW, false)
+    private var ringFollow: RingFollow =
+        RingFollow.entries.firstOrNull { it.name == prefs.getString(KEY_RING_FOLLOW_MODE, null) }
+            ?: if (prefs.getBoolean(KEY_RING_FOLLOW, false)) RingFollow.LOCKED else RingFollow.WORLD
 
     /** Set once a real head pose has been applied, so (0,0) is never assumed. */
     private var ringAnchored = false
@@ -289,11 +315,14 @@ class XrPlayer(
     private var lastTiltPlaceNs = 0L
 
     private var playing = false
+    @Volatile
     private var loaded = false
+    @Volatile
     private var durationMs = 0L
     private var lastSnapshotAt = 0L
     private var lastPlayheadAt = 0L
     private var lastMarkerAt = 0L
+    @Volatile
     private var spatialInfo: SpatialInfo = SpatialInfo()
     /** False until the azimuths have been read once after a rebuild. */
     private var spatialSettled = false
@@ -328,8 +357,10 @@ class XrPlayer(
         val available: Boolean = false,
         val layout: String = "panned",
         val channels: Int = 0,
-        val azimuths: List<Float> = emptyList(),
-    )
+        val directions: List<Direction> = emptyList(),
+    ) {
+        val azimuths: List<Float> get() = directions.map { it.azimuth }
+    }
 
     fun attachScene(scene: Scene, spatialAudio: SpatialAudioFeature) {
         this.scene = scene
@@ -391,25 +422,32 @@ class XrPlayer(
     }
 
     /**
-     * Follow the listener ("mitwandern") or stay in the world.
+     * Where the ring lives while the listener moves.
      *
-     * Switching to follow pulls the ring under the current head at once;
-     * switching off leaves it where it is, which is the point of the mode.
+     * Switching away from WORLD pulls the ring under the current head at once;
+     * switching back to WORLD leaves it where it is, which is the point of the
+     * world-anchored mode.
      */
-    fun setRingFollowsHead(on: Boolean) {
-        ringFollowsHead = on
-        prefs.edit { putBoolean(KEY_RING_FOLLOW, on) }
-        if (on) {
+    fun setRingFollow(mode: RingFollow) {
+        if (mode == ringFollow) return
+        ringFollow = mode
+        prefs.edit { putString(KEY_RING_FOLLOW_MODE, mode.name) }
+        if (mode != RingFollow.WORLD) {
             submit {
                 ringCenterX = listenerPos.x
                 ringCenterZ = listenerPos.z
                 ringY = listenerPos.y.coerceIn(0.2f, 2.4f)
+                if (mode == RingFollow.LOCKED) ringYawRad = headYaw
+                ringAnchored = true
                 applyPositions()
             }
         }
     }
 
-    fun isRingFollowsHead(): Boolean = ringFollowsHead
+    fun ringFollowMode(): RingFollow = ringFollow
+
+    /** True when the ring follows the listener in any way. */
+    fun isRingFollowsHead(): Boolean = ringFollow != RingFollow.WORLD
 
     /** Tilt the ring plane with the head when the listener reclines. */
     fun setRingTilts(on: Boolean) {
@@ -481,6 +519,8 @@ class XrPlayer(
             runCatching { thread.join(STOP_JOIN_MS) }
         }
         releaseAll()
+        ioScope.cancel()
+        parseScope.cancel()
     }
 
     /** True once the HVSC database went to the SID service. */
@@ -627,18 +667,17 @@ class XrPlayer(
         submit {
             engine?.command("""{"type":"setJamMode","enabled":$on}""")
             settings = settings.copy(playback = settings.playback.copy(jamMode = on))
-            settingsStore.save(settings)
+            saveSettingsAsync()
         }
     }
 
     fun update(transform: (AndroidSettings) -> AndroidSettings) {
         submit {
-            val oldDome = settings.view.dome3D
             val oldGrab = settings.view.grabSources
             settings = transform(settings)
             pushSettings()
-            settingsStore.save(settings)
-            if (settings.view.dome3D != oldDome || settings.view.grabSources != oldGrab) {
+            saveSettingsAsync()
+            if (settings.view.grabSources != oldGrab) {
                 applyPositions()
                 if (debugVisible) rebuildMarkers()
             }
@@ -666,8 +705,12 @@ class XrPlayer(
         submit {
             engine?.command("""{"type":"setMixerLayout","value":"$layout"}""")
             settings = settings.copy(mixer = settings.mixer.copy(layout = layout))
-            settingsStore.save(settings)
+            saveSettingsAsync()
             rebuildOutputs()
+            // The bus layout (ring or dome) is geometry as well as panning:
+            // move the 32 bus entities and hand the native panner the new
+            // directions before the next block.
+            applyPositions()
             publish(playing)
         }
     }
@@ -681,7 +724,7 @@ class XrPlayer(
             if (v == settings.transport.volume) return@submit
             engine?.command("""{"type":"setVolume","value":$v}""")
             settings = settings.copy(transport = settings.transport.copy(volume = v))
-            settingsStore.save(settings)
+            saveSettingsAsync()
             publish(playing)
         }
     }
@@ -937,6 +980,8 @@ class XrPlayer(
         reverbBuffer = reverbBuf
         engine?.setSpatialWet(wetPercent)
         engine?.setSpatialRoom(roomWidth, roomDepth, roomHeight, ROOM_ABSORPTION)
+        engine?.setSpatialBuses(busDirectionArray(settings.mixer.layout))
+        placedLayout = settings.mixer.layout
 
         // Snapshot the geometry: the bus entities must be created on the same
         // ring the mixer is already using, and the fields may move before the
@@ -1007,10 +1052,13 @@ class XrPlayer(
         busesReady = true
     }
 
-    /** Put the buses on the ring again after a radius or centre change. */
+    /** Put the buses on the ring again after a radius, centre or layout change. */
     private fun placeBuses() {
         if (busEntities.isEmpty()) return
-        if (placedRadius == ringRadius &&
+        val layout = settings.mixer.layout
+        val layoutChanged = placedLayout != layout
+        if (!layoutChanged &&
+            placedRadius == ringRadius &&
             placedX == ringCenterX &&
             placedZ == ringCenterZ &&
             placedY == ringY &&
@@ -1025,6 +1073,10 @@ class XrPlayer(
         placedY = ringY
         placedTilt = tiltApplied
         placedYaw = ringYawRad
+        placedLayout = layout
+        if (layoutChanged) {
+            engine?.setSpatialBuses(busDirectionArray(layout))
+        }
         val radius = ringRadius
         val cx = ringCenterX
         val cz = ringCenterZ
@@ -1040,25 +1092,24 @@ class XrPlayer(
         }
     }
 
-    private data class SpatialAngles(val azimuthDeg: Float, val elevationDeg: Float)
-
-    private fun channelSpatialAngles(index: Int, totalChannels: Int): SpatialAngles {
-        val az = -180f + (360f * index / totalChannels)
-        if (!settings.view.dome3D) {
-            return SpatialAngles(az, 0f)
+    /** Flattened xyz per bus, in the stage frame: what the native panner uses. */
+    private fun busDirectionArray(layout: String): FloatArray {
+        val dirs = SpatialLayout.busLayout(layout)
+        val out = FloatArray(dirs.size * 3)
+        for (i in dirs.indices) {
+            val v = SpatialLayout.unit(dirs[i])
+            out[i * 3] = v[0]
+            out[i * 3 + 1] = v[1]
+            out[i * 3 + 2] = v[2]
         }
-        val elev = when (index % 3) {
-            0 -> 10f
-            1 -> 38f
-            else -> 64f
-        }
-        return SpatialAngles(az, elev)
+        return out
     }
 
-    /** Ring point for a bus, from explicit geometry instead of live fields. */
+    /** Ring point for a bus, from the current bus layout. */
     private fun busPositionOf(index: Int, radius: Float, cx: Float, cz: Float, cy: Float): Vector3 {
-        val angles = channelSpatialAngles(index, BUS_COUNT)
-        return domePoint(angles.azimuthDeg, angles.elevationDeg, radius, cx, cz, cy)
+        val dirs = SpatialLayout.busLayout(settings.mixer.layout)
+        val d = dirs.getOrElse(index) { dirs.last() }
+        return domePoint(d.azimuth, d.elevation, radius, cx, cz, cy)
     }
 
     /**
@@ -1217,28 +1268,18 @@ class XrPlayer(
     }
 
     /**
-     * Move the per-channel objects and the debug markers onto the ring.
-     *
-     * The positions are computed on the audio thread; the ECS writes happen on
-     * the main thread, because that is the only place the data model may be
-     * touched.
+     * Where a channel's sound is: a point on the stage at the channel's
+     * direction, on the ring radius. Both panners place the phantom at this
+     * direction (2D VBAP on the ring, a 3D kernel on the dome), so the marker
+     * and the sound share one point.
      */
-    /**
-     * Where the debug sphere for one channel sits.
-     *
-     * The sphere is the *object's* position dropped by [MARKER_DROP] so the two
-     * never z-fight. Both the first build and the per-tick update go through
-     * here: the first build used to place the sphere at exactly the object's
-     * height, and with a static layout it then kept that height, because
-     * [refreshSpatial] returns early when no azimuth changed. The markers were
-     * 12 cm above the sound for the rest of the session after every rebuild.
-     */
-    private fun markerPositionFor(degrees: Float, index: Int = 0): Vector3 {
-        val total = spatialInfo.channels.coerceAtLeast(1)
-        val angles = channelSpatialAngles(index, total)
-        val p = domePoint(degrees, angles.elevationDeg, ringRadius, ringCenterX, ringCenterZ, ringY)
-        return Vector3(p.x, p.y + 0.35f - MARKER_DROP, p.z)
-    }
+    private fun sourcePoint(
+        direction: Direction,
+        radius: Float,
+        cx: Float,
+        cz: Float,
+        cy: Float,
+    ): Vector3 = domePoint(direction.azimuth, direction.elevation, radius, cx, cz, cy)
 
     /**
      * Push new azimuths to the markers, the buses and the native mixer.
@@ -1248,28 +1289,41 @@ class XrPlayer(
      */
     private fun applyPositions() {
         placeBuses()
+        moveMarkers()
         pushSources()
     }
 
     /**
-     * Reads live marker transforms strictly on the Main Thread and updates
-     * [markerPositionsCache] and label positions.
+     * Move the existing debug spheres and labels. Only the azimuths, the ring
+     * and the tilt changed, so no entity has to be rebuilt.
      */
-    private fun updateMarkerPositionsCache() {
-        onMain {
-            val channels = minOf(spatialInfo.channels, MAX_SOURCES)
-            for (i in 0 until channels) {
-                val markerEntity = markers.getOrNull(i)
-                val transform = markerEntity?.let { runCatching { it.getComponent<Transform>() }.getOrNull() }
-                if (transform != null) {
-                    val t = transform.transform.t
-                    runCatching { transform.recycle() }
-                    val pos = Vector3(t.x, t.y + MARKER_DROP, t.z)
-                    markerPositionsCache[i] = pos
-                    markerLabels.getOrNull(i)?.setComponent(Transform(Pose(Vector3(t.x, t.y + 0.16f, t.z))))
-                } else {
-                    markerPositionsCache[i] = null
-                }
+    private fun moveMarkers() {
+        if (markers.isEmpty()) return
+        val channels = minOf(spatialInfo.channels, MAX_SOURCES)
+        if (channels <= 0) return
+        val radius = ringRadius
+        val cx = ringCenterX
+        val cz = ringCenterZ
+        val cy = ringY
+        val overrides = grabOverrides
+        val dirs = spatialInfo.directions
+        val positions =
+            Array(channels) { i ->
+                overrides.getOrNull(i) ?: sourcePoint(
+                    dirs.getOrElse(i) { Direction(0f) },
+                    radius,
+                    cx,
+                    cz,
+                    cy,
+                )
+            }
+        mainHandler.post {
+            for (i in 0 until minOf(channels, markers.size)) {
+                val p = positions[i]
+                markers[i].setComponent(Transform(Pose(p)))
+                markerLabels.getOrNull(i)?.setComponent(
+                    Transform(Pose(Vector3(p.x, p.y + MARKER_LABEL_OFFSET, p.z))),
+                )
             }
         }
     }
@@ -1277,8 +1331,9 @@ class XrPlayer(
     /**
      * Hand the mixer one parameter row per channel.
      *
-     * Reads live marker positions from [markerPositionsCache] (updated on Main Thread),
-     * or falls back to dome geometry. Sends 3D distance, azimuth, and occlusion.
+     * A grabbed marker overrides the geometric position; the array is filled
+     * on the main thread by [refreshGrabOverrides] and is immutable in between,
+     * so the audio thread never reads an ECS component.
      */
     private fun pushSources() {
         val eng = engine ?: return
@@ -1286,36 +1341,84 @@ class XrPlayer(
         val channels = minOf(spatialInfo.channels, MAX_SOURCES)
         if (channels <= 0) return
 
-        if (debugVisible && markers.isNotEmpty()) {
-            updateMarkerPositionsCache()
-        }
-
         val listener = listenerPos
         val boxes = occluders
         val params = sourceParams
+        val overrides = grabOverrides
+        val dirs = spatialInfo.directions
+        val radius = ringRadius
+        val cx = ringCenterX
+        val cz = ringCenterZ
+        val cy = ringY
+        val cY = kotlin.math.cos(ringYawRad)
+        val sY = kotlin.math.sin(ringYawRad)
+        val cT = kotlin.math.cos(tiltApplied)
+        val sT = kotlin.math.sin(tiltApplied)
         for (i in 0 until channels) {
-            val position = markerPositionsCache.getOrNull(i) ?: run {
-                val azimuth = spatialInfo.azimuths.getOrElse(i) { 0f }
-                val angles = channelSpatialAngles(i, channels)
-                domePoint(azimuth, angles.elevationDeg, ringRadius, ringCenterX, ringCenterZ, ringY)
-            }
+            val position =
+                overrides.getOrNull(i) ?: sourcePoint(
+                    dirs.getOrElse(i) { Direction(0f) },
+                    radius,
+                    cx,
+                    cz,
+                    cy,
+                )
 
             val dx = position.x - listener.x
             val dy = position.y - listener.y
             val dz = position.z - listener.z
             val distance = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
 
-            val rawAz = Math.toDegrees(kotlin.math.atan2(dx.toDouble(), dz.toDouble())).toFloat()
-            val azimuth = rawAz - Math.toDegrees(ringYawRad.toDouble()).toFloat()
+            // Direction in the stage frame: undo the ring yaw and the tilt, so
+            // the native panner works in the same local frame as the bus
+            // directions it was given. Using the listener made a fixed marker
+            // slide across the ring while walking.
+            val rx = position.x - cx
+            val ry = position.y - cy
+            val rz = position.z - cz
+            val vx = rx * cY - rz * sY
+            val vz = rx * sY + rz * cY
+            val vy = ry * cT - vz * sT
+            val vz2 = ry * sT + vz * cT
+            val horizontal = kotlin.math.sqrt(vx * vx + vz2 * vz2)
+            val azimuth = Math.toDegrees(kotlin.math.atan2(vx.toDouble(), vz2.toDouble())).toFloat()
+            val elevation = Math.toDegrees(kotlin.math.atan2(vy.toDouble(), horizontal.toDouble())).toFloat()
 
-            val base = i * 5
+            val base = i * 6
             params[base] = azimuth
-            params[base + 1] = distance
-            params[base + 2] = 1f
-            params[base + 3] = spreadDeg
-            params[base + 4] = occlusion(listener, position, boxes)
+            params[base + 1] = elevation
+            params[base + 2] = distance
+            params[base + 3] = 1f
+            params[base + 4] = spreadDeg
+            params[base + 5] = occlusion(listener, position, boxes)
         }
         eng.setSpatialSources(params, channels)
+    }
+
+    /**
+     * Read the live position of grabbed markers on the main thread.
+     *
+     * Called from the per-frame host system at the listener rate. When the
+     * debug view is off, or nothing is grabbable, the overrides are cleared and
+     * the mixer uses the geometric positions.
+     */
+    fun refreshGrabOverrides() {
+        if (!debugVisible || !settings.view.grabSources || markers.isEmpty()) {
+            if (grabOverrides.any { it != null }) grabOverrides = arrayOfNulls(MAX_SOURCES)
+            return
+        }
+        val channels = minOf(spatialInfo.channels, MAX_SOURCES)
+        val next = arrayOfNulls<Vector3>(MAX_SOURCES)
+        for (i in 0 until minOf(channels, markers.size)) {
+            val t = runCatching { markers[i].getComponent<Transform>() }.getOrNull() ?: continue
+            try {
+                val p = t.transform.t
+                next[i] = Vector3(p.x, p.y, p.z)
+            } finally {
+                runCatching { t.recycle() }
+            }
+        }
+        grabOverrides = next
     }
 
     /**
@@ -1396,9 +1499,6 @@ class XrPlayer(
         headYaw = yaw
         headPitch = pitch
         val targetY = y.coerceIn(0.2f, 2.4f)
-        val movedX = x - ringCenterX
-        val movedZ = z - ringCenterZ
-        val moved = kotlin.math.sqrt(movedX * movedX + movedZ * movedZ)
 
         if (!ringAnchored) {
             // The very first pose: never fall back to the world origin.
@@ -1413,42 +1513,49 @@ class XrPlayer(
             return
         }
 
-        if (ringFollowsHead) {
-            if (moved > RING_FOLLOW_STEP || kotlin.math.abs(targetY - ringY) > RING_FOLLOW_STEP) {
-                submit {
-                    ringCenterX = x
-                    ringCenterZ = z
-                    ringY = targetY
-                    applyPositions()
+        when (ringFollow) {
+            RingFollow.WORLD -> {
+                // World-anchored, but the plane still has to sit on the ears:
+                // lying down changes the height without moving the stage.
+                if (kotlin.math.abs(targetY - ringY) > RING_HEIGHT_STEP) {
+                    submit {
+                        ringY = targetY
+                        applyPositions()
+                    }
                 }
             }
-        } else if (kotlin.math.abs(targetY - ringY) > RING_HEIGHT_STEP) {
-            // World-anchored, but the plane still has to sit on the ears: lying
-            // down changes the height without moving the stage.
-            submit {
-                ringY = targetY
-                applyPositions()
+            RingFollow.STICKY, RingFollow.LOCKED -> {
+                // Live reposition: one-pole towards the head, 33 Hz feed.
+                // Only the centre (and the yaw in LOCKED) moves; the radius
+                // stays, so the mix keeps its shape around the body.
+                submit {
+                    val k = FOLLOW_SMOOTH
+                    val nx = ringCenterX + (x - ringCenterX) * k
+                    val nz = ringCenterZ + (z - ringCenterZ) * k
+                    val ny = ringY + (targetY - ringY) * k
+                    val moved = kotlin.math.abs(nx - ringCenterX) > FOLLOW_EPSILON ||
+                        kotlin.math.abs(nz - ringCenterZ) > FOLLOW_EPSILON ||
+                        kotlin.math.abs(ny - ringY) > FOLLOW_EPSILON
+                    ringCenterX = nx
+                    ringCenterZ = nz
+                    ringY = ny
+                    var turned = false
+                    if (ringFollow == RingFollow.LOCKED) {
+                        val d = wrapPi(yaw - ringYawRad)
+                        if (kotlin.math.abs(d) > FOLLOW_YAW_STEP) {
+                            ringYawRad += d * k
+                            turned = true
+                        }
+                    }
+                    if (moved || turned) applyPositions()
+                }
             }
         }
 
         // A recline changes the plane, not the centre. Only when the option is
         // on; the applied tilt eases towards this on the render tick, so the
-        // stage rotates instead of stepping in 10 Hz jumps.
+        // stage rotates instead of stepping with the listener feed.
         tiltTarget = if (ringTilts) pitch.coerceIn(-1.2f, 1.2f) else 0f
-
-        // "Mitwandern" means the stage keeps azimuth 0 in front of the face, so
-        // the ring yaw follows the head as well. A world-anchored ring keeps
-        // the yaw it was built with, which is what makes turning your head
-        // reveal the side channels.
-        if (ringFollowsHead) {
-            val d = wrapPi(yaw - ringYawRad)
-            if (kotlin.math.abs(d) > FOLLOW_YAW_STEP) {
-                submit {
-                    ringYawRad = yaw
-                    applyPositions()
-                }
-            }
-        }
     }
 
     /** Shortest signed angle between two angles, in radians. */
@@ -1530,15 +1637,16 @@ class XrPlayer(
     }
 
     /**
-     * (Re)create one marker sphere per spatial channel.
+     * (Re)create one marker sphere and one text mesh per spatial channel.
      *
-     * `mesh://sphere` is parameterised, not a fixed primitive: Meta's 3D objects
-     * page defines it as a "sphere mesh with a radius defined by the attached
-     * `Sphere(radius: Float)` component". A sphere mesh without that component
-     * gives the mesh creator no radius, and the entity takes the renderer down
-     * with it - which is what the marker switch used to do. `Sphere` supplies
-     * the geometry, `Scale` (documented for meshes) the live size, so a level
-     * change does not rebuild the mesh.
+     * `mesh://sphere` is parameterised: Meta's 3D objects page defines it as a
+     * sphere mesh with a radius from the attached `Sphere(radius: Float)`
+     * component. `Sphere` supplies the geometry and `Scale` the live size, so
+     * a level change does not rebuild the mesh.
+     *
+     * The label used to be a Compose panel - one Android view, virtual display
+     * and compositor layer per channel, 32 of them. `Text3D` is the SDK's own
+     * extruded text mesh: no view, no layer, one draw call each.
      */
     private fun rebuildMarkers() {
         destroyMarkers()
@@ -1546,10 +1654,17 @@ class XrPlayer(
         val channels = spatialInfo.channels
         if (channels <= 0) return
         val positions = List(channels) { i ->
-            markerPositionFor(spatialInfo.azimuths.getOrElse(i) { 0f }, i)
+            sourcePoint(
+                spatialInfo.directions.getOrElse(i) { Direction(0f) },
+                ringRadius,
+                ringCenterX,
+                ringCenterZ,
+                ringY,
+            )
         }
         val colors = List(channels) { channelColor(it) }
         val grab = settings.view.grabSources
+        val collision = if (grab) MeshCollision.LineTest else MeshCollision.NoCollision
         mainHandler.post {
             if (!debugVisible || outputMode != 2) return@post
             if (markerSizes.size < positions.size) {
@@ -1557,7 +1672,7 @@ class XrPlayer(
             }
             for (i in positions.indices) {
                 val components = ArrayList<ComponentBase>()
-                components += Mesh("mesh://sphere".toUri(), MeshCollision.LineTest)
+                components += Mesh("mesh://sphere".toUri(), collision)
                 components += Sphere(MARKER_SPHERE_RADIUS)
                 components += Transform(Pose(positions[i]))
                 components += Scale(Vector3(MARKER_MIN, MARKER_MIN, MARKER_MIN))
@@ -1577,9 +1692,18 @@ class XrPlayer(
                 markers += Entity.create(components)
 
                 val labelComponents = ArrayList<ComponentBase>()
-                val labelPos = Vector3(positions[i].x, positions[i].y + 0.14f, positions[i].z)
-                labelComponents += Transform(Pose(labelPos))
-                labelComponents += Panel(CHANNEL_LABEL_IDS[i % 32], MeshCollision.NoCollision)
+                labelComponents += Mesh(
+                    Text3D.create("CH ${(i + 1).toString().padStart(2, '0')}"),
+                    MeshCollision.NoCollision,
+                )
+                labelComponents += Transform(
+                    Pose(Vector3(positions[i].x, positions[i].y + MARKER_LABEL_OFFSET, positions[i].z)),
+                )
+                labelComponents += Scale(Vector3(MARKER_LABEL_SCALE, MARKER_LABEL_SCALE, MARKER_LABEL_SCALE))
+                labelComponents += Material().apply {
+                    baseColor = colors[i]
+                    unlit = true
+                }
                 labelComponents += Visible(true)
                 markerLabels += Entity.create(labelComponents)
             }
@@ -1605,7 +1729,7 @@ class XrPlayer(
         markers.clear()
         for (l in markerLabels) runCatching { l.destroy() }
         markerLabels.clear()
-        markerPositionsCache.fill(null)
+        grabOverrides = arrayOfNulls(MAX_SOURCES)
         markerSizes.fill(-1f)
     }
 
@@ -1687,7 +1811,7 @@ class XrPlayer(
             return
         }
         val changed =
-            info.azimuths != spatialInfo.azimuths || info.layout != spatialInfo.layout
+            info.directions != spatialInfo.directions || info.layout != spatialInfo.layout
         if (!rebuild && !changed) return
         spatialInfo = info
         applyPositions()
@@ -1768,58 +1892,6 @@ class XrPlayer(
         }
     }
 
-    private fun effectiveAzimuths(
-        channels: Int,
-        layout: String,
-        rawAzimuths: List<Float>,
-    ): List<Float> {
-        if (channels <= 0) return emptyList()
-        if (channels == 1) return listOf(0f)
-        if (layout == "full360") {
-            val step = 360f / channels
-            val offset = step / 2f
-            return List(channels) { i ->
-                val angle = -180f + offset + i * step
-                if (angle > 180f) angle - 360f else angle
-            }
-        }
-        if (layout == "lrlr" && channels >= 4) {
-            return List(channels) { i ->
-                when (i) {
-                    0 -> -45f  // Left Front
-                    1 -> 45f   // Right Front
-                    2 -> -135f // Left Back
-                    3 -> 135f  // Right Back
-                    else -> rawAzimuths.getOrElse(i) { 0f }
-                }
-            }
-        }
-        if (layout == "lrrl" && channels >= 4) {
-            return List(channels) { i ->
-                when (i) {
-                    0 -> -45f  // Left Front
-                    1 -> 45f   // Right Front
-                    2 -> 135f  // Right Back
-                    3 -> -135f // Left Back
-                    else -> rawAzimuths.getOrElse(i) { 0f }
-                }
-            }
-        }
-        // "Pan (Dynamic)" is the engine's own pan, not a spread. The engine
-        // reports one azimuth per channel from the module's channel pan times
-        // the pan separation (rounded to 0.1 degree), and that is what this
-        // mode is named after. Falling through to the even spread below made
-        // the most dynamic layout the most static one and discarded the
-        // separation the settings slider sets.
-        if (layout == "panned" && rawAzimuths.size >= channels) {
-            return rawAzimuths.take(channels)
-        }
-        // 180 degrees in front: even spacing, both edges included.
-        return List(channels) { i ->
-            -90f + (i * 180f / (channels - 1))
-        }
-    }
-
     private fun readSpatialInfo(): SpatialInfo {
         val eng = engine ?: return SpatialInfo()
         val raw = runCatching { eng.spatialInfo() }.getOrNull() ?: return SpatialInfo()
@@ -1829,13 +1901,13 @@ class XrPlayer(
             val layout = obj["layout"]?.jsonPrimitive?.content ?: "panned"
             val rawAz = (obj["azimuths"] as? kotlinx.serialization.json.JsonArray)
                 ?.mapNotNull { it.jsonPrimitive.content.toFloatOrNull() } ?: emptyList()
-            val azimuths = effectiveAzimuths(ch, layout, rawAz)
+            val directions = SpatialLayout.directions(layout, ch, rawAz)
             SpatialInfo(
                 enabled = obj["enabled"]?.jsonPrimitive?.content == "true",
                 available = obj["available"]?.jsonPrimitive?.content == "true",
                 layout = layout,
                 channels = ch,
-                azimuths = azimuths,
+                directions = directions,
             )
         }.getOrElse { SpatialInfo() }
     }
@@ -1867,12 +1939,39 @@ class XrPlayer(
         }.getOrDefault(PatternData())
     }
 
+    /**
+     * Capture the engine strings on the V8 thread and parse them elsewhere.
+     *
+     * `snapshot()` builds the track object and the channel list and used to be
+     * parsed here, on the thread that owes the mixer a block every 20 ms. V8
+     * calls must stay on this thread; kotlinx.serialization does not.
+     */
     private fun publish(isPlaying: Boolean) {
         val eng = engine ?: return
+        if (publishPending) return
+        publishPending = true
+        val raw = runCatching { eng.snapshot() }.getOrNull()
+        val pattern = if (loaded) readPattern(_playhead.value.pattern) else PatternData()
+        val settingsNow = settings
+        parseScope.launch {
+            try {
+                parseSnapshot(raw, pattern, isPlaying, settingsNow)
+            } catch (t: Throwable) {
+                Log.e(TAG, "snapshot parse failed", t)
+            } finally {
+                publishPending = false
+            }
+        }
+    }
+
+    private fun parseSnapshot(
+        raw: String?,
+        patternData: PatternData,
+        isPlaying: Boolean,
+        settingsNow: AndroidSettings,
+    ) {
         val previous = _state.value
-        val snap = runCatching {
-            Json.parseToJsonElement(eng.snapshot()) as? JsonObject
-        }.getOrNull()
+        val snap = raw?.let { runCatching { Json.parseToJsonElement(it) as? JsonObject }.getOrNull() }
         val state = snap?.get("state") as? JsonObject
         val track = snap?.get("track") as? JsonObject
         val caps = snap?.get("capabilities") as? JsonObject
@@ -1882,9 +1981,9 @@ class XrPlayer(
             // is only reformatted when a view option that shapes it changes.
             // Without this key, toggling "sample lengths" or "loop marker" left
             // the panel on the old text until the next module loaded.
-            val detailKey = settings.view.sampleLengths to settings.view.sampleLoopFlags
+            val detailKey = settingsNow.view.sampleLengths to settingsNow.view.sampleLoopFlags
             if (cachedTrackDetail == null || cachedDetailKey != detailKey) {
-                cachedTrackDetail = readTrackDetail(track, settings.view)
+                cachedTrackDetail = readTrackDetail(track, settingsNow.view)
                 cachedDetailKey = detailKey
             }
             cachedDetails = track.entries
@@ -1911,8 +2010,7 @@ class XrPlayer(
         val newPos = state?.get("positionMs")?.jsonPrimitive?.content?.toLongOrNull()
             ?.let { it / 1000L * 1000L } ?: 0L
         val newPattern = if (loaded) {
-            readPattern(state?.get("pattern")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
-                .copy(row = state?.get("row")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
+            patternData.copy(row = state?.get("row")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
         } else {
             PatternData()
         }
@@ -1929,9 +2027,10 @@ class XrPlayer(
             spatialEnabled = spatialInfo.enabled,
             layout = spatialInfo.layout,
             azimuths = spatialInfo.azimuths,
+            elevations = spatialInfo.directions.map { it.elevation },
             debugSources = debugVisible,
             levels = if (debugVisible) levels.toList() else emptyList(),
-            volume = settings.transport.volume,
+            volume = settingsNow.transport.volume,
             solo = snap?.get("soloChannel")?.jsonPrimitive?.content?.toIntOrNull() ?: -1,
             muted = snap?.get("channels")
                 ?.let { element ->
@@ -1952,13 +2051,13 @@ class XrPlayer(
             canMixer = cachedCaps.canMixer,
             canPan = cachedCaps.canPan,
             seekable = cachedCaps.seekable,
-            follow = settings.view.follow,
-            visualizer = settings.view.visualizer,
-            showChannelStrip = settings.view.showChannelStrip,
-            stripDots = settings.view.stripDots,
-            sampleLengths = settings.view.sampleLengths,
-            sampleLoopFlags = settings.view.sampleLoopFlags,
-            patternColors = settings.view.patternColors,
+            follow = settingsNow.view.follow,
+            visualizer = settingsNow.view.visualizer,
+            showChannelStrip = settingsNow.view.showChannelStrip,
+            stripDots = settingsNow.view.stripDots,
+            sampleLengths = settingsNow.view.sampleLengths,
+            sampleLoopFlags = settingsNow.view.sampleLoopFlags,
+            patternColors = settingsNow.view.patternColors,
             trackDetail = cachedTrackDetail ?: current.trackDetail,
         )
 
@@ -2030,6 +2129,12 @@ class XrPlayer(
         engine?.command("{\"type\":\"setSettings\",\"settings\":$json}")
     }
 
+    /** Serialise and persist off the audio thread. */
+    private fun saveSettingsAsync() {
+        val snapshot = settings
+        ioScope.launch { runCatching { settingsStore.save(snapshot) } }
+    }
+
     private fun snapshotLong(key: String): Long =
         runCatching {
             val eng = engine ?: return 0L
@@ -2095,15 +2200,17 @@ class XrPlayer(
          */
         private const val MARKER_SPHERE_RADIUS = 0.08f
 
-        /** Markers sit a little below the audio objects so they do not z-fight. */
-        private const val MARKER_DROP = 0.12f
+        /** Text3D's default glyph height is 0.1 m; 0.55 gives a 5.5 cm label. */
+        private const val MARKER_LABEL_SCALE = 0.55f
+
+        /** Label sits above its sphere so the text does not cover it. */
+        private const val MARKER_LABEL_OFFSET = 0.10f
         private const val KEY_RADIUS = "radius"
         private const val KEY_RADIUS_MANUAL = "radiusManual"
         private const val KEY_RING_FOLLOW = "ringFollowsHead"
+        private const val KEY_RING_FOLLOW_MODE = "ringFollowMode"
         private const val KEY_RING_TILT = "ringTiltsWithHead"
 
-        /** Below this the ring is not re-placed; 5 cm is inaudible. */
-        private const val RING_FOLLOW_STEP = 0.05f
         private const val RING_HEIGHT_STEP = 0.05f
 
         /** Below this the tilt counts as settled and the ring stops moving. */
@@ -2116,6 +2223,12 @@ class XrPlayer(
 
         /** ~5.7 degrees of head yaw before the following ring is re-placed. */
         private const val FOLLOW_YAW_STEP = 0.10f
+
+        /** One-pole per 33 ms listener feed (~80 ms time constant). */
+        private const val FOLLOW_SMOOTH = 0.34f
+
+        /** 2 mm: below this the bus entities are not rewritten. */
+        private const val FOLLOW_EPSILON = 0.002f
         private const val KEY_SPATIAL = "spatialEnabled"
         private const val KEY_WET = "reverbWet"
         private const val KEY_SPREAD = "sourceSpread"

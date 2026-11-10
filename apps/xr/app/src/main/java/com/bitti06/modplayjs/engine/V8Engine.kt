@@ -152,9 +152,14 @@ class V8Engine(
         handle != 0L &&
             nativeStartSpatialBuses(busBuffers, reverbBuffer, sampleRate, frames, busCount)
 
-    /** 5 floats per source: azimuthDeg, distanceM, gain, spreadDeg, occlusion01. */
+    /** 6 floats per source: azimuthDeg, elevationDeg, distanceM, gain, spreadDeg, occlusion01. */
     fun setSpatialSources(params: FloatArray, count: Int) {
         if (handle != 0L) nativeSetSpatialSources(params, count)
+    }
+
+    /** Bus directions in the stage frame, xyz per bus (3 floats each). */
+    fun setSpatialBuses(dirs: FloatArray) {
+        if (handle != 0L) nativeSetSpatialBuses(dirs)
     }
 
     fun setSpatialRoom(width: Float, depth: Float, height: Float, absorption: Float) {
@@ -211,6 +216,8 @@ class V8Engine(
     ): Boolean
 
     private external fun nativeSetSpatialSources(params: FloatArray, count: Int)
+
+    private external fun nativeSetSpatialBuses(dirs: FloatArray)
 
     private external fun nativeSetSpatialRoom(
         width: Float,

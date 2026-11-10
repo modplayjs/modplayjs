@@ -308,21 +308,38 @@ metavr.os.Build.Version.getApiVersion()   // 207 on the current OS line
 ## Audio path
 
 - stereo mode: one interleaved `AudioTrack`
-- spatial mode: one mono `AudioTrack` per tracker channel, each with its own
-  session registered via `SpatialAudioFeature.registerAudioSessionId`, and an
-  entity at the channel's azimuth. The platform HRTF does panning and head
-  tracking; the engine only supplies the stems and the angle.
+- spatial mode: a fixed set of 32 mono bus `AudioTrack`s, each with its own
+  session registered via `SpatialAudioFeature.registerAudioSessionId` and an
+  entity at a bus direction. The native mixer pans every channel stem into the
+  bus set; the platform HRTF does the head-relative rendering and head
+  tracking. The bus graph never changes size between layouts or tracks.
 
-Azimuth source, in `engine-entry.ts`:
+Azimuth source, in `xr/audio/SpatialLayout.kt` (the engine only reports the raw
+channel pan):
 
-| file layout | ch0 | ch1 | ch2 | ch3 |
-|---|---|---|---|---|
-| `lrlr` | -45° | +45° | -15° | +15° |
-| `lrrl` | -45° | +45° | +15° | -15° |
-| `panned` | pan × 60° × panSeparation/100 | … | … | … |
+| file layout | ch0 | ch1 | ch2 | ch3 | rest |
+|---|---|---|---|---|---|
+| `panned` | pan × 60° × panSeparation/100 | … | … | … | same |
+| `front180` | −90° | −30° | +30° | +90° | even −90…+90 |
+| `full360` | −45° (front-left) | then clockwise, 360/n per step | | | ring closes at the back |
+| `lrlr` | −45° | +45° | −135° | +135° | module pan |
+| `lrrl` | −45° | +45° | +135° | −135° | module pan |
+| `spatial3d` | −45° (front-left) | golden-angle spiral up the dome | | | 8…68° elevation |
 
-Channels ≥ 5 use their module pan. Layout is switchable at runtime in the
-Settings panel; unknown layouts fall back to `panned`.
+`full360` starts channel 1 at front-left; 4 channels give the standard quad
+(FL, FR, BR, BL) and 32 channels land exactly on the 32-bus ring.
+
+`spatial3d` is the full-sphere mode. The bus set becomes a 32-point dome (12 at
+10°, 12 at 35°, 8 at 60°), the mixer switches from 2D VBAP to a 3D kernel
+panner, and each channel gets an elevation the tracker itself does not carry:
+channels spiral around the listener on a golden angle while climbing from 8° to
+68°, and the module pan offsets the azimuth by up to ±20°. Moving the ring
+mode, the tilt, the radius or the layout updates the same bus entities, so the
+markers and the sound stay on the same point.
+
+Layout is switchable at runtime in the Settings panel; unknown layouts fall
+back to the front 180 spread. The engine's `spatialInfo` carries raw pans only,
+so there is one layout table instead of three.
 
 Spatial is **on by default** (`DEFAULT_SPATIAL = true` in `XrPlayer`). The
 preference, the initial panel state and the engine choice all come from the same

@@ -94,6 +94,7 @@ fun SettingsPanel() {
                             Option(stringResource(R.string.xr_layout_full360), "full360"),
                             Option(stringResource(R.string.xr_layout_lrlr), "lrlr"),
                             Option(stringResource(R.string.xr_layout_lrrl), "lrrl"),
+                            Option(stringResource(R.string.xr_layout_dome), "spatial3d"),
                         ),
                         settings.mixer.layout,
                     ) { XrStore.setLayout(it) }
@@ -123,18 +124,26 @@ fun SettingsPanel() {
                             radiusManual = false
                         }
                     }
-                    ToggleRow(
+                    OptionRow(
                         stringResource(R.string.xr_ring_follow),
-                        state.ringFollowsHead,
-                    ) {
-                        XrStore.setRingFollowsHead(!state.ringFollowsHead)
+                        listOf(
+                            Option(stringResource(R.string.xr_ring_world), "WORLD"),
+                            Option(stringResource(R.string.xr_ring_sticky), "STICKY"),
+                            Option(stringResource(R.string.xr_ring_locked), "LOCKED"),
+                        ),
+                        state.ringFollowMode,
+                    ) { mode ->
+                        XrStore.setRingFollow(
+                            com.bitti06.modplayjs.xr.play.RingFollow.entries
+                                .firstOrNull { it.name == mode } ?: com.bitti06.modplayjs.xr.play.RingFollow.WORLD,
+                        )
                     }
                     MetaText(
                         stringResource(
-                            if (state.ringFollowsHead) {
-                                R.string.xr_ring_follow_hint
-                            } else {
-                                R.string.xr_ring_world_hint
+                            when (state.ringFollowMode) {
+                                "STICKY" -> R.string.xr_ring_sticky_hint
+                                "LOCKED" -> R.string.xr_ring_follow_hint
+                                else -> R.string.xr_ring_world_hint
                             },
                         ),
                     )
@@ -156,9 +165,6 @@ fun SettingsPanel() {
                         "${state.sourceSpread.toInt()}°",
                     ) { step ->
                         XrStore.setSpatialSpread(state.sourceSpread + if (step > 0) 5f else -5f)
-                    }
-                    ToggleRow(stringResource(R.string.xr_dome_3d), settings.view.dome3D) {
-                        set { s -> s.copy(view = s.view.copy(dome3D = !s.view.dome3D)) }
                     }
                     ToggleRow(stringResource(R.string.xr_free_layout), state.freeLayout) {
                         XrStore.setFreeLayout(!state.freeLayout)
@@ -238,7 +244,7 @@ fun SettingsPanel() {
                         set { s ->
                             s.copy(
                                 transport = s.transport.copy(
-                                    numVoices = (s.transport.numVoices + (step * 4).toInt()).coerceIn(4, 128),
+                                    numVoices = (s.transport.numVoices + (step * 4).toInt()).coerceIn(4, 64),
                                 ),
                             )
                         }

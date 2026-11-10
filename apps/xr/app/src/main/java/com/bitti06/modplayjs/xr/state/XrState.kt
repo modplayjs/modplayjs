@@ -63,6 +63,8 @@ data class XrState(
     val sourceSpread: Float = 0f,
     /** The bus ring follows the listener instead of staying in the room. */
     val ringFollowsHead: Boolean = false,
+    /** WORLD, STICKY (experimental, position only) or LOCKED (position + yaw). */
+    val ringFollowMode: String = "WORLD",
     /** The ring plane follows the head pitch, for reclined listening. */
     val ringTilts: Boolean = false,
 )

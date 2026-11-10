@@ -27,17 +27,6 @@ enum class PanelId {
     IGNORED,
 }
 
-val CHANNEL_LABEL_IDS: List<Int> = listOf(
-    R.id.panel_channel_label_0, R.id.panel_channel_label_1, R.id.panel_channel_label_2, R.id.panel_channel_label_3,
-    R.id.panel_channel_label_4, R.id.panel_channel_label_5, R.id.panel_channel_label_6, R.id.panel_channel_label_7,
-    R.id.panel_channel_label_8, R.id.panel_channel_label_9, R.id.panel_channel_label_10, R.id.panel_channel_label_11,
-    R.id.panel_channel_label_12, R.id.panel_channel_label_13, R.id.panel_channel_label_14, R.id.panel_channel_label_15,
-    R.id.panel_channel_label_16, R.id.panel_channel_label_17, R.id.panel_channel_label_18, R.id.panel_channel_label_19,
-    R.id.panel_channel_label_20, R.id.panel_channel_label_21, R.id.panel_channel_label_22, R.id.panel_channel_label_23,
-    R.id.panel_channel_label_24, R.id.panel_channel_label_25, R.id.panel_channel_label_26, R.id.panel_channel_label_27,
-    R.id.panel_channel_label_28, R.id.panel_channel_label_29, R.id.panel_channel_label_30, R.id.panel_channel_label_31,
-)
-
 /**
  * Everything the activity needs to create one panel: where it stands, how big
  * it is and what draws inside it. Sizes used to live in the activity and poses
@@ -156,24 +145,22 @@ val PANELS: List<PanelSpec> =
     )
 
 /**
- * The visibility rules, as one pure function.
+ * The visibility rules, as one pure function, in priority order.
  *
- * Now playing never hides. The pattern appears only when the module has a grid
- * (SID and streamed modules have none, and an empty grid reads as broken), and
- * it replaces the library while the transport runs: two panels in view is the
- * playback view, four is a wall. Details, settings, queue, ignored and debug
- * are demand-only.
+ * The host caps the live set at five. Context panels are mutually exclusive by
+ * construction (opening Settings closes Details, enabling Debug replaces the
+ * Details shelf), so normal use stays at three or four.
  */
-fun visiblePanels(state: XrState): Set<PanelId> {
+fun visiblePanels(state: XrState): List<PanelId> {
     val playing = state.player
-    return buildSet {
+    return buildList {
         add(PanelId.MAIN)
         if (state.overlays.library) add(PanelId.LIBRARY)
-        if (playing.loaded && playing.canPattern && state.settings.view.patternView) add(PanelId.PATTERN)
-        if (playing.loaded && state.overlays.details) add(PanelId.DETAILS)
         if (state.overlays.settings) add(PanelId.SETTINGS)
         if (state.overlays.queue) add(PanelId.QUEUE)
         if (state.overlays.ignored) add(PanelId.IGNORED)
+        if (playing.loaded && state.overlays.details && !playing.debugSources) add(PanelId.DETAILS)
+        if (playing.loaded && playing.canPattern && state.settings.view.patternView) add(PanelId.PATTERN)
         if (playing.debugSources) add(PanelId.DEBUG)
     }
 }

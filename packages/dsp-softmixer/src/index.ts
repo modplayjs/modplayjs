@@ -115,8 +115,12 @@ export interface SoftMixerOptions {
    *    (chn < 4 only; channels 4+ keep their module pan).
    *  - `'lrrl'`: OpenMPT/PaulaLib Amiga default — ch0 L, ch1 R, ch2 R,
    *    ch3 L.
+   *
+   * The XR host also sends `front180`, `full360` and `spatial3d`; the mixer
+   * leaves those alone (the host owns the spatial layout) and only the two
+   * Amiga layouts change the stereo downmix.
    */
-  layout?: 'panned' | 'lrlr' | 'lrrl';
+  layout?: 'panned' | 'lrlr' | 'lrrl' | 'front180' | 'full360' | 'spatial3d';
   /**
    * Paula mode filter table: `'a500'` (LED off) or `'a500led'` (LED on,
    * the classic dimmed-power-light lowpass). Only meaningful with
@@ -316,7 +320,7 @@ export class SoftMixer implements DspPlugin {
   amplify = DEFAULT_AMPLIFY;
   /** Runtime-safe mode/layout mirrors (set via configure()). */
   mode: 'libxmp' | 'paula' = 'libxmp';
-  layout: 'panned' | 'lrlr' | 'lrrl' = 'panned';
+  layout: 'panned' | 'lrlr' | 'lrrl' | 'front180' | 'full360' | 'spatial3d' = 'panned';
   amigaFilter: 'a500' | 'a500led' = 'a500';
 
   private bidirAdjust = 0;
@@ -482,7 +486,7 @@ export class SoftMixer implements DspPlugin {
       // correct A500 speaker. With the libxmp mixers the module pans are
       // the reference, and forcing hard L/R here would double the
       // per-speaker amplitude and clip the output.
-      if (this.mode === 'paula' && this.layout !== 'panned' && pan !== 0x8000 && vi.chn < 4) {
+      if (this.mode === 'paula' && (this.layout === 'lrlr' || this.layout === 'lrrl') && pan !== 0x8000 && vi.chn < 4) {
         const hardLeft = this.layout === 'lrlr'
           ? vi.chn % 2 === 0
           : vi.chn === 0 || vi.chn === 3;

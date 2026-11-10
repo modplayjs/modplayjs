@@ -26,16 +26,34 @@ class PanelAnimator : SystemBase() {
     private val moves = LinkedHashMap<Entity, Move>()
 
     /**
-     * Animate [entity] to [target]. Re-targeting an entity that is already
-     * moving starts from where it currently is, not from the old destination.
+     * Move [entity] to [target].
+     *
+     * A long move (more than 2 m) or a large rotation (more than 120 degrees)
+     * lands instantly instead of flying through the user: a panel travelling
+     * across the room and spinning on the way is what reads as "the layout
+     * flipped".
      */
     fun moveTo(
         entity: Entity,
         target: Pose,
         durationMs: Long = DEFAULT_DURATION_MS,
     ) {
+        val from = readPose(entity) ?: return
+        if (from.t.distanceTo(target.t) > TELEPORT_DISTANCE_M ||
+            angleBetween(from.q, target.q) > TELEPORT_ANGLE_DEG
+        ) {
+            moves.remove(entity)
+            entity.setComponent(Transform(target))
+            return
+        }
         moves[entity] =
-            Move(readPose(entity) ?: return, target, System.currentTimeMillis(), durationMs)
+            Move(from, target, System.currentTimeMillis(), durationMs)
+    }
+
+    /** Shortest rotation between two orientations, in degrees. */
+    private fun angleBetween(a: com.meta.spatial.core.Quaternion, b: com.meta.spatial.core.Quaternion): Float {
+        val d = kotlin.math.abs(a.dot(b)).coerceIn(0f, 1f)
+        return Math.toDegrees(2.0 * kotlin.math.acos(d.toDouble())).toFloat()
     }
 
     fun cancel(entity: Entity) {
@@ -89,6 +107,8 @@ class PanelAnimator : SystemBase() {
         )
 
     private companion object {
-        const val DEFAULT_DURATION_MS = 320L
+        const val DEFAULT_DURATION_MS = 500L
+        const val TELEPORT_DISTANCE_M = 2.0f
+        const val TELEPORT_ANGLE_DEG = 120f
     }
 }

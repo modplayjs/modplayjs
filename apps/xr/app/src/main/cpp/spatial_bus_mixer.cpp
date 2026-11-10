@@ -10,6 +10,9 @@ namespace {
 constexpr float kCrossoverHz = 90.f;
 constexpr float kMaxDistanceMetres = 40.f;
 constexpr float kGainSmooth = 0.08f;   // per 2.7 ms sub-block, tau ~ 33 ms
+// 3D dome window: 24 deg, about one bus spacing on the dome. The source width
+// opens it further; outside it a bus gets no gain.
+constexpr float kDomeWindowRad = 0.42f;
 
 // A tiny DC offset keeps the feedback paths out of the denormal range without
 // writing the FPCR flush-to-zero bit, which would also affect V8 in the same
@@ -141,9 +144,12 @@ void SpatialBusMixer::configure(int sampleRate, int frames, int buses) {
     for (int b = 0; b < buses_; ++b) {
         const float az = -180.f + 360.f * float(b) / float(buses_);
         const float rad = az * kPi / 180.f;
-        busCos_[b] = std::cos(rad);        // AmbiX X: front
-        busSin_[b] = -std::sin(rad);       // AmbiX Y: left is positive
+        busDirX_[b] = std::sin(rad);
+        busDirY_[b] = 0.f;
+        busDirZ_[b] = std::cos(rad);
     }
+    dome_ = false;
+    updateReverbDirections();
 
     rebuildReverb();
 }
@@ -158,6 +164,27 @@ void SpatialBusMixer::setRoom(float width, float depth, float height, float abso
 
 void SpatialBusMixer::setWet(int percent) {
     wet_ = clampf(float(percent) / 100.f, 0.f, 1.f);
+}
+
+void SpatialBusMixer::updateReverbDirections() {
+    for (int b = 0; b < buses_; ++b) {
+        busCos_[b] = busDirZ_[b];    // AmbiX X: front
+        busSin_[b] = -busDirX_[b];   // AmbiX Y: left is positive
+    }
+}
+
+void SpatialBusMixer::setBuses(const float* xyz, int count) {
+    if (!xyz || count <= 0) return;
+    const int n = std::min(count, buses_);
+    bool dome = false;
+    for (int b = 0; b < n; ++b) {
+        busDirX_[b] = xyz[size_t(b) * 3 + 0];
+        busDirY_[b] = xyz[size_t(b) * 3 + 1];
+        busDirZ_[b] = xyz[size_t(b) * 3 + 2];
+        if (std::fabs(busDirY_[b]) > 0.05f) dome = true;
+    }
+    dome_ = dome;
+    updateReverbDirections();
 }
 
 void SpatialBusMixer::rebuildReverb() {
@@ -181,7 +208,15 @@ void SpatialBusMixer::rebuildReverb() {
 
 // ---------------------------------------------------------------- sources
 
-void SpatialBusMixer::rebuildPans(int source, float azimuthDeg, float spreadDeg) {
+void SpatialBusMixer::rebuildPans(int source, float azimuthDeg, float elevationDeg, float spreadDeg) {
+    if (dome_) {
+        rebuildPans3D(source, azimuthDeg, elevationDeg, spreadDeg);
+    } else {
+        rebuildPans2D(source, azimuthDeg, spreadDeg);
+    }
+}
+
+void SpatialBusMixer::rebuildPans2D(int source, float azimuthDeg, float spreadDeg) {
     SourceRuntime& rt = src_[source];
     const float spacing = 360.f / float(buses_);
 
@@ -233,15 +268,76 @@ void SpatialBusMixer::rebuildPans(int source, float azimuthDeg, float spreadDeg)
     rt.tgtN = n;
 }
 
+void SpatialBusMixer::rebuildPans3D(int source, float azimuthDeg, float elevationDeg, float spreadDeg) {
+    SourceRuntime& rt = src_[source];
+    const float az = azimuthDeg * kPi / 180.f;
+    const float el = clampf(elevationDeg, -80.f, 80.f) * kPi / 180.f;
+    const float ce = std::cos(el);
+    const float sx = std::sin(az) * ce;
+    const float sy = std::sin(el);
+    const float sz = std::cos(az) * ce;
+
+    // Triangular kernel in cos space. The source width opens the window; a
+    // point source keeps roughly one to three buses, a wide one fans out.
+    const float window =
+        clampf(kDomeWindowRad + spreadDeg * 0.5f * kPi / 180.f, 0.15f, 1.4f);
+    const float cosWindow = std::cos(window);
+
+    Tap cand[kMaxBuses];
+    int n = 0;
+    for (int b = 0; b < buses_; ++b) {
+        const float c = sx * busDirX_[b] + sy * busDirY_[b] + sz * busDirZ_[b];
+        if (c <= cosWindow) continue;
+        cand[n].bus = b;
+        cand[n].gain = (c - cosWindow) / (1.f - cosWindow);
+        ++n;
+    }
+
+    if (n == 0) {
+        // Never leave a source silent because it fell into a hole between the
+        // dome buses: use the nearest one.
+        float best = -2.f;
+        int bi = 0;
+        for (int b = 0; b < buses_; ++b) {
+            const float c = sx * busDirX_[b] + sy * busDirY_[b] + sz * busDirZ_[b];
+            if (c > best) {
+                best = c;
+                bi = b;
+            }
+        }
+        rt.tgt[0].bus = bi;
+        rt.tgt[0].gain = 1.f;
+        rt.tgtN = 1;
+        return;
+    }
+
+    std::sort(cand, cand + n, [](const Tap& a, const Tap& b) { return a.gain > b.gain; });
+    if (n > kMaxTaps) n = kMaxTaps;
+
+    float power = 0.f;
+    for (int t = 0; t < n; ++t) power += cand[t].gain * cand[t].gain;
+    if (power <= 0.f) {
+        rt.tgtN = 0;
+        return;
+    }
+    const float norm = 1.f / std::sqrt(power);
+    for (int t = 0; t < n; ++t) {
+        rt.tgt[t].bus = cand[t].bus;
+        rt.tgt[t].gain = cand[t].gain * norm;
+    }
+    rt.tgtN = n;
+}
+
 void SpatialBusMixer::setSources(const float* params, int count) {
     sourceCount_ = std::clamp(count, 0, kMaxSources);
     for (int s = 0; s < sourceCount_; ++s) {
-        const float* p = params + size_t(s) * 5;
+        const float* p = params + size_t(s) * 6;
         const float az = p[0];
-        const float dist = clampf(p[1], 0.f, kMaxDistanceMetres);
-        const float gain = std::max(p[2], 0.f);
-        const float spread = std::max(p[3], 0.f);
-        const float occ = clampf(p[4], 0.f, 1.f);
+        const float el = p[1];
+        const float dist = clampf(p[2], 0.f, kMaxDistanceMetres);
+        const float gain = std::max(p[3], 0.f);
+        const float spread = std::max(p[4], 0.f);
+        const float occ = clampf(p[5], 0.f, 1.f);
 
         // Inverse distance with a 1 m reference and a floor for far sources.
         const float distanceGain = clampf(1.f / std::max(dist, 1.f), 0.05f, 1.f);
@@ -260,7 +356,7 @@ void SpatialBusMixer::setSources(const float* params, int count) {
         const float fc = clampf(std::min(fcAir, fcOcc), 300.f, 20000.f);
         rt.airCoef = clampf(1.f - std::exp(-2.f * kPi * fc / float(sampleRate_)), 0.f, 1.f);
 
-        rebuildPans(s, az, spread);
+        rebuildPans(s, az, el, spread);
     }
 }
 

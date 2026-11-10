@@ -7,11 +7,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import androidx.compose.ui.platform.ComposeView
 import com.bitti06.modplayjs.engine.ModuleCatalog
 import com.bitti06.modplayjs.xr.input.ControllerInputSystem
@@ -19,8 +14,8 @@ import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.library.Playlist
 import com.bitti06.modplayjs.xr.layout.PanelAnimator
 import com.bitti06.modplayjs.xr.layout.PanelPlacement
-import com.bitti06.modplayjs.xr.panels.CHANNEL_LABEL_IDS
 import com.bitti06.modplayjs.xr.panels.PANELS
+import com.bitti06.modplayjs.xr.panels.PanelHost
 import com.bitti06.modplayjs.xr.panels.PanelId
 import com.bitti06.modplayjs.xr.panels.PanelSpec
 import com.bitti06.modplayjs.xr.panels.visiblePanels
@@ -28,7 +23,6 @@ import com.bitti06.modplayjs.xr.play.XrPlayer
 import com.bitti06.modplayjs.xr.state.XrHost
 import com.bitti06.modplayjs.xr.state.XrState
 import com.bitti06.modplayjs.xr.state.XrStore
-import com.bitti06.modplayjs.xr.ui.ChannelLabelBadge
 import com.bitti06.modplayjs.xr.ui.XrTheme
 import com.meta.spatial.compose.ComposeFeature
 import com.meta.spatial.compose.ComposeViewPanelRegistration
@@ -48,8 +42,6 @@ import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
 import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.DpPerMeterDisplayOptions
-import com.meta.spatial.toolkit.MeshCollision
-import com.meta.spatial.toolkit.Panel
 import com.meta.spatial.toolkit.PanelRegistration
 import com.meta.spatial.toolkit.PlayerBodyAttachmentSystem
 import com.meta.spatial.toolkit.QuadShapeOptions
@@ -59,7 +51,6 @@ import com.meta.spatial.toolkit.PanelStyleOptions
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.UIPanelRenderOptions
 import com.meta.spatial.toolkit.UIPanelSettings
-import com.meta.spatial.toolkit.Visible
 import com.meta.spatial.vr.VRFeature
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -82,10 +73,17 @@ class XrActivity : AppSystemActivity(), XrHost {
     private lateinit var placement: PanelPlacement
 
     private val panelAnimator = PanelAnimator()
-    private val panels = LinkedHashMap<PanelId, Entity>()
+    private lateinit var panelHost: PanelHost
 
-    private var visible: Set<PanelId> = emptySet()
-    private var lastLoaded = false
+    /**
+     * The Compose view behind each live panel, so it can be disposed when the
+     * panel entity is destroyed. All panel views share one
+     * `PanelViewLifecycleOwner` (activity lifetime), so
+     * `DisposeOnViewTreeLifecycleDestroyed` never fires for a single panel;
+     * without this a show/hide cycle would leave a composition behind.
+     */
+    private val panelViews = HashMap<Entity, ComposeView>()
+
     private var resumeOnMount = false
     private var resumeAfterPause = false
     private var isdkSystem: IsdkSystem? = null
@@ -93,10 +91,11 @@ class XrActivity : AppSystemActivity(), XrHost {
     /** What the input systems were last told; re-asserted after a reload. */
     private var iskdInputActive = false
     private var lastRecenterNs = 0L
-    /** The arc is placed once, anchored to the head position. */
-    private var panelsPlaced = false
-    /** Last listener/occluder push to the mixer. */
+    /** Last head/ring feed to the mixer. */
     private var lastSpatialFeedNs = 0L
+    /** Last occluder push; panels move on layout events, not per frame. */
+    private var lastOccluderFeedNs = 0L
+    private val occluderScratch = FloatArray(PANELS.size * 7)
     private var anchoredToHead = false
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -119,44 +118,18 @@ class XrActivity : AppSystemActivity(), XrHost {
         list += PANELS.map { spec ->
             ComposeViewPanelRegistration(
                 spec.androidId,
-                composeViewCreator = { _, ctx ->
+                composeViewCreator = { entity, ctx ->
                     ComposeView(ctx).apply {
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
                         setContent { XrTheme { PanelContent(spec) } }
+                        panelViews[entity] = this
                     }
                 },
                 settingsCreator = { panelSettings(spec) },
             )
         }
-
-        // Register 32 channel label panel registrations for floating VR labels
-        for (ch in 0 until 32) {
-            val regId = CHANNEL_LABEL_IDS[ch]
-            list += ComposeViewPanelRegistration(
-                regId,
-                composeViewCreator = { _, ctx ->
-                    ComposeView(ctx).apply {
-                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                        setContent { XrTheme { ChannelLabelBadge(ch) } }
-                    }
-                },
-                settingsCreator = { channelLabelPanelSettings() },
-            )
-        }
         return list
     }
-
-    private fun channelLabelPanelSettings(): PanelSettings =
-        UIPanelSettings(
-            shape = QuadShapeOptions(width = 0.16f, height = 0.07f),
-            style = PanelStyleOptions(themeResourceId = R.style.PanelAppThemeTransparent),
-            display = DpPerMeterDisplayOptions(dpPerMeter = 600f, resolutionScale = 1.0f),
-            rendering = UIPanelRenderOptions(
-                renderMode = PanelRenderMode.Layer(
-                    layerBlendType = PanelShapeLayerBlendType.ALPHA_BLEND,
-                )
-            )
-        )
 
     private fun panelSettings(spec: PanelSpec): PanelSettings {
         val base =
@@ -256,53 +229,24 @@ class XrActivity : AppSystemActivity(), XrHost {
         systemManager.registerSystem(ControllerInputSystem { XrStore.toggleSettings() })
         Log.i(TAG, "input: isdk=${isdkSystem?.active} cursor=${cursorSystem != null}")
 
-        for (spec in PANELS) {
-            panels[spec.id] =
-                Entity.create(
-                    Panel(spec.androidId, MeshCollision.LineTest),
-                    // A panel must have a Transform from the first frame: the
-                    // ISDK reads it on its first tick and a missing component
-                    // is a native assert, not a nullable read. This is a
-                    // placeholder until the anchored placement below runs.
-                    Transform(spec.pose),
-                    Visible(false),
-                )
-        }
-
+        panelHost =
+            PanelHost(
+                placement,
+                panelAnimator,
+                onRelease = { entity -> panelViews.remove(entity)?.disposeComposition() },
+            )
         registerArcAnchor()
         activityScope.launch { XrStore.state.collect { applyState(it) } }
-
-        Log.i(TAG, "panels placed: ${panels.size}, free=${placement.free}")
     }
 
     /**
-     * Apply one state: place the arc when the loaded track changed, then show
-     * exactly the panels [visiblePanels] names.
+     * Apply one state: create/destroy the live panel entities, then let the
+     * host place them. Head movement never re-places anything; only a layout
+     * event does.
      */
     private fun applyState(state: XrState) {
-        if (!panelsPlaced) {
-            // Show the arc in this very emission. Panels are created hidden so
-            // the placeholder Transform is never on screen; waiting for the
-            // avatar body before revealing them left the room empty, because
-            // the body arrives well after the scene and the state flow only
-            // emits when something changes. The authored poses are the
-            // fallback; the head anchor moves the arc once it is readable.
-            placement.apply(panels, force = true)
-            panelsPlaced = true
-            // The head may already be readable in this first emission; the
-            // per-frame system is only the retry.
-            anchorArcToHead()
-        }
-        if (state.player.loaded != lastLoaded) {
-            lastLoaded = state.player.loaded
-            placement.apply(panels)
-        }
-        val next = visiblePanels(state)
-        if (next == visible) return
-        visible = next
-        for ((id, entity) in panels) {
-            entity.setComponent(Visible(id in next))
-        }
+        if (!anchoredToHead) anchorArcToHead()
+        panelHost.sync(visiblePanels(state))
     }
 
     /**
@@ -321,7 +265,6 @@ class XrActivity : AppSystemActivity(), XrHost {
                 private var frames = 0
 
                 override fun execute() {
-                    if (!panelsPlaced) return
                     if (!anchoredToHead) {
                         if (frames++ > 360) {
                             anchoredToHead = true
@@ -329,49 +272,60 @@ class XrActivity : AppSystemActivity(), XrHost {
                         } else {
                             anchorArcToHead()
                         }
+                        return
                     }
-                    // The mixer needs the ear position for distance and the
-                    // panels for occlusion. Both are ECS reads, so they belong
-                    // here on the main thread; 10 Hz is enough, the mixer
-                    // smooths the gains.
+                    // The head feed drives two consumers: the ring (live
+                    // position in STICKY/LOCKED) and the stage frame (posture
+                    // changes). 30 Hz keeps a walking ring smooth; the mixer
+                    // smooths the gains on top.
                     val now = System.nanoTime()
-                    if (now - lastSpatialFeedNs < SPATIAL_FEED_NS) return
-                    lastSpatialFeedNs = now
-                    feedSpatialInputs()
+                    if (now - lastSpatialFeedNs >= SPATIAL_FEED_NS) {
+                        lastSpatialFeedNs = now
+                        readHeadPose()?.let { head ->
+                            val (yaw, pitch) = headYawPitch(head.q)
+                            player.setListener(head.t.x, head.t.y, head.t.z, yaw, pitch)
+                            if (placement.onHead(head, now)) {
+                                // A sustained posture change recaptures the
+                                // stage; rebase the live panels as one body.
+                                panelHost.applyPoses(animate = true)
+                            }
+                            player.refreshGrabOverrides()
+                        }
+                    }
+                    // Occluders only change when a panel moves, so 5 Hz is
+                    // plenty and keeps the 30 Hz head feed cheap.
+                    if (now - lastOccluderFeedNs >= OCCLUDER_FEED_NS) {
+                        lastOccluderFeedNs = now
+                        publishOccluders()
+                    }
                 }
             },
         )
     }
 
     /**
-     * Publish the listener pose and the opaque panel boxes to the player.
+     * Publish the opaque panel boxes to the player.
      *
      * Seven floats per panel: centre, yaw, half extents. The details shelf is
      * transparent and therefore not an occluder; a 4 cm depth keeps a ray from
      * slipping through a panel that is nearly edge-on.
      */
-    private fun feedSpatialInputs() {
-        // Occluders do not depend on the head, so they are published even
-        // before the avatar exists and the pose is still unreadable.
-        readHeadPose()?.let { head ->
-            val (yaw, pitch) = headYawPitch(head.q)
-            player.setListener(head.t.x, head.t.y, head.t.z, yaw, pitch)
-        }
-
-        val boxes = ArrayList<Float>(PANELS.size * 7)
+    private fun publishOccluders() {
+        val boxes = occluderScratch
+        var n = 0
         for (spec in PANELS) {
             if (spec.transparent) continue
-            val entity = panels[spec.id] ?: continue
+            val entity = panelHost.entities[spec.id] ?: continue
             val pose = readEntityPose(entity) ?: continue
-            boxes.add(pose.t.x)
-            boxes.add(pose.t.y)
-            boxes.add(pose.t.z)
-            boxes.add(yawOf(pose.q))
-            boxes.add(spec.width / 2f)
-            boxes.add(spec.height / 2f)
-            boxes.add(PANEL_HALF_THICKNESS)
+            boxes[n++] = pose.t.x
+            boxes[n++] = pose.t.y
+            boxes[n++] = pose.t.z
+            boxes[n++] = yawOf(pose.q)
+            boxes[n++] = spec.width / 2f
+            boxes[n++] = spec.height / 2f
+            boxes[n++] = PANEL_HALF_THICKNESS
         }
-        player.setOccluders(boxes.toFloatArray())
+        player.setOccluders(boxes.copyOf(n))
     }
 
     private fun readEntityPose(entity: Entity): Pose? {
@@ -422,10 +376,8 @@ class XrActivity : AppSystemActivity(), XrHost {
      */
     private fun anchorArcToHead() {
         val head = readHeadPose() ?: return
-        placement.setAnchor(head)
-        // force: a panel already holds the placeholder Transform from creation,
-        // which apply() would otherwise leave alone in free mode.
-        placement.apply(panels, force = true)
+        placement.capture(head)
+        panelHost.applyPoses(animate = false)
         // The bus ring is built from the same pose, so panels and sound share
         // one frame: height from the ear, centre from the listener, yaw from
         // where the user is looking.
@@ -478,11 +430,12 @@ class XrActivity : AppSystemActivity(), XrHost {
     private fun applyRoom(room: MRUKRoom) {
         if (!::player.isInitialized) return
         val size = room.roomBounds.size()
-        val head = readHeadPose()
+        // Size only. The centre belongs to the ring follow mode; taking it from
+        // the head here made the whole mix jump when the room model arrived.
         player.setRingAuto(
             XrPlayer.autoRadius(size.x, size.z),
-            head?.t?.x ?: player.ringCenterX(),
-            head?.t?.z ?: player.ringCenterZ(),
+            player.ringCenterX(),
+            player.ringCenterZ(),
         )
         // Sabine estimate for the room reverb, from the same bounds.
         player.setRoomSize(size.x, size.y, size.z)
@@ -527,11 +480,11 @@ class XrActivity : AppSystemActivity(), XrHost {
         // The toggle lives in the settings panel: moving that panel out from
         // under the user's hand mid-tap is the one change they cannot follow,
         // so it stays where it is and only gets the new grab state.
-        placement.setFree(on, panels, skip = setOf(PanelId.SETTINGS))
+        placement.setFree(on, panelHost.entities, skip = setOf(PanelId.SETTINGS))
     }
 
     override fun resetLayout() {
-        placement.reset(panels)
+        panelHost.reset()
     }
 
     override fun setPassthrough(on: Boolean) {
@@ -573,9 +526,10 @@ class XrActivity : AppSystemActivity(), XrHost {
     }
 
     /**
-     * VRC.Quest.Functional.9: a recenter moves the LOCAL_FLOOR origin, so the
-     * fixed arc is re-authored in front of the new forward direction. Free
-     * layouts are left alone on purpose: the user placed those in the world.
+     * VRC.Quest.Functional.9: a recenter moves the LOCAL_FLOOR origin. The
+     * stage frame is recaptured and every live panel is rebased as one body;
+     * the stored free arrangement is stage-relative, so it comes along instead
+     * of being wiped.
      */
     override fun onRecenter(isUserInitiated: Boolean) {
         super.onRecenter(isUserInitiated)
@@ -583,11 +537,9 @@ class XrActivity : AppSystemActivity(), XrHost {
         if (now - lastRecenterNs < RECENTER_DEBOUNCE_NS) return
         lastRecenterNs = now
 
-        if (::placement.isInitialized) {
-            placement.clearSavedPoses()
-        }
         anchoredToHead = false
         anchorArcToHead()
+        if (::panelHost.isInitialized) placement.onRecenter(panelHost.entities)
         XrScene.reapply()
     }
 
@@ -683,7 +635,9 @@ class XrActivity : AppSystemActivity(), XrHost {
     }
 
     private fun saveFreeLayout() {
-        if (::placement.isInitialized && placement.free) placement.save(panels)
+        if (::placement.isInitialized && placement.free && ::panelHost.isInitialized) {
+            panelHost.save()
+        }
     }
 
     /**
@@ -764,7 +718,12 @@ class XrActivity : AppSystemActivity(), XrHost {
     companion object {
         private const val TAG = "modplay-xr"
         private const val RECENTER_DEBOUNCE_NS = 250_000_000L
-        private const val SPATIAL_FEED_NS = 100_000_000L
+
+        /** Listener/ring feed: 30 Hz keeps a walking sticky ring smooth. */
+        private const val SPATIAL_FEED_NS = 33_000_000L
+
+        /** Occluders only move on layout events, so 5 Hz is plenty. */
+        private const val OCCLUDER_FEED_NS = 200_000_000L
         /** Half thickness of a panel used as an acoustic occluder. */
         private const val PANEL_HALF_THICKNESS = 0.02f
 
@@ -790,19 +749,10 @@ class XrActivity : AppSystemActivity(), XrHost {
 }
 
 /**
- * Compose a panel only while it is on screen.
- *
- * All eight panels exist as windows from the start, so all eight used to keep
- * their whole composition alive and recompose on every state change - eight
- * Compose trees for the two or three panels anyone can see. Returning before
- * `spec.content()` releases the hidden ones; they compose again when they
- * become visible.
+ * A panel exists only while it is in [visiblePanels] (see [PanelHost]), so its
+ * content can be composed unconditionally.
  */
 @Composable
 private fun PanelContent(spec: PanelSpec) {
-    val isVisible by remember(spec.id) {
-        XrStore.state.map { spec.id in visiblePanels(it) }.distinctUntilChanged()
-    }.collectAsState(initial = false)
-
-    if (isVisible) spec.content()
+    spec.content()
 }

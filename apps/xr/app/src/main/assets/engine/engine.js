@@ -50046,6 +50046,10 @@
     void cRSID_C64;
   }
   var sidInitOverrides = { model: 0 };
+  function setSidInitOverrides(model, videoStandard) {
+    sidInitOverrides.model = model;
+    sidInitOverrides.videoStandard = videoStandard;
+  }
   function sidApplyInitOverrides() {
     cRSID.SelectedSIDmodel = sidInitOverrides.model;
     cRSID.ForcedVideoStandard = sidInitOverrides.videoStandard;
@@ -56048,6 +56052,10 @@
       playTimeSeconds: getSidPlayTimeSeconds,
       chipCount: getSidChipCount,
       applySettings: applySidSettingsLive,
+      applyInitSettings: (model, videoStandard) => setSidInitOverrides(
+        model,
+        videoStandard === 0 || videoStandard === 1 ? videoStandard : void 0
+      ),
       loadSongLengths: loadSidSongLengths
     };
     services.fc = {
@@ -64745,7 +64753,7 @@
           vol = Math.trunc(vol * this.mvol / this.mvolbase);
         }
         let pan = vi.pan;
-        if (this.mode === "paula" && this.layout !== "panned" && pan !== 32768 && vi.chn < 4) {
+        if (this.mode === "paula" && (this.layout === "lrlr" || this.layout === "lrrl") && pan !== 32768 && vi.chn < 4) {
           const hardLeft = this.layout === "lrlr" ? vi.chn % 2 === 0 : vi.chn === 0 || vi.chn === 3;
           pan = hardLeft ? -128 : 127;
         }
@@ -67048,7 +67056,7 @@
       mixer: tracker,
       mixerMode: tracker && mod.format === "mod" && mod.chn === 4,
       amigaFilter: tracker && mod.format === "mod" && mod.chn === 4,
-      panSeparation: tracker && settings.mixer.layout === "panned",
+      panSeparation: tracker && (settings.mixer.layout === "panned" || settings.mixer.layout === "spatial3d"),
       sidPanel: sid,
       sidStereo: sid && (services.sid?.chipCount() ?? 0) > 1,
       audition: tracker && (mod.ins > 0 || core.samples.size > 0),
@@ -67141,7 +67149,10 @@
     ended = false;
     if (!streamed) {
       core.setSampleRate(sampleRate);
-      if (sidBytes && isSid()) services.sid?.startTune(sidBytes, sampleRate, 1);
+      if (sidBytes && isSid()) {
+        services.sid?.applyInitSettings(settings.sid.model, settings.sid.videoStandard);
+        services.sid?.startTune(sidBytes, sampleRate, 1);
+      }
       core.startSmix(4);
       core.startPlayer();
       applySettings();
@@ -67212,6 +67223,7 @@
       core.stopPlayer();
     } catch {
     }
+    services.sid?.applyInitSettings(settings.sid.model, settings.sid.videoStandard);
     services.sid?.startTune(sidBytes, sampleRate, 1);
     core.startPlayer();
     applySidSettings2();
@@ -67503,12 +67515,6 @@
     return core.module?.chn ?? 0;
   }
   function azimuthFor(i) {
-    const layout = settings.mixer.layout;
-    if (layout !== "panned" && i < 4) {
-      const left = layout === "lrlr" ? i % 2 === 0 : i === 0 || i === 3;
-      const magnitude = i < 2 ? 45 : 15;
-      return left ? -magnitude : magnitude;
-    }
     const xc = core.channelStates[i];
     const pan = xc ? (xc.info_finalpan - 128) / 128 : 0;
     return pan * 60 * (settings.transport.panSeparation / 100);

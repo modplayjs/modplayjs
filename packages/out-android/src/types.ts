@@ -17,7 +17,7 @@ export interface AndroidSettings {
   };
   mixer: {
     mode: 'libxmp' | 'paula';
-    layout: 'panned' | 'lrlr' | 'lrrl';
+    layout: 'panned' | 'lrlr' | 'lrrl' | 'front180' | 'full360' | 'spatial3d';
     amigaFilter: 'a500' | 'a500led';
     amplify: number;
   };

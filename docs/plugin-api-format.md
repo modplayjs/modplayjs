@@ -1,9 +1,10 @@
 # Format plugin API
 
 A **format plugin** parses a tracker file into the core's data model and
-applies pattern events to channel state during playback. The core ships
-four — MOD, S3M, XM, IT. Any number can be registered; the first one whose
-`test()` accepts the file wins.
+applies pattern events to channel state during playback. The repository
+ships a loader package per format family; the four reference families are
+MOD, S3M, XM and IT. Any number can be registered; the first one whose
+`test()` accepts the file wins, in registration order.
 
 ## The interface
 
@@ -59,6 +60,9 @@ Two hard rules:
    arithmetic matches the format's own numbering.
 2. **`load()` releases nothing** — the core clears the sample store before
    calling `load()`, so each file starts from ID 0.
+3. **`ModuleData.format` is the plugin name.** The core re-enters
+   `registries.format(mod.format)` on every row, so a custom format must set
+   its own name (e.g. `format: 'toy'`) and register under the same name.
 
 ## Quirks and personality
 
@@ -83,10 +87,25 @@ effect arms (route to the shared processors in `effects-shared`:
 jump/break/loop/delay…), instrument-specific NNA/DCT checks, and the
 IT/MPT note-delay and retrigger handling.
 
-The shared processors live in `@modplayjs/effects-shared` and are the
-frame-accurate C ports — a format reader's job is to translate its file's
-effect encoding into those calls with the right parameters, exactly as
-libxmp's `read_event_*.c` readers translate into `effects.c` handlers.
+Fetch the cell through the core, never directly from `mod.patterns`:
+
+```ts
+const mod = core.module!;
+const e =
+  core.readEventScratch(chn) ??
+  core.readEventAt(mod.xxo[core.ctx.p.ord] ?? 0, chn, row);
+```
+
+`readEventScratch` carries delayed/injected events; `readEventAt` reads the
+current order's pattern cell. A reader that walks the pattern array directly
+drops EDx-delayed events and the IT/MPT note-delay path.
+
+The shared processors live in `@modplayjs/effects-shared` (a re-export of
+`@modplayjs/core`) and are the frame-accurate C ports — a format reader's job
+is to translate its file's effect encoding into those calls with the right
+parameters, exactly as libxmp's `read_event_*.c` readers translate into
+`effects.c` handlers. The four shared readers are `readEventMod`
+(`@modplayjs/fmt-mod`), `readEventSt3`, `readEventFt2` and `readEventIt`.
 
 ## Example: minimal format plugin
 
@@ -106,9 +125,12 @@ const plugin: FormatPlugin = {
     return mod;
   },
   readEvent(core, chn, row) {
-    const ev = /* the event cell (chn, row) of the current pattern */;
-    // translate to shared processors / channel state, as libxmp's
-    // read_event_*.c readers do
+    const mod = core.module!;
+    const ev =
+      core.readEventScratch(chn) ??
+      core.readEventAt(mod.xxo[core.ctx.p.ord] ?? 0, chn, row);
+    // translate ev to shared processors / channel state, as libxmp's
+    // read_event_*.c readers do; or reuse readEventMod(core, ev, chn).
   },
 };
 ```
