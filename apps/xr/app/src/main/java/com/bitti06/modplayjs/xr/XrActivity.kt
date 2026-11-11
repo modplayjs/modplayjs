@@ -13,6 +13,7 @@ import com.bitti06.modplayjs.xr.input.ControllerInputSystem
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.library.Playlist
 import com.bitti06.modplayjs.xr.layout.PanelAnimator
+import com.bitti06.modplayjs.xr.layout.PanelGrabSystem
 import com.bitti06.modplayjs.xr.layout.PanelPlacement
 import com.bitti06.modplayjs.xr.panels.PANELS
 import com.bitti06.modplayjs.xr.panels.PanelHost
@@ -237,6 +238,14 @@ class XrActivity : AppSystemActivity(), XrHost {
                 onRelease = { entity -> panelViews.remove(entity)?.disposeComposition() },
             )
         registerArcAnchor()
+        // Runs after IsdkComponentCreationSystem, which is what gives a panel
+        // its dimensions and grab handle before IsdkGrabbable is written.
+        systemManager.registerSystem(
+            PanelGrabSystem(
+                panels = { panelHost.entities },
+                free = { placement.free },
+            ),
+        )
         activityScope.launch { XrStore.state.collect { applyState(it) } }
     }
 

@@ -4,6 +4,7 @@ import com.bitti06.modplayjs.xr.layout.PanelAnimator
 import com.bitti06.modplayjs.xr.layout.PanelPlacement
 import com.meta.spatial.core.Entity
 import com.meta.spatial.toolkit.MeshCollision
+import com.meta.spatial.toolkit.Hittable
 import com.meta.spatial.toolkit.Panel
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.Visible
@@ -61,11 +62,14 @@ class PanelHost(
             val entity =
                 Entity.create(
                     Panel(spec.androidId, MeshCollision.LineTest),
+                    // The sample panels set Hittable explicitly; without it the
+                    // Interaction SDK does not register the panel as an
+                    // interactable that can receive the grab.
+                    Hittable(),
                     Transform(placement.poseFor(id)),
                     Visible(true),
                 )
             live[id] = entity
-            placement.applyGrab(entity)
         }
     }
 

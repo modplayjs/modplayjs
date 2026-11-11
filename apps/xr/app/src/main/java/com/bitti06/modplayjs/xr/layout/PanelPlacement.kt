@@ -9,8 +9,6 @@ import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.Vector3
 import com.meta.spatial.isdk.IsdkGrabState
 import com.meta.spatial.isdk.IsdkGrabbable
-import com.meta.spatial.toolkit.Grabbable
-import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Transform
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,7 +88,6 @@ class PanelPlacement(
         _free.value = on
         prefs.edit().putBoolean(KEY_FREE, on).apply()
         for ((id, entity) in entities) {
-            applyGrab(entity)
             if (id in skip || isGrabbed(entity)) continue
             move(entity, poseFor(id), animate = true)
         }
@@ -101,7 +98,6 @@ class PanelPlacement(
         clearStored()
         anchor.recapture()
         for ((id, entity) in entities) {
-            applyGrab(entity)
             if (isGrabbed(entity)) continue
             move(entity, poseFor(id), animate = false)
         }
@@ -135,26 +131,20 @@ class PanelPlacement(
         edit.apply()
     }
 
-    /** Set or clear the toolkit grab handle. */
-    fun applyGrab(entity: Entity, enabled: Boolean = free) {
-        if (!enabled) {
-            entity.tryRemoveComponent<Grabbable>()
-            return
+    /**
+     * Whether the input system owns this panel right now.
+     *
+     * Free mode makes the panel grabbable through `IsdkGrabbable` (see
+     * [PanelGrabSystem]); while it is grabbed the SDK moves it and the layout
+     * must not.
+     */
+    fun isGrabbed(entity: Entity): Boolean {
+        val isdk = runCatching { entity.tryGetComponent<IsdkGrabbable>() }.getOrNull() ?: return false
+        return try {
+            isdk.grabState == IsdkGrabState.Grabbed
+        } finally {
+            runCatching { isdk.recycle() }
         }
-        animator?.cancel(entity)
-        val current = runCatching { entity.tryGetComponent<Grabbable>() }.getOrNull()
-        if (current != null) {
-            runCatching { current.recycle() }
-            return
-        }
-        entity.setComponent(
-            Grabbable(
-                enabled = true,
-                type = GrabbableType.PIVOT_Y,
-                minHeight = 0.1f,
-                maxHeight = 4.0f,
-            ),
-        )
     }
 
     // ------------------------------------------------------------ internals
@@ -198,33 +188,6 @@ class PanelPlacement(
         } else {
             animator?.cancel(entity)
             entity.setComponent(Transform(pose))
-        }
-    }
-
-    /**
-     * Whether the input system owns this panel right now.
-     *
-     * The toolkit flag is written by the bridge, but it is only a mirror of the
-     * Interaction SDK's grab state and lags it by a frame; a panel that is
-     * being moved would be re-placed by [apply] in that window and feel stuck.
-     * Both flags are read (never written) and either one is enough.
-     */
-    fun isGrabbed(entity: Entity): Boolean {
-        val grab = runCatching { entity.tryGetComponent<Grabbable>() }.getOrNull()
-        if (grab != null) {
-            val grabbed =
-                try {
-                    grab.isGrabbed
-                } finally {
-                    runCatching { grab.recycle() }
-                }
-            if (grabbed) return true
-        }
-        val isdk = runCatching { entity.tryGetComponent<IsdkGrabbable>() }.getOrNull() ?: return false
-        return try {
-            isdk.grabState == IsdkGrabState.Grabbed
-        } finally {
-            runCatching { isdk.recycle() }
         }
     }
 
