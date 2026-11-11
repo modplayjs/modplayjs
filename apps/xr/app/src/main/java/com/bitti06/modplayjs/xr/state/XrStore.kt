@@ -416,6 +416,10 @@ object XrStore {
         rescan()
     }
 
-    /** 10 Hz: fast enough to read, slow enough not to recompose per file. */
-    private const val PROGRESS_NS = 100_000_000L
+    /**
+     * 4 Hz. Every progress value recomposes the library panel (and its cover
+     * thumbnails), so this is the difference between a readable counter and a
+     * main thread that cannot keep up with hand tracking.
+     */
+    private const val PROGRESS_NS = 250_000_000L
 }

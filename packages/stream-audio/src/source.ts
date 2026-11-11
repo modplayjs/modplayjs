@@ -7,6 +7,9 @@ import { decodeWav } from './wav.js';
 import { decodeMp3File } from './mp3.js';
 import { decodeOggFile } from './ogg.js';
 
+/** Longest file the whole-buffer decoder accepts; see createStreamedSource. */
+const MAX_DECODED_MS = 20 * 60 * 1000;
+
 export interface StreamedSource {
   /** Interleaved stereo float pull, mirroring Core.playBuffer semantics:
    *  fills `out` (≤ size floats), returns the number of floats written
@@ -111,54 +114,61 @@ export function createStreamedSource(bytes: Uint8Array, format: StreamedFormat, 
     pcm = stereo;
   }
 
-  // Resample to the output rate if needed (linear).
   const inRate = decoded.sampleRate;
-  if (inRate !== outputRate) {
-    const ratio = outputRate / inRate;
-    const frames = pcm.length / 2;
-    const outFrames = Math.floor(frames * ratio);
-    const resampled = new Float32Array(outFrames * 2);
-    for (let i = 0; i < outFrames; i++) {
-      const src = i / ratio;
-      const i0 = Math.floor(src);
-      const frac = src - i0;
-      const i1 = Math.min(i0 + 1, frames - 1);
-      for (let c = 0; c < 2; c++) {
-        resampled[i * 2 + c] =
-          pcm[i0 * 2 + c]! * (1 - frac) + pcm[i1 * 2 + c]! * frac;
+  const totalFrames = pcm.length / 2;
+  const durationMs = Math.round((totalFrames / inRate) * 1000);
+
+  // A whole file is decoded into one buffer, so length is memory. Beyond this
+  // the V8 heap runs out mid-load and takes the app down instead of reporting
+  // a load error; twenty minutes of stereo at 44-48 kHz is ~400 MB.
+  if (durationMs > MAX_DECODED_MS) return null;
+
+  // Resample while pulling instead of building a second, rate-matched copy of
+  // the whole file. The old copy doubled the peak memory, which is what made
+  // longer WAVs fail on the headset.
+  const ratio = inRate / outputRate; // source frames per output frame
+  let pos = 0; // fractional source frame
+  const playBuffer = (out: Float32Array, size: number, loop?: number): number => {
+    const wanted = Math.floor(size / 2);
+    if (wanted <= 0) return 0;
+    let written = 0;
+    if (ratio === 1) {
+      const start = Math.floor(pos);
+      const take = Math.min(wanted, Math.max(0, totalFrames - start));
+      for (let i = 0; i < take * 2; i++) out[i] = pcm[start * 2 + i]!;
+      pos = start + take;
+      written = take;
+    } else {
+      while (written < wanted) {
+        if (pos >= totalFrames - 1) {
+          if (loop && totalFrames > 1) {
+            pos = 0;
+            continue;
+          }
+          break;
+        }
+        const i0 = Math.floor(pos);
+        const i1 = Math.min(i0 + 1, totalFrames - 1);
+        const frac = pos - i0;
+        out[written * 2] = pcm[i0 * 2]! * (1 - frac) + pcm[i1 * 2]! * frac;
+        out[written * 2 + 1] = pcm[i0 * 2 + 1]! * (1 - frac) + pcm[i1 * 2 + 1]! * frac;
+        pos += ratio;
+        written++;
       }
     }
-    pcm = resampled;
-  }
-  const total = pcm.length;
-  let playPos = 0;
-  const playBuffer = (out: Float32Array, size: number, loop?: number): number => {
-      const framesWanted = Math.floor(size / 2);
-      const remaining = Math.floor((total - playPos) / 2);
-      const frames = Math.min(framesWanted, remaining);
-      if (frames <= 0) {
-        if (loop) {
-          playPos = 0;
-          return playBuffer(out, size, loop);
-        }
-        return 0;
-      }
-      for (let i = 0; i < frames * 2; i++) out[i] = pcm[playPos + i]!;
-      playPos += frames * 2;
-      for (let i = frames * 2; i < size; i++) out[i] = 0;
-      return frames * 2;
+    for (let i = written * 2; i < size; i++) out[i] = 0;
+    return written * 2;
   };
   const seek = (ms: number): void => {
-    // playPos is a float index into interleaved stereo: one frame is two
-    // floats. (The earlier form multiplied by the channel count and then by
-    // two again, so a seek to 50 % landed at the end of the file.)
-    const frame = Math.floor((Math.max(0, ms) / 1000) * outputRate);
-    playPos = Math.min(frame * 2, total);
+    // pos is a source frame, not an interleaved float index. Multiplying by
+    // the channel count and then by two again put a 50 % seek at the end.
+    const frame = (Math.max(0, ms) / 1000) * inRate;
+    pos = Math.max(0, Math.min(totalFrames, frame));
   };
   return {
     channels: 2,
-    sampleRate: outputRate,
-    durationMs: Math.round((total / 2 / outputRate) * 1000),
+    sampleRate: inRate,
+    durationMs,
     playBuffer,
     seek,
   };

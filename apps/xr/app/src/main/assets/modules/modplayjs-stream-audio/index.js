@@ -317,6 +317,7 @@ function decodeOggFile(b) {
 }
 
 // ../../packages/stream-audio/src/source.ts
+var MAX_DECODED_MS = 20 * 60 * 1e3;
 function detectStreamedFormat(bytes, name) {
   if (bytes.length > 38 && bytes[0] === 69 && bytes[1] === 120 && bytes[2] === 116 && bytes[3] === 101) return null;
   if (bytes.length > 1084) {
@@ -387,48 +388,50 @@ function createStreamedSource(bytes, format, outputRate) {
     pcm = stereo;
   }
   const inRate = decoded.sampleRate;
-  if (inRate !== outputRate) {
-    const ratio = outputRate / inRate;
-    const frames = pcm.length / 2;
-    const outFrames = Math.floor(frames * ratio);
-    const resampled = new Float32Array(outFrames * 2);
-    for (let i = 0; i < outFrames; i++) {
-      const src = i / ratio;
-      const i0 = Math.floor(src);
-      const frac = src - i0;
-      const i1 = Math.min(i0 + 1, frames - 1);
-      for (let c = 0; c < 2; c++) {
-        resampled[i * 2 + c] = pcm[i0 * 2 + c] * (1 - frac) + pcm[i1 * 2 + c] * frac;
-      }
-    }
-    pcm = resampled;
-  }
-  const total = pcm.length;
-  let playPos = 0;
+  const totalFrames = pcm.length / 2;
+  const durationMs = Math.round(totalFrames / inRate * 1e3);
+  if (durationMs > MAX_DECODED_MS) return null;
+  const ratio = inRate / outputRate;
+  let pos = 0;
   const playBuffer = (out, size, loop) => {
-    const framesWanted = Math.floor(size / 2);
-    const remaining = Math.floor((total - playPos) / 2);
-    const frames = Math.min(framesWanted, remaining);
-    if (frames <= 0) {
-      if (loop) {
-        playPos = 0;
-        return playBuffer(out, size, loop);
+    const wanted = Math.floor(size / 2);
+    if (wanted <= 0) return 0;
+    let written = 0;
+    if (ratio === 1) {
+      const start = Math.floor(pos);
+      const take = Math.min(wanted, Math.max(0, totalFrames - start));
+      for (let i = 0; i < take * 2; i++) out[i] = pcm[start * 2 + i];
+      pos = start + take;
+      written = take;
+    } else {
+      while (written < wanted) {
+        if (pos >= totalFrames - 1) {
+          if (loop && totalFrames > 1) {
+            pos = 0;
+            continue;
+          }
+          break;
+        }
+        const i0 = Math.floor(pos);
+        const i1 = Math.min(i0 + 1, totalFrames - 1);
+        const frac = pos - i0;
+        out[written * 2] = pcm[i0 * 2] * (1 - frac) + pcm[i1 * 2] * frac;
+        out[written * 2 + 1] = pcm[i0 * 2 + 1] * (1 - frac) + pcm[i1 * 2 + 1] * frac;
+        pos += ratio;
+        written++;
       }
-      return 0;
     }
-    for (let i = 0; i < frames * 2; i++) out[i] = pcm[playPos + i];
-    playPos += frames * 2;
-    for (let i = frames * 2; i < size; i++) out[i] = 0;
-    return frames * 2;
+    for (let i = written * 2; i < size; i++) out[i] = 0;
+    return written * 2;
   };
   const seek = (ms) => {
-    const frame = Math.floor(Math.max(0, ms) / 1e3 * outputRate);
-    playPos = Math.min(frame * 2, total);
+    const frame = Math.max(0, ms) / 1e3 * inRate;
+    pos = Math.max(0, Math.min(totalFrames, frame));
   };
   return {
     channels: 2,
-    sampleRate: outputRate,
-    durationMs: Math.round(total / 2 / outputRate * 1e3),
+    sampleRate: inRate,
+    durationMs,
     playBuffer,
     seek
   };
