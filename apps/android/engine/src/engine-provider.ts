@@ -42,6 +42,15 @@ import {
   getSidPlayTimeSeconds,
 } from '@modplayjs/fmt-sid';
 import { plugin as fcPlugin, fcEffect, setModEventReader } from '@modplayjs/fmt-fc';
+import {
+  plugin as midPlugin,
+  midDsp,
+  midSetSoundfont,
+  midHasSoundfont,
+  midStartTune,
+  midSeek,
+  getMidPlayTimeMs,
+} from '@modplayjs/fmt-mid';
 import { pwPlugin } from '@modplayjs/fmt-prowizard';
 import { services, staticFormatNames } from './engine-services.js';
 
@@ -70,6 +79,7 @@ const FORMAT_PLUGINS = [
   med4Plugin,
   stPlugin,
   sidPlugin,
+  midPlugin,
   fcPlugin,
   pwPlugin,
 ];
@@ -100,6 +110,14 @@ function provide(core: CorePlayer): void {
         core.registries.format('mod').readEvent(c, chn, row);
       });
     },
+  };
+  services.mid = {
+    dsp: midDsp,
+    setSoundfont: midSetSoundfont,
+    hasSoundfont: midHasSoundfont,
+    startTune: midStartTune,
+    seek: midSeek,
+    playTimeMs: getMidPlayTimeMs,
   };
 }
 

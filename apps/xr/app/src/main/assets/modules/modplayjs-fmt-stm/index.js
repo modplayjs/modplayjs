@@ -1,4 +1,4 @@
-// ../../packages/fmt-stm/src/stm.ts
+// packages/fmt-stm/src/stm.ts
 import { SampleFlags } from "@modplayjs/core";
 import { LSN, MSN } from "@modplayjs/core";
 import { ParseError } from "@modplayjs/core";

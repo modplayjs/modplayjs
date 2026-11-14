@@ -1,7 +1,7 @@
-// ../../packages/out-android/src/types.ts
+// packages/out-android/src/types.ts
 var SCHEMA_VERSION = 1;
 
-// ../../packages/out-android/src/defaults.ts
+// packages/out-android/src/defaults.ts
 var DEFAULT_SETTINGS = {
   schemaVersion: 1,
   transport: {
@@ -53,7 +53,7 @@ function normaliseSettings(input) {
   };
 }
 
-// ../../packages/out-android/src/parity.ts
+// packages/out-android/src/parity.ts
 var PARITY = {
   play: { command: "play", screen: "Player" },
   pause: { command: "pause", screen: "Player" },

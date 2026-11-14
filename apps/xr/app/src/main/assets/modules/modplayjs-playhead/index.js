@@ -1,4 +1,4 @@
-// ../../packages/playhead/src/playhead.ts
+// packages/playhead/src/playhead.ts
 var FALLBACK_CLOCK = () => {
   const perf = globalThis.performance;
   if (perf !== void 0 && typeof perf.now === "function") return perf.now();

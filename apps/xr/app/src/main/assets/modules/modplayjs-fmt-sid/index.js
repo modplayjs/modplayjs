@@ -1,4 +1,4 @@
-// ../../packages/fmt-sid/src/config.ts
+// packages/fmt-sid/src/config.ts
 var CRSID_OVERSAMPLING_RATIO = 5;
 var CRSID_FILTERTABLE_RESOLUTION = 12;
 var CRSID_OVERSAMPLING_FILTERTABLE_RESOLUTION = 13;
@@ -6,7 +6,7 @@ var CRSID_RESAMPLER_SINCWINDOW_PERIODS = 6;
 var CRSID_RESAMPLER_SINCPERIOD_SAMPLES = 256;
 var CRSID_RESAMPLER_SINCWINDOW_MAGNITUDE = 2048;
 
-// ../../packages/fmt-sid/src/c64types.ts
+// packages/fmt-sid/src/c64types.ts
 function CRSID_BYTE_LOG2(x) {
   return x < 2 ? 0 : x < 4 ? 1 : x < 8 ? 2 : x < 16 ? 3 : x < 32 ? 4 : x < 64 ? 5 : x < 128 ? 6 : x < 256 ? 7 : 8;
 }
@@ -133,7 +133,7 @@ function bankCode(entry) {
   return entry >>> 16;
 }
 
-// ../../packages/fmt-sid/src/instance.ts
+// packages/fmt-sid/src/instance.ts
 var cRSID = {
   CLImode: 0,
   SampleBufferLength: 0,
@@ -180,10 +180,10 @@ var cRSID = {
 };
 var cRSID_C64 = createC64instance();
 
-// ../../packages/fmt-sid/src/host.ts
+// packages/fmt-sid/src/host.ts
 var CRSID_FILEVERSION_WEBSID = 78;
 
-// ../../packages/fmt-sid/src/mem.ts
+// packages/fmt-sid/src/mem.ts
 function cRSID_generateMemoryBankPointers(C64) {
   for (let i = 0; i < 4; ++i) {
     for (let j = 0; j < 256; ++j) {
@@ -312,7 +312,7 @@ function cRSID_initMem(C64) {
   C64.IObankWR[56580] = C64.IObankWR[56581] = 255;
 }
 
-// ../../packages/fmt-sid/src/cia.ts
+// packages/fmt-sid/src/cia.ts
 function cRSID_createCIAchip(C64, CIA, baseaddress) {
   CIA.ChipModel = 0;
   CIA.BaseAddress = baseaddress;
@@ -419,7 +419,7 @@ function cRSID_acknowledgeCIAIRQ(C64, CIA) {
   C64.IObankRD[CIA.BasePtrRD + INTERRUPTS] = 0;
 }
 
-// ../../packages/fmt-sid/src/vic.ts
+// packages/fmt-sid/src/vic.ts
 function cRSID_createVICchip(C64, baseaddress) {
   C64.VIC.ChipModel = 0;
   C64.VIC.BaseAddress = baseaddress;
@@ -470,7 +470,7 @@ function cRSID_acknowledgeVICrasterIRQ(C64) {
   C64.IObankRD[vicRD + INTERRUPT] &= ~(VIC_IRQ | RASTERROW_MATCH_IRQ);
 }
 
-// ../../packages/fmt-sid/src/cpu.ts
+// packages/fmt-sid/src/cpu.ts
 var N = 128;
 var V = 64;
 var B = 16;
@@ -1184,7 +1184,7 @@ function cRSID_handleCPUinterrupts(C64) {
   return 0;
 }
 
-// ../../packages/fmt-sid/src/combiwaves.ts
+// packages/fmt-sid/src/combiwaves.ts
 var CRSID_SawTriangle = new Uint8Array([
   0,
   0,
@@ -17578,7 +17578,7 @@ var CRSID_PulseSawTriangle = new Uint8Array([
   255
 ]);
 
-// ../../packages/fmt-sid/src/filtercurves.ts
+// packages/fmt-sid/src/filtercurves.ts
 var CRSID_Resonances8580 = new Uint16Array([
   5792,
   5311,
@@ -25820,7 +25820,7 @@ var CRSID_CutoffMul6581_OverSampleRate = new Uint16Array([
   0
 ]);
 
-// ../../packages/fmt-sid/src/sidoutputs.ts
+// packages/fmt-sid/src/sidoutputs.ts
 var FRACTIONAL_BITS = 12;
 var FRACTIONAL_SHIFTS = FRACTIONAL_BITS;
 var CRSID_FILTERTABLE_MAGNITUDE = 1 << CRSID_FILTERTABLE_RESOLUTION;
@@ -25931,7 +25931,7 @@ function cRSID_emulateHQresampledSIDdigi(C64, SID, signal) {
   }
 }
 
-// ../../packages/fmt-sid/src/sidadsr.ts
+// packages/fmt-sid/src/sidadsr.ts
 var cRSID_ADSR_DAC_6581 = new Uint8Array([
   0,
   2,
@@ -26513,7 +26513,7 @@ function cRSID_emulateADSRs(_C64, SID, cycles) {
   }
 }
 
-// ../../packages/fmt-sid/src/sidoscwaves.ts
+// packages/fmt-sid/src/sidoscwaves.ts
 function getPW(C64, channelptr) {
   const W = C64.IObankWR;
   return ((W[channelptr + 3] & 15) << 8 | W[channelptr + 2]) << 4 >>> 0;
@@ -26837,7 +26837,7 @@ function cRSID_emulateHQwaves(C64, SID, cycles) {
   return SIDwavOutput;
 }
 
-// ../../packages/fmt-sid/src/sid.ts
+// packages/fmt-sid/src/sid.ts
 function cRSID_createSIDchip(C64, SID, model, channel, baseaddress) {
   SID.ChipModel = model;
   SID.Channel = channel;
@@ -26875,7 +26875,7 @@ function cRSID_emulateHQresampledSID(C64, SID, cycles) {
   return SID.Output;
 }
 
-// ../../packages/fmt-sid/src/sincwindow.ts
+// packages/fmt-sid/src/sincwindow.ts
 var SincWindow = new Int16Array([
   0,
   0,
@@ -28415,7 +28415,7 @@ var SincWindow = new Int16Array([
   0
 ]);
 
-// ../../packages/fmt-sid/src/psiddigi.ts
+// packages/fmt-sid/src/psiddigi.ts
 var D418_VOL_RANGE = 16;
 var DIGI_MAX = D418_VOL_RANGE - 1;
 var DIGI_MASK = DIGI_MAX;
@@ -28468,7 +28468,7 @@ function cRSID_playPSIDdigi() {
   return Math.trunc(st.Output / C64.Attenuation);
 }
 
-// ../../packages/fmt-sid/src/sidrouting.ts
+// packages/fmt-sid/src/sidrouting.ts
 function divTrunc3(a, b) {
   return Math.trunc(a / b);
 }
@@ -28921,7 +28921,7 @@ function cRSID_emulateHQresampledSIDoutputs(C64) {
   return Output;
 }
 
-// ../../packages/fmt-sid/src/c64.ts
+// packages/fmt-sid/src/c64.ts
 var VOLUME_MAX = 15;
 var CHANNELS2 = 3 + 1;
 var SID_FULLVOLUME = CHANNELS2 * VOLUME_MAX;
@@ -29140,7 +29140,7 @@ function cRSID_emulateC64(C64) {
   return Output;
 }
 
-// ../../packages/fmt-sid/src/loader.ts
+// packages/fmt-sid/src/loader.ts
 function cRSID_decodeSIDheader(filedata) {
   const be16 = (o) => filedata[o] << 8 | filedata[o + 1];
   const magic = String.fromCharCode(filedata[0], filedata[1], filedata[2], filedata[3]);
@@ -29385,7 +29385,7 @@ function cRSID_close() {
   cRSID.Paused = 1;
 }
 
-// ../../packages/fmt-sid/src/songlengths.ts
+// packages/fmt-sid/src/songlengths.ts
 import { md5Hex } from "@modplayjs/core";
 var subtuneDurations = [];
 var dbLoaded = false;
@@ -29432,7 +29432,7 @@ function isSidSongLengthDbLoaded() {
   return dbLoaded;
 }
 
-// ../../packages/fmt-sid/src/sidseek.ts
+// packages/fmt-sid/src/sidseek.ts
 var sidTuneBytes = null;
 var sidTuneHeader = null;
 var sidTuneSubtune = 1;
@@ -29470,7 +29470,7 @@ function sidSeek(seconds) {
   }
 }
 
-// ../../packages/fmt-sid/src/settings.ts
+// packages/fmt-sid/src/settings.ts
 function getSidSettings() {
   return {
     volume: cRSID.MainVolume,
@@ -29506,7 +29506,7 @@ function getSidChipCount() {
   return cRSID_C64.SIDchipCount;
 }
 
-// ../../packages/fmt-sid/src/sidplugin.ts
+// packages/fmt-sid/src/sidplugin.ts
 var SID_STUB_CHANNELS = 1;
 var SID_STUB_ROWS = 64;
 function cRSID_sidTest(bytes) {

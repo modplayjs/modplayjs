@@ -1,4 +1,4 @@
-// ../../packages/fmt-it/src/it.ts
+// packages/fmt-it/src/it.ts
 import {
   C4_NTSC_RATE,
   ChannelFlags,
@@ -25,7 +25,7 @@ import {
 } from "@modplayjs/core";
 import { SET_NOTE, TEST_NOTE, NoteFlag, readEventIt } from "@modplayjs/core";
 
-// ../../packages/fmt-it/src/itsex.ts
+// packages/fmt-it/src/itsex.ts
 var READ_BITS_MASK = (n) => (1 << n) - 1;
 var TEMP_BUFFER_LEN = 65536;
 function readBits(s, buf, n) {
@@ -225,7 +225,7 @@ function write16(buf, sampleIdx, v) {
   buf[o + 1] = v >> 8 & 255;
 }
 
-// ../../packages/fmt-it/src/it.ts
+// packages/fmt-it/src/it.ts
 var MAGIC_IMPM = 1229803597;
 var MAGIC_IMPI = 1229803593;
 var MAGIC_IMPS = 1229803603;
@@ -1541,7 +1541,7 @@ var plugin = {
   }
 };
 
-// ../../packages/fmt-it/src/itWrite.ts
+// packages/fmt-it/src/itWrite.ts
 var MAGIC = "IMPM";
 var ByteWriter = class {
   buf = new Uint8Array(1024);

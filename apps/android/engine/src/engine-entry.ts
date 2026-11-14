@@ -122,6 +122,16 @@ function attachServices(kind: string, value: unknown): boolean {
     }
     return true;
   }
+  if (kind === 'mid') {
+    const mid = value as NonNullable<typeof services.mid>;
+    services.mid = mid;
+    try {
+      core.registries.registerDsp(mid.dsp);
+    } catch {
+      // Already registered (a repeated install): the DSP is a singleton.
+    }
+    return true;
+  }
   return false;
 }
 
@@ -132,6 +142,7 @@ const mixer = createSoftMixerPlugin() as SoftMixer;
 core.registries.registerDsp(mixer);
 if (services.sid) core.registries.registerDsp(services.sid.dsp);
 if (services.fc) core.registries.registerEffect(services.fc.effect);
+if (services.mid) core.registries.registerDsp(services.mid.dsp);
 services.fc?.installEventReader(core);
 
 let settings: AndroidSettings = normaliseSettings({});
@@ -145,6 +156,7 @@ let streamed: StreamedSource | null = null;
 let streamedFormat: string | null = null;
 let streamedFrames = 0;
 let sidBytes: Uint8Array | null = null;
+let midBytes: Uint8Array | null = null;
 let channelMutes: boolean[] = [];
 let soloChannel: number | null = null;
 let savedMutes: boolean[] | null = null;
@@ -152,6 +164,7 @@ let spatialEnabled = false;
 
 const isStreamed = (): boolean => streamed !== null;
 const isSid = (): boolean => core.module?.format === 'sid';
+const isMid = (): boolean => core.module?.format === 'mid';
 
 function durationMs(): number {
   if (streamed) return streamed.durationMs;
@@ -168,6 +181,7 @@ function durationMs(): number {
 function modulePosition(): number {
   if (streamed) return (streamedFrames / sampleRate) * 1000;
   if (isSid()) return (services.sid?.playTimeSeconds() ?? 0) * 1000;
+  if (isMid()) return services.mid?.playTimeMs() ?? 0;
   return core.playState.timeMs;
 }
 
@@ -394,6 +408,7 @@ function load(bytes: Uint8Array, name: string): void {
   streamedFormat = null;
   streamedFrames = 0;
   sidBytes = null;
+  midBytes = null;
   soloChannel = null;
   savedMutes = null;
   trackName = name;
@@ -415,6 +430,11 @@ function load(bytes: Uint8Array, name: string): void {
   if (mod.format === 'sid') {
     sidBytes = bytes;
     core.setDsp('sid');
+  } else if (mod.format === 'mid') {
+    // MIDI is engine-paced like SID: the DSP plays the message stream, the
+    // stub tracker only paces playBuffer chunks.
+    midBytes = bytes;
+    core.setDsp('mid');
   } else {
     core.setDsp('softmixer');
     applySettings();
@@ -436,6 +456,9 @@ function play(): void {
     if (sidBytes && isSid()) {
       services.sid?.applyInitSettings(settings.sid.model, settings.sid.videoStandard);
       services.sid?.startTune(sidBytes, sampleRate, 1);
+    }
+    if (midBytes && isMid()) {
+      services.mid?.startTune(midBytes, sampleRate);
     }
     core.startSmix(4);
     core.startPlayer();
@@ -478,6 +501,8 @@ function seek(ms: number): void {
     streamedFrames = (target / 1000) * sampleRate;
   } else if (isSid()) {
     services.sid?.seek(requested / 1000);
+  } else if (isMid()) {
+    services.mid?.seek(requested);
   } else {
     core.seekTime(requested);
   }

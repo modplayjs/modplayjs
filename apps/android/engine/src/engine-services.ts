@@ -35,9 +35,20 @@ export interface FcServices {
   installEventReader(core: Core): void;
 }
 
+export interface MidServices {
+  readonly dsp: DspPlugin;
+  /** Load a SoundFont 2 bank (.sf2). Required before startTune. */
+  setSoundfont(sf2: Uint8Array): number;
+  hasSoundfont(): boolean;
+  startTune(bytes: Uint8Array, sampleRate: number): void;
+  seek(targetMs: number): void;
+  playTimeMs(): number;
+}
+
 export interface EngineServices {
   sid?: SidServices;
   fc?: FcServices;
+  mid?: MidServices;
 }
 
 /** Filled by the provider module and by `__modplayInstall`. */

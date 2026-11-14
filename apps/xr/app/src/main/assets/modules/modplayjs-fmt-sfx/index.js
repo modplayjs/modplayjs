@@ -1,4 +1,4 @@
-// ../../packages/fmt-sfx/src/sfx.ts
+// packages/fmt-sfx/src/sfx.ts
 import { SampleFlags } from "@modplayjs/core";
 import { LSN, MSN, PERIOD_BASE, EMPTY_EVENT } from "@modplayjs/core";
 import { ParseError } from "@modplayjs/core";

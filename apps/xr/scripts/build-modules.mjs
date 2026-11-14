@@ -68,6 +68,7 @@ const FORMATS = {
   },
   st: { pkg: 'fmt-st', exports: ['plugin'], ext: ['st'] },
   sid: { pkg: 'fmt-sid', exports: ['plugin'], ext: ['sid'] },
+  mid: { pkg: 'fmt-mid', exports: ['plugin'], ext: ['mid'] },
   fc: { pkg: 'fmt-fc', exports: ['plugin'], ext: ['fc13', 'fc14'] },
   prowizard: {
     pkg: 'fmt-prowizard',
@@ -116,6 +117,25 @@ const SERVICE_BRIDGES = {
       // The reader needs the MOD format plugin; the engine calls this after
       // registering MOD, and retries if MOD is installed later.
       installEventReader: '() => setModEventReader((c, chn, row) => c.registries.format("mod").readEvent(c, chn, row))',
+    },
+  },
+  'fmt-mid': {
+    kind: 'mid',
+    exports: [
+      'midDsp',
+      'midSetSoundfont',
+      'midHasSoundfont',
+      'midStartTune',
+      'midSeek',
+      'getMidPlayTimeMs',
+    ],
+    wire: {
+      dsp: 'midDsp',
+      setSoundfont: 'midSetSoundfont',
+      hasSoundfont: 'midHasSoundfont',
+      startTune: 'midStartTune',
+      seek: 'midSeek',
+      playTimeMs: 'getMidPlayTimeMs',
     },
   },
 };

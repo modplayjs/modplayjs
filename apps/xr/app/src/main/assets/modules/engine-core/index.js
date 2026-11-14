@@ -1,4 +1,4 @@
-// ../android/engine/src/engine-entry.ts
+// apps/android/engine/src/engine-entry.ts
 import { CorePlayer } from "@modplayjs/core";
 import { createPaulaPlugin } from "@modplayjs/dsp-paula";
 import { createSoftMixerPlugin } from "@modplayjs/dsp-softmixer";
@@ -11,11 +11,11 @@ import {
   SCHEMA_VERSION
 } from "@modplayjs/out-android";
 
-// ../android/engine/src/engine-services.ts
+// apps/android/engine/src/engine-services.ts
 var services = {};
 var staticFormatNames = [];
 
-// ../android/engine/src/engine-entry.ts
+// apps/android/engine/src/engine-entry.ts
 var core = new CorePlayer();
 globalThis.__modplayProvide?.(core);
 var installedFormats = [...staticFormatNames];
@@ -68,6 +68,15 @@ function attachServices(kind, value) {
     }
     return true;
   }
+  if (kind === "mid") {
+    const mid = value;
+    services.mid = mid;
+    try {
+      core.registries.registerDsp(mid.dsp);
+    } catch {
+    }
+    return true;
+  }
   return false;
 }
 globalThis.__modplayAttach = attachServices;
@@ -76,6 +85,7 @@ var mixer = createSoftMixerPlugin();
 core.registries.registerDsp(mixer);
 if (services.sid) core.registries.registerDsp(services.sid.dsp);
 if (services.fc) core.registries.registerEffect(services.fc.effect);
+if (services.mid) core.registries.registerDsp(services.mid.dsp);
 services.fc?.installEventReader(core);
 var settings = normaliseSettings({});
 var sampleRate = 48e3;
@@ -88,12 +98,14 @@ var streamed = null;
 var streamedFormat = null;
 var streamedFrames = 0;
 var sidBytes = null;
+var midBytes = null;
 var channelMutes = [];
 var soloChannel = null;
 var savedMutes = null;
 var spatialEnabled = false;
 var isStreamed = () => streamed !== null;
 var isSid = () => core.module?.format === "sid";
+var isMid = () => core.module?.format === "mid";
 function durationMs() {
   if (streamed) return streamed.durationMs;
   const mod = core.module;
@@ -105,6 +117,7 @@ function durationMs() {
 function modulePosition() {
   if (streamed) return streamedFrames / sampleRate * 1e3;
   if (isSid()) return (services.sid?.playTimeSeconds() ?? 0) * 1e3;
+  if (isMid()) return services.mid?.playTimeMs() ?? 0;
   return core.playState.timeMs;
 }
 function applySettings() {
@@ -320,6 +333,7 @@ function load(bytes, name) {
   streamedFormat = null;
   streamedFrames = 0;
   sidBytes = null;
+  midBytes = null;
   soloChannel = null;
   savedMutes = null;
   trackName = name;
@@ -341,6 +355,9 @@ function load(bytes, name) {
   if (mod.format === "sid") {
     sidBytes = bytes;
     core.setDsp("sid");
+  } else if (mod.format === "mid") {
+    midBytes = bytes;
+    core.setDsp("mid");
   } else {
     core.setDsp("softmixer");
     applySettings();
@@ -361,6 +378,9 @@ function play() {
     if (sidBytes && isSid()) {
       services.sid?.applyInitSettings(settings.sid.model, settings.sid.videoStandard);
       services.sid?.startTune(sidBytes, sampleRate, 1);
+    }
+    if (midBytes && isMid()) {
+      services.mid?.startTune(midBytes, sampleRate);
     }
     core.startSmix(4);
     core.startPlayer();
@@ -398,6 +418,8 @@ function seek(ms) {
     streamedFrames = target / 1e3 * sampleRate;
   } else if (isSid()) {
     services.sid?.seek(requested / 1e3);
+  } else if (isMid()) {
+    services.mid?.seek(requested);
   } else {
     core.seekTime(requested);
   }

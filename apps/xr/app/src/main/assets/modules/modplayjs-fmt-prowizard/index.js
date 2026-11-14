@@ -1,7 +1,7 @@
-// ../../packages/fmt-prowizard/src/prowiz.ts
+// packages/fmt-prowizard/src/prowiz.ts
 import { ParseError as ParseError2 } from "@modplayjs/core";
 
-// ../../packages/fmt-prowizard/src/pw-pp.ts
+// packages/fmt-prowizard/src/pw-pp.ts
 import { ParseError } from "@modplayjs/core";
 function put8(out, b) {
   out.push(b & 255);
@@ -238,7 +238,7 @@ var pwPp30 = {
   depack: (data, start) => depackPp21Pp30(data, start, true)
 };
 
-// ../../packages/fmt-prowizard/src/ptktable.ts
+// packages/fmt-prowizard/src/ptktable.ts
 var ptkTable = [
   [0, 0],
   [3, 88],
@@ -285,7 +285,7 @@ function ptkIsValidNote(n) {
   return n >= 0 && n < ptkTable.length;
 }
 
-// ../../packages/fmt-prowizard/src/pw-p40.ts
+// packages/fmt-prowizard/src/pw-p40.ts
 var MAGIC_P40A = 1345597505;
 var MAGIC_P40B = 1345597506;
 var MAGIC_P41A = 1345597761;
@@ -474,7 +474,7 @@ var pwP4x = {
   depack: depackP4x
 };
 
-// ../../packages/fmt-prowizard/src/pw-theplayer.ts
+// packages/fmt-prowizard/src/pw-theplayer.ts
 var PW_MOD_MAGIC2 = 1294879534;
 function put83(out, b) {
   out.push(b & 255);
@@ -769,7 +769,7 @@ var pwP60a = {
   depack: (data, start) => theplayerDepack(data, start, 96)
 };
 
-// ../../packages/fmt-prowizard/src/pw-tp1.ts
+// packages/fmt-prowizard/src/pw-tp1.ts
 var PW_MOD_MAGIC3 = 1294879534;
 function put84(out, b) {
   out.push(b & 255);
@@ -905,7 +905,7 @@ var pwTp1 = {
   depack: depackTp1
 };
 
-// ../../packages/fmt-prowizard/src/pw-tp3.ts
+// packages/fmt-prowizard/src/pw-tp3.ts
 var PW_MOD_MAGIC4 = 1294879534;
 function put85(out, b) {
   out.push(b & 255);
@@ -1074,7 +1074,7 @@ var pwTp2 = {
   depack: (data, start) => depackTp23(data, start, 2)
 };
 
-// ../../packages/fmt-prowizard/src/pw-unic.ts
+// packages/fmt-prowizard/src/pw-unic.ts
 var MAGIC_M_K_ = 1294879534;
 var MAGIC_UNIC = 1431193923;
 var MAGIC_0000 = 0;
@@ -1289,7 +1289,7 @@ var pwUnicEmptyId = {
   depack: depackUnic
 };
 
-// ../../packages/fmt-prowizard/src/pw-unic2.ts
+// packages/fmt-prowizard/src/pw-unic2.ts
 function put87(out, b) {
   out.push(b & 255);
 }
@@ -1426,7 +1426,7 @@ var pwUnic2 = {
   depack: depackUnic2
 };
 
-// ../../packages/fmt-prowizard/src/pw-np12.ts
+// packages/fmt-prowizard/src/pw-np12.ts
 var PW_MOD_MAGIC5 = 1294879534;
 function put88(out, b) {
   out.push(b & 255);
@@ -1612,7 +1612,7 @@ var pwNp2 = {
   depack: (data, st) => depackNp12(data, st, false)
 };
 
-// ../../packages/fmt-prowizard/src/pw-np3.ts
+// packages/fmt-prowizard/src/pw-np3.ts
 var PW_MOD_MAGIC6 = 1294879534;
 function put89(out, b) {
   out.push(b & 255);
@@ -1786,7 +1786,7 @@ var pwNp3 = {
   depack: depackNp3
 };
 
-// ../../packages/fmt-prowizard/src/pw-xann.ts
+// packages/fmt-prowizard/src/pw-xann.ts
 var SMP_DESC_ADDRESS = 518;
 var PAT_DATA_ADDRESS = 1084;
 function put810(out, b) {
@@ -2014,7 +2014,7 @@ var pwXann = {
   depack: depackXann
 };
 
-// ../../packages/fmt-prowizard/src/pw-wn.ts
+// packages/fmt-prowizard/src/pw-wn.ts
 var PW_MOD_MAGIC7 = 1294879534;
 function put811(out, b) {
   out.push(b & 255);
@@ -2071,7 +2071,7 @@ var pwWn = {
   depack: depackWn
 };
 
-// ../../packages/fmt-prowizard/src/pw-zen.ts
+// packages/fmt-prowizard/src/pw-zen.ts
 var PW_MOD_MAGIC8 = 1294879534;
 function put812(out, b) {
   out.push(b & 255);
@@ -2207,7 +2207,7 @@ var pwZen = {
   depack: depackZen
 };
 
-// ../../packages/fmt-prowizard/src/pw-ksm.ts
+// packages/fmt-prowizard/src/pw-ksm.ts
 var PW_MOD_MAGIC9 = 1294879534;
 function put813(out, b) {
   out.push(b & 255);
@@ -2377,7 +2377,7 @@ var pwKsm = {
   depack: depackKsm
 };
 
-// ../../packages/fmt-prowizard/src/pw-hrt.ts
+// packages/fmt-prowizard/src/pw-hrt.ts
 var PW_MOD_MAGIC10 = 1294879534;
 function put814(out, b) {
   out.push(b & 255);
@@ -2459,7 +2459,7 @@ var pwHrt = {
   depack: depackHrt
 };
 
-// ../../packages/fmt-prowizard/src/pw-mp.ts
+// packages/fmt-prowizard/src/pw-mp.ts
 var MAGIC_TRK1 = 1414679345;
 var PW_MOD_MAGIC11 = 1294879534;
 function put815(out, b) {
@@ -2592,7 +2592,7 @@ var pwMpNoid = {
   depack: depackMp
 };
 
-// ../../packages/fmt-prowizard/src/pw-di.ts
+// packages/fmt-prowizard/src/pw-di.ts
 var PW_MOD_MAGIC12 = 1294879534;
 function put816(out, b) {
   out.push(b & 255);
@@ -2734,7 +2734,7 @@ var pwDi = {
   depack: depackDi
 };
 
-// ../../packages/fmt-prowizard/src/pw-ac1d.ts
+// packages/fmt-prowizard/src/pw-ac1d.ts
 var NO_NOTE = 255;
 function put817(out, b) {
   out.push(b & 255);
@@ -2850,7 +2850,7 @@ var pwAc1d = {
   depack: depackAc1d
 };
 
-// ../../packages/fmt-prowizard/src/pw-eureka.ts
+// packages/fmt-prowizard/src/pw-eureka.ts
 var PW_MOD_MAGIC13 = 1294879534;
 function put32b18(out, v) {
   out.push(v >>> 24 & 255, v >> 16 & 255, v >> 8 & 255, v & 255);
@@ -2979,7 +2979,7 @@ var pwEu = {
   depack: depackEu
 };
 
-// ../../packages/fmt-prowizard/src/pw-fcm.ts
+// packages/fmt-prowizard/src/pw-fcm.ts
 var PW_MOD_MAGIC14 = 1294879534;
 function put818(out, b) {
   out.push(b & 255);
@@ -3065,7 +3065,7 @@ var pwFcm = {
   depack: depackFcm
 };
 
-// ../../packages/fmt-prowizard/src/pw-fuchs.ts
+// packages/fmt-prowizard/src/pw-fuchs.ts
 var PW_MOD_MAGIC15 = 1294879534;
 function put32b20(out, v) {
   out.push(v >>> 24 & 255, v >> 16 & 255, v >> 8 & 255, v & 255);
@@ -3174,7 +3174,7 @@ var pwFchs = {
   depack: depackFuchs
 };
 
-// ../../packages/fmt-prowizard/src/pw-skyt.ts
+// packages/fmt-prowizard/src/pw-skyt.ts
 var PW_MOD_MAGIC16 = 1294879534;
 function put819(out, b) {
   out.push(b & 255);
@@ -3276,7 +3276,7 @@ var pwSkyt = {
   depack: depackSkyt
 };
 
-// ../../packages/fmt-prowizard/src/pw-starpack.ts
+// packages/fmt-prowizard/src/pw-starpack.ts
 function put820(out, v) {
   out.push(v & 255);
 }
@@ -3487,7 +3487,7 @@ var pwStarpack = {
   depack: depackStarpack
 };
 
-// ../../packages/fmt-prowizard/src/prowiz.ts
+// packages/fmt-prowizard/src/prowiz.ts
 function readmem16b(d, off) {
   return d[off] << 8 | d[off + 1];
 }
@@ -3570,7 +3570,7 @@ function pwWizardry(data, start, outName) {
   return out;
 }
 
-// ../../packages/fmt-prowizard/src/pw-plugin.ts
+// packages/fmt-prowizard/src/pw-plugin.ts
 import { loadDepackedMod, readEvent } from "@modplayjs/fmt-mod";
 function pwTest(bytes) {
   return pwCheck(bytes, 0) !== null;

@@ -1,4 +1,4 @@
-// ../../packages/fmt-fc/src/fc.ts
+// packages/fmt-fc/src/fc.ts
 import {
   C4_PAL_RATE,
   EMPTY_EVENT,
@@ -14,10 +14,10 @@ import {
   SampleFlags
 } from "@modplayjs/core";
 
-// ../../packages/fmt-fc/src/synth.ts
+// packages/fmt-fc/src/synth.ts
 import { NoteFlag } from "@modplayjs/core";
 
-// ../../packages/fmt-fc/src/linearTables.ts
+// packages/fmt-fc/src/linearTables.ts
 var IT_SINUS_TABLE = [
   0,
   2,
@@ -277,7 +277,7 @@ var IT_SINUS_TABLE = [
   -2
 ];
 
-// ../../packages/fmt-fc/src/synth.ts
+// packages/fmt-fc/src/synth.ts
 var SynthEventType = /* @__PURE__ */ ((SynthEventType2) => {
   SynthEventType2[SynthEventType2["StopScript"] = 0] = "StopScript";
   SynthEventType2[SynthEventType2["Jump"] = 1] = "Jump";
@@ -1595,7 +1595,7 @@ function ftmPitchToPeriod(pitch, _core, _chn) {
   return period < 1 ? 1 : period;
 }
 
-// ../../packages/fmt-fc/src/fc.ts
+// packages/fmt-fc/src/fc.ts
 var FC_MAX_SIZE = 524288;
 function sequenceSizeOf(h) {
   if (h.sequenceSize > 0) return h.sequenceSize;

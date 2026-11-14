@@ -1,4 +1,4 @@
-// ../../packages/fmt-669/src/sixtysixtynine.ts
+// packages/fmt-669/src/sixtysixtynine.ts
 import { SampleFlags } from "@modplayjs/core";
 import { LSN, MSN } from "@modplayjs/core";
 import { ParseError } from "@modplayjs/core";

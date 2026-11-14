@@ -1,4 +1,4 @@
-// ../../packages/fmt-digi/src/digi.ts
+// packages/fmt-digi/src/digi.ts
 import { SampleFlags } from "@modplayjs/core";
 import { LSN, MSN, EMPTY_EVENT } from "@modplayjs/core";
 import { ParseError } from "@modplayjs/core";

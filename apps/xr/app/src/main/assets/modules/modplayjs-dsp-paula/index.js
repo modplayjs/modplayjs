@@ -1,4 +1,4 @@
-// ../../packages/dsp-paula/src/index.ts
+// packages/dsp-paula/src/index.ts
 import { NoteFlag } from "@modplayjs/core";
 var PAULA_FREQUENCY = 70937892e-1 / 2;
 function periodToRate(period, sampleRate) {

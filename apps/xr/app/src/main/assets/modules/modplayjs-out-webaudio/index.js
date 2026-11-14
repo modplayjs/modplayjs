@@ -1,4 +1,4 @@
-// ../../packages/out-webaudio/src/webaudio.ts
+// packages/out-webaudio/src/webaudio.ts
 import { StateError } from "@modplayjs/core";
 var RING_FRAMES = 65536;
 var HIGH_WATER_FRAMES = RING_FRAMES / 2;

@@ -1,4 +1,4 @@
-// ../../packages/fmt-st/src/st.ts
+// packages/fmt-st/src/st.ts
 import { C4_PAL_RATE, PeriodType, Quirk, ReadEventType, SampleFlags } from "@modplayjs/core";
 import { LSN, MSN, ParseError } from "@modplayjs/core";
 import { readEvent as readEventDispatch, decodeEvent, TrackerId } from "@modplayjs/fmt-mod";
