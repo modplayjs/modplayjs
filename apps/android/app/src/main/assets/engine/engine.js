@@ -17419,7 +17419,6 @@
       this.bytes = bytes;
       this.pos = start;
     }
-    bytes;
     pos;
     get length() {
       return this.bytes.length;
@@ -18966,7 +18965,6 @@
     constructor(mem) {
       this.mem = mem;
     }
-    mem;
     nbnum = 0;
     getNibble() {
       const mloc = this.nbnum >> 1;
@@ -19420,7 +19418,6 @@
       this.bytes = bytes;
       this.pos = pos;
     }
-    bytes;
     hasNibble = false;
     value = 0;
     pos;
@@ -52431,7 +52428,7 @@
     return (v.flags & 64) === 0;
   }
 
-  // ../../packages/fmt-mid/dist/tml.js
+  // ../../packages/fmt-mid/src/tml.ts
   var TML_NOTE_OFF = 128;
   var TML_NOTE_ON = 144;
   var TML_KEY_PRESSURE = 160;
@@ -52473,13 +52470,10 @@
   function tml_readvariablelength(p, mem) {
     let res = 0, i = 0;
     for (; i !== 4; i++) {
-      if (p.buf === p.buf_end)
-        return -1;
+      if (p.buf === p.buf_end) return -1;
       const c = mem[p.buf++];
-      if (c & 128)
-        res = (res | c & 127) << 7;
-      else
-        return res | c;
+      if (c & 128) res = (res | c & 127) << 7;
+      else return res | c;
     }
     return -1;
   }
@@ -52487,21 +52481,16 @@
     let deltatime = tml_readvariablelength(p, mem);
     let status = tml_readbyte(p, mem);
     let evt;
-    if (deltatime & 4293918720)
-      deltatime = 0;
-    if (status < 0)
-      return -1;
+    if (deltatime & 4293918720) deltatime = 0;
+    if (status < 0) return -1;
     if ((status & 128) === 0) {
-      if ((p.last_status & 128) === 0)
-        return -1;
+      if ((p.last_status & 128) === 0) return -1;
       p.buf--;
       status = p.last_status;
-    } else
-      p.last_status = status;
+    } else p.last_status = status;
     if (p.message_array_size === p.message_count) {
       p.message_array_size += p.message_array_size === 0 ? 64 : p.message_array_size > 4096 ? 1024 : p.message_array_size;
-      if (p.message_array_size < p.message_count + 1)
-        return -1;
+      if (p.message_array_size < p.message_count + 1) return -1;
     }
     evt = new TmlMessage();
     if (status === TML_SYSEX || status === TML_EOX) {
@@ -52516,23 +52505,19 @@
       const meta_type = tml_readbyte(p, mem);
       const buflen = tml_readvariablelength(p, mem);
       const metadata = p.buf;
-      if (meta_type < 0)
-        return -1;
+      if (meta_type < 0) return -1;
       if (buflen > 0 && (p.buf += buflen) > p.buf_end) {
         p.buf = p.buf_end;
         return -1;
       }
       switch (meta_type) {
         case TML_EOT:
-          if (buflen !== 0)
-            return -1;
-          if (!deltatime)
-            return TML_EOT;
+          if (buflen !== 0) return -1;
+          if (!deltatime) return TML_EOT;
           evt.type = TML_EOT;
           break;
         case TML_SET_TEMPO:
-          if (buflen !== 3)
-            return -1;
+          if (buflen !== 3) return -1;
           evt.type = TML_SET_TEMPO;
           evt.tempo[0] = mem[metadata];
           evt.tempo[1] = mem[metadata + 1];
@@ -52543,8 +52528,7 @@
       }
     } else {
       const param = tml_readbyte(p, mem);
-      if (param < 0)
-        return -1;
+      if (param < 0) return -1;
       evt.key = param & 127;
       evt.channel = status & 15;
       switch (evt.type = status & 240) {
@@ -52553,15 +52537,13 @@
         case TML_KEY_PRESSURE:
         case TML_CONTROL_CHANGE: {
           const param2 = tml_readbyte(p, mem);
-          if (param2 < 0)
-            return -1;
+          if (param2 < 0) return -1;
           evt.velocity = param2 & 127;
           break;
         }
         case TML_PITCH_BEND: {
           const param2 = tml_readbyte(p, mem);
-          if (param2 < 0)
-            return -1;
+          if (param2 < 0) return -1;
           evt.pitch_bend = (param2 & 127) << 7 | evt.key;
           break;
         }
@@ -52587,43 +52569,35 @@
     const messages = [];
     const p = new TmlParser();
     const midi_header = new Uint8Array(14);
-    if (read(midi_header, 14) !== 14)
-      return messages.length ? messages[0] : null;
+    if (read(midi_header, 14) !== 14) return messages.length ? messages[0] : null;
     if (midi_header[0] !== 77 || midi_header[1] !== 84 || midi_header[2] !== 104 || midi_header[3] !== 100 || midi_header[7] !== 6 || midi_header[9] > 2) {
       return messages.length ? messages[0] : null;
     }
-    if (midi_header[12] & 128)
-      return messages.length ? messages[0] : null;
+    if (midi_header[12] & 128) return messages.length ? messages[0] : null;
     num_tracks = midi_header[10] << 8 | midi_header[11];
     division = midi_header[12] << 8 | midi_header[13];
-    if (num_tracks <= 0 && division <= 0)
-      return messages.length ? messages[0] : null;
+    if (num_tracks <= 0 && division <= 0) return messages.length ? messages[0] : null;
     const tracks = [];
-    for (let i = 0; i !== num_tracks; i++)
-      tracks.push({ Idx: 0, End: 0, Ticks: 0 });
+    for (let i = 0; i !== num_tracks; i++) tracks.push({ Idx: 0, End: 0, Ticks: 0 });
     const tracksEnd = num_tracks;
     for (let ti = 0; ti !== tracksEnd; ti++) {
       const t = tracks[ti];
       const track_header = new Uint8Array(8);
-      if (read(track_header, 8) !== 8)
-        break;
+      if (read(track_header, 8) !== 8) break;
       if (track_header[0] !== 77 || track_header[1] !== 84 || track_header[2] !== 114 || track_header[3] !== 107)
         break;
       const track_length = track_header[7] | track_header[6] << 8 | track_header[5] << 16 | track_header[4] << 24;
-      if (track_length < 0)
-        break;
+      if (track_length < 0) break;
       if (trackbufsize < track_length) {
         trackbuf = new Uint8Array(trackbufsize = track_length);
       }
-      if (read(trackbuf, track_length) !== track_length)
-        break;
+      if (read(trackbuf, track_length) !== track_length) break;
       t.Idx = p.message_count;
       p.buf = 0;
       p.buf_end = track_length;
       for (; p.buf !== p.buf_end; ) {
         const type = tml_parsemessage(messages, p, trackbuf);
-        if (type === TML_EOT || type < 0)
-          break;
+        if (type === TML_EOT || type < 0) break;
       }
       t.End = p.message_count;
     }
@@ -52637,8 +52611,7 @@
         msec = tempo_msec + Math.trunc((ticks - tempo_ticks) * ticks2time);
         for (let ti = 0; ti !== tracksEnd; ti++) {
           const t = tracks[ti];
-          if (t.Idx === t.End)
-            continue;
+          if (t.Idx === t.End) continue;
           let j = t.Idx;
           const jEnd = t.End;
           for (; j !== jEnd && t.Ticks + messages[j].time === ticks; j++, t.Idx++) {
@@ -52665,26 +52638,21 @@
           }
           if (j !== jEnd && t.Ticks + messages[j].time > ticks) {
             const step = Math.trunc(t.Ticks + messages[j].time - ticks);
-            if (step < step_smallest)
-              step_smallest = step;
+            if (step < step_smallest) step_smallest = step;
           }
         }
       }
-      if (PrevMessage)
-        PrevMessage.next = null;
-      else
-        p.message_count = 0;
+      if (PrevMessage) PrevMessage.next = null;
+      else p.message_count = 0;
     }
-    if (p.message_count === 0)
-      return null;
+    if (p.message_count === 0) return null;
     return messages[0];
   }
   function tml_load_memory(buffer) {
     const total = buffer.length;
     let pos = 0;
     return tml_load_stream((ptr, size) => {
-      if (size > total - pos)
-        size = total - pos;
+      if (size > total - pos) size = total - pos;
       ptr.set(buffer.subarray(pos, pos + size));
       pos += size;
       return size;
@@ -52701,18 +52669,15 @@
         programs[Msg.key] = 1;
         used_programs++;
       }
-      if (Msg.type !== TML_NOTE_ON)
-        continue;
-      if (time_first_note === 4294967295)
-        time_first_note = time_length;
+      if (Msg.type !== TML_NOTE_ON) continue;
+      if (time_first_note === 4294967295) time_first_note = time_length;
       if (!channels[Msg.channel]) {
         channels[Msg.channel] = 1;
         used_channels++;
       }
       total_notes++;
     }
-    if (time_first_note === 4294967295)
-      time_first_note = 0;
+    if (time_first_note === 4294967295) time_first_note = 0;
     if (out) {
       out.used_channels = used_channels;
       out.used_programs = used_programs;
@@ -52723,7 +52688,7 @@
     return total_notes;
   }
 
-  // ../../packages/fmt-mid/dist/refmath.js
+  // ../../packages/fmt-mid/src/refmath.ts
   function rm_dd_make(hi, lo) {
     return { hi, lo };
   }
@@ -52776,8 +52741,7 @@
     return rm_dd_make(rm_scalbn(a.hi, k), rm_scalbn(a.lo, k));
   }
   function rm_scalbn(x, k) {
-    if (x === 0 || !Number.isFinite(x))
-      return x;
+    if (x === 0 || !Number.isFinite(x)) return x;
     if (k > 0) {
       while (k > 1023) {
         x *= RM_POW2[1023];
@@ -52793,10 +52757,8 @@
   }
   function rm_rint(x) {
     const f = Math.floor(x), d = x - f;
-    if (d > 0.5)
-      return f + 1;
-    if (d < 0.5)
-      return f;
+    if (d > 0.5) return f + 1;
+    if (d < 0.5) return f;
     return f - 2 * Math.floor(f / 2) === 0 ? f : f + 1;
   }
   var RM_LN2 = rm_dd_make(0.6931471805599453, 23190468138462996e-33);
@@ -52808,8 +52770,7 @@
     for (let n = 1; n <= 25; n++) {
       term = rm_dd_div(rm_dd_mul(term, r), rm_dd_make(n, 0));
       sum = rm_dd_add(sum, term);
-      if (n > 8 && term.hi < 2465190328815662e-47 && term.hi > -2465190328815662e-47)
-        break;
+      if (n > 8 && term.hi < 2465190328815662e-47 && term.hi > -2465190328815662e-47) break;
     }
     return rm_dd_scalbn(sum, k);
   }
@@ -52831,8 +52792,7 @@
     for (let n = 1; n <= 40; n++) {
       term = rm_dd_mul(term, z2);
       sum = rm_dd_add(sum, rm_dd_div(term, rm_dd_make(2 * n + 1, 0)));
-      if (term.hi < 2465190328815662e-47 && term.hi > -2465190328815662e-47)
-        break;
+      if (term.hi < 2465190328815662e-47 && term.hi > -2465190328815662e-47) break;
     }
     return rm_dd_add(rm_dd_mul(rm_dd_make(e, 0), RM_LN2), rm_dd_scalbn(sum, 1));
   }
@@ -52842,8 +52802,7 @@
     for (let n = 1; n <= 30; n++) {
       term = rm_dd_div(rm_dd_mul(term, x2), rm_dd_make(2 * n * (2 * n + 1), 0));
       sum = n & 1 ? rm_dd_add(sum, rm_dd_neg(term)) : rm_dd_add(sum, term);
-      if (n > 8 && term.hi < 2465190328815662e-47 && term.hi > -2465190328815662e-47)
-        break;
+      if (n > 8 && term.hi < 2465190328815662e-47 && term.hi > -2465190328815662e-47) break;
     }
     return sum;
   }
@@ -52853,8 +52812,7 @@
     for (let n = 1; n <= 30; n++) {
       term = rm_dd_div(rm_dd_mul(term, x2), rm_dd_make((2 * n - 1) * (2 * n), 0));
       sum = n & 1 ? rm_dd_add(sum, rm_dd_neg(term)) : rm_dd_add(sum, term);
-      if (n > 8 && term.hi < 2465190328815662e-47 && term.hi > -2465190328815662e-47)
-        break;
+      if (n > 8 && term.hi < 2465190328815662e-47 && term.hi > -2465190328815662e-47) break;
     }
     return sum;
   }
@@ -52863,8 +52821,7 @@
     const r = rm_dd_add(x, rm_dd_mul(rm_dd_make(-n, 0), RM_PI_2));
     const t = rm_dd_div(rm_sin_dd(r), rm_cos_dd(r));
     const q = n - 2 * Math.floor(n / 2);
-    if (q === 0)
-      return t;
+    if (q === 0) return t;
     return rm_dd_div(rm_dd_make(1, 0), rm_dd_neg(t));
   }
   function rm_exp(x) {
@@ -52881,16 +52838,12 @@
     return rm_dd_div(rm_log_dd(rm_dd_make(x, 0)), l10).hi;
   }
   function rm_pow(x, y) {
-    if (y === 0)
-      return 1;
-    if (x === 1)
-      return 1;
-    if (x === 0)
-      return y > 0 ? 0 : Infinity;
+    if (y === 0) return 1;
+    if (x === 1) return 1;
+    if (x === 0) return y > 0 ? 0 : Infinity;
     if (x < 0) {
       const yi = rm_rint(y);
-      if (yi !== y)
-        return NaN;
+      if (yi !== y) return NaN;
       const p = rm_exp_dd(rm_dd_mul(rm_dd_make(y, 0), rm_log_dd(rm_dd_make(-x, 0)))).hi;
       const parity = yi - 2 * Math.floor(yi / 2);
       return parity === 0 ? p : -p;
@@ -52905,7 +52858,7 @@
   }
   var f32 = Math.fround;
 
-  // ../../packages/fmt-mid/dist/tsf.js
+  // ../../packages/fmt-mid/src/tsf.ts
   var f322 = Math.fround;
   var TSF_RENDER_EFFECTSAMPLEBLOCK = 64;
   var TSF_FASTRELEASETIME = f322(0.01);
@@ -53058,15 +53011,13 @@
     let pos = 0;
     return tsf_load_stream({
       read(ptr, size) {
-        if (size > buffer.length - pos)
-          size = buffer.length - pos;
+        if (size > buffer.length - pos) size = buffer.length - pos;
         ptr.set(buffer.subarray(pos, pos + size));
         pos += size;
         return size;
       },
       skip(count) {
-        if (pos + count > buffer.length)
-          return false;
+        if (pos + count > buffer.length) return false;
         pos += count;
         return true;
       }
@@ -53078,40 +53029,33 @@
     const four = new Uint8Array(4);
     return {
       u8() {
-        if (stream.read(one, 1) !== 1)
-          return 0;
+        if (stream.read(one, 1) !== 1) return 0;
         return one[0];
       },
       s8() {
-        if (stream.read(one, 1) !== 1)
-          return 0;
+        if (stream.read(one, 1) !== 1) return 0;
         return one[0] << 24 >> 24;
       },
       u16() {
-        if (stream.read(two, 2) !== 2)
-          return 0;
+        if (stream.read(two, 2) !== 2) return 0;
         return two[0] | two[1] << 8;
       },
       s16() {
-        if (stream.read(two, 2) !== 2)
-          return 0;
+        if (stream.read(two, 2) !== 2) return 0;
         return (two[0] | two[1] << 8) << 16 >> 16;
       },
       u32() {
-        if (stream.read(four, 4) !== 4)
-          return 0;
+        if (stream.read(four, 4) !== 4) return 0;
         return (four[0] | four[1] << 8 | four[2] << 16 | four[3] << 24) >>> 0;
       },
       /** tsf_char20: 20 raw bytes as a C string (last byte forced NUL on copy). */
       char20() {
         const b = new Uint8Array(20);
-        if (stream.read(b, 20) !== 20)
-          return "";
+        if (stream.read(b, 20) !== 20) return "";
         let s = "";
         for (let i = 0; i < 20; i++) {
           const c = b[i];
-          if (c === 0)
-            break;
+          if (c === 0) break;
           s += String.fromCharCode(c);
         }
         return s;
@@ -53212,31 +53156,21 @@
     let IsRiff, IsList;
     const four = new Uint8Array(4);
     const sizebuf = new Uint8Array(4);
-    if (parent && 8 > parent.size)
-      return false;
-    if (!r.readRaw(four, 4))
-      return false;
+    if (parent && 8 > parent.size) return false;
+    if (!r.readRaw(four, 4)) return false;
     chunk.id = String.fromCharCode(four[0], four[1], four[2], four[3]);
-    if (four[0] <= 32 || four[0] >= 122)
-      return false;
-    if (!r.readRaw(sizebuf, 4))
-      return false;
+    if (four[0] <= 32 || four[0] >= 122) return false;
+    if (!r.readRaw(sizebuf, 4)) return false;
     chunk.size = (sizebuf[0] | sizebuf[1] << 8 | sizebuf[2] << 16 | sizebuf[3] << 24) >>> 0;
-    if (parent && 8 + chunk.size > parent.size)
-      return false;
-    if (parent)
-      parent.size = parent.size - (8 + chunk.size) >>> 0;
+    if (parent && 8 + chunk.size > parent.size) return false;
+    if (parent) parent.size = parent.size - (8 + chunk.size) >>> 0;
     IsRiff = TSF_FourCCEquals(chunk.id, "RIFF");
     IsList = TSF_FourCCEquals(chunk.id, "LIST");
-    if (IsRiff && parent)
-      return false;
-    if (!IsRiff && !IsList)
-      return true;
-    if (!r.readRaw(four, 4))
-      return false;
+    if (IsRiff && parent) return false;
+    if (!IsRiff && !IsList) return true;
+    if (!r.readRaw(four, 4)) return false;
     chunk.id = String.fromCharCode(four[0], four[1], four[2], four[3]);
-    if (four[0] <= 32 || four[0] >= 122)
-      return false;
+    if (four[0] <= 32 || four[0] >= 122) return false;
     chunk.size = chunk.size - 4 >>> 0;
     return true;
   }
@@ -53621,8 +53555,7 @@
     zero.hivel = 127;
     zero.pitch_keycenter = 60;
     Object.assign(i, zero);
-    if (for_relative)
-      return;
+    if (for_relative) return;
     i.pitch_keytrack = 100;
     i.pitch_keycenter = -1;
     i.ampenv.delay = i.ampenv.attack = i.ampenv.hold = i.ampenv.decay = i.ampenv.release = -12e3;
@@ -53632,8 +53565,7 @@
     i.delayVibLFO = -12e3;
   }
   function tsf_region_apply(region, genOper, amount) {
-    if (genOper >= _GEN_MAX)
-      return;
+    if (genOper >= _GEN_MAX) return;
     const meta = genMetas[genOper];
     switch (meta.mode & _GEN_TYPE_MASK) {
       case GEN_FLOAT:
@@ -53646,7 +53578,11 @@
         regFieldSet(region, meta.field, regFieldGet(region, meta.field) + amount.shortAmount >>> 0);
         return;
       case GEN_UINT_ADD15:
-        regFieldSet(region, meta.field, regFieldGet(region, meta.field) + (amount.shortAmount << 15) >>> 0);
+        regFieldSet(
+          region,
+          meta.field,
+          regFieldGet(region, meta.field) + (amount.shortAmount << 15) >>> 0
+        );
         return;
       case GEN_KEYRANGE:
         region.lokey = amount.lo;
@@ -53670,8 +53606,7 @@
   function tsf_region_merge(region, merge_region) {
     for (let genOper = 0; genOper !== _GEN_MAX; genOper++) {
       const meta = genMetas[genOper];
-      if (!meta.field)
-        continue;
+      if (!meta.field) continue;
       switch (meta.mode & _GEN_TYPE_MASK) {
         case GEN_FLOAT: {
           let v = regFieldGet(region, meta.field);
@@ -53719,10 +53654,8 @@
               continue;
           }
           v = f322(v * vfactor);
-          if (v < vmin)
-            v = vmin;
-          else if (v > vmax)
-            v = vmax;
+          if (v < vmin) v = vmin;
+          else if (v > vmax) v = vmax;
           regFieldSet(region, meta.field, v);
           continue;
         }
@@ -53756,15 +53689,17 @@
             default:
               continue;
           }
-          if (v < vmin)
-            v = vmin;
-          else if (v > vmax)
-            v = vmax;
+          if (v < vmin) v = vmin;
+          else if (v > vmax) v = vmax;
           regFieldSet(region, meta.field, v);
           continue;
         }
         case GEN_UINT_ADD: {
-          regFieldSet(region, meta.field, regFieldGet(region, meta.field) + regFieldGet(merge_region, meta.field) >>> 0);
+          regFieldSet(
+            region,
+            meta.field,
+            regFieldGet(region, meta.field) + regFieldGet(merge_region, meta.field) >>> 0
+          );
           continue;
         }
       }
@@ -53774,22 +53709,16 @@
     p.delay = p.delay < -11950 ? 0 : tsf_timecents2Secsf(p.delay);
     p.attack = p.attack < -11950 ? 0 : tsf_timecents2Secsf(p.attack);
     p.release = p.release < -11950 ? 0 : tsf_timecents2Secsf(p.release);
-    if (!p.keynumToHold)
-      p.hold = p.hold < -11950 ? 0 : tsf_timecents2Secsf(p.hold);
-    if (!p.keynumToDecay)
-      p.decay = p.decay < -11950 ? 0 : tsf_timecents2Secsf(p.decay);
-    if (p.sustain < 0)
-      p.sustain = 0;
-    else if (sustainIsGain)
-      p.sustain = tsf_decibelsToGain(f322(-p.sustain / 10));
-    else
-      p.sustain = f322(1 - f322(p.sustain / F_1000));
+    if (!p.keynumToHold) p.hold = p.hold < -11950 ? 0 : tsf_timecents2Secsf(p.hold);
+    if (!p.keynumToDecay) p.decay = p.decay < -11950 ? 0 : tsf_timecents2Secsf(p.decay);
+    if (p.sustain < 0) p.sustain = 0;
+    else if (sustainIsGain) p.sustain = tsf_decibelsToGain(f322(-p.sustain / 10));
+    else p.sustain = f322(1 - f322(p.sustain / F_1000));
   }
   function tsf_load_presets(res, hydra, fontSampleCount) {
     const GenInstrument = 41, GenKeyRange = 43, GenVelRange = 44, GenSampleID = 53;
     res.presetNum = hydra.phdrNum - 1;
-    if (res.presetNum < 0)
-      return false;
+    if (res.presetNum < 0) return false;
     res.presets = [];
     for (let i = 0; i !== res.presetNum; i++)
       res.presets.push({ presetName: "", preset: 0, bank: 0, regions: [], regionNum: 0 });
@@ -53799,16 +53728,11 @@
       let sortedIndex = 0, region_index = 0;
       for (let oi = 0; oi !== pphdrMax; oi++) {
         const otherphdr = hydra.phdrs[oi];
-        if (oi === pi || otherphdr.bank > pphdr.bank)
-          continue;
-        else if (otherphdr.bank < pphdr.bank)
-          sortedIndex++;
-        else if (otherphdr.preset > pphdr.preset)
-          continue;
-        else if (otherphdr.preset < pphdr.preset)
-          sortedIndex++;
-        else if (oi < pi)
-          sortedIndex++;
+        if (oi === pi || otherphdr.bank > pphdr.bank) continue;
+        else if (otherphdr.bank < pphdr.bank) sortedIndex++;
+        else if (otherphdr.preset > pphdr.preset) continue;
+        else if (otherphdr.preset < pphdr.preset) sortedIndex++;
+        else if (oi < pi) sortedIndex++;
       }
       const preset = res.presets[sortedIndex];
       preset.presetName = pphdr.presetName;
@@ -53830,10 +53754,8 @@
             phivel = ppgen.genAmount.hi;
             continue;
           }
-          if (ppgen.genOper !== GenInstrument)
-            continue;
-          if (ppgen.genAmount.wordAmount >= hydra.instNum)
-            continue;
+          if (ppgen.genOper !== GenInstrument) continue;
+          if (ppgen.genAmount.wordAmount >= hydra.instNum) continue;
           const pinst = hydra.insts[ppgen.genAmount.wordAmount];
           for (let ii = pinst.instBagNdx, iEnd = hydra.insts[ppgen.genAmount.wordAmount + 1].instBagNdx; ii !== iEnd; ii++) {
             const pibag = hydra.ibags[ii];
@@ -53868,8 +53790,7 @@
           const ppgen = hydra.pgens[gi];
           if (ppgen.genOper === GenInstrument) {
             const whichInst = ppgen.genAmount.wordAmount;
-            if (whichInst >= hydra.instNum)
-              continue;
+            if (whichInst >= hydra.instNum) continue;
             const instRegion = newRegion();
             tsf_region_clear(instRegion, TSF_FALSE);
             const pinst = hydra.insts[whichInst];
@@ -53884,14 +53805,10 @@
                     continue;
                   if (zoneRegion.hivel < presetRegion.lovel || zoneRegion.lovel > presetRegion.hivel)
                     continue;
-                  if (presetRegion.lokey > zoneRegion.lokey)
-                    zoneRegion.lokey = presetRegion.lokey;
-                  if (presetRegion.hikey < zoneRegion.hikey)
-                    zoneRegion.hikey = presetRegion.hikey;
-                  if (presetRegion.lovel > zoneRegion.lovel)
-                    zoneRegion.lovel = presetRegion.lovel;
-                  if (presetRegion.hivel < zoneRegion.hivel)
-                    zoneRegion.hivel = presetRegion.hivel;
+                  if (presetRegion.lokey > zoneRegion.lokey) zoneRegion.lokey = presetRegion.lokey;
+                  if (presetRegion.hikey < zoneRegion.hikey) zoneRegion.hikey = presetRegion.hikey;
+                  if (presetRegion.lovel > zoneRegion.lovel) zoneRegion.lovel = presetRegion.lovel;
+                  if (presetRegion.hivel < zoneRegion.hivel) zoneRegion.hivel = presetRegion.hivel;
                   tsf_region_merge(zoneRegion, presetRegion);
                   tsf_region_envtosecs(zoneRegion.ampenv, TSF_TRUE);
                   tsf_region_envtosecs(zoneRegion.modenv, TSF_FALSE);
@@ -53902,33 +53819,24 @@
                   zoneRegion.end = zoneRegion.end + pshdr.end >>> 0;
                   zoneRegion.loop_start = zoneRegion.loop_start + pshdr.startLoop >>> 0;
                   zoneRegion.loop_end = zoneRegion.loop_end + pshdr.endLoop >>> 0;
-                  if (pshdr.endLoop > 0)
-                    zoneRegion.loop_end = zoneRegion.loop_end - 1 >>> 0;
-                  if (zoneRegion.loop_end > fontSampleCount)
-                    zoneRegion.loop_end = fontSampleCount;
-                  if (zoneRegion.pitch_keycenter === -1)
-                    zoneRegion.pitch_keycenter = pshdr.originalPitch;
+                  if (pshdr.endLoop > 0) zoneRegion.loop_end = zoneRegion.loop_end - 1 >>> 0;
+                  if (zoneRegion.loop_end > fontSampleCount) zoneRegion.loop_end = fontSampleCount;
+                  if (zoneRegion.pitch_keycenter === -1) zoneRegion.pitch_keycenter = pshdr.originalPitch;
                   zoneRegion.tune = zoneRegion.tune + pshdr.pitchCorrection | 0;
                   zoneRegion.sample_rate = pshdr.sampleRate;
-                  if (zoneRegion.end && zoneRegion.end < fontSampleCount)
-                    zoneRegion.end++;
-                  else
-                    zoneRegion.end = fontSampleCount;
+                  if (zoneRegion.end && zoneRegion.end < fontSampleCount) zoneRegion.end++;
+                  else zoneRegion.end = fontSampleCount;
                   preset.regions[region_index] = cloneRegion(zoneRegion);
                   region_index++;
                   hadSampleID = 1;
-                } else
-                  tsf_region_apply(zoneRegion, pigen.genOper, pigen.genAmount);
+                } else tsf_region_apply(zoneRegion, pigen.genOper, pigen.genAmount);
               }
-              if (ii === pinst.instBagNdx && !hadSampleID)
-                copyRegionInto(instRegion, zoneRegion);
+              if (ii === pinst.instBagNdx && !hadSampleID) copyRegionInto(instRegion, zoneRegion);
             }
             hadGenInstrument = 1;
-          } else
-            tsf_region_apply(presetRegion, ppgen.genOper, ppgen.genAmount);
+          } else tsf_region_apply(presetRegion, ppgen.genOper, ppgen.genAmount);
         }
-        if (bi === pphdr.presetBagNdx && !hadGenInstrument)
-          copyRegionInto(globalRegion, presetRegion);
+        if (bi === pphdr.presetBagNdx && !hadGenInstrument) copyRegionInto(globalRegion, presetRegion);
       }
     }
     return true;
@@ -53936,8 +53844,7 @@
   function tsf_load_samples(pFloatBuffer, pSmplCount, chunkSmpl, r) {
     pSmplCount.v = Math.floor(chunkSmpl.size / 2);
     const raw = new Uint8Array(chunkSmpl.size);
-    if (!r.readRaw(raw, chunkSmpl.size))
-      return false;
+    if (!r.readRaw(raw, chunkSmpl.size)) return false;
     const res = new Float32Array(pSmplCount.v);
     const inView = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
     for (let i = 0; i < pSmplCount.v; i++)
@@ -53946,7 +53853,9 @@
     return true;
   }
   function tsf_voice_envelope_release_samples(e, outSampleRate) {
-    return Math.trunc(f322((e.parameters.release <= 0 ? TSF_FASTRELEASETIME : e.parameters.release) * outSampleRate));
+    return Math.trunc(
+      f322((e.parameters.release <= 0 ? TSF_FASTRELEASETIME : e.parameters.release) * outSampleRate)
+    );
   }
   function tsf_voice_envelope_nextsegment(e, active_segment, outSampleRate) {
     let seg = active_segment;
@@ -53965,7 +53874,9 @@
       e.samplesUntilNextSegment = Math.trunc(f322(e.parameters.attack * outSampleRate));
       if (e.samplesUntilNextSegment > 0) {
         if (!e.isAmpEnv) {
-          e.samplesUntilNextSegment = Math.trunc(f322(f322(e.parameters.attack * f322((145 - e.midiVelocity) / 144)) * outSampleRate));
+          e.samplesUntilNextSegment = Math.trunc(
+            f322(f322(e.parameters.attack * f322((145 - e.midiVelocity) / 144)) * outSampleRate)
+          );
         }
         e.segment = TSF_SEGMENT_ATTACK;
         e.segmentIsExponential = TSF_FALSE;
@@ -54000,7 +53911,9 @@
           }
         } else {
           e.slope = f322(-1 / e.samplesUntilNextSegment);
-          e.samplesUntilNextSegment = Math.trunc(f322(f322(e.parameters.decay * f322(1 - e.parameters.sustain)) * outSampleRate));
+          e.samplesUntilNextSegment = Math.trunc(
+            f322(f322(e.parameters.decay * f322(1 - e.parameters.sustain)) * outSampleRate)
+          );
           e.segmentIsExponential = TSF_FALSE;
         }
         return;
@@ -54036,11 +53949,15 @@
   function tsf_voice_envelope_setup(e, new_parameters, midiNoteNumber, midiVelocity, isAmpEnv, outSampleRate) {
     e.parameters = { ...new_parameters };
     if (e.parameters.keynumToHold) {
-      e.parameters.hold = f322(e.parameters.hold + f322(e.parameters.keynumToHold * f322(60 - midiNoteNumber)));
+      e.parameters.hold = f322(
+        e.parameters.hold + f322(e.parameters.keynumToHold * f322(60 - midiNoteNumber))
+      );
       e.parameters.hold = e.parameters.hold < -1e4 ? 0 : tsf_timecents2Secsf(e.parameters.hold);
     }
     if (e.parameters.keynumToDecay) {
-      e.parameters.decay = f322(e.parameters.decay + f322(e.parameters.keynumToDecay * f322(60 - midiNoteNumber)));
+      e.parameters.decay = f322(
+        e.parameters.decay + f322(e.parameters.keynumToDecay * f322(60 - midiNoteNumber))
+      );
       e.parameters.decay = e.parameters.decay < -1e4 ? 0 : tsf_timecents2Secsf(e.parameters.decay);
     }
     e.midiVelocity = midiVelocity;
@@ -54049,10 +53966,8 @@
   }
   function tsf_voice_envelope_process(e, numSamples, outSampleRate) {
     if (e.slope) {
-      if (e.segmentIsExponential)
-        e.level = f322(e.level * rm_powf(e.slope, numSamples));
-      else
-        e.level = f322(e.level + f322(e.slope * numSamples));
+      if (e.segmentIsExponential) e.level = f322(e.level * rm_powf(e.slope, numSamples));
+      else e.level = f322(e.level + f322(e.slope * numSamples));
     }
     if ((e.samplesUntilNextSegment -= numSamples) <= 0)
       tsf_voice_envelope_nextsegment(e, e.segment, outSampleRate);
@@ -54116,8 +54031,7 @@
     const region = v.region;
     const note = v.playingKey + region.transpose + region.tune / 100;
     let adjustedPitch = region.pitch_keycenter + (note - region.pitch_keycenter) * (region.pitch_keytrack / 100);
-    if (pitchShift)
-      adjustedPitch += pitchShift;
+    if (pitchShift) adjustedPitch += pitchShift;
     v.pitchInputTimecents = adjustedPitch * 100;
     v.pitchOutputFactor = region.sample_rate / (tsf_timecents2Secsd(region.pitch_keycenter * 100) * outSampleRate);
   }
@@ -54146,39 +54060,38 @@
     let tmpModLfoToVolume;
     if (dynamicLowpass)
       tmpInitialFilterFc = region.initialFilterFc, tmpModLfoToFilterFc = region.modLfoToFilterFc, tmpModEnvToFilterFc = region.modEnvToFilterFc;
-    else
-      tmpInitialFilterFc = 0, tmpModLfoToFilterFc = 0, tmpModEnvToFilterFc = 0;
+    else tmpInitialFilterFc = 0, tmpModLfoToFilterFc = 0, tmpModEnvToFilterFc = 0;
     if (dynamicPitchRatio)
       pitchRatio = 0, tmpModLfoToPitch = region.modLfoToPitch, tmpVibLfoToPitch = region.vibLfoToPitch, tmpModEnvToPitch = region.modEnvToPitch;
     else
       pitchRatio = tsf_timecents2Secsd(v.pitchInputTimecents) * v.pitchOutputFactor, tmpModLfoToPitch = 0, tmpVibLfoToPitch = 0, tmpModEnvToPitch = 0;
-    if (dynamicGain)
-      tmpModLfoToVolume = f322(region.modLfoToVolume * f322(0.1));
-    else
-      noteGain = tsf_decibelsToGain(v.noteGainDB), tmpModLfoToVolume = 0;
+    if (dynamicGain) tmpModLfoToVolume = f322(region.modLfoToVolume * f322(0.1));
+    else noteGain = tsf_decibelsToGain(v.noteGainDB), tmpModLfoToVolume = 0;
     while (numSamples) {
       let gainMono, gainLeft, gainRight;
       let blockSamples = numSamples > TSF_RENDER_EFFECTSAMPLEBLOCK ? TSF_RENDER_EFFECTSAMPLEBLOCK : numSamples;
       numSamples -= blockSamples;
       if (dynamicLowpass) {
-        const fres = f322(f322(tmpInitialFilterFc + f322(v.modlfo.level * tmpModLfoToFilterFc)) + f322(v.modenv.level * tmpModEnvToFilterFc));
+        const fres = f322(
+          f322(tmpInitialFilterFc + f322(v.modlfo.level * tmpModLfoToFilterFc)) + f322(v.modenv.level * tmpModEnvToFilterFc)
+        );
         const lowpassFc = fres <= 13500 ? f322(tsf_cents2Hertz(fres) / tmpSampleRate) : 1;
         tmpLowpass.active = lowpassFc < 0.499;
-        if (tmpLowpass.active)
-          tsf_voice_lowpass_setup(tmpLowpass, lowpassFc);
+        if (tmpLowpass.active) tsf_voice_lowpass_setup(tmpLowpass, lowpassFc);
       }
       if (dynamicPitchRatio)
-        pitchRatio = tsf_timecents2Secsd(v.pitchInputTimecents + f322(f322(f322(v.modlfo.level * tmpModLfoToPitch) + f322(v.viblfo.level * tmpVibLfoToPitch)) + f322(v.modenv.level * tmpModEnvToPitch))) * v.pitchOutputFactor;
+        pitchRatio = tsf_timecents2Secsd(
+          v.pitchInputTimecents + f322(
+            f322(f322(v.modlfo.level * tmpModLfoToPitch) + f322(v.viblfo.level * tmpVibLfoToPitch)) + f322(v.modenv.level * tmpModEnvToPitch)
+          )
+        ) * v.pitchOutputFactor;
       if (dynamicGain)
         noteGain = tsf_decibelsToGain(f322(v.noteGainDB + f322(v.modlfo.level * tmpModLfoToVolume)));
       gainMono = f322(noteGain * v.ampenv.level);
       tsf_voice_envelope_process(v.ampenv, blockSamples, tmpSampleRate);
-      if (updateModEnv)
-        tsf_voice_envelope_process(v.modenv, blockSamples, tmpSampleRate);
-      if (updateModLFO)
-        tsf_voice_lfo_process(v.modlfo, blockSamples);
-      if (updateVibLFO)
-        tsf_voice_lfo_process(v.viblfo, blockSamples);
+      if (updateModEnv) tsf_voice_envelope_process(v.modenv, blockSamples, tmpSampleRate);
+      if (updateModLFO) tsf_voice_lfo_process(v.modlfo, blockSamples);
+      if (updateVibLFO) tsf_voice_lfo_process(v.viblfo, blockSamples);
       switch (f.outputmode) {
         case TSF_STEREO_INTERLEAVED:
           gainLeft = f322(gainMono * v.panFactorLeft);
@@ -54187,8 +54100,7 @@
             const pos = Math.floor(tmpSourceSamplePosition) >>> 0, nextPos = pos >= tmpLoopEnd && isLooping ? tmpLoopStart : pos + 1;
             const alpha = f322(tmpSourceSamplePosition - pos);
             let val = f322(f322(smp(pos) * f322(1 - alpha)) + f322(smp(nextPos) * alpha));
-            if (tmpLowpass.active)
-              val = tsf_voice_lowpass_process(tmpLowpass, val);
+            if (tmpLowpass.active) val = tsf_voice_lowpass_process(tmpLowpass, val);
             outputBuffer[outL] = outputBuffer[outL] + f322(val * gainLeft);
             outputBuffer[outL + 1] = outputBuffer[outL + 1] + f322(val * gainRight);
             outL += 2;
@@ -54204,8 +54116,7 @@
             const pos = Math.floor(tmpSourceSamplePosition) >>> 0, nextPos = pos >= tmpLoopEnd && isLooping ? tmpLoopStart : pos + 1;
             const alpha = f322(tmpSourceSamplePosition - pos);
             let val = f322(f322(smp(pos) * f322(1 - alpha)) + f322(smp(nextPos) * alpha));
-            if (tmpLowpass.active)
-              val = tsf_voice_lowpass_process(tmpLowpass, val);
+            if (tmpLowpass.active) val = tsf_voice_lowpass_process(tmpLowpass, val);
             outputBuffer[outL] = outputBuffer[outL] + f322(val * gainLeft);
             outputBuffer[outR] = outputBuffer[outR] + f322(val * gainRight);
             outL += 1;
@@ -54220,8 +54131,7 @@
             const pos = Math.floor(tmpSourceSamplePosition) >>> 0, nextPos = pos >= tmpLoopEnd && isLooping ? tmpLoopStart : pos + 1;
             const alpha = f322(tmpSourceSamplePosition - pos);
             let val = f322(f322(smp(pos) * f322(1 - alpha)) + f322(smp(nextPos) * alpha));
-            if (tmpLowpass.active)
-              val = tsf_voice_lowpass_process(tmpLowpass, val);
+            if (tmpLowpass.active) val = tsf_voice_lowpass_process(tmpLowpass, val);
             outputBuffer[outL] = outputBuffer[outL] + f322(val * gainMono);
             outL += 1;
             tmpSourceSamplePosition += pitchRatio;
@@ -54236,8 +54146,7 @@
       }
     }
     v.sourceSamplePosition = tmpSourceSamplePosition;
-    if (tmpLowpass.active || dynamicLowpass)
-      v.lowpass = tmpLowpass;
+    if (tmpLowpass.active || dynamicLowpass) v.lowpass = tmpLowpass;
   }
   function tsf_load_stream(stream) {
     const r = makeReader(stream);
@@ -54409,8 +54318,7 @@
                 }
                 break;
             }
-          } else
-            r.skip(chunk.size);
+          } else r.skip(chunk.size);
         }
       } else if (TSF_FourCCEquals(chunkList.id, "sdta")) {
         while (tsf_riffchunk_read(chunkList, chunk, r)) {
@@ -54423,13 +54331,10 @@
             }
             floatBuffer = fb.v;
             smplCount = sc.v;
-          } else
-            r.skip(chunk.size);
+          } else r.skip(chunk.size);
         }
-      } else
-        r.skip(chunkList.size);
-      if (out_of_memory)
-        break;
+      } else r.skip(chunkList.size);
+      if (out_of_memory) break;
     }
     if (!hydra.phdrs.length || !hydra.pbags.length || !hydra.pmods.length || !hydra.pgens.length || !hydra.insts.length || !hydra.ibags.length || !hydra.imods.length || !hydra.igens.length || !hydra.shdrs.length) {
     } else if (!floatBuffer) {
@@ -54454,8 +54359,7 @@
   }
   function tsf_get_presetindex(f, bank, preset_number) {
     for (let i = 0, iMax = f.presetNum; i < iMax; i++)
-      if (f.presets[i].preset === preset_number && f.presets[i].bank === bank)
-        return i;
+      if (f.presets[i].preset === preset_number && f.presets[i].bank === bank) return i;
     return -1;
   }
   function tsf_set_output(f, outputmode, samplerate, global_gain_db = 0) {
@@ -54466,8 +54370,7 @@
   function tsf_note_on(f, preset_index, key, vel) {
     const midiVelocity = Math.trunc(f322(vel * 127));
     let voicePlayIndex;
-    if (preset_index < 0 || preset_index >= f.presetNum)
-      return 1;
+    if (preset_index < 0 || preset_index >= f.presetNum) return 1;
     if (vel <= 0) {
       tsf_note_off(f, preset_index, key);
       return 1;
@@ -54477,18 +54380,15 @@
     const preset = f.presets[preset_index];
     for (let ri = 0; ri < preset.regionNum; ri++) {
       const region = preset.regions[ri];
-      if (!region)
-        continue;
+      if (!region) continue;
       let voice = null;
       if (key < region.lokey || key > region.hikey || midiVelocity < region.lovel || midiVelocity > region.hivel)
         continue;
       voice = null;
       if (region.group) {
         for (const v of f.voices) {
-          if (v.playingPreset === preset_index && v.region.group === region.group)
-            tsf_voice_endquick(f, v);
-          else if (v.playingPreset === -1 && !voice)
-            voice = v;
+          if (v.playingPreset === preset_index && v.region.group === region.group) tsf_voice_endquick(f, v);
+          else if (v.playingPreset === -1 && !voice) voice = v;
         }
       } else
         for (const v of f.voices)
@@ -54508,13 +54408,11 @@
               }
             }
           }
-          if (!voice)
-            continue;
+          if (!voice) continue;
           tsf_voice_kill(voice);
         } else {
           f.voiceNum += 4;
-          while (f.voices.length < f.voiceNum)
-            f.voices.push(newVoice());
+          while (f.voices.length < f.voiceNum) f.voices.push(newVoice());
           voice = f.voices[f.voiceNum - 4];
           f.voices[f.voiceNum - 3].playingPreset = -1;
           f.voices[f.voiceNum - 2].playingPreset = -1;
@@ -54526,7 +54424,9 @@
       voice.playingKey = key;
       voice.playIndex = voicePlayIndex;
       voice.heldSustain = 0;
-      voice.noteGainDB = f322(f322(f.globalGainDB - region.attenuation) - tsf_gainToDecibels(f322(1 / vel)));
+      voice.noteGainDB = f322(
+        f322(f.globalGainDB - region.attenuation) - tsf_gainToDecibels(f322(1 / vel))
+      );
       if (f.channels) {
         tsf_channel_setup_voice(f, voice);
       } else {
@@ -54545,8 +54445,7 @@
       voice.lowpass.QInv = 1 / rm_pow(10, lowpassFilterQDB / 20);
       voice.lowpass.z1 = voice.lowpass.z2 = 0;
       voice.lowpass.active = lowpassFc < 0.499;
-      if (voice.lowpass.active)
-        tsf_voice_lowpass_setup(voice.lowpass, lowpassFc);
+      if (voice.lowpass.active) tsf_voice_lowpass_setup(voice.lowpass, lowpassFc);
       tsf_voice_lfo_setup(voice.modlfo, region.delayModLFO, region.freqModLFO, f.outSampleRate);
       tsf_voice_lfo_setup(voice.viblfo, region.delayVibLFO, region.freqVibLFO, f.outSampleRate);
     }
@@ -54557,13 +54456,10 @@
     for (const v of f.voices) {
       if (v.playingPreset !== preset_index || v.playingKey !== key || v.ampenv.segment >= TSF_SEGMENT_RELEASE)
         continue;
-      else if (!vMatchFirst || v.playIndex < vMatchFirst.playIndex)
-        vMatchFirst = vMatchLast = v;
-      else if (v.playIndex === vMatchFirst.playIndex)
-        vMatchLast = v;
+      else if (!vMatchFirst || v.playIndex < vMatchFirst.playIndex) vMatchFirst = vMatchLast = v;
+      else if (v.playIndex === vMatchFirst.playIndex) vMatchLast = v;
     }
-    if (!vMatchFirst)
-      return;
+    if (!vMatchFirst) return;
     const first = vMatchFirst;
     const iFirst = f.voices.indexOf(first), iLast = f.voices.indexOf(vMatchLast);
     for (let i = iFirst; i <= iLast; i++) {
@@ -54575,18 +54471,19 @@
   }
   function tsf_render_float(f, buffer, offset, samples, flag_mixing) {
     const channels = f.outputmode === TSF_MONO ? 1 : 2;
-    if (!flag_mixing)
-      buffer.fill(0, offset, offset + channels * samples);
-    for (const v of f.voices)
-      if (v.playingPreset !== -1)
-        tsf_voice_render(f, v, buffer, offset, samples);
+    if (!flag_mixing) buffer.fill(0, offset, offset + channels * samples);
+    for (const v of f.voices) if (v.playingPreset !== -1) tsf_voice_render(f, v, buffer, offset, samples);
   }
   function tsf_channel_setup_voice(f, v) {
     const c = f.channels.channels[f.channels.activeChannel];
     const newpan = f322(v.region.pan + c.panOffset);
     v.playingChannel = f.channels.activeChannel;
     v.noteGainDB = f322(v.noteGainDB + c.gainDB);
-    tsf_voice_calcpitchratio(v, c.pitchWheel === 8192 ? c.tuning : f322(f322(f322(f322(f322(c.pitchWheel / F_16383) * c.pitchRange) * 2) - c.pitchRange) + c.tuning), f.outSampleRate);
+    tsf_voice_calcpitchratio(
+      v,
+      c.pitchWheel === 8192 ? c.tuning : f322(f322(f322(f322(f322(c.pitchWheel / F_16383) * c.pitchRange) * 2) - c.pitchRange) + c.tuning),
+      f.outSampleRate
+    );
     if (newpan <= -0.5) {
       v.panFactorLeft = 1;
       v.panFactorRight = 0;
@@ -54599,8 +54496,7 @@
     }
   }
   function tsf_channel_init(f, channel) {
-    if (f.channels && channel < f.channels.channelNum)
-      return f.channels.channels[channel];
+    if (f.channels && channel < f.channels.channelNum) return f.channels.channels[channel];
     if (!f.channels) {
       f.channels = { channelNum: 0, activeChannel: 0, channels: [] };
     }
@@ -54621,20 +54517,14 @@
   function tsf_channel_set_presetnumber(f, channel, preset_number, flag_mididrums = false) {
     let preset_index;
     const c = tsf_channel_init(f, channel);
-    if (!c)
-      return 0;
+    if (!c) return 0;
     if (flag_mididrums) {
       preset_index = tsf_get_presetindex(f, 128 | c.bank & 32767, preset_number);
-      if (preset_index === -1)
-        preset_index = tsf_get_presetindex(f, 128, preset_number);
-      if (preset_index === -1)
-        preset_index = tsf_get_presetindex(f, 128, 0);
-      if (preset_index === -1)
-        preset_index = tsf_get_presetindex(f, c.bank & 32767, preset_number);
-    } else
-      preset_index = tsf_get_presetindex(f, c.bank & 32767, preset_number);
-    if (preset_index === -1)
-      preset_index = tsf_get_presetindex(f, 0, preset_number);
+      if (preset_index === -1) preset_index = tsf_get_presetindex(f, 128, preset_number);
+      if (preset_index === -1) preset_index = tsf_get_presetindex(f, 128, 0);
+      if (preset_index === -1) preset_index = tsf_get_presetindex(f, c.bank & 32767, preset_number);
+    } else preset_index = tsf_get_presetindex(f, c.bank & 32767, preset_number);
+    if (preset_index === -1) preset_index = tsf_get_presetindex(f, 0, preset_number);
     if (preset_index !== -1) {
       c.presetIndex = preset_index & 65535;
       return 1;
@@ -54643,19 +54533,16 @@
   }
   function tsf_channel_set_bank_preset(f, channel, bank, preset_number) {
     const c = tsf_channel_init(f, channel);
-    if (!c)
-      return 0;
+    if (!c) return 0;
     const preset_index = tsf_get_presetindex(f, bank, preset_number);
-    if (preset_index === -1)
-      return 0;
+    if (preset_index === -1) return 0;
     c.presetIndex = preset_index & 65535;
     c.bank = bank & 65535;
     return 1;
   }
   function tsf_channel_set_pan(f, channel, pan) {
     const c = tsf_channel_init(f, channel);
-    if (!c)
-      return 0;
+    if (!c) return 0;
     for (const v of f.voices)
       if (v.playingPreset !== -1 && v.playingChannel === channel) {
         const newpan = f322(f322(v.region.pan + pan) - 0.5);
@@ -54676,65 +54563,51 @@
   function tsf_channel_set_volume(f, channel, volume) {
     const gainDB = tsf_gainToDecibels(volume);
     const c = tsf_channel_init(f, channel);
-    if (!c)
-      return 0;
-    if (gainDB === c.gainDB)
-      return 1;
+    if (!c) return 0;
+    if (gainDB === c.gainDB) return 1;
     const gainDBChange = f322(gainDB - c.gainDB);
     for (const v of f.voices)
-      if (v.playingPreset !== -1 && v.playingChannel === channel)
-        v.noteGainDB = f322(v.noteGainDB + gainDBChange);
+      if (v.playingPreset !== -1 && v.playingChannel === channel) v.noteGainDB = f322(v.noteGainDB + gainDBChange);
     c.gainDB = gainDB;
     return 1;
   }
   function tsf_channel_set_pitchwheel(f, channel, pitch_wheel) {
     const c = tsf_channel_init(f, channel);
-    if (!c)
-      return 0;
-    if (c.pitchWheel === pitch_wheel)
-      return 1;
+    if (!c) return 0;
+    if (c.pitchWheel === pitch_wheel) return 1;
     c.pitchWheel = pitch_wheel & 65535;
     tsf_channel_applypitch(f, channel, c);
     return 1;
   }
   function tsf_channel_set_pitchrange(f, channel, pitch_range) {
     const c = tsf_channel_init(f, channel);
-    if (!c)
-      return 0;
-    if (c.pitchRange === pitch_range)
-      return 1;
+    if (!c) return 0;
+    if (c.pitchRange === pitch_range) return 1;
     c.pitchRange = pitch_range;
-    if (c.pitchWheel !== 8192)
-      tsf_channel_applypitch(f, channel, c);
+    if (c.pitchWheel !== 8192) tsf_channel_applypitch(f, channel, c);
     return 1;
   }
   function tsf_channel_set_tuning(f, channel, tuning) {
     const c = tsf_channel_init(f, channel);
-    if (!c)
-      return 0;
-    if (c.tuning === tuning)
-      return 1;
+    if (!c) return 0;
+    if (c.tuning === tuning) return 1;
     c.tuning = tuning;
     tsf_channel_applypitch(f, channel, c);
     return 1;
   }
   function tsf_channel_set_sustain(f, channel, flag_sustain) {
     const c = tsf_channel_init(f, channel);
-    if (!c)
-      return 0;
-    if (!c.sustain === !flag_sustain)
-      return 1;
+    if (!c) return 0;
+    if (!c.sustain === !flag_sustain) return 1;
     c.sustain = flag_sustain ? 1 : 0;
-    if (flag_sustain)
-      return 1;
+    if (flag_sustain) return 1;
     for (const v of f.voices)
       if (v.playingPreset !== -1 && v.playingChannel === channel && v.ampenv.segment < TSF_SEGMENT_RELEASE && v.heldSustain)
         tsf_voice_end(f, v);
     return 1;
   }
   function tsf_channel_note_on(f, channel, key, vel) {
-    if (!f.channels || channel >= f.channels.channelNum)
-      return 1;
+    if (!f.channels || channel >= f.channels.channelNum) return 1;
     f.channels.activeChannel = channel;
     if (!vel) {
       tsf_channel_note_off(f, channel, key);
@@ -54747,13 +54620,10 @@
     for (const v of f.voices) {
       if (v.playingPreset === -1 || v.playingChannel !== channel || v.playingKey !== key || v.ampenv.segment >= TSF_SEGMENT_RELEASE || v.heldSustain)
         continue;
-      else if (!vMatchFirst || v.playIndex < vMatchFirst.playIndex)
-        vMatchFirst = vMatchLast = v;
-      else if (v.playIndex === vMatchFirst.playIndex)
-        vMatchLast = v;
+      else if (!vMatchFirst || v.playIndex < vMatchFirst.playIndex) vMatchFirst = vMatchLast = v;
+      else if (v.playIndex === vMatchFirst.playIndex) vMatchLast = v;
     }
-    if (!vMatchFirst)
-      return;
+    if (!vMatchFirst) return;
     const first = vMatchFirst;
     const sustain = f.channels.channels[channel].sustain;
     const iFirst = f.voices.indexOf(first), iLast = f.voices.indexOf(vMatchLast);
@@ -54761,10 +54631,8 @@
       const v = f.voices[i];
       if (v !== first && v !== vMatchLast && (v.playIndex !== first.playIndex || v.playingPreset === -1 || v.playingChannel !== channel || v.playingKey !== key || v.ampenv.segment >= TSF_SEGMENT_RELEASE))
         continue;
-      if (sustain)
-        v.heldSustain = 1;
-      else
-        tsf_voice_end(f, v);
+      if (sustain) v.heldSustain = 1;
+      else tsf_voice_end(f, v);
     }
   }
   function tsf_channel_note_off_all(f, channel) {
@@ -54779,8 +54647,7 @@
   }
   function tsf_channel_midi_control(f, channel, controller, control_value) {
     const c = tsf_channel_init(f, channel);
-    if (!c)
-      return 0;
+    if (!c) return 0;
     switch (controller) {
       case 7:
         c.midiVolume = (c.midiVolume & 127 | control_value << 7) & 65535;
@@ -54853,7 +54720,11 @@
       case 39:
       case 11:
       case 43:
-        tsf_channel_set_volume(f, channel, f322(rm_pow(f322(f322(c.midiVolume / F_16383) * f322(c.midiExpression / F_16383)), 3)));
+        tsf_channel_set_volume(
+          f,
+          channel,
+          f322(rm_pow(f322(f322(c.midiVolume / F_16383) * f322(c.midiExpression / F_16383)), 3))
+        );
         return 1;
       case 10:
       case 42:
@@ -54862,30 +54733,39 @@
       case 6:
       case 38:
         if (c.midiRPN === 0)
-          tsf_channel_set_pitchrange(f, channel, f322((c.midiData >> 7) + f322(f322(0.01) * (c.midiData & 127))));
+          tsf_channel_set_pitchrange(
+            f,
+            channel,
+            f322((c.midiData >> 7) + f322(f322(0.01) * (c.midiData & 127)))
+          );
         else if (c.midiRPN === 1)
-          tsf_channel_set_tuning(f, channel, f322(Math.trunc(c.tuning) + f322(f322(c.midiData - 8192) / 8192)));
+          tsf_channel_set_tuning(
+            f,
+            channel,
+            f322(Math.trunc(c.tuning) + f322(f322(c.midiData - 8192) / 8192))
+          );
         else if (c.midiRPN === 2 && controller === 6)
-          tsf_channel_set_tuning(f, channel, f322(f322(control_value - 64) + f322(c.tuning - Math.trunc(c.tuning))));
+          tsf_channel_set_tuning(
+            f,
+            channel,
+            f322(f322(control_value - 64) + f322(c.tuning - Math.trunc(c.tuning)))
+          );
         return 1;
       default:
         return 1;
     }
   }
 
-  // ../../packages/fmt-mid/dist/midplugin.js
+  // ../../packages/fmt-mid/src/midplugin.ts
   var MID_STUB_CHANNELS = 1;
   var MID_STUB_ROWS = 64;
   var MID_DEFAULT_GAIN_DB = -10;
   var MID_DRUM_CHANNEL = 9;
   var f323 = Math.fround;
   function midTest(bytes) {
-    if (bytes.length < 14)
-      return false;
-    if (bytes[0] !== 77 || bytes[1] !== 84)
-      return false;
-    if (bytes[2] !== 104 || bytes[3] !== 100)
-      return false;
+    if (bytes.length < 14) return false;
+    if (bytes[0] !== 77 || bytes[1] !== 84) return false;
+    if (bytes[2] !== 104 || bytes[3] !== 100) return false;
     return bytes[7] === 6 && bytes[9] <= 2 && !(bytes[12] & 128);
   }
   function midLoad(bytes, ctx) {
@@ -54900,14 +54780,12 @@
     const tracks = [];
     for (let c = 0; c < MID_STUB_CHANNELS; ++c) {
       const event = [];
-      for (let r = 0; r < MID_STUB_ROWS; ++r)
-        event.push({ note: 0, ins: 0, vol: -1, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
+      for (let r = 0; r < MID_STUB_ROWS; ++r) event.push({ note: 0, ins: 0, vol: -1, fxt: 0, fxp: 0, f2t: 0, f2p: 0 });
       tracks.push({ rows: MID_STUB_ROWS, event });
     }
     const patterns = [{ rows: MID_STUB_ROWS, tracks }];
     const channels = [];
-    for (let c = 0; c < MID_STUB_CHANNELS; ++c)
-      channels.push({ pan: 128, vol: 64, flg: 0 });
+    for (let c = 0; c < MID_STUB_CHANNELS; ++c) channels.push({ pan: 128, vol: 64, flg: 0 });
     const mod = {
       title: "",
       format: "mid",
@@ -54962,8 +54840,7 @@
   var g_MidiFirst = null;
   function midSetSoundfont(sf2) {
     const f = tsf_load_memory(sf2);
-    if (!f)
-      throw new Error("fmt-mid: not a valid SoundFont (.sf2)");
+    if (!f) throw new Error("fmt-mid: not a valid SoundFont (.sf2)");
     g_TinySoundFont = f;
     return f.presetNum;
   }
@@ -54972,11 +54849,9 @@
   }
   function midStartTune(bytes, sampleRate2, gainDb = MID_DEFAULT_GAIN_DB) {
     const f = g_TinySoundFont;
-    if (!f)
-      throw new Error("fmt-mid: no soundfont loaded (call midSetSoundfont first)");
+    if (!f) throw new Error("fmt-mid: no soundfont loaded (call midSetSoundfont first)");
     const first = tml_load_memory(bytes);
-    if (!first)
-      throw new Error("fmt-mid: not a valid MIDI file");
+    if (!first) throw new Error("fmt-mid: not a valid MIDI file");
     g_MidiFirst = first;
     g_MidiMessage = first;
     g_Msec = 0;
@@ -55017,8 +54892,7 @@
     tsf_render_float(g_TinySoundFont, out, off, blockSamples, false);
   }
   function midSeek(targetMs) {
-    if (!g_TinySoundFont || !g_MidiFirst)
-      return;
+    if (!g_TinySoundFont || !g_MidiFirst) return;
     const target = Math.max(0, targetMs);
     midFifoReset();
     if (target < g_Msec) {
@@ -69295,7 +69169,7 @@
       numVoices: 32,
       tempoFactor: 1
     },
-    mixer: { mode: "libxmp", layout: "panned", amigaFilter: "a500", amplify: 1 },
+    mixer: { mode: "libxmp", layout: "panned", amigaFilter: "a500", amplify: 1, reflectPanels: false },
     sid: { model: 0, videoStandard: null, quality: "light", stereo: 0, volume: 255 },
     playback: { repeat: "off", shuffle: false, autoAdvance: true, jamMode: false },
     view: {
@@ -69327,7 +69201,11 @@
           Math.max(0.25, input.transport?.tempoFactor ?? d.transport.tempoFactor)
         )
       },
-      mixer: { ...d.mixer, ...input.mixer },
+      mixer: {
+        ...d.mixer,
+        ...input.mixer,
+        reflectPanels: input.mixer?.reflectPanels == true
+      },
       sid: {
         ...d.sid,
         ...input.sid,
