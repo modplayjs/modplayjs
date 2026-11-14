@@ -134,6 +134,14 @@ class V8Engine(
         if (handle != 0L) nativeSetSpatialSources(params, count)
     }
 
+    /**
+     * Early reflection taps per source: [tapCount, (delaySec, gain, bus) × 6]
+     * per source (19 floats). Computed by the host from real geometry.
+     */
+    fun setSpatialReflections(params: FloatArray, count: Int) {
+        if (handle != 0L) nativeSetSpatialReflections(params, count)
+    }
+
     /** Bus directions in the stage frame, xyz per bus (3 floats each). */
     fun setSpatialBuses(dirs: FloatArray) {
         if (handle != 0L) nativeSetSpatialBuses(dirs)
@@ -193,6 +201,8 @@ class V8Engine(
     ): Boolean
 
     private external fun nativeSetSpatialSources(params: FloatArray, count: Int)
+
+    private external fun nativeSetSpatialReflections(params: FloatArray, count: Int)
 
     private external fun nativeSetSpatialBuses(dirs: FloatArray)
 

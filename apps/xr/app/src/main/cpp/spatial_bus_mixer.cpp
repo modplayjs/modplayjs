@@ -128,6 +128,7 @@ void SpatialBusMixer::configure(int sampleRate, int frames, int buses) {
     for (int s = 0; s < kMaxSources; ++s) {
         SourceRuntime& rt = src_[s];
         rt.curN = rt.tgtN = 0;
+        rt.rcurN = rt.rtgtN = 0;
         rt.airState = 0.f;
         rt.airCoef = 0.f;
         rt.lowPass.reset();
@@ -135,6 +136,9 @@ void SpatialBusMixer::configure(int sampleRate, int frames, int buses) {
         lowPassCoef(rt.lowPass, float(sampleRate_), kCrossoverHz);
         highPassCoef(rt.highPass, float(sampleRate_), kCrossoverHz);
         rt.tgtHigh = rt.tgtLow = rt.highGain = rt.lowGain = 0.f;
+        // 200 ms of stem history: the longest reflected path is ~68 m.
+        rt.delayBuf.assign(size_t(sampleRate_ / 5) + 4, 0.f);
+        rt.delayIdx = 0;
     }
     sourceCount_ = 0;
 
@@ -357,7 +361,44 @@ void SpatialBusMixer::setSources(const float* params, int count) {
     }
 }
 
+void SpatialBusMixer::setReflections(const float* data, int count) {
+    if (!data) return;
+    count = std::clamp(count, 0, kMaxSources);
+    const int stride = 1 + 3 * kMaxReflTaps;
+    for (int s = 0; s < count; ++s) {
+        SourceRuntime& rt = src_[s];
+        const float* p = data + size_t(s) * stride;
+        const int n = std::clamp(int(p[0]), 0, kMaxReflTaps);
+        rt.rtgtN = n;
+        for (int t = 0; t < n; ++t) {
+            RTap& tap = rt.rtgt[t];
+            tap.delay = clampf(p[1 + t * 3 + 0], 0.001f, 0.19f);
+            tap.gain = clampf(p[1 + t * 3 + 1], 0.f, 1.f);
+            tap.bus = std::clamp(int(p[1 + t * 3 + 2]), 0, buses_ - 1);
+        }
+    }
+}
+
 // ------------------------------------------------------------------- mix
+
+/**
+ * One early reflection: read the stem `delaySamples` behind the write index
+ * (linear interpolation) and add it to the tap's bus at output frame `frame`.
+ */
+static inline void addReflTap(
+    float* busOut, int frames, int frame,
+    const float* buf, int len, int widx,
+    int bus, float gain, float delaySamples)
+{
+    const int di = int(delaySamples);
+    const float f = delaySamples - float(di);
+    int r0 = widx - di;
+    if (r0 < 0) r0 += len;
+    int r1 = r0 - 1;
+    if (r1 < 0) r1 += len;
+    const float y = buf[size_t(r0)] * (1.f - f) + buf[size_t(r1)] * f;
+    busOut[size_t(bus) * size_t(frames) + size_t(frame)] += y * gain;
+}
 
 void SpatialBusMixer::mix(const float* stems, int sources, int frames, float* busOut) {
     if (!busOut || sources <= 0 || frames <= 0) return;
@@ -416,6 +457,52 @@ void SpatialBusMixer::mix(const float* stems, int sources, int frames, float* bu
                            rt.tgt[t].gain);
                 }
             }
+
+            // Early reflections: the raw stem goes into the source delay line
+            // and each tap reads it back at its own delay onto the tap's bus.
+            // Tap changes crossfade across the call like the pan taps above.
+            {
+                bool rchanged = rt.rcurN != rt.rtgtN;
+                if (!rchanged) {
+                    for (int t = 0; t < rt.rtgtN; ++t) {
+                        const RTap& a = rt.rcur[t];
+                        const RTap& b = rt.rtgt[t];
+                        if (a.bus != b.bus || std::fabs(a.gain - b.gain) > 1e-4f ||
+                            std::fabs(a.delay - b.delay) > 1e-7f) {
+                            rchanged = true;
+                            break;
+                        }
+                    }
+                }
+                float* dBuf = rt.delayBuf.data();
+                const int dLen = int(rt.delayBuf.size());
+                const bool anyRefl = rt.rcurN > 0 || rt.rtgtN > 0;
+                for (int i = 0; i < n; ++i) {
+                    dBuf[size_t(rt.delayIdx)] = src[i];
+                    if (anyRefl) {
+                        const int frame = off + i;
+                        if (rchanged) {
+                            for (int t = 0; t < rt.rcurN; ++t) {
+                                const RTap& tap = rt.rcur[t];
+                                addReflTap(busOut, frames, frame, dBuf, dLen, rt.delayIdx,
+                                           tap.bus, tap.gain * (1.f - u), tap.delay * float(sampleRate_));
+                            }
+                            for (int t = 0; t < rt.rtgtN; ++t) {
+                                const RTap& tap = rt.rtgt[t];
+                                addReflTap(busOut, frames, frame, dBuf, dLen, rt.delayIdx,
+                                           tap.bus, tap.gain * u, tap.delay * float(sampleRate_));
+                            }
+                        } else {
+                            for (int t = 0; t < rt.rtgtN; ++t) {
+                                const RTap& tap = rt.rtgt[t];
+                                addReflTap(busOut, frames, frame, dBuf, dLen, rt.delayIdx,
+                                           tap.bus, tap.gain, tap.delay * float(sampleRate_));
+                            }
+                        }
+                    }
+                    if (++rt.delayIdx >= dLen) rt.delayIdx = 0;
+                }
+            }
         }
 
         // The low path is direction-free: one sum, added to every bus with
@@ -430,6 +517,8 @@ void SpatialBusMixer::mix(const float* stems, int sources, int frames, float* bu
         SourceRuntime& rt = src_[s];
         std::copy(rt.tgt, rt.tgt + rt.tgtN, rt.cur);
         rt.curN = rt.tgtN;
+        std::copy(rt.rtgt, rt.rtgt + rt.rtgtN, rt.rcur);
+        rt.rcurN = rt.rtgtN;
     }
 }
 

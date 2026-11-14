@@ -20,6 +20,8 @@ export interface AndroidSettings {
     layout: 'panned' | 'lrlr' | 'lrrl' | 'front180' | 'full360' | 'spatial3d';
     amigaFilter: 'a500' | 'a500led';
     amplify: number;
+    /** Early reflections off panel boxes (XR): walls and room volumes always reflect. */
+    reflectPanels: boolean;
   };
   sid: {
     model: 0 | 6581 | 8580;

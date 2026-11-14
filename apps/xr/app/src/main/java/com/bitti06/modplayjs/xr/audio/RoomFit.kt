@@ -63,4 +63,47 @@ object RoomFit {
         val root = sqrt(disc)
         return floatArrayOf((halfP + root) / 2f, (halfP - root) / 2f, height)
     }
+
+    /**
+     * The six faces of an upright box (yaw around the vertical axis) as
+     * reflection records: kind, centre, normal, halfWidth, halfHeight.
+     * The u axis of a face rectangle is the horizontal in-plane axis of the
+     * normal (n x up), which lines up with the box axes for every face.
+     */
+    fun boxFaces(
+        kind: Float,
+        cx: Float, cy: Float, cz: Float,
+        yaw: Float,
+        hx: Float, hy: Float, hz: Float,
+    ): FloatArray {
+        val c = kotlin.math.cos(yaw)
+        val s = kotlin.math.sin(yaw)
+        // Local -> world, inverse of the occlusion test's world -> panel.
+        fun wx(x: Float, z: Float) = c * x + s * z
+        fun wz(x: Float, z: Float) = -s * x + c * z
+        val out = FloatArray(6 * 9)
+        data class Face(val dx: Float, val dy: Float, val dz: Float, val nx: Float, val ny: Float, val nz: Float, val hw: Float, val hh: Float)
+        val faces = arrayOf(
+            Face(hx, 0f, 0f, 1f, 0f, 0f, hz, hy),
+            Face(-hx, 0f, 0f, -1f, 0f, 0f, hz, hy),
+            Face(0f, 0f, hz, 0f, 0f, 1f, hx, hy),
+            Face(0f, 0f, -hz, 0f, 0f, -1f, hx, hy),
+            Face(0f, hy, 0f, 0f, 1f, 0f, hx, hz),
+            Face(0f, -hy, 0f, 0f, -1f, 0f, hx, hz),
+        )
+        for (i in faces.indices) {
+            val f = faces[i]
+            val o = i * 9
+            out[o] = kind
+            out[o + 1] = cx + wx(f.dx, f.dz)
+            out[o + 2] = cy + f.dy
+            out[o + 3] = cz + wz(f.dx, f.dz)
+            out[o + 4] = wx(f.nx, f.nz)
+            out[o + 5] = f.ny
+            out[o + 6] = wz(f.nx, f.nz)
+            out[o + 7] = f.hw
+            out[o + 8] = f.hh
+        }
+        return out
+    }
 }

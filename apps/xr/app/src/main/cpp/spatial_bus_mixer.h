@@ -12,6 +12,8 @@
 //   - distance gain and air absorption from the listener pose,
 //   - occlusion gain and low-pass, fed by panel raycasts from Kotlin,
 //   - a bass split at 90 Hz so low frequencies are not tied to a point,
+//   - early reflections from real geometry (wall segments, room volumes,
+//     optionally panels), fed as per-source taps by Kotlin,
 //   - a room reverb encoded to first-order ambisonics and played back through
 //     one extra AMBISONIC_ORDER_1 session.
 //
@@ -32,6 +34,7 @@ public:
     static constexpr int kMaxSources = 128;
     static constexpr int kSubBlock = 128;
     static constexpr int kMaxTaps = 8;
+    static constexpr int kMaxReflTaps = 6;
     static constexpr float kPi = 3.14159265358979f;
     static constexpr float kHalfPi = 1.57079632679490f;
 
@@ -59,6 +62,14 @@ public:
      * kernel. Must be called before the first mix for the layout to apply.
      */
     void setBuses(const float* xyz, int count);
+
+    /**
+     * Early reflection taps per source, computed by the host from real
+     * geometry (image sources across wall segments, room volume faces and —
+     * when switched on — panel faces). Layout per source: tapCount, then
+     * kMaxReflTaps entries of (delaySec, gain, bus). Called with setSources.
+     */
+    void setReflections(const float* data, int count);
 
     /**
      * Mix `sources` stems of `frames` into `busOut` ([buses][frames]).
@@ -97,11 +108,25 @@ private:
         float gain = 0.f;
     };
 
+    /** One early reflection: delayed, attenuated copy toward one bus. */
+    struct RTap {
+        int bus = 0;
+        float gain = 0.f;
+        float delay = 0.f;
+    };
+
     struct SourceRuntime {
         Tap cur[kMaxTaps];
         int curN = 0;
         Tap tgt[kMaxTaps];
         int tgtN = 0;
+
+        RTap rcur[kMaxReflTaps];
+        int rcurN = 0;
+        RTap rtgt[kMaxReflTaps];
+        int rtgtN = 0;
+        std::vector<float> delayBuf;  // raw stem history for the tap reads
+        int delayIdx = 0;
 
         Biquad lowPass;   // bass split, 2nd order Butterworth at 90 Hz
         Biquad highPass;

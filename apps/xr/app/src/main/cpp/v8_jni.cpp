@@ -381,6 +381,16 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeSetSpatialSources(
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeSetSpatialReflections(
+        JNIEnv* env, jobject, jfloatArray params, jint count) {
+    if (!g_busMixer || !params) return;
+    auto* p = static_cast<jfloat*>(env->GetPrimitiveArrayCritical(params, nullptr));
+    if (!p) return;
+    g_busMixer->setReflections(p, count);
+    env->ReleasePrimitiveArrayCritical(params, p, JNI_ABORT);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_bitti06_modplayjs_engine_V8Engine_nativeSetSpatialRoom(
         JNIEnv*, jobject, jfloat width, jfloat depth, jfloat height, jfloat absorption) {
     if (g_busMixer) g_busMixer->setRoom(width, depth, height, absorption);

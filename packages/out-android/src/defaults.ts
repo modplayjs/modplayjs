@@ -10,7 +10,7 @@ export const DEFAULT_SETTINGS: AndroidSettings = {
     numVoices: 32,
     tempoFactor: 1,
   },
-  mixer: { mode: 'libxmp', layout: 'panned', amigaFilter: 'a500', amplify: 1 },
+  mixer: { mode: 'libxmp', layout: 'panned', amigaFilter: 'a500', amplify: 1, reflectPanels: false },
   sid: { model: 0, videoStandard: null, quality: 'light', stereo: 0, volume: 255 },
   playback: { repeat: 'off', shuffle: false, autoAdvance: true, jamMode: false },
   view: {
@@ -45,7 +45,11 @@ export function normaliseSettings(input: Partial<AndroidSettings>): AndroidSetti
         Math.max(0.25, input.transport?.tempoFactor ?? d.transport.tempoFactor),
       ),
     },
-    mixer: { ...d.mixer, ...input.mixer },
+    mixer: {
+      ...d.mixer,
+      ...input.mixer,
+      reflectPanels: input.mixer?.reflectPanels == true,
+    },
     sid: {
       ...d.sid,
       ...input.sid,

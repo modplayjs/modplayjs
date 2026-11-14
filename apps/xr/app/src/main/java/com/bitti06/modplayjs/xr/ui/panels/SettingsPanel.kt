@@ -233,6 +233,11 @@ fun SettingsPanel() {
                             }
                         }
                     }
+                    // Walls and room volumes always reflect; the panels are
+                    // the switchable part (six box faces per panel).
+                    ToggleRow(stringResource(R.string.xr_reflect_panels), settings.mixer.reflectPanels) {
+                        set { s -> s.copy(mixer = s.mixer.copy(reflectPanels = !s.mixer.reflectPanels)) }
+                    }
                     OptionRow(
                         stringResource(R.string.xr_interpolation),
                         listOf(

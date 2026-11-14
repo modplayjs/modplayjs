@@ -25,6 +25,8 @@ data class MixerSettings(
     val mode: String = "libxmp",
     val layout: String = "panned",
     val amigaFilter: String = "a500",
+    /** Early reflections off panel boxes (XR): walls and room volumes always reflect. */
+    val reflectPanels: Boolean = false,
 )
 
 @Serializable

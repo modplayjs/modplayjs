@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
 import com.bitti06.modplayjs.engine.ModuleCatalog
+import com.bitti06.modplayjs.xr.audio.RoomFit
 import com.bitti06.modplayjs.xr.input.ControllerInputSystem
 import com.bitti06.modplayjs.xr.input.PushPullGrabSystem
 import com.bitti06.modplayjs.xr.library.Library
@@ -44,6 +45,7 @@ import com.meta.spatial.mruk.MRUKFeature
 import com.meta.spatial.mruk.MRUKPlane
 import com.meta.spatial.mruk.MRUKRoom
 import com.meta.spatial.mruk.MRUKSceneEventListener
+import com.meta.spatial.mruk.MRUKVolume
 import com.meta.spatial.mruk.SurfaceType
 import com.meta.spatial.runtime.PanelShapeLayerBlendType
 import com.meta.spatial.runtime.ReferenceSpace
@@ -498,11 +500,12 @@ class XrActivity : AppSystemActivity(), XrHost {
     private var wallSampleZ = Float.MIN_VALUE
 
     /**
-     * Per-direction wall distances around the ring centre (5° bins). The room
-     * outline lives in MRUK's own coordinate space, but raycastRoom takes
-     * app-space poses and returns hit distances - the only room query that
-     * needs no coordinate conversion, and the one the channel ring is fitted
-     * against (an hourglass room has no single radius).
+     * Per-direction wall distances around the ring centre (5° bins) and the
+     * wall reflector set. The room outline lives in MRUK's own coordinate
+     * space, but raycastRoom takes app-space poses and returns hit positions
+     * and normals — the one room query that needs no coordinate conversion.
+     * The channels are fitted against the distances; the reflections get the
+     * hit planes (oversized rectangles) plus the furniture volume faces.
      */
     private fun sampleRoomWalls(room: MRUKRoom) {
         if (!::player.isInitialized) return
@@ -510,6 +513,7 @@ class XrActivity : AppSystemActivity(), XrHost {
         val cz = player.ringCenterZ()
         val origin = Vector3(cx, 1.4f, cz)
         val distances = FloatArray(WALL_BINS)
+        val records = ArrayList<Float>(WALL_BINS * 9 + 64)
         for (i in 0 until WALL_BINS) {
             val rad = Math.toRadians(i * 360.0 / WALL_BINS)
             val dir = Vector3(kotlin.math.sin(rad).toFloat(), 0f, kotlin.math.cos(rad).toFloat())
@@ -517,10 +521,67 @@ class XrActivity : AppSystemActivity(), XrHost {
                 mrukFeature.raycastRoom(room.roomUuid, origin, dir, MAX_WALL_DISTANCE, SurfaceType.PLANE_VOLUME)
             }.getOrNull()
             distances[i] = hit?.hitDistance ?: MAX_WALL_DISTANCE
+            // Wall reflectors come from planes only: a volume hit is
+            // furniture, modelled as box faces by collectVolumeFaces (a ray
+            // crossing a table leg must not become an infinite wall plane).
+            val wallHit = runCatching {
+                mrukFeature.raycastRoom(room.roomUuid, origin, dir, MAX_WALL_DISTANCE, SurfaceType.PLANE)
+            }.getOrNull()
+            if (wallHit != null) {
+                val p = wallHit.hitPosition
+                val n = wallHit.hitNormal
+                // kind 0 = wall: effectively infinite rectangle.
+                records += floatArrayOf(0f, p.x, p.y, p.z, n.x, n.y, n.z, 100f, 100f)
+            }
         }
         player.setWallDistances(distances)
+        collectVolumeFaces(room, records)
+        player.setReflectors(records.toFloatArray())
         wallSampleX = cx
         wallSampleZ = cz
+    }
+
+    /**
+     * Furniture volumes (tables, shelves) as box-face reflectors — a user
+     * placed furniture as a box in the room model and it should reflect.
+     * Upright assumption like the panels: yaw from the anchor rotation.
+     */
+    private fun collectVolumeFaces(room: MRUKRoom, out: MutableList<Float>) {
+        for (anchor in room.anchors) {
+            val volume = runCatching { anchor.tryGetComponent<MRUKVolume>() }.getOrNull() ?: continue
+            try {
+                val min = volume.min
+                val max = volume.max
+                val hx = (max.x - min.x) / 2f
+                val hy = (max.y - min.y) / 2f
+                val hz = (max.z - min.z) / 2f
+                if (hx <= 0f || hy <= 0f || hz <= 0f) continue
+                val transform = runCatching { anchor.getComponent<Transform>() }.getOrNull() ?: continue
+                try {
+                    val pose = transform.transform
+                    val q = pose.q
+                    val yaw = kotlin.math.atan2(
+                        2.0 * (q.x * q.z + q.w * q.y).toDouble(),
+                        1.0 - 2.0 * (q.y * q.y + q.x * q.x).toDouble(),
+                    ).toFloat()
+                    val cx0 = (min.x + max.x) / 2f
+                    val cy0 = (min.y + max.y) / 2f
+                    val cz0 = (min.z + max.z) / 2f
+                    val c = kotlin.math.cos(yaw)
+                    val s = kotlin.math.sin(yaw)
+                    val cx = pose.t.x + (c * cx0 + s * cz0)
+                    val cy = pose.t.y + cy0
+                    val cz = pose.t.z + (-s * cx0 + c * cz0)
+                    // kind 1 = room volume (furniture).
+                    val faces = RoomFit.boxFaces(1f, cx, cy, cz, yaw, hx, hy, hz)
+                    for (v in faces) out += v
+                } finally {
+                    runCatching { transform.recycle() }
+                }
+            } finally {
+                runCatching { volume.recycle() }
+            }
+        }
     }
 
     // ---- XrHost ----------------------------------------------------------

@@ -16,6 +16,7 @@ import com.bitti06.modplayjs.engine.PatternColors
 import com.bitti06.modplayjs.engine.SettingsStore
 import com.bitti06.modplayjs.engine.V8Engine
 import com.bitti06.modplayjs.xr.audio.Direction
+import com.bitti06.modplayjs.xr.audio.RoomFit
 import com.bitti06.modplayjs.xr.audio.SpatialLayout
 import com.meta.spatial.core.Color4
 import com.meta.spatial.core.Entity
@@ -236,6 +237,12 @@ class XrPlayer(
     @Volatile private var roomHeight = 2.6f
     @Volatile private var wetPercent = prefs.getInt(KEY_WET, 25)
     @Volatile private var spreadDeg = prefs.getFloat(KEY_SPREAD, 0f)
+    /** Room + volume reflection records (see setReflectors). */
+    private var roomReflectors = FloatArray(0)
+    /** Panel face records (rebuilt from the occluder boxes). */
+    private var panelFaces = FloatArray(0)
+    /** Both sets, as reflectionTaps reads them. */
+    private var reflectors = FloatArray(0)
 
     /** Reused every push; 6 floats per source. */
     private val sourceParams = FloatArray(MAX_SOURCES * 6)
@@ -710,6 +717,9 @@ class XrPlayer(
             settings = transform(settings)
             pushSettings()
             saveSettingsAsync()
+            // Settings that feed the 10 Hz source/reflection params (panel
+            // reflections, layout, width fold) apply without a reload.
+            submit { runCatching { pushSources() } }
             if (settings.view.grabSources != oldGrab) {
                 applyPositions()
                 if (debugVisible) rebuildMarkers()
@@ -1465,6 +1475,113 @@ class XrPlayer(
     }
 
     /**
+     * Early reflection taps for one source: the mirror image across each
+     * real reflector (wall rectangle, room volume face, panel face), with
+     * the bounce point required to land on the reflector. The loudest
+     * [MAX_REFL_TAPS] taps survive, each as [delaySec, gain, bus].
+     */
+    private fun reflectionTaps(source: Vector3, listener: Vector3, direct: Float): List<FloatArray> {
+        val rec = reflectors
+        if (rec.isEmpty()) return emptyList()
+        val cY = kotlin.math.cos(ringYawRad)
+        val sY = kotlin.math.sin(ringYawRad)
+        val cT = kotlin.math.cos(tiltApplied)
+        val sT = kotlin.math.sin(tiltApplied)
+        val busDirs = SpatialLayout.busLayout(settings.mixer.layout)
+        val out = ArrayList<FloatArray>(MAX_REFL_TAPS + 4)
+        var i = 0
+        while (i + 8 < rec.size) {
+            val kind = rec[i]
+            val px = rec[i + 1]
+            val py = rec[i + 2]
+            val pz = rec[i + 3]
+            val nx = rec[i + 4]
+            val ny = rec[i + 5]
+            val nz = rec[i + 6]
+            val hw = rec[i + 7]
+            val hh = rec[i + 8]
+            i += 9
+            if (kind == REFLECT_KIND_PANEL && !settings.mixer.reflectPanels) continue
+
+            // Mirror the source across the plane; a source on the wall side
+            // (or on it) cannot bounce off it.
+            val d = (source.x - px) * nx + (source.y - py) * ny + (source.z - pz) * nz
+            if (d <= 0f) continue
+            val ix = source.x - 2f * d * nx
+            val iy = source.y - 2f * d * ny
+            val iz = source.z - 2f * d * nz
+            val ldx = ix - listener.x
+            val ldy = iy - listener.y
+            val ldz = iz - listener.z
+            val path = kotlin.math.sqrt((ldx * ldx + ldy * ldy + ldz * ldz).toDouble()).toFloat()
+            if (path <= direct) continue
+
+            // The bounce lands where the listener->image line crosses the
+            // plane; it has to be inside the reflector's rectangle.
+            val den = ldx * nx + ldy * ny + ldz * nz
+            if (den == 0f) continue
+            val t = ((px - listener.x) * nx + (py - listener.y) * ny + (pz - listener.z) * nz) / den
+            if (t <= 0f || t >= 1f) continue
+            val bx = listener.x + t * ldx
+            val by = listener.y + t * ldy
+            val bz = listener.z + t * ldz
+
+            // Rectangle axes from the normal: u = n x up, v = n x u.
+            var ux = -nz
+            var uy = 0f
+            var uz = nx
+            var ulen = kotlin.math.sqrt((ux * ux + uz * uz).toDouble()).toFloat()
+            if (ulen < 0.001f) {
+                ux = 1f
+                uz = 0f
+                ulen = 1f
+            }
+            ux /= ulen
+            uz /= ulen
+            val vx = ny * uz - nz * uy
+            val vy = nz * ux - nx * uz
+            val vz = nx * uy - ny * ux
+            val ru = (bx - px) * ux + (by - py) * uy + (bz - pz) * uz
+            val rv = (bx - px) * vx + (by - py) * vy + (bz - pz) * vz
+            if (ru < -hw || ru > hw || rv < -hh || rv > hh) continue
+
+            val reflectivity =
+                when (kind) {
+                    REFLECT_KIND_WALL -> 0.7f
+                    REFLECT_KIND_VOLUME -> 0.6f
+                    else -> 0.5f
+                }
+            val gain = reflectivity * (1f / maxOf(path, 1f)).coerceIn(0.05f, 1f)
+            val delay = maxOf((path - direct) / SPEED_OF_SOUND, 0.002f)
+
+            // Nearest ring bus to the image direction, in the stage frame
+            // (the same undo of ring yaw and tilt the source params use).
+            val rvx = ix - listener.x
+            val rvy = iy - listener.y
+            val rvz = iz - listener.z
+            val sx = rvx * cY - rvz * sY
+            val sz = rvx * sY + rvz * cY
+            val sy = rvy * cT - sz * sT
+            val sz2 = rvy * sT + sz * cT
+            val ilen = kotlin.math.sqrt((sx * sx + sy * sy + sz2 * sz2).toDouble()).toFloat()
+            if (ilen <= 0f) continue
+            var best = -2f
+            var bestBus = 0
+            for (b in busDirs.indices) {
+                val u = SpatialLayout.unit(busDirs[b])
+                val dot = (sx * u[0] + sy * u[1] + sz2 * u[2]) / ilen
+                if (dot > best) {
+                    best = dot
+                    bestBus = b
+                }
+            }
+            out += floatArrayOf(delay, gain, bestBus.toFloat())
+        }
+        out.sortByDescending { it[1] }
+        return if (out.size > MAX_REFL_TAPS) out.subList(0, MAX_REFL_TAPS) else out
+    }
+
+    /**
      * Hand the mixer one parameter row per channel.
      *
      * A grabbed marker overrides the geometric position; the array is filled
@@ -1490,6 +1607,7 @@ class XrPlayer(
         val sY = kotlin.math.sin(ringYawRad)
         val cT = kotlin.math.cos(tiltApplied)
         val sT = kotlin.math.sin(tiltApplied)
+        val refl = FloatArray(channels * REFL_STRIDE)
         for (i in 0 until channels) {
             val position =
                 overrides.getOrNull(i) ?: sourcePoint(
@@ -1527,8 +1645,21 @@ class XrPlayer(
             params[base + 3] = 1f
             params[base + 4] = spreadDeg
             params[base + 5] = occlusion(listener, position, boxes)
+
+            // Early reflections from the real geometry, computed here at the
+            // same 10 Hz cadence as the source params.
+            val taps = reflectionTaps(position, listener, distance)
+            var rb = i * REFL_STRIDE
+            refl[rb] = taps.size.toFloat()
+            for (tap in taps) {
+                refl[rb + 1] = tap[0]
+                refl[rb + 2] = tap[1]
+                refl[rb + 3] = tap[2]
+                rb += 3
+            }
         }
         eng.setSpatialSources(params, channels)
+        eng.setSpatialReflections(refl, channels)
     }
 
     /**
@@ -1736,6 +1867,23 @@ class XrPlayer(
     /** Seven floats per occluding panel: centre, yaw, half extents. */
     fun setOccluders(boxes: FloatArray) {
         occluders = boxes
+        // The same boxes are reflectors when the panel switch is on: expand
+        // each to its six faces (filtered at tap time).
+        val faces = FloatArray((boxes.size / 7) * 6 * 9)
+        var o = 0
+        var i = 0
+        while (i + 6 < boxes.size) {
+            val f = RoomFit.boxFaces(
+                REFLECT_KIND_PANEL,
+                boxes[i], boxes[i + 1], boxes[i + 2], boxes[i + 3],
+                boxes[i + 4], boxes[i + 5], boxes[i + 6],
+            )
+            for (k in f.indices) faces[o + k] = f[k]
+            o += f.size
+            i += 7
+        }
+        panelFaces = if (o == faces.size) faces else faces.copyOf(o)
+        rebuildReflectors()
     }
 
     fun setRoomSize(width: Float, depth: Float, height: Float) {
@@ -1762,6 +1910,30 @@ class XrPlayer(
         prefs.edit { putFloat(KEY_SPREAD, v) }
         foldWidthIntoPan()
         submit { runCatching { pushSources() } }
+    }
+
+    /**
+     * Reflection geometry as flat 9-float records:
+     * kind, x, y, z, nx, ny, nz, halfWidth, halfHeight.
+     *
+     * kind 0 = wall (oversized rectangle), 1 = room volume face (furniture),
+     * 2 = panel face. Walls and volumes always reflect; panels only while
+     * settings.mixer.reflectPanels is on. Positions are app space; the tap
+     * math mirrors sources across the planes and keeps the loudest few.
+     */
+    fun setReflectors(data: FloatArray) {
+        submit {
+            roomReflectors = data
+            rebuildReflectors()
+            pushSources()
+        }
+    }
+
+    /** Concatenate the reflection sets (panels are filtered at tap time). */
+    private fun rebuildReflectors() {
+        reflectors =
+            if (panelFaces.isEmpty()) roomReflectors
+            else roomReflectors + panelFaces
     }
 
     /**
@@ -2227,6 +2399,17 @@ class XrPlayer(
         private const val WALL_MARGIN = 0.3f
         /** Nothing fits closer than this to the ring centre. */
         private const val RING_MIN_RADIUS = 0.3f
+
+        /** Reflection tap kinds in the reflector records. */
+        private const val REFLECT_KIND_WALL = 0f
+        private const val REFLECT_KIND_VOLUME = 1f
+        private const val REFLECT_KIND_PANEL = 2f
+        /** Kept taps per source; matches SpatialBusMixer::kMaxReflTaps. */
+        private const val MAX_REFL_TAPS = 6
+        /** tapCount + (delay, gain, bus) per tap. */
+        private const val REFL_STRIDE = 1 + 3 * MAX_REFL_TAPS
+        /** Metres per second; the tap delays are path differences over c. */
+        private const val SPEED_OF_SOUND = 343f
 
         /**
          * `Sphere` carries the radius that `mesh://sphere` builds from; the
