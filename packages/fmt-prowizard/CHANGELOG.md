@@ -1,5 +1,17 @@
 # @modplayjs/fmt-prowizard
 
+## 0.3.0
+
+### Minor Changes
+
+- [`c0bb636`](https://github.com/modplayjs/modplayjs/commit/c0bb636f9c03a7bc56fb6ffab8d7ae05df88d3fa) - - Standard MIDI File plugin — pristine 1:1 TinySoundFont port (direct push)
+
+### Patch Changes
+
+- Updated dependencies [[`f59898f`](https://github.com/modplayjs/modplayjs/commit/f59898fa3aa1249e14d9ad33ce83548ffcf3db12), [`c0bb636`](https://github.com/modplayjs/modplayjs/commit/c0bb636f9c03a7bc56fb6ffab8d7ae05df88d3fa)]:
+  - @modplayjs/core@0.3.0
+  - @modplayjs/fmt-mod@0.3.0
+
 ## 0.2.2
 
 ### Patch Changes

@@ -1,5 +1,20 @@
 # @modplayjs/stream-audio
 
+## 0.3.0
+
+### Minor Changes
+
+- [`c0bb636`](https://github.com/modplayjs/modplayjs/commit/c0bb636f9c03a7bc56fb6ffab8d7ae05df88d3fa) - - Standard MIDI File plugin — pristine 1:1 TinySoundFont port (direct push)
+
+### Patch Changes
+
+- [`1ed7086`](https://github.com/modplayjs/modplayjs/commit/1ed70868050181facc1d54e135547715bb58fc18) - - billboard channel labels, correct streamed seeks, throttle library scan (direct push)
+
+- [`cf084d4`](https://github.com/modplayjs/modplayjs/commit/cf084d4b33606a6e755787e783ba5dd0eff6e4b4) - - resample while pulling, and cap what one decode may hold (direct push)
+- Updated dependencies [[`c0bb636`](https://github.com/modplayjs/modplayjs/commit/c0bb636f9c03a7bc56fb6ffab8d7ae05df88d3fa)]:
+  - @modplayjs/fmt-mo3@0.3.0
+  - @modplayjs/stb-vorbis@0.3.0
+
 ## 0.2.2
 
 ### Patch Changes

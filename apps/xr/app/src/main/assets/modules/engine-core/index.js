@@ -1,4 +1,4 @@
-// apps/android/engine/src/engine-entry.ts
+// ../android/engine/src/engine-entry.ts
 import { CorePlayer } from "@modplayjs/core";
 import { createPaulaPlugin } from "@modplayjs/dsp-paula";
 import { createSoftMixerPlugin } from "@modplayjs/dsp-softmixer";
@@ -11,11 +11,11 @@ import {
   SCHEMA_VERSION
 } from "@modplayjs/out-android";
 
-// apps/android/engine/src/engine-services.ts
+// ../android/engine/src/engine-services.ts
 var services = {};
 var staticFormatNames = [];
 
-// apps/android/engine/src/engine-entry.ts
+// ../android/engine/src/engine-entry.ts
 var core = new CorePlayer();
 globalThis.__modplayProvide?.(core);
 var installedFormats = [...staticFormatNames];

@@ -1,4 +1,4 @@
-// packages/fmt-asylum/src/asylum.ts
+// ../../packages/fmt-asylum/src/asylum.ts
 import { SampleFlags } from "@modplayjs/core";
 import { ParseError } from "@modplayjs/core";
 import { FX_MULTI_RETRIG } from "@modplayjs/core";
