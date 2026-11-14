@@ -1,6 +1,6 @@
 {
   "name": "@modplayjs/dsp-softmixer",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Software mixer DSP for the modplayjs tracker player (libxmp soft_mixer port).",
   "type": "module",
   "main": "dist/index.js",
@@ -20,7 +20,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modplayjs/core": "^0.2.3"
+    "@modplayjs/core": "^0.3.0"
   },
   "keywords": [
     "tracker",
