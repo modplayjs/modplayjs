@@ -14,6 +14,7 @@ import com.bitti06.modplayjs.xr.input.ControllerInputSystem
 import com.bitti06.modplayjs.xr.input.PushPullGrabSystem
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.library.Playlist
+import com.bitti06.modplayjs.xr.audio.RoomFit
 import com.bitti06.modplayjs.xr.layout.PanelAnimator
 import com.bitti06.modplayjs.xr.layout.PanelPlacement
 import com.bitti06.modplayjs.xr.panels.PANELS
@@ -472,8 +473,8 @@ class XrActivity : AppSystemActivity(), XrHost {
      * [w, d, h] for the reverb: the equivalent box of the floor outline, or
      * the bounding box when there is no outline to measure.
      */
-    private fun roomReverbBox(room: MRUKRoom, size: com.meta.spatial.core.Bound3D): FloatArray {
-        val height = size.size().y
+    private fun roomReverbBox(room: MRUKRoom, size: Vector3): FloatArray {
+        val height = size.y
         val floor = room.floors.firstOrNull()
         val plane = floor?.let { runCatching { it.tryGetComponent<MRUKPlane>() }.getOrNull() }
         if (plane != null) {

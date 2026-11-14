@@ -208,7 +208,7 @@ class Library(private val context: Context) {
                     // two subfolders both called "live" are still two folders,
                     // and losing the parent chain made them collapse into one.
                     val relative =
-                        runCatching { base.relativize(file.parentFile.toPath()).toString() }
+                        runCatching { file.parentFile?.let { base.relativize(it.toPath()).toString() } }
                             .getOrNull()
                             .orEmpty()
                     val folder = if (relative.isEmpty()) label else "$label/$relative"
