@@ -24,7 +24,7 @@ const esbuild = (await import('esbuild')).default;
 const aliasMap = Object.fromEntries(
   ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it',
    'dsp-paula', 'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm',
-   'fmt-st', 'fmt-sid', 'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi',
+   'fmt-st', 'fmt-sid', 'fmt-mid', 'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi',
    'fmt-asylum', 'fmt-ice', 'fmt-med', 'fmt-mo3', 'fmt-fc', 'stb-vorbis',
    'stream-audio']
     .map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
@@ -57,6 +57,7 @@ core.registries.registerDsp(m.sidDsp);
 
 const path = resolve(repo, file);
 const isSid = path.toLowerCase().endsWith('.sid');
+const isMid = path.toLowerCase().endsWith('.mid');
 core.loadModule(new Uint8Array(readFileSync(path)), {});
 core.setSampleRate(48000);
 
@@ -64,6 +65,14 @@ if (isSid) {
   core.setDsp('sid');
   core.startPlayer();
   m.sidStartTune(new Uint8Array(readFileSync(path)), 48000, 1);
+} else if (isMid) {
+  // MIDI needs a SoundFont: MODPLAYJS_SF2=path (see packages/fmt-mid).
+  const sf2Path = process.env.MODPLAYJS_SF2;
+  if (!sf2Path) { console.error('MODPLAYJS_SF2 not set'); process.exit(2); }
+  core.setDsp('mid');
+  core.startPlayer();
+  m.midSetSoundfont(new Uint8Array(readFileSync(resolve(repo, sf2Path))));
+  m.midStartTune(new Uint8Array(readFileSync(path)), 48000);
 } else {
   core.setDsp('softmixer');
   core.startPlayer();

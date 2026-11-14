@@ -1,0 +1,50 @@
+{
+  "name": "@modplayjs/fmt-mid",
+  "version": "0.2.3",
+  "description": "Standard MIDI File (.mid) format plugin for modplayjs — pristine 1:1 TypeScript port of TinySoundFont (tml.h + tsf.h) by Bernhard Schelling.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "NOTICE.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modplayjs/core": "^0.2.3"
+  },
+  "keywords": [
+    "midi",
+    "smf",
+    "soundfont",
+    "sf2",
+    "tinysoundfont",
+    "chiptune",
+    "audio",
+    "music"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/modplayjs/modplayjs.git",
+    "directory": "packages/fmt-mid"
+  },
+  "bugs": "https://github.com/modplayjs/modplayjs/issues",
+  "homepage": "https://github.com/modplayjs/modplayjs#readme",
+  "license": "BSD-3-Clause",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}
