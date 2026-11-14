@@ -76,6 +76,28 @@ jobs:
       - name: Configure GitHub Packages authentication
         run: echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> "$HOME/.npmrc"
 
+      # The packages are pushed to npm separately, so every tarball must
+      # carry its own third-party notices (the same guard as the local
+      # publish-npm.mjs helper). Failing here is cheap; a tarball published
+      # without its notices is not.
+      - name: Verify per-package notices
+        run: |
+          set -euo pipefail
+          for manifest in packages/*/package.json; do
+            if [ "$(node -p "Boolean(require('./$manifest').private)")" = "true" ]; then
+              continue
+            fi
+            dir=$(dirname "$manifest")
+            name=$(node -p "require('./$manifest').name")
+            if [ ! -f "$dir/NOTICE.md" ]; then
+              echo "$name: missing NOTICE.md"; exit 1
+            fi
+            if [ "$(node -p "Boolean((require('./$manifest').files || []).includes('NOTICE.md'))")" != "true" ]; then
+              echo "$name: NOTICE.md exists but is not listed in package.json files"; exit 1
+            fi
+          done
+          echo "all packages ship NOTICE.md"
+
       - name: Publish to npmjs.com
         run: |
           set -euo pipefail
