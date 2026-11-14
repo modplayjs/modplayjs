@@ -347,6 +347,13 @@ class XrPlayer(
     private var cachedPatternIndex = -1
     private var cachedPattern: PatternData? = null
     private var markerSizes = FloatArray(0)
+    /**
+     * Wall distance per 5° azimuth bin around the ring centre (0 = unknown).
+     * Sampled by room raycast (XrActivity.sampleRoomWalls): a freeform room —
+     * hourglass, L-shape — has no single ring radius, so each direction is
+     * fitted to the wall actually behind it.
+     */
+    private var wallDistances = FloatArray(0)
     /** Label aim: the user position at the last recenter (main thread only). */
     private var labelAim = Vector3(0f, 0f, 0f)
     private var labelAimSet = false
@@ -413,6 +420,19 @@ class XrPlayer(
             ringAnchored = true
             applyPositions()
             if (debugVisible && oldR != ringRadius) rebuildMarkers()
+        }
+    }
+
+    /**
+     * Per-azimuth wall distances (5° bins, metres, 0 = unknown) sampled
+     * around the ring centre by the room raycast. Channels and markers are
+     * fitted against these, so an hourglass or L-shaped room gets a ring that
+     * follows its real boundary instead of its bounding box.
+     */
+    fun setWallDistances(distances: FloatArray) {
+        submit {
+            wallDistances = distances
+            applyPositions()
         }
     }
 
@@ -1168,6 +1188,19 @@ class XrPlayer(
     }
 
     /**
+     * Fit one direction to the room: the base radius clamped by the wall
+     * behind it. Unknown bins (no room scan yet) keep the base radius.
+     */
+    private fun fitRadius(azimuth: Float, base: Float): Float {
+        if (wallDistances.isEmpty()) return base
+        var az = azimuth % 360f
+        if (az < 0f) az += 360f
+        val wall = wallDistances[((az / WALL_BIN_DEG).toInt()).coerceIn(0, wallDistances.size - 1)]
+        if (wall <= 0f) return base
+        return minOf(base, wall - WALL_MARGIN).coerceAtLeast(RING_MIN_RADIUS)
+    }
+
+    /**
      * A point on the 3D dome, optionally tilted about the listener's right axis.
      */
     private fun domePoint(
@@ -1181,13 +1214,16 @@ class XrPlayer(
         val ringYaw = ringYawRad
         val azRad = Math.toRadians(azimuthDeg.toDouble()).toFloat() + ringYaw
         val elRad = Math.toRadians(elevationDeg.toDouble()).toFloat()
+        // The wall distances are sampled in world space; the placement
+        // direction is the same azimuth plus the ring yaw.
+        val r = fitRadius(azimuthDeg + Math.toDegrees(ringYaw.toDouble()).toFloat(), radius)
 
         val cosEl = Math.cos(elRad.toDouble()).toFloat()
         val sinEl = Math.sin(elRad.toDouble()).toFloat()
 
-        val vx = (Math.sin(azRad.toDouble()).toFloat() * radius * cosEl)
-        val vz = (Math.cos(azRad.toDouble()).toFloat() * radius * cosEl)
-        val vy = radius * sinEl
+        val vx = (Math.sin(azRad.toDouble()).toFloat() * r * cosEl)
+        val vz = (Math.cos(azRad.toDouble()).toFloat() * r * cosEl)
+        val vy = r * sinEl
 
         val tilt = tiltApplied
         if (tilt == 0f) return Vector3(cx + vx, cy + vy, cz + vz)
@@ -2176,6 +2212,13 @@ class XrPlayer(
         private const val MARKER_MIN = 0.8f
         private const val MARKER_RANGE = 0.8f
         private const val MARKER_STEP = 0.01f
+
+        /** Wall-distance bins: one per 5° of azimuth. */
+        private const val WALL_BIN_DEG = 5f
+        /** Keep channels and markers this far off the wall behind them. */
+        private const val WALL_MARGIN = 0.3f
+        /** Nothing fits closer than this to the ring centre. */
+        private const val RING_MIN_RADIUS = 0.3f
 
         /**
          * `Sphere` carries the radius that `mesh://sphere` builds from; the

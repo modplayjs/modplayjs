@@ -40,8 +40,10 @@ import com.meta.spatial.isdk.IsdkPanelDimensions
 import com.meta.spatial.isdk.IsdkPanelGrabHandle
 import com.meta.spatial.isdk.IsdkSystem
 import com.meta.spatial.mruk.MRUKFeature
+import com.meta.spatial.mruk.MRUKPlane
 import com.meta.spatial.mruk.MRUKRoom
 import com.meta.spatial.mruk.MRUKSceneEventListener
+import com.meta.spatial.mruk.SurfaceType
 import com.meta.spatial.runtime.PanelShapeLayerBlendType
 import com.meta.spatial.runtime.ReferenceSpace
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
@@ -317,6 +319,14 @@ class XrActivity : AppSystemActivity(), XrHost {
                     if (now - lastOccluderFeedNs >= OCCLUDER_FEED_NS) {
                         lastOccluderFeedNs = now
                         publishOccluders()
+                        // The wall fit follows the ring centre: in the follow
+                        // modes it moves with the listener, so re-sample once
+                        // it has gone half a metre (72 rays, cheap).
+                        val wdx = player.ringCenterX() - wallSampleX
+                        val wdz = player.ringCenterZ() - wallSampleZ
+                        if (wdx * wdx + wdz * wdz > 0.25f) {
+                            mrukFeature.getCurrentRoom()?.let { sampleRoomWalls(it) }
+                        }
                     }
                 }
             },
@@ -420,8 +430,11 @@ class XrActivity : AppSystemActivity(), XrHost {
      * The ring is never centred on the room: MRUK reports its bounds in its own
      * coordinate space - the runtime logs a scene origin offset of about
      * -1.3 / -1.0 m and a rotation - while the audio objects live in the app's
-     * reference space. Only the size is taken from the room; the centre stays
-     * on the listener, and the height on the ear.
+     * reference space. Only size crosses over; the centre stays on the
+     * listener, and the height on the ear. The reverb uses the floor
+     * outline's true area and perimeter (freeform rooms are not their box);
+     * the wall distances are sampled by raycast, which is the one query that
+     * speaks app-space.
      */
     private fun applyRoom(room: MRUKRoom) {
         if (!::player.isInitialized) return
@@ -433,8 +446,69 @@ class XrActivity : AppSystemActivity(), XrHost {
             player.ringCenterX(),
             player.ringCenterZ(),
         )
-        // Sabine estimate for the room reverb, from the same bounds.
-        player.setRoomSize(size.x, size.y, size.z)
+        // Sabine estimate for the room reverb: the outline-extruded room as an
+        // equivalent box (same volume, same wall surface), falling back to the
+        // bounding box when the scan captured no floor outline.
+        val box = roomReverbBox(room, size)
+        player.setRoomSize(box[0], box[1], box[2])
+        sampleRoomWalls(room)
+    }
+
+    /**
+     * [w, d, h] for the reverb: the equivalent box of the floor outline, or
+     * the bounding box when there is no outline to measure.
+     */
+    private fun roomReverbBox(room: MRUKRoom, size: com.meta.spatial.core.Bound3D): FloatArray {
+        val height = size.size().y
+        val floor = room.floors.firstOrNull()
+        val plane = floor?.let { runCatching { it.tryGetComponent<MRUKPlane>() }.getOrNull() }
+        if (plane != null) {
+            try {
+                val n = plane.boundariesCount
+                if (n >= 3) {
+                    val points = ArrayList<com.meta.spatial.core.Vector2>(n)
+                    for (i in 0 until n) plane.boundary.get(i)?.let { points += it }
+                    if (points.size >= 3) {
+                        val area = RoomFit.polygonArea(points)
+                        val perimeter = RoomFit.polygonPerimeter(points)
+                        if (area > 0f && perimeter > 0f) return RoomFit.equivalentBox(area, perimeter, height)
+                    }
+                }
+            } finally {
+                runCatching { plane.recycle() }
+            }
+        }
+        return floatArrayOf(size.x, size.z, height)
+    }
+
+    /** Last sampled ring centre; far from any room until the first sample. */
+    private var wallSampleX = Float.MIN_VALUE
+    private var wallSampleZ = Float.MIN_VALUE
+
+    /**
+     * Per-direction wall distances around the ring centre (5° bins). The room
+     * outline lives in MRUK's own coordinate space, but raycastRoom takes
+     * app-space poses and returns hit distances - the only room query that
+     * needs no coordinate conversion, and the one the channel ring is fitted
+     * against (an hourglass room has no single radius).
+     */
+    private fun sampleRoomWalls(room: MRUKRoom) {
+        if (!::player.isInitialized) return
+        val cx = player.ringCenterX()
+        val cz = player.ringCenterZ()
+        val origin = Vector3(cx, 1.4f, cz)
+        val distances = FloatArray(WALL_BINS)
+        for (i in 0 until WALL_BINS) {
+            val rad = Math.toRadians(i * 360.0 / WALL_BINS)
+            val dir = Vector3(kotlin.math.sin(rad).toFloat(), 0f, kotlin.math.cos(rad).toFloat())
+            val hit = runCatching {
+                mrukFeature.raycastRoom(room.roomUuid, origin, dir, MAX_WALL_DISTANCE, SurfaceType.PLANE_VOLUME)
+            }.getOrNull()
+            distances[i] = hit?.hitDistance ?: MAX_WALL_DISTANCE
+        }
+        player.setWallDistances(distances)
+        wallSampleX = cx
+        wallSampleZ = cz
     }
 
     // ---- XrHost ----------------------------------------------------------
@@ -718,6 +792,11 @@ class XrActivity : AppSystemActivity(), XrHost {
     companion object {
         private const val TAG = "modplay-xr"
         private const val RECENTER_DEBOUNCE_NS = 250_000_000L
+
+        /** Wall-distance bins sampled by raycast; 360 / WALL_BIN_DEG. */
+        private const val WALL_BINS = 72
+        /** Room rays longer than this count as "no wall" (open space). */
+        private const val MAX_WALL_DISTANCE = 12f
 
         /** Listener/ring feed: 30 Hz keeps a walking sticky ring smooth. */
         private const val SPATIAL_FEED_NS = 33_000_000L
