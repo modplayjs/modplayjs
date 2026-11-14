@@ -28,34 +28,23 @@ class V8Engine(
                 System.loadLibrary("modplay_v8")
                 // The modular engine is an ES module that imports @modplayjs/*
                 // from the asset tree; the native loader resolves and caches
-                // those. Passing null for the script selects that path. The
-                // bundled engine.js is only used when the modular assets are
-                // missing (a build without node, or an older APK).
-                // Prefer the modular engine. The bundled script stays as a
-                // fallback and is only read when the modular start failed, so
-                // a successful start never pays for the 1.3 MB read.
+                // those. Passing null for the script selects that path. There
+                // is no bundled-monolith fallback: a modular engine that does
+                // not start is a broken build and the log says so.
                 val overlay = EngineModules.overlayRoot(context)
-                if (hasModularAssets(context) || overlay != null) {
-                    nativeCreate(null, context.assets, overlay)
+                val first = nativeCreate(context.assets, overlay)
+                if (first != 0L) {
+                    first
+                } else if (overlay != null) {
+                    // A downloaded engine that does not start must not brick
+                    // the app: drop the overlay and start the APK's own
+                    // engine. No rolling back to older overlays — a previous
+                    // generation is not a supported state.
+                    Log.w(TAG, "modular engine failed with overlay, dropping it")
+                    EngineModules.discard(context)
+                    nativeCreate(context.assets, null)
                 } else {
-                    nativeCreate(bundledScript(context), context.assets, null)
-                }.let { modularHandle ->
-                    if (modularHandle != 0L) {
-                        modularHandle
-                    } else {
-                        if (overlay != null) {
-                            // A downloaded engine that does not start must not
-                            // brick the app: fall back one generation, then to
-                            // the APK assets.
-                            Log.w(TAG, "modular engine failed with overlay")
-                            val recovered = EngineModules.recover(context)
-                            val nextOverlay = if (recovered) EngineModules.overlayRoot(context) else null
-                            nativeCreate(null, context.assets, nextOverlay)
-                        } else {
-                            Log.w(TAG, "modular engine failed, retrying with the bundle")
-                            nativeCreate(bundledScript(context), context.assets, null)
-                        }
-                    }
+                    0L
                 }
             } catch (t: Throwable) {
                 initError = "${t.javaClass.simpleName}: ${t.message}"
@@ -67,21 +56,6 @@ class V8Engine(
             Log.e(TAG, "V8 unavailable: $initError")
         }
     }
-
-    private fun bundledScript(context: Context): String? =
-        runCatching {
-            context.assets
-                .open("engine/engine.js")
-                .bufferedReader()
-                .use { it.readText() }
-        }.getOrNull()
-
-    private fun hasModularAssets(context: Context): Boolean =
-        runCatching {
-            context.assets.open("modules/manifest.json").close()
-            context.assets.open("modules/engine-core/index.js").close()
-            true
-        }.getOrDefault(false)
 
     /**
      * Install one format bridge. Idempotent; runs on the V8 thread.
@@ -182,7 +156,6 @@ class V8Engine(
     }
 
     private external fun nativeCreate(
-        script: String?,
         assets: android.content.res.AssetManager,
         overlayRoot: String?,
     ): Long

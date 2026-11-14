@@ -1,6 +1,5 @@
-// apps/android/engine/src/engine-entry.ts
+// ../android/engine/src/engine-entry.ts
 import { CorePlayer } from "@modplayjs/core";
-import { createPaulaPlugin } from "@modplayjs/dsp-paula";
 import { createSoftMixerPlugin } from "@modplayjs/dsp-softmixer";
 import {
   createStreamedSource,
@@ -11,11 +10,11 @@ import {
   SCHEMA_VERSION
 } from "@modplayjs/out-android";
 
-// apps/android/engine/src/engine-services.ts
+// ../android/engine/src/engine-services.ts
 var services = {};
 var staticFormatNames = [];
 
-// apps/android/engine/src/engine-entry.ts
+// ../android/engine/src/engine-entry.ts
 var core = new CorePlayer();
 globalThis.__modplayProvide?.(core);
 var installedFormats = [...staticFormatNames];
@@ -80,7 +79,6 @@ function attachServices(kind, value) {
   return false;
 }
 globalThis.__modplayAttach = attachServices;
-core.registries.registerDsp(createPaulaPlugin());
 var mixer = createSoftMixerPlugin();
 core.registries.registerDsp(mixer);
 if (services.sid) core.registries.registerDsp(services.sid.dsp);
@@ -276,8 +274,12 @@ function buildCapabilities() {
     seekable: loaded && durationMs() > 0,
     patternView: tracker,
     mixer: tracker,
-    mixerMode: tracker && mod.format === "mod" && mod.chn === 4,
-    amigaFilter: tracker && mod.format === "mod" && mod.chn === 4,
+    // Paula mode and the A500 LED filter are the Amiga output path. The
+    // softmixer's Paula mode is libxmp's per-voice BLEP simulator (one Paula
+    // state per voice slot), so any MOD channel count works — the old
+    // 4-channel gate made the mode unselectable for most of the library.
+    mixerMode: tracker && mod.format === "mod",
+    amigaFilter: tracker && mod.format === "mod",
     panSeparation: tracker && (settings.mixer.layout === "panned" || settings.mixer.layout === "spatial3d"),
     sidPanel: sid,
     sidStereo: sid && (services.sid?.chipCount() ?? 0) > 1,

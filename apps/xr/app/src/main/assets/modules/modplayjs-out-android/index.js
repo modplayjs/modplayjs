@@ -1,7 +1,7 @@
-// packages/out-android/src/types.ts
+// ../../packages/out-android/src/types.ts
 var SCHEMA_VERSION = 1;
 
-// packages/out-android/src/defaults.ts
+// ../../packages/out-android/src/defaults.ts
 var DEFAULT_SETTINGS = {
   schemaVersion: 1,
   transport: {
@@ -33,7 +33,9 @@ function normaliseSettings(input) {
     schemaVersion: 1,
     transport: {
       volume: clamp(input.transport?.volume ?? d.transport.volume, 0, 100),
-      panSeparation: clamp(input.transport?.panSeparation ?? d.transport.panSeparation, 0, 100),
+      // 0..200: 100 is the classic full stereo width; the XR app's width fold
+      // mirrors its source spread up to 200 for the azimuth fan.
+      panSeparation: clamp(input.transport?.panSeparation ?? d.transport.panSeparation, 0, 200),
       sampleRate: input.transport?.sampleRate ?? d.transport.sampleRate,
       interpolation: input.transport?.interpolation ?? d.transport.interpolation,
       numVoices: clamp(input.transport?.numVoices ?? d.transport.numVoices, 4, 64),
@@ -53,7 +55,7 @@ function normaliseSettings(input) {
   };
 }
 
-// packages/out-android/src/parity.ts
+// ../../packages/out-android/src/parity.ts
 var PARITY = {
   play: { command: "play", screen: "Player" },
   pause: { command: "pause", screen: "Player" },

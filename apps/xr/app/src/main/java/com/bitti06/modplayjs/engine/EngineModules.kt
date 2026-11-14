@@ -33,8 +33,6 @@ object EngineModules {
 
     fun stagingDir(context: Context): File = File(root(context), "staging")
 
-    fun previousDir(context: Context): File = File(root(context), "previous")
-
     /**
      * The overlay the V8 loader should search first, or null when nothing is
      * installed. Requires a manifest, so a directory left behind by a failed
@@ -75,7 +73,7 @@ object EngineModules {
         current.deleteRecursively()
     }
 
-    /** Swap staging into current, keeping the old set for one generation. */
+    /** Swap staging into current; the old set is dropped, not kept. */
     fun promote(context: Context): Boolean {
         val staging = stagingDir(context)
         if (!File(staging, "modules/manifest.json").isFile) {
@@ -83,45 +81,12 @@ object EngineModules {
             return false
         }
         val current = currentDir(context)
-        val previous = previousDir(context)
-        previous.deleteRecursively()
-        if (current.exists() && !current.renameTo(previous)) {
-            Log.e(TAG, "could not move current aside")
-            return false
-        }
+        current.deleteRecursively()
         if (!staging.renameTo(current)) {
             Log.e(TAG, "could not promote staging")
-            // Put the old one back so the app keeps working.
-            previous.renameTo(current)
             return false
         }
         return true
-    }
-
-    /**
-     * After a failed start with an overlay: go back one generation if there is
-     * one, otherwise drop the overlay entirely.
-     *
-     * A new engine that cannot start must not brick the app, and going back to
-     * the previous version is better than falling all the way to the APK when
-     * that version was known to work.
-     */
-    fun recover(context: Context): Boolean {
-        if (rollback(context)) {
-            Log.w(TAG, "engine overlay rolled back to the previous generation")
-            return true
-        }
-        discard(context)
-        return false
-    }
-
-    /** Roll back to the previous generation after a failed start. */
-    fun rollback(context: Context): Boolean {
-        val current = currentDir(context)
-        val previous = previousDir(context)
-        if (!previous.exists()) return false
-        current.deleteRecursively()
-        return previous.renameTo(current)
     }
 
     /** True when [file] matches [sha256Hex]; false on any read error. */

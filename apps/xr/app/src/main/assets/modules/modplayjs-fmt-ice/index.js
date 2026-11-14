@@ -1,4 +1,4 @@
-// packages/fmt-ice/src/ice.ts
+// ../../packages/fmt-ice/src/ice.ts
 import { SampleFlags } from "@modplayjs/core";
 import { ParseError } from "@modplayjs/core";
 import { FX_ICE_SPEED, FX_SPEED } from "@modplayjs/core";

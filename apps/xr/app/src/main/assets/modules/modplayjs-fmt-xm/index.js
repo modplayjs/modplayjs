@@ -1,4 +1,4 @@
-// packages/fmt-xm/src/xm.ts
+// ../../packages/fmt-xm/src/xm.ts
 import {
   C4_NTSC_RATE,
   FLOW_MODE_MPT_116,
@@ -961,7 +961,7 @@ var plugin = {
   }
 };
 
-// packages/fmt-xm/src/xmWrite.ts
+// ../../packages/fmt-xm/src/xmWrite.ts
 var ByteWriter = class {
   buf = new Uint8Array(1024);
   len = 0;

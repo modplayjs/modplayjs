@@ -1,4 +1,4 @@
-// packages/out-pcm/src/pcm.ts
+// ../../packages/out-pcm/src/pcm.ts
 function encodeWavStereo(pcm, sampleRate) {
   const numChannels = 2;
   const bytesPerSample = 2;

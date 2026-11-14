@@ -34,7 +34,9 @@ export function normaliseSettings(input: Partial<AndroidSettings>): AndroidSetti
     schemaVersion: 1,
     transport: {
       volume: clamp(input.transport?.volume ?? d.transport.volume, 0, 100),
-      panSeparation: clamp(input.transport?.panSeparation ?? d.transport.panSeparation, 0, 100),
+      // 0..200: 100 is the classic full stereo width; the XR app's width fold
+      // mirrors its source spread up to 200 for the azimuth fan.
+      panSeparation: clamp(input.transport?.panSeparation ?? d.transport.panSeparation, 0, 200),
       sampleRate: input.transport?.sampleRate ?? d.transport.sampleRate,
       interpolation: (input.transport?.interpolation ?? d.transport.interpolation) as 0 | 1 | 2,
       numVoices: clamp(input.transport?.numVoices ?? d.transport.numVoices, 4, 64),

@@ -53,7 +53,11 @@ class PanelPlacement(
     fun setAnchor(head: Pose?) = anchor.capture(head)
 
     /** Returns true when the stage was recaptured and panels must be re-applied. */
-    fun onHead(head: Pose, nowNs: Long): Boolean = anchor.onHead(head, nowNs)
+    fun onHead(
+        head: Pose,
+        nowNs: Long,
+        entities: Map<PanelId, Entity>,
+    ): Boolean = anchor.onHead(head, nowNs) { saveLive(entities) }
 
     /** Authored arc pose for a panel in the current stage frame. */
     fun poseFor(id: PanelId): Pose {
@@ -89,6 +93,10 @@ class PanelPlacement(
         prefs.edit().putBoolean(KEY_FREE, on).apply()
         for ((id, entity) in entities) {
             if (id in skip || isGrabbed(entity)) continue
+            // Manual ISDK takeover: the panel's IsdkGrabbable is created at
+            // panel spawn (see XrActivity), and this flips it by construction
+            // — never a mutate-while-grabbed write.
+            entity.setComponent(IsdkGrabbable(enabled = on))
             move(entity, poseFor(id), animate = true)
         }
     }
@@ -106,9 +114,11 @@ class PanelPlacement(
     /**
      * A system recenter moved the reference frame. Recapture and rebase; the
      * stored arrangement is stage-relative, so it comes with the user instead
-     * of being wiped (which is what the old code did).
+     * of being wiped (which is what the old code did). Live poses are saved
+     * first so a panel the user moved does not snap back to a stale slot.
      */
     fun onRecenter(entities: Map<PanelId, Entity>) {
+        saveLive(entities)
         anchor.recapture()
         apply(entities, animate = true)
     }
@@ -134,9 +144,8 @@ class PanelPlacement(
     /**
      * Whether the input system owns this panel right now.
      *
-     * Free mode makes the panel grabbable through `IsdkGrabbable` (see
-     * [PanelGrabSystem]); while it is grabbed the SDK moves it and the layout
-     * must not.
+     * Free mode makes the panel grabbable through `IsdkGrabbable`; while it is
+     * grabbed the SDK moves it and the layout must not.
      */
     fun isGrabbed(entity: Entity): Boolean {
         val isdk = runCatching { entity.tryGetComponent<IsdkGrabbable>() }.getOrNull() ?: return false

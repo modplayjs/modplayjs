@@ -22,30 +22,25 @@ contains; this file lists every source used across the project.
    src/common.h, src/include/xmp.h.
    https://github.com/libxmp/libxmp
 
-3. Paula-Tracker — MIT
-   Copyright (C) 2025 Michael Binder
-   Ported from: paulalib/audio-engine.js (Paula mixing kernel).
-   https://github.com/RednibCoding/Paula-Tracker
-
-4. cRSID (libcRSID 1.58) — WTF (public-domain style; author requests attribution)
+3. cRSID (libcRSID 1.58) — WTF (public-domain style; author requests attribution)
    Copyright (C) 2025-2026 Mihály Horváth (Hermit)
    Ported from: libcRSID/ — 6510 CPU, SID chip, CIA/VIC, memory banking,
    PSID/RSID loader. All tables (combined waveforms, filter curves, Sinc
    window, ADSR DAC) are verbatim copies.
    https://csdb.dk/release/?id=261057
 
-5. stb_vorbis — dual MIT / public domain (public-domain alternative used)
+4. stb_vorbis — dual MIT / public domain (public-domain alternative used)
    Original version written by Sean Barrett (nothings) in 2007
    Ported from: stb_vorbis.c (decoder verified bit-exact against the C build).
    https://github.com/nothings/stb
 
-6. minimp3 — public domain (CC0 dedication)
+5. minimp3 — public domain (CC0 dedication)
    By lieff
    Ported from: minimp3.h (Layer-III decoder used by fmt-mo3 for
    MP3-compressed samples).
    https://github.com/lieff/minimp3
 
-7. TinySoundFont — MIT (tsf.h) and zlib (tml.h)
+6. TinySoundFont — MIT (tsf.h) and zlib (tml.h)
    tsf.h: Copyright (C) 2017-2025 Bernhard Schelling, based on SFZero,
    Copyright (C) 2012 Steve Folta
    tml.h: Copyright (C) 2017, 2018, 2020 Bernhard Schelling
@@ -107,31 +102,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-
-
-### Paula-Tracker — MIT
-
-MIT License
-
-Copyright (c) 2025 Michael Binder
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 
 
 ### cRSID (libcRSID 1.58) — WTF (public-domain style; author requests attribution)

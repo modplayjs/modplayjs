@@ -28,8 +28,7 @@ import com.meta.spatial.spatialaudio.AudioType
 import com.meta.spatial.spatialaudio.SoundfieldOrientation
 import com.meta.spatial.spatialaudio.SoundfieldOrientationType
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
-import com.meta.spatial.toolkit.Grabbable
-import com.meta.spatial.toolkit.GrabbableType
+import com.meta.spatial.isdk.IsdkGrabbable
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
 import com.meta.spatial.toolkit.MeshCollision
@@ -40,6 +39,7 @@ import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.Visible
 import com.bitti06.modplayjs.xr.R
 import com.meta.spatial.core.ComponentBase
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -104,6 +104,9 @@ class XrPlayer(
         val canMute: Boolean = false,
         val canPattern: Boolean = false,
         val canMixer: Boolean = false,
+        /** Paula mode / A500 LED filter: the Amiga output path (any MOD). */
+        val canMixerMode: Boolean = false,
+        val canAmigaFilter: Boolean = false,
         val canPan: Boolean = false,
         /** View settings the panels read; they live in the engine's settings. */
         val follow: Boolean = true,
@@ -696,13 +699,17 @@ class XrPlayer(
     fun setSpatialEnabled(enabled: Boolean) {
         spatialPreferred = enabled
         prefs.edit { putBoolean(KEY_SPATIAL, enabled) }
+        if (enabled) foldWidthIntoPan()
         submit {
             engine?.command("""{"type":"setSpatial","enabled":$enabled}""")
             spatialInfo = spatialInfo.copy(enabled = enabled)
-            rebuildOutputs()
+            rebuildOutputs(keepMarkers = true)
             publish(playing)
         }
     }
+
+    /** Spatial mode is on (the stereo fallback is not). */
+    fun isSpatialEnabled(): Boolean = spatialInfo.enabled
 
     fun setLayout(layout: String) {
         submit {
@@ -872,8 +879,8 @@ class XrPlayer(
 
     // --------------------------------------------------------------- outputs
 
-    private fun rebuildOutputs() {
-        releaseOutputs()
+    private fun rebuildOutputs(keepMarkers: Boolean = false) {
+        releaseOutputs(keepMarkers)
         destroyMarkers()
         // The first read happens before the mixer has run, so the azimuths are
         // not final yet; a settle pass follows as soon as audio has ticked.
@@ -925,7 +932,13 @@ class XrPlayer(
         outputMode = 2
         if (busGraphReady) startBuses()
         pushSources()
-        if (debugVisible) rebuildMarkers()
+        if (debugVisible) {
+            // A pure spatial toggle keeps the channel markers: same channel
+            // count, so reposition instead of rebuilding (a rebuild would
+            // drop a marker the user is holding and flicker the labels).
+            val want = minOf(info.channels, MAX_SOURCES)
+            if (markers.isEmpty() || markers.size != want) rebuildMarkers() else moveMarkers()
+        }
         Log.i(
             TAG,
             "spatial buses ${busTracks.size}, sources ${info.channels}, layout ${info.layout}",
@@ -1230,7 +1243,7 @@ class XrPlayer(
         return builder.build()
     }
 
-    private fun releaseOutputs() {
+    private fun releaseOutputs(keepMarkers: Boolean = true) {
         // Any create that is still queued must not run after this.
         audioGeneration++
         for (out in outputs) {
@@ -1251,7 +1264,7 @@ class XrPlayer(
             }
             busesReady = false
         }
-        destroyMarkers()
+        if (!keepMarkers) destroyMarkers()
         outputMode = 0
         outChannels = 0
     }
@@ -1690,7 +1703,22 @@ class XrPlayer(
         val v = degrees.coerceIn(0f, 90f)
         spreadDeg = v
         prefs.edit { putFloat(KEY_SPREAD, v) }
+        foldWidthIntoPan()
         submit { runCatching { pushSources() } }
+    }
+
+    /**
+     * Width fold: in spatial mode one control drives both the per-source pad
+     * and the azimuth fan. A mono bus has no stereo image, so the tracker's
+     * panSeparation is only a second width knob here — it is mirrored from
+     * the spread (0..90 deg -> 100..200 % fan) and kept for the stereo
+     * fallback, where it is a real stereo pan.
+     */
+    private fun foldWidthIntoPan() {
+        val sep = (100f + spreadDeg * 100f / 90f).roundToInt().coerceIn(0, 200)
+        if (settings.transport.panSeparation == sep) return
+        settings = settings.copy(transport = settings.transport.copy(panSeparation = sep))
+        submit { runCatching { engine?.command("""{"type":"setPanSeparation","value":$sep}""") } }
     }
 
     fun spatialSpread(): Float = spreadDeg
@@ -1753,12 +1781,11 @@ class XrPlayer(
                 }
                 components += Visible(true)
                 if (grab) {
-                    components += Grabbable(
-                        enabled = true,
-                        type = GrabbableType.PIVOT_Y,
-                        minHeight = 0.3f,
-                        maxHeight = 3.0f,
-                    )
+                    // Manual ISDK takeover (IsdkComponentCreationSystem is
+                    // off): the docs' non-panel path is an IsdkGrabbable on
+                    // the entity itself. Defaults are Direct movement with
+                    // 0.15 responsiveness.
+                    components += IsdkGrabbable(enabled = true)
                 }
                 markers += Entity.create(components)
 

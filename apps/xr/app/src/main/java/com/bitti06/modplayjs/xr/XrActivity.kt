@@ -13,7 +13,6 @@ import com.bitti06.modplayjs.xr.input.ControllerInputSystem
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.library.Playlist
 import com.bitti06.modplayjs.xr.layout.PanelAnimator
-import com.bitti06.modplayjs.xr.layout.PanelGrabSystem
 import com.bitti06.modplayjs.xr.layout.PanelPlacement
 import com.bitti06.modplayjs.xr.panels.PANELS
 import com.bitti06.modplayjs.xr.panels.PanelHost
@@ -31,10 +30,15 @@ import com.meta.spatial.compose.ComposeViewPanelRegistration
 import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Quaternion
+import com.meta.spatial.core.Vector2
 import com.meta.spatial.core.Vector3
 import com.meta.spatial.core.SpatialFeature
 import com.meta.spatial.core.SystemBase
+import com.meta.spatial.isdk.IsdkComponentCreationSystem
 import com.meta.spatial.isdk.IsdkDefaultCursorSystem
+import com.meta.spatial.isdk.IsdkGrabbable
+import com.meta.spatial.isdk.IsdkPanelDimensions
+import com.meta.spatial.isdk.IsdkPanelGrabHandle
 import com.meta.spatial.isdk.IsdkSystem
 import com.meta.spatial.mruk.MRUKFeature
 import com.meta.spatial.mruk.MRUKRoom
@@ -121,6 +125,14 @@ class XrActivity : AppSystemActivity(), XrHost {
             ComposeViewPanelRegistration(
                 spec.androidId,
                 composeViewCreator = { entity, ctx ->
+                    // Manual ISDK takeover (IsdkComponentCreationSystem is off):
+                    // write the panel's ISDK components here, in the documented
+                    // order. IsdkGrabbable last — writing it before the
+                    // dimensions/handle existed is what used to crash the native
+                    // panel-handle coordinator.
+                    entity.setComponent(IsdkPanelDimensions(Vector2(spec.width, spec.height)))
+                    entity.setComponent(IsdkPanelGrabHandle())
+                    entity.setComponent(IsdkGrabbable(enabled = placement.free))
                     ComposeView(ctx).apply {
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
                         setContent { XrTheme { PanelContent(spec) } }
@@ -225,6 +237,12 @@ class XrActivity : AppSystemActivity(), XrHost {
 
         isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
         cursorSystem = runCatching { systemManager.findSystem<IsdkDefaultCursorSystem>() }.getOrNull()
+        // Manual ISDK takeover: the automatic component creation system is
+        // off, and every interactable carries its own IsdkGrabbable (panels at
+        // spawn in registerPanels, channel markers in XrPlayer). This makes
+        // the component ordering deterministic instead of racing a per-frame
+        // creation system.
+        runCatching { systemManager.findSystem<IsdkComponentCreationSystem>().active = false }
         applyInputState()
         // VRC.Quest.Input.1 (menu button) and the visible laser: both are the
         // app's job under the Interaction SDK.
@@ -238,14 +256,6 @@ class XrActivity : AppSystemActivity(), XrHost {
                 onRelease = { entity -> panelViews.remove(entity)?.disposeComposition() },
             )
         registerArcAnchor()
-        // Runs after IsdkComponentCreationSystem, which is what gives a panel
-        // its dimensions and grab handle before IsdkGrabbable is written.
-        systemManager.registerSystem(
-            PanelGrabSystem(
-                panels = { panelHost.entities },
-                free = { placement.free },
-            ),
-        )
         activityScope.launch { XrStore.state.collect { applyState(it) } }
     }
 
@@ -294,7 +304,7 @@ class XrActivity : AppSystemActivity(), XrHost {
                         readHeadPose()?.let { head ->
                             val frame = HeadFrames.of(head)
                             player.setListener(frame.x, frame.y, frame.z, frame.yaw, frame.pitch)
-                            if (placement.onHead(frame.pose, now)) {
+                            if (placement.onHead(frame.pose, now, panelHost.entities)) {
                                 // A sustained posture change recaptures the
                                 // stage; rebase the live panels as one body.
                                 panelHost.applyPoses(animate = true)

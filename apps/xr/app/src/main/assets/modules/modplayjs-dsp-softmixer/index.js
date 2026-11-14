@@ -1,4 +1,4 @@
-// packages/dsp-softmixer/src/index.ts
+// ../../packages/dsp-softmixer/src/index.ts
 import {
   SampleFlags,
   VoiceFlag,
@@ -6,7 +6,7 @@ import {
   NoteFlag
 } from "@modplayjs/core";
 
-// packages/dsp-softmixer/src/blep-tables.ts
+// ../../packages/dsp-softmixer/src/blep-tables.ts
 var WINSINC_A500_OFF = new Int32Array([
   131072,
   131072,
@@ -4108,7 +4108,7 @@ var WINSINC_A500_ON = new Int32Array([
   0
 ]);
 
-// packages/dsp-softmixer/src/paula.ts
+// ../../packages/dsp-softmixer/src/paula.ts
 var PAULA_HZ = 3546895;
 var MINIMUM_INTERVAL = 16;
 var BLEP_SCALE = 17;
@@ -4182,7 +4182,7 @@ var PaulaState = class {
   }
 };
 
-// packages/dsp-softmixer/src/lut.ts
+// ../../packages/dsp-softmixer/src/lut.ts
 var cubic_spline_lut0 = new Int16Array([
   0,
   -8,
@@ -8288,7 +8288,7 @@ var cubic_spline_lut3 = new Int16Array([
   -8
 ]);
 
-// packages/dsp-softmixer/src/index.ts
+// ../../packages/dsp-softmixer/src/index.ts
 var SMIX_SHIFT = 16;
 var SMIX_MASK = 65535;
 var C4_PERIOD = 428;

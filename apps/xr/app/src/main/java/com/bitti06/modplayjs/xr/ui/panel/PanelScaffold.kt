@@ -181,6 +181,7 @@ fun OptionRow(
     label: String,
     options: List<Option>,
     current: String,
+    enabled: Boolean = true,
     onPick: (String) -> Unit,
 ) {
     Row(
@@ -190,7 +191,7 @@ fun OptionRow(
         Text(
             label,
             fontSize = PanelTokens.Body,
-            color = PanelTokens.TextDim,
+            color = if (enabled) PanelTokens.TextDim else PanelTokens.TextDim.copy(alpha = 0.5f),
         )
         Spacer(Modifier.weight(1f))
         options.forEach { option ->
@@ -198,12 +199,12 @@ fun OptionRow(
             Text(
                 option.text,
                 fontSize = PanelTokens.ChipText,
-                fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
-                color = if (on) PanelTokens.OnAccent else PanelTokens.TextDim,
+                fontWeight = if (on && enabled) FontWeight.Bold else FontWeight.Normal,
+                color = if (on && enabled) PanelTokens.OnAccent else PanelTokens.TextDim,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(if (on) PanelTokens.Accent else PanelTokens.SurfaceSunken)
-                    .clickable { onPick(option.value) }
+                    .background(if (on && enabled) PanelTokens.Accent else PanelTokens.SurfaceSunken)
+                    .clickable(enabled = enabled) { onPick(option.value) }
                     .padding(horizontal = PanelTokens.GapSm, vertical = 2.dp),
             )
         }

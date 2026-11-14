@@ -2,8 +2,8 @@
 
 A **DSP plugin** is a mixer: it turns the player's per-channel state into
 rendered audio. The core ships two — `dsp-softmixer` (libxmp-parity software
-mixer for S3M/XM/IT and the generic MOD path) and `dsp-paula` (Amiga
-Paula emulation for MOD). Exactly one DSP is active at a time; it is
+mixer for S3M/XM/IT and the generic MOD path, including its A500 Paula
+BLEP mode for MOD). Exactly one DSP is active at a time; it is
 selected after `loadModule` and before `startPlayer`.
 
 ## The interface

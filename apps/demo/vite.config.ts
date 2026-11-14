@@ -93,7 +93,6 @@ export default defineConfig({
       { find: '@modplayjs/stb-vorbis', replacement: resolve(__dirname, '../../packages/stb-vorbis/src/index.ts') },
       { find: '@modplayjs/stream-audio', replacement: resolve(__dirname, '../../packages/stream-audio/src/index.ts') },
       { find: '@modplayjs/fmt-prowizard', replacement: resolve(__dirname, '../../packages/fmt-prowizard/src/index.ts') },
-      { find: '@modplayjs/dsp-paula', replacement: resolve(__dirname, '../../packages/dsp-paula/src/index.ts') },
       { find: '@modplayjs/dsp-softmixer', replacement: resolve(__dirname, '../../packages/dsp-softmixer/src/index.ts') },
       { find: '@modplayjs/out-webaudio', replacement: resolve(__dirname, '../../packages/out-webaudio/src/index.ts') },
       { find: '@modplayjs/out-pcm', replacement: resolve(__dirname, '../../packages/out-pcm/src/index.ts') },

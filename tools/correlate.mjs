@@ -71,7 +71,7 @@ if (!['.mod', '.s3m', '.xm', '.it', '.mtm', '.stm', '.669', '.sfx', '.digi', '.a
 const esbuild = (await import('esbuild')).default ?? (await import('esbuild'));
 const aliasMap = Object.fromEntries(
   ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it',
-   'dsp-paula', 'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm', 'fmt-st', 'fmt-sid']
+   'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm', 'fmt-st', 'fmt-sid']
     .map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
 const ourBundle = resolve(outDir, 'our-player.mjs');
 await esbuild.build({

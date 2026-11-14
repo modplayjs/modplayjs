@@ -50,6 +50,8 @@ class EnginePoller(private val scope: CoroutineScope) {
         val canMute: Boolean = false,
         val canPattern: Boolean = false,
         val canMixer: Boolean = false,
+        val canMixerMode: Boolean = false,
+        val canAmigaFilter: Boolean = false,
         val canPan: Boolean = false,
         val seekable: Boolean = false,
     )
@@ -121,6 +123,8 @@ class EnginePoller(private val scope: CoroutineScope) {
                 canMute = caps?.get("channelMute")?.jsonPrimitive?.content == "true",
                 canPattern = caps?.get("patternView")?.jsonPrimitive?.content == "true",
                 canMixer = caps?.get("mixer")?.jsonPrimitive?.content == "true",
+                canMixerMode = caps?.get("mixerMode")?.jsonPrimitive?.content == "true",
+                canAmigaFilter = caps?.get("amigaFilter")?.jsonPrimitive?.content == "true",
                 canPan = caps?.get("panSeparation")?.jsonPrimitive?.content == "true",
                 seekable = caps?.get("seekable")?.jsonPrimitive?.content == "true",
             )
@@ -179,6 +183,8 @@ class EnginePoller(private val scope: CoroutineScope) {
                 canMute = cachedCaps.canMute,
                 canPattern = cachedCaps.canPattern,
                 canMixer = cachedCaps.canMixer,
+                canMixerMode = cachedCaps.canMixerMode,
+                canAmigaFilter = cachedCaps.canAmigaFilter,
                 canPan = cachedCaps.canPan,
                 seekable = cachedCaps.seekable,
                 follow = input.settings.view.follow,

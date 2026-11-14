@@ -136,7 +136,6 @@ contracts are documented in [docs/](docs/) —
 | `@modplayjs/stb-vorbis` | stb_vorbis Ogg Vorbis decoder (OpenMPT stb_vorbis.c port; bit-exact vs C) |
 | `@modplayjs/stream-audio` | WAV/MP3/OGG streamed-audio decode for file-based playback |
 | `@modplayjs/effects-shared` | Shared effect handlers and per-frame stages (frame-accurate C port) |
-| `@modplayjs/dsp-paula` | Amiga Paula-emulating mixer (MOD) — **deprecated**, superseded by `dsp-softmixer`'s Paula mode |
 | `@modplayjs/dsp-softmixer` | libxmp-parity software mixer (exact integer mixing domain) + A500 Paula BLEP mode (`mode: 'paula'`), L/R layouts, `XMP_PLAYER_AMPLIFY` |
 | `@modplayjs/out-webaudio` | AudioWorklet output: SAB ring (COOP/COEP) with automatic copy-mode fallback, pause/resume |
 | `@modplayjs/out-pcm` | Offline PCM render + WAV encoder |
@@ -249,9 +248,10 @@ npx turbo run dev --filter=@modplayjs/demo   # demo page
 ## License
 
 BSD-3-Clause — see [LICENSE](LICENSE). Ported third-party material remains
-under its original licensing (OpenMPT BSD-3-Clause, libxmp MIT,
-Paula-Tracker MIT, cRSID 1.58 WTFPL-style public-domain-style license by
-Hermit/Mihály Horváth, stb_vorbis public domain) — see [NOTICE](NOTICE).
+under its original licensing (OpenMPT BSD-3-Clause, libxmp MIT, cRSID
+1.58 WTFPL-style public-domain-style license by Hermit/Mihály Horváth,
+stb_vorbis public domain, minimp3 public domain, TinySoundFont MIT/zlib)
+— see [NOTICE](NOTICE).
 
 Code written by an AI assistant from the reference implementations above;
 review, debugging, verification and testing by Bitti09.

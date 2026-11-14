@@ -61,6 +61,8 @@ data class XrState(
     val reverbWet: Int = 25,
     /** Point width of every source, degrees; 0 is a point source. */
     val sourceSpread: Float = 0f,
+    /** Spatial output is on; false is the stereo fallback. */
+    val spatialEnabled: Boolean = true,
     /** The bus ring follows the listener instead of staying in the room. */
     val ringFollowsHead: Boolean = false,
     /** WORLD, STICKY (experimental, position only) or LOCKED (position + yaw). */

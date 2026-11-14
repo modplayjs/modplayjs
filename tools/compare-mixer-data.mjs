@@ -29,7 +29,7 @@ const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const esbuild = (await import('esbuild')).default;
 const aliasMap = Object.fromEntries(
   ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'fmt-mtm', 'fmt-stm', 'fmt-669',
-   'dsp-paula', 'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm']
+   'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm']
     .map(p => [`@modplayjs/${p}`, resolve(repo, `packages/${p}/src/index.ts`)]));
 const bundle = resolve(repo, 'out/mixer-dump.mjs');
 await esbuild.build({

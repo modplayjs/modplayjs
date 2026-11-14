@@ -65,7 +65,7 @@ Engine* engine(jlong h) { return reinterpret_cast<Engine*>(h); }
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_bitti06_modplayjs_engine_V8Engine_nativeCreate(
-        JNIEnv* env, jobject, jstring script, jobject assetManager, jstring overlayRoot) {
+        JNIEnv* env, jobject, jobject assetManager, jstring overlayRoot) {
     init_v8();
     auto* e = new Engine();
     v8::Isolate::CreateParams params;
@@ -97,34 +97,12 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeCreate(
     bool started = false;
     if (e->loader->ready()) {
         // The modular path: engine-core is an ES module that imports
-        // @modplayjs/core and friends from the asset tree.
+        // @modplayjs/core and friends from the asset tree. There is no
+        // bundled-monolith fallback: a modular engine that does not start is
+        // a broken asset build, and the caller decides what to do about it.
         started = e->loader->run(context, "modules/engine-core/index.js");
         if (started) LOGI("engine: modular, %zu modules compiled", e->loader->moduleCount());
-        else LOGW("engine-core failed, falling back to the bundled script");
-    }
-
-    if (!started && script) {
-        // The monolith fallback: a single bundled classic script, evaluated as
-        // before. Used when the modular assets are missing or engine-core
-        // threw, so a broken asset build costs a diagnostic line instead of
-        // the whole app.
-        v8::TryCatch try_catch(e->isolate);
-        const char* src = env->GetStringUTFChars(script, nullptr);
-        v8::Local<v8::String> source =
-            v8::String::NewFromUtf8(e->isolate, src).ToLocalChecked();
-        env->ReleaseStringUTFChars(script, src);
-        v8::Local<v8::Script> compiled;
-        if (!v8::Script::Compile(context, source).ToLocal(&compiled)) {
-            LOGE("engine compile failed: %s", to_string(e, try_catch.Exception()).c_str());
-        } else {
-            v8::Local<v8::Value> result;
-            if (compiled->Run(context).ToLocal(&result)) {
-                started = true;
-                LOGI("engine: bundled script");
-            } else {
-                LOGE("engine run failed: %s", to_string(e, try_catch.Exception()).c_str());
-            }
-        }
+        else LOGW("engine-core failed to start");
     }
 
     if (!started) {

@@ -8,7 +8,6 @@
 // globalThis.__modplayInstall. Everything the engine needs from an optional
 // package beyond its plugin value is injected via engine-services.
 import { CorePlayer } from '@modplayjs/core';
-import { createPaulaPlugin } from '@modplayjs/dsp-paula';
 import { createSoftMixerPlugin, type SoftMixer } from '@modplayjs/dsp-softmixer';
 import {
   createStreamedSource,
@@ -137,7 +136,6 @@ function attachServices(kind: string, value: unknown): boolean {
 
 (globalThis as unknown as { __modplayAttach?: unknown }).__modplayAttach = attachServices;
 
-core.registries.registerDsp(createPaulaPlugin());
 const mixer = createSoftMixerPlugin() as SoftMixer;
 core.registries.registerDsp(mixer);
 if (services.sid) core.registries.registerDsp(services.sid.dsp);
@@ -347,8 +345,12 @@ function buildCapabilities(): AndroidCapabilities {
     seekable: loaded && durationMs() > 0,
     patternView: tracker,
     mixer: tracker,
-    mixerMode: tracker && mod.format === 'mod' && mod.chn === 4,
-    amigaFilter: tracker && mod.format === 'mod' && mod.chn === 4,
+    // Paula mode and the A500 LED filter are the Amiga output path. The
+    // softmixer's Paula mode is libxmp's per-voice BLEP simulator (one Paula
+    // state per voice slot), so any MOD channel count works — the old
+    // 4-channel gate made the mode unselectable for most of the library.
+    mixerMode: tracker && mod.format === 'mod',
+    amigaFilter: tracker && mod.format === 'mod',
     panSeparation: tracker && (settings.mixer.layout === 'panned' || settings.mixer.layout === 'spatial3d'),
     sidPanel: sid,
     sidStereo: sid && (services.sid?.chipCount() ?? 0) > 1,

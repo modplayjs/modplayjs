@@ -71,8 +71,12 @@ class StageAnchor {
      * centimetres; looking at a panel moves it by a neck bend. The pitch test
      * is only used while already low, which is the rolling-over case. It must
      * hold for [POSTURE_HOLD_NS] before the stage rotates.
+     *
+     * [beforeRecapture] runs before the frame is swapped, so callers can save
+     * live poses against the OLD stage: the arrangement is then rebased as one
+     * rigid body instead of snapping back to stale stored poses.
      */
-    fun onHead(head: Pose, nowNs: Long): Boolean {
+    fun onHead(head: Pose, nowNs: Long, beforeRecapture: (() -> Unit)? = null): Boolean {
         lastHead = head
         if (stage == null) return false
         val pitch = HeadFrames.pitchOf(head.q)
@@ -89,6 +93,7 @@ class StageAnchor {
             return false
         }
         if (nowNs - postureSinceNs < POSTURE_HOLD_NS) return false
+        beforeRecapture?.invoke()
         capture(head)
         return true
     }

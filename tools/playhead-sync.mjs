@@ -16,7 +16,7 @@ import { existsSync, readFileSync } from 'node:fs';
 const repo = resolve(import.meta.dirname, '..');
 const esbuild = (await import('esbuild')).default;
 const PACKAGES = [
-  'core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 'dsp-paula',
+  'core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it', 
   'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm', 'fmt-st', 'fmt-sid',
   'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi', 'fmt-asylum', 'fmt-ice',
   'fmt-med', 'fmt-mo3', 'fmt-fc', 'stb-vorbis', 'stream-audio', 'playhead',

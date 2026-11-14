@@ -219,13 +219,15 @@ fun SettingsPanel() {
 
             item {
                 Section(stringResource(R.string.xr_section_audio)) {
-                    if (playback.canPan) {
+                    // Stereo-only: in spatial mode there is one width control
+                    // (source width), and panSeparation is folded into it.
+                    if (playback.canPan && !state.spatialEnabled) {
                         StepperRow(stringResource(R.string.xr_pan), "${settings.transport.panSeparation}") { step ->
                             set { s ->
                                 s.copy(
                                     transport = s.transport.copy(
                                         panSeparation =
-                                            (s.transport.panSeparation + (step * 10).toInt()).coerceIn(0, 100),
+                                            (s.transport.panSeparation + (step * 10).toInt()).coerceIn(0, 200),
                                     ),
                                 )
                             }
@@ -273,6 +275,7 @@ fun SettingsPanel() {
                             Option(stringResource(R.string.xr_mixer_paula), "paula"),
                         ),
                         settings.mixer.mode,
+                        enabled = playback.canMixerMode,
                     ) { set { s -> s.copy(mixer = s.mixer.copy(mode = it)) } }
                     OptionRow(
                         stringResource(R.string.xr_filter),
@@ -281,6 +284,7 @@ fun SettingsPanel() {
                             Option(stringResource(R.string.xr_led_on), "a500led"),
                         ),
                         settings.mixer.amigaFilter,
+                        enabled = playback.canAmigaFilter,
                     ) { set { s -> s.copy(mixer = s.mixer.copy(amigaFilter = it)) } }
                 }
             }

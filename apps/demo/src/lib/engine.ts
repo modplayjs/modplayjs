@@ -27,7 +27,6 @@ import { plugin as mo3Plugin } from '@modplayjs/fmt-mo3';
 import { plugin as sidPlugin, sidDsp } from '@modplayjs/fmt-sid';
 import { plugin as fcPlugin, fcEffect, setModEventReader } from '@modplayjs/fmt-fc';
 import { pwPlugin } from '@modplayjs/fmt-prowizard';
-import { createPaulaPlugin } from '@modplayjs/dsp-paula';
 import { createSoftMixerPlugin, type SoftMixer } from '@modplayjs/dsp-softmixer';
 import { WebAudioOutput } from '@modplayjs/out-webaudio';
 import { Playhead } from '@modplayjs/playhead';
@@ -61,7 +60,6 @@ setModEventReader((c: Core, chn: number, row: number) => {
   core.registries.format('mod').readEvent(c, chn, row);
 });
 core.registries.registerFormat(pwPlugin);
-core.registries.registerDsp(createPaulaPlugin());
 export const mixerInstance = createSoftMixerPlugin() as SoftMixer;
 core.registries.registerDsp(mixerInstance);
 core.registries.registerDsp(sidDsp);

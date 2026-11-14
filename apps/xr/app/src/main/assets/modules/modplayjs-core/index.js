@@ -4,7 +4,7 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// packages/core/src/model/constants.ts
+// ../../packages/core/src/model/constants.ts
 var Quirk = {
   S3MLOOP: 1 << 0,
   // S3M loop mode
@@ -169,7 +169,7 @@ var PluginKind = {
 var C4_PAL_RATE = 8287;
 var C4_NTSC_RATE = 8363;
 
-// packages/core/src/model/fx.ts
+// ../../packages/core/src/model/fx.ts
 var fx_exports = {};
 __export(fx_exports, {
   EX_CUT: () => EX_CUT,
@@ -392,7 +392,7 @@ var FX_PITCH_ADD = 184;
 var FX_PITCH_SUB = 185;
 var FX_LINE_JUMP = 186;
 
-// packages/core/src/model/model.ts
+// ../../packages/core/src/model/model.ts
 var SampleFlags = {
   /** 16-bit sample data. */
   BITS16: 1 << 0,
@@ -733,7 +733,7 @@ var XMP_KEY_CUT = 130;
 var XMP_KEY_FADE = 131;
 var XMP_KEY_CUT_FADE = 132;
 
-// packages/core/src/errors.ts
+// ../../packages/core/src/errors.ts
 var ModplayError = class extends Error {
   constructor(message) {
     super(message);
@@ -759,7 +759,7 @@ var PluginNotFoundError = class extends ModplayError {
 var SampleError = class extends ModplayError {
 };
 
-// packages/core/src/virtual.ts
+// ../../packages/core/src/virtual.ts
 var PERIOD_BASE = 13696;
 function noteToPeriodMix(n, b) {
   return PERIOD_BASE / Math.pow(2, (n + b / 12800) / 12);
@@ -1570,7 +1570,7 @@ var VirtualLayer = class {
   }
 };
 
-// packages/core/src/samples.ts
+// ../../packages/core/src/samples.ts
 var MAX_SAMPLE_SIZE = 268435456;
 var DecodeFlag = {
   /** SAMPLE_FLAG_DIFF: delta-encoded samples. */
@@ -1831,7 +1831,7 @@ var SampleStore = class {
   }
 };
 
-// packages/core/src/depack/md5.ts
+// ../../packages/core/src/depack/md5.ts
 var S = [
   7,
   12,
@@ -1959,7 +1959,7 @@ function md5Hex(data) {
   return hex;
 }
 
-// packages/core/src/registry.ts
+// ../../packages/core/src/registry.ts
 var Registries = class {
   formats = /* @__PURE__ */ new Map();
   /** Format plugins in registration order — probe order matters. */
@@ -2043,7 +2043,7 @@ var Registries = class {
   }
 };
 
-// packages/core/src/flow.ts
+// ../../packages/core/src/flow.ts
 function resetFlow(f) {
   f.jumpline = 0;
   f.jump = -1;
@@ -2153,7 +2153,7 @@ function refOf(get, set) {
   return { get, set };
 }
 
-// packages/core/src/scan.ts
+// ../../packages/core/src/scan.ts
 var XMP_MARK_END = 255;
 var XMP_MIN_BPM = 32;
 var NO_SEQUENCE = 255;
@@ -2734,7 +2734,7 @@ function applyScanToModule(mod) {
   return res;
 }
 
-// packages/core/src/depack/ice.ts
+// ../../packages/core/src/depack/ice.ts
 var DEPACK_LIMIT = 268435456;
 var ICE_BUFFER_SIZE = 4096;
 var VERSION_113 = 113;
@@ -3120,7 +3120,7 @@ function depackIce(src) {
   throw new PackedModuleError("not an ICE file");
 }
 
-// packages/core/src/depack/pp.ts
+// ../../packages/core/src/depack/pp.ts
 function readmem24b(m, off) {
   return m[off] << 16 | m[off + 1] << 8 | m[off + 2];
 }
@@ -3223,7 +3223,7 @@ function depackPp(src) {
   return ok ? dest : null;
 }
 
-// packages/core/src/depack/moduleQuirks.ts
+// ../../packages/core/src/depack/moduleQuirks.ts
 var XmpMode = {
   AUTO: 0,
   MOD: 1,
@@ -3296,7 +3296,7 @@ var MODULE_QUIRKS = [
   { md5: "ca378c0e874f1ecda3e98bdd11468d69", flags: XmpFlag.VBLANK, mode: XmpMode.AUTO }
 ];
 
-// packages/core/src/effects/helpers.ts
+// ../../packages/core/src/effects/helpers.ts
 var WAVEFORM_SIZE = 64;
 var SINE_WAVE = [
   0,
@@ -3619,7 +3619,7 @@ function doToneporta(core, xc, noteIn) {
   xc.porta.dir = xc.period < xc.porta.target ? 1 : -1;
 }
 
-// packages/core/src/effects/state.ts
+// ../../packages/core/src/effects/state.ts
 var VolSlideFlag = {
   VOL_SLIDE: 1 << 0,
   PAN_SLIDE: 1 << 1,
@@ -3669,7 +3669,7 @@ var NoteFlag2 = {
   RELEASE: 1 << 1 | 1 << 10
 };
 
-// packages/core/src/effects/fx.ts
+// ../../packages/core/src/effects/fx.ts
 function fxArpeggio(core, xc, fxpIn, s3mMem) {
   let fxp = fxpIn;
   if (s3mMem) {
@@ -3915,7 +3915,7 @@ function exInvloop(xc, fxp) {
   xc.invloop.speed = fxp;
 }
 
-// packages/core/src/effects/vfx.ts
+// ../../packages/core/src/effects/vfx.ts
 var XMP_MIN_BPM2 = 20;
 var ROWDELAY_ON = 1 << 0;
 var ROWDELAY_FIRST_FRAME = 1 << 1;
@@ -4206,7 +4206,7 @@ function fxItRowDelay(core, fxp) {
   }
 }
 
-// packages/core/src/effects/extras.ts
+// ../../packages/core/src/effects/extras.ts
 var MED_VER_210 = 528;
 var MED_VER_300 = 768;
 var MED_VER_320 = 800;
@@ -4702,7 +4702,7 @@ function medPlayExtras(core, chn, xc) {
   }
 }
 
-// packages/core/src/effects/process.ts
+// ../../packages/core/src/effects/process.ts
 var PERIOD_BASE3 = 13696;
 var NOTE_GLISSANDO_BIT = 1 << 9;
 function processFx(core, xc, chn, ev, fnum, hooks = {}) {
@@ -5421,7 +5421,7 @@ function exFilterAmiga(core, fxp) {
   }
 }
 
-// packages/core/src/effects/midi-macro.ts
+// ../../packages/core/src/effects/midi-macro.ts
 var CLAMP = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
 function midiNibble(core, xc, chn, midiStr, inSt) {
   if (inSt.buffer >= 0) {
@@ -5566,7 +5566,7 @@ function updateMidiMacro(core, chn) {
   }
 }
 
-// packages/core/src/effects/tick.ts
+// ../../packages/core/src/effects/tick.ts
 var TREMOR_ON = 128;
 var TREMOR_SUPPRESS = 64;
 var PAN_SURROUND = 32768;
@@ -6555,7 +6555,7 @@ function isValidInstrumentOrSfx(core, ins) {
   return ins >>> 0 < m.ins && ins >= 0 && m.instruments[ins] !== void 0 && (m.instruments[ins].nsm ?? 0) > 0;
 }
 
-// packages/core/src/effects/readevent.ts
+// ../../packages/core/src/effects/readevent.ts
 function isValidInstrument(core, ins) {
   const mod = core.module;
   return ins >= 0 && ins < mod.ins && (mod.instruments[ins]?.nsm ?? 0) > 0;
@@ -6674,7 +6674,7 @@ function setPeriodFt2(core, key, note, sub, xc, isToneporta) {
   }
 }
 
-// packages/core/src/effects/readevent-st3.ts
+// ../../packages/core/src/effects/readevent-st3.ts
 function readEventSt3(core, e, chn) {
   const mod = core.module;
   const xc = core.ctx.channelStates[chn];
@@ -6767,7 +6767,7 @@ function readEventSt3(core, e, chn) {
   }
 }
 
-// packages/core/src/effects/readevent-ft2.ts
+// ../../packages/core/src/effects/readevent-ft2.ts
 var FT2_NOTE_BN1 = 11;
 var FT2_NOTE_C0 = 12;
 var FT2_NOTE_AS9 = 130;
@@ -6900,7 +6900,7 @@ function readEventFt2(core, e, chn) {
   }
 }
 
-// packages/core/src/effects/readevent-it.ts
+// ../../packages/core/src/effects/readevent-it.ts
 var XMP_KEY_OFF2 = 129;
 var XMP_KEY_CUT2 = 130;
 var XMP_KEY_FADE2 = 131;
@@ -7363,7 +7363,7 @@ function readEventIt(core, e, chn) {
   }
 }
 
-// packages/core/src/core.ts
+// ../../packages/core/src/core.ts
 var MSN3 = (v) => v >> 4 & 15;
 var LSN3 = (v) => v & 15;
 var XMP_MARK_END2 = 255;

@@ -78,7 +78,7 @@ const FORMATS = {
 };
 
 /** Loaded for every session; the mixer and the Paula path are not optional. */
-const ALWAYS = ['core', 'effects-shared', 'dsp-softmixer', 'dsp-paula', 'out-android'];
+const ALWAYS = ['core', 'effects-shared', 'dsp-softmixer', 'out-android'];
 
 /**
  * Packages whose exports the engine calls directly, and how the bridge builds

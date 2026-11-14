@@ -23,7 +23,7 @@ const esbuild = (await import('esbuild')).default;
 
 const aliasMap = Object.fromEntries(
   ['core', 'effects-shared', 'fmt-mod', 'fmt-s3m', 'fmt-xm', 'fmt-it',
-   'dsp-paula', 'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm',
+   'dsp-softmixer', 'fmt-prowizard', 'out-webaudio', 'out-pcm',
    'fmt-st', 'fmt-sid', 'fmt-mid', 'fmt-mtm', 'fmt-stm', 'fmt-669', 'fmt-sfx', 'fmt-digi',
    'fmt-asylum', 'fmt-ice', 'fmt-med', 'fmt-mo3', 'fmt-fc', 'stb-vorbis',
    'stream-audio']

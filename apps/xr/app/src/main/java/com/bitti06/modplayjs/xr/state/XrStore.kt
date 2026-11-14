@@ -186,6 +186,7 @@ object XrStore {
                 sessionId = p?.sessionId() ?: 0,
                 reverbWet = p?.spatialWet() ?: 25,
                 sourceSpread = p?.spatialSpread() ?: 0f,
+                spatialEnabled = p?.isSpatialEnabled() ?: true,
                 ringFollowsHead = p?.isRingFollowsHead() ?: false,
                 ringFollowMode = p?.ringFollowMode()?.name ?: "WORLD",
                 ringTilts = p?.isRingTilts() ?: false,

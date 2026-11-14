@@ -13,7 +13,9 @@ buildscript {
         // Applied via classpath instead of the plugins DSL so the Kotlin
         // compiler that Meta ships (2.2.0) can be excluded: KGP 2.4.x warns
         // when a second kotlin-compiler-embeddable sits on the build
-        // classpath.
+        // classpath. Keep this version in step with `spatialsdk` in
+        // gradle/libs.versions.toml (the buildscript block cannot read the
+        // version catalog).
         classpath("com.meta.spatial:spatial-gradle-plugin-impl:0.15.0") {
             exclude(group = "org.jetbrains.kotlin", module = "kotlin-compiler-embeddable")
         }

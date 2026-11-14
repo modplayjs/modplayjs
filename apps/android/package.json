@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@modplayjs/core": "^0.2.2",
-    "@modplayjs/dsp-paula": "^0.2.2",
     "@modplayjs/dsp-softmixer": "^0.3.0",
     "@modplayjs/fmt-669": "^0.2.2",
     "@modplayjs/fmt-asylum": "^0.2.2",
