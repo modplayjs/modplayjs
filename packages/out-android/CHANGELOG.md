@@ -1,5 +1,16 @@
 # @modplayjs/out-android
 
+## 0.4.0
+
+### Minor Changes
+
+- [`c0bb636`](https://github.com/modplayjs/modplayjs/commit/c0bb636f9c03a7bc56fb6ffab8d7ae05df88d3fa) - - Standard MIDI File plugin — pristine 1:1 TinySoundFont port (direct push)
+
+- [`eba6272`](https://github.com/modplayjs/modplayjs/commit/eba6272c47d552c6ac4490bd195b2cb2620237ef) - - SDK modernization, grab takeover for panels+markers, no backward compat (direct push)
+
+- [`fac0a86`](https://github.com/modplayjs/modplayjs/commit/fac0a86a3f6afc67650e0280acdd75aeb518dd94) - - early reflections from real geometry (direct push)
+  - instruments and samples list follows the track (direct push)
+
 ## 0.3.1
 
 ### Patch Changes

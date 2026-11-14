@@ -17419,6 +17419,7 @@
       this.bytes = bytes;
       this.pos = start;
     }
+    bytes;
     pos;
     get length() {
       return this.bytes.length;
@@ -18965,6 +18966,7 @@
     constructor(mem) {
       this.mem = mem;
     }
+    mem;
     nbnum = 0;
     getNibble() {
       const mloc = this.nbnum >> 1;
@@ -19418,6 +19420,7 @@
       this.bytes = bytes;
       this.pos = pos;
     }
+    bytes;
     hasNibble = false;
     value = 0;
     pos;
