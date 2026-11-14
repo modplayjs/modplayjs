@@ -34,7 +34,6 @@ import com.meta.spatial.core.Vector2
 import com.meta.spatial.core.Vector3
 import com.meta.spatial.core.SpatialFeature
 import com.meta.spatial.core.SystemBase
-import com.meta.spatial.isdk.IsdkComponentCreationSystem
 import com.meta.spatial.isdk.IsdkDefaultCursorSystem
 import com.meta.spatial.isdk.IsdkGrabbable
 import com.meta.spatial.isdk.IsdkPanelDimensions
@@ -125,11 +124,12 @@ class XrActivity : AppSystemActivity(), XrHost {
             ComposeViewPanelRegistration(
                 spec.androidId,
                 composeViewCreator = { entity, ctx ->
-                    // Manual ISDK takeover (IsdkComponentCreationSystem is off):
-                    // write the panel's ISDK components here, in the documented
-                    // order. IsdkGrabbable last — writing it before the
-                    // dimensions/handle existed is what used to crash the native
-                    // panel-handle coordinator.
+                    // Write the panel's ISDK components here, in the documented
+                    // order and complete from frame 0: IsdkGrabbable last —
+                    // writing it before the dimensions/handle existed is what
+                    // used to crash the native panel-handle coordinator. The
+                    // creation system stays enabled and refines the
+                    // dimensions/handle from the real panel.
                     entity.setComponent(IsdkPanelDimensions(Vector2(spec.width, spec.height)))
                     entity.setComponent(IsdkPanelGrabHandle())
                     entity.setComponent(IsdkGrabbable(enabled = placement.free))
@@ -237,12 +237,12 @@ class XrActivity : AppSystemActivity(), XrHost {
 
         isdkSystem = runCatching { systemManager.findSystem<IsdkSystem>() }.getOrNull()
         cursorSystem = runCatching { systemManager.findSystem<IsdkDefaultCursorSystem>() }.getOrNull()
-        // Manual ISDK takeover: the automatic component creation system is
-        // off, and every interactable carries its own IsdkGrabbable (panels at
-        // spawn in registerPanels, channel markers in XrPlayer). This makes
-        // the component ordering deterministic instead of racing a per-frame
-        // creation system.
-        runCatching { systemManager.findSystem<IsdkComponentCreationSystem>().active = false }
+        // The creation system stays ON: it wires the ISDK grabbable feature
+        // (the depth movement — push and pull) from the components present.
+        // The components themselves are written at spawn in registerPanels,
+        // in the documented order and complete from frame 0 — writing
+        // IsdkGrabbable before IsdkPanelDimensions/IsdkPanelGrabHandle exist
+        // is what used to crash the native panel-handle coordinator.
         applyInputState()
         // VRC.Quest.Input.1 (menu button) and the visible laser: both are the
         // app's job under the Interaction SDK.
@@ -535,7 +535,11 @@ class XrActivity : AppSystemActivity(), XrHost {
 
         anchoredToHead = false
         anchorArcToHead()
-        if (::panelHost.isInitialized) placement.onRecenter(panelHost.entities)
+        // The origin has shifted: the head pose read NOW is the one the new
+        // coordinates are relative to, not the cached one from before.
+        val head = readHeadPose()
+        if (::panelHost.isInitialized) placement.onRecenter(panelHost.entities, head)
+        head?.let { player.aimLabels(it.t.x, it.t.y, it.t.z) }
         XrScene.reapply()
     }
 

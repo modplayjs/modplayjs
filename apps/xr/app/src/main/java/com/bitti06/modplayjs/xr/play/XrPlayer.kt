@@ -28,7 +28,8 @@ import com.meta.spatial.spatialaudio.AudioType
 import com.meta.spatial.spatialaudio.SoundfieldOrientation
 import com.meta.spatial.spatialaudio.SoundfieldOrientationType
 import com.meta.spatial.spatialaudio.SpatialAudioFeature
-import com.meta.spatial.isdk.IsdkGrabbable
+import com.meta.spatial.toolkit.Grabbable
+import com.meta.spatial.toolkit.GrabbableType
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
 import com.meta.spatial.toolkit.MeshCollision
@@ -346,6 +347,9 @@ class XrPlayer(
     private var cachedPatternIndex = -1
     private var cachedPattern: PatternData? = null
     private var markerSizes = FloatArray(0)
+    /** Label aim: the user position at the last recenter (main thread only). */
+    private var labelAim = Vector3(0f, 0f, 0f)
+    private var labelAimSet = false
 
     private val scratchShort = ShortArray(BLOCK * 2)
 
@@ -860,7 +864,7 @@ class XrPlayer(
                     val a = if (v < 0f) -v else v
                     if (a > peak) peak = a
                 }
-                levels[ch] = (levels[ch] * 0.7f) + (peak * 0.3f)
+                levels[ch] = if (peak > levels[ch]) peak else levels[ch] * 0.85f
             }
         }
 
@@ -1389,8 +1393,8 @@ class XrPlayer(
      * still head from writing a Transform thirty times a second.
      */
     private fun setLabelPose(label: Entity, point: Vector3, index: Int) {
-        val dx = listenerPos.x - point.x
-        val dz = listenerPos.z - point.z
+        val dx = labelAim.x - point.x
+        val dz = labelAim.z - point.z
         if (dx * dx + dz * dz < LABEL_MIN_DISTANCE_SQ) return
         val yaw = kotlin.math.atan2(dx, dz)
         val last = labelYaw.getOrNull(index) ?: Float.NaN
@@ -1406,6 +1410,17 @@ class XrPlayer(
             val point = labelPoints.getOrNull(i) ?: continue
             setLabelPose(markerLabels[i], point, i)
         }
+    }
+
+    /**
+     * Point the channel labels at the user position captured at a recenter
+     * (and at creation time). They keep this aim until the next recenter, so
+     * walking around does not rewrite every label every tick.
+     */
+    fun aimLabels(x: Float, y: Float, z: Float) {
+        labelAim = Vector3(x, y, z)
+        labelAimSet = true
+        if (markerLabels.isNotEmpty()) faceLabels()
     }
 
     /**
@@ -1578,8 +1593,9 @@ class XrPlayer(
         listenerPos = Vector3(x, y, z)
         headYaw = yaw
         headPitch = pitch
-        // The labels are billboards: they follow the head, not the ring.
-        if (markerLabels.isNotEmpty()) faceLabels()
+        // The labels are NOT live billboards any more: they face the user
+        // position captured at the last recenter (see aimLabels), which is
+        // stable in the room and costs no per-tick component writes.
         val targetY = y.coerceIn(0.2f, 2.4f)
 
         if (!ringAnchored) {
@@ -1764,6 +1780,12 @@ class XrPlayer(
         val collision = if (grab) MeshCollision.LineTest else MeshCollision.NoCollision
         mainHandler.post {
             if (!debugVisible || outputMode != 2) return@post
+            // First aim: the user position at creation (the launch counts as
+            // the last recenter until one happens).
+            if (!labelAimSet) {
+                labelAim = listenerPos
+                labelAimSet = true
+            }
             if (markerSizes.size < positions.size) {
                 markerSizes = FloatArray(positions.size) { -1f }
             }
@@ -1781,11 +1803,17 @@ class XrPlayer(
                 }
                 components += Visible(true)
                 if (grab) {
-                    // Manual ISDK takeover (IsdkComponentCreationSystem is
-                    // off): the docs' non-panel path is an IsdkGrabbable on
-                    // the entity itself. Defaults are Direct movement with
-                    // 0.15 responsiveness.
-                    components += IsdkGrabbable(enabled = true)
+                    // Toolkit Grabbable + mesh: the ISDK bridge turns this
+                    // into the grabbable feature (PIVOT_Y with height clamps).
+                    // A bare IsdkGrabbable drops the feature wiring and with
+                    // it the depth movement (push/pull) — it is for tuning
+                    // the movement the bridge creates, not a replacement.
+                    components += Grabbable(
+                        enabled = true,
+                        type = GrabbableType.PIVOT_Y,
+                        minHeight = 0.3f,
+                        maxHeight = 3.0f,
+                    )
                 }
                 markers += Entity.create(components)
 
@@ -1859,8 +1887,10 @@ class XrPlayer(
         }
 
         // Marker size does not need a state publish, so it runs on its own
-        // timer: twice per snapshot would step 500 ms at a time, which reads
-        // as a slideshow next to the audio.
+        // timer. 25 Hz with a 0.01 step keeps the size motion smooth at arm's
+        // length: at 10 Hz the same motion reads as a slideshow (one visible
+        // step per beat), and the slow level envelope behind it made the
+        // markers drift in slow motion instead of pulsing with the music.
         if (debugVisible && outputMode == 2 && now - lastMarkerAt >= MARKER_MS) {
             lastMarkerAt = now
             applyMarkerLevels()
@@ -2127,7 +2157,7 @@ class XrPlayer(
         private const val PLAYHEAD_MS = 35L
 
         /** Marker levels: fast enough to follow the music, slow enough to be cheap. */
-        private const val MARKER_MS = 100L
+        private const val MARKER_MS = 40L
         /**
          * How often the channel azimuths are re-read while playing.
          *
@@ -2145,7 +2175,7 @@ class XrPlayer(
         private const val RING_Y = 1.4f
         private const val MARKER_MIN = 0.8f
         private const val MARKER_RANGE = 0.8f
-        private const val MARKER_STEP = 0.02f
+        private const val MARKER_STEP = 0.01f
 
         /**
          * `Sphere` carries the radius that `mesh://sphere` builds from; the
@@ -2185,7 +2215,7 @@ class XrPlayer(
         private const val FOLLOW_EPSILON = 0.002f
 
         /** Label billboard: rewrite only past ~1.7 degrees of head turn. */
-        private const val LABEL_YAW_STEP = 0.03f
+        private const val LABEL_YAW_STEP = 0.10f
 
         /** Closer than 2 cm the direction is numerical noise. */
         private const val LABEL_MIN_DISTANCE_SQ = 0.0004f

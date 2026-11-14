@@ -93,10 +93,20 @@ class PanelPlacement(
         prefs.edit().putBoolean(KEY_FREE, on).apply()
         for ((id, entity) in entities) {
             if (id in skip || isGrabbed(entity)) continue
-            // Manual ISDK takeover: the panel's IsdkGrabbable is created at
-            // panel spawn (see XrActivity), and this flips it by construction
-            // — never a mutate-while-grabbed write.
-            entity.setComponent(IsdkGrabbable(enabled = on))
+            // Flip the existing IsdkGrabbable instance instead of replacing
+            // the component: the native grab feature keeps its registration,
+            // and recreating it is what used to break grab behaviour.
+            val isdk = runCatching { entity.tryGetComponent<IsdkGrabbable>() }.getOrNull()
+            if (isdk != null) {
+                try {
+                    isdk.enabled = on
+                    entity.setComponent(isdk)
+                } finally {
+                    runCatching { isdk.recycle() }
+                }
+            } else {
+                entity.setComponent(IsdkGrabbable(enabled = on))
+            }
             move(entity, poseFor(id), animate = true)
         }
     }
@@ -116,10 +126,15 @@ class PanelPlacement(
      * stored arrangement is stage-relative, so it comes with the user instead
      * of being wiped (which is what the old code did). Live poses are saved
      * first so a panel the user moved does not snap back to a stale slot.
+     *
+     * [head] is the CURRENT head pose: after a recenter the tracking origin
+     * has already shifted, so the cached lastHead is stale and capturing
+     * from it puts the stage in the wrong place — which is what scrambled
+     * the layout on every recenter.
      */
-    fun onRecenter(entities: Map<PanelId, Entity>) {
+    fun onRecenter(entities: Map<PanelId, Entity>, head: Pose? = null) {
         saveLive(entities)
-        anchor.recapture()
+        if (head != null) anchor.capture(head) else anchor.recapture()
         apply(entities, animate = true)
     }
 
