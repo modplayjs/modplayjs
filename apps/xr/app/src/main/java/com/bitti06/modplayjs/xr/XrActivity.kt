@@ -9,7 +9,6 @@ import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
 import com.bitti06.modplayjs.engine.ModuleCatalog
-import com.bitti06.modplayjs.xr.audio.RoomFit
 import com.bitti06.modplayjs.xr.input.ControllerInputSystem
 import com.bitti06.modplayjs.xr.input.PushPullGrabSystem
 import com.bitti06.modplayjs.xr.library.Library
@@ -484,9 +483,9 @@ class XrActivity : AppSystemActivity(), XrHost {
                     val points = ArrayList<com.meta.spatial.core.Vector2>(n)
                     for (i in 0 until n) plane.boundary.get(i)?.let { points += it }
                     if (points.size >= 3) {
-                        val area = RoomFit.polygonArea(points)
-                        val perimeter = RoomFit.polygonPerimeter(points)
-                        if (area > 0f && perimeter > 0f) return RoomFit.equivalentBox(area, perimeter, height)
+                        val area = com.bitti06.modplayjs.xr.audio.RoomFit.polygonArea(points)
+                        val perimeter = com.bitti06.modplayjs.xr.audio.RoomFit.polygonPerimeter(points)
+                        if (area > 0f && perimeter > 0f) return com.bitti06.modplayjs.xr.audio.RoomFit.equivalentBox(area, perimeter, height)
                     }
                 }
             } finally {
@@ -519,20 +518,20 @@ class XrActivity : AppSystemActivity(), XrHost {
             val rad = Math.toRadians(i * 360.0 / WALL_BINS)
             val dir = Vector3(kotlin.math.sin(rad).toFloat(), 0f, kotlin.math.cos(rad).toFloat())
             val hit = runCatching {
-                mrukFeature.raycastRoom(room.roomUuid, origin, dir, MAX_WALL_DISTANCE, SurfaceType.PLANE_VOLUME)
+                mrukFeature.raycastRoom(room.anchor.uuid, origin, dir, MAX_WALL_DISTANCE, SurfaceType.PLANE_VOLUME)
             }.getOrNull()
             distances[i] = hit?.hitDistance ?: MAX_WALL_DISTANCE
             // Wall reflectors come from planes only: a volume hit is
             // furniture, modelled as box faces by collectVolumeFaces (a ray
             // crossing a table leg must not become an infinite wall plane).
             val wallHit = runCatching {
-                mrukFeature.raycastRoom(room.roomUuid, origin, dir, MAX_WALL_DISTANCE, SurfaceType.PLANE)
+                mrukFeature.raycastRoom(room.anchor.uuid, origin, dir, MAX_WALL_DISTANCE, SurfaceType.PLANE)
             }.getOrNull()
             if (wallHit != null) {
                 val p = wallHit.hitPosition
                 val n = wallHit.hitNormal
                 // kind 0 = wall: effectively infinite rectangle.
-                records += floatArrayOf(0f, p.x, p.y, p.z, n.x, n.y, n.z, 100f, 100f)
+                records.addAll(floatArrayOf(0f, p.x, p.y, p.z, n.x, n.y, n.z, 100f, 100f).asList())
             }
         }
         player.setWallDistances(distances)
@@ -574,7 +573,7 @@ class XrActivity : AppSystemActivity(), XrHost {
                     val cy = pose.t.y + cy0
                     val cz = pose.t.z + (-s * cx0 + c * cz0)
                     // kind 1 = room volume (furniture).
-                    val faces = RoomFit.boxFaces(1f, cx, cy, cz, yaw, hx, hy, hz)
+                    val faces = com.bitti06.modplayjs.xr.audio.RoomFit.boxFaces(1f, cx, cy, cz, yaw, hx, hy, hz)
                     for (v in faces) out += v
                 } finally {
                     runCatching { transform.recycle() }
