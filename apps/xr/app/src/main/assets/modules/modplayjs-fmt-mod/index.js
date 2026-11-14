@@ -1,4 +1,4 @@
-// packages/fmt-mod/src/mod.ts
+// ../../packages/fmt-mod/src/mod.ts
 import {
   C4_NTSC_RATE,
   C4_PAL_RATE,
@@ -16,7 +16,7 @@ import { SampleFlags, adpcm4Decode } from "@modplayjs/core";
 import { LSN, MSN, PERIOD_BASE } from "@modplayjs/core";
 import { ParseError } from "@modplayjs/core";
 
-// packages/fmt-mod/src/tracker.ts
+// ../../packages/fmt-mod/src/tracker.ts
 var TrackerId = {
   PROTRACKER: 0,
   NOISETRACKER: 1,
@@ -217,7 +217,7 @@ function getTrackerId(m, mh, modPat, modChn, idIn) {
   return id;
 }
 
-// packages/fmt-mod/src/mod.ts
+// ../../packages/fmt-mod/src/mod.ts
 var SF_FULLREP = 512;
 var SF_ADPCM = 16384;
 var XMP_MAX_CHANNELS = 64;
@@ -845,7 +845,7 @@ function modLoad(bytes, ctx) {
   return mod;
 }
 
-// packages/fmt-mod/src/modcore.ts
+// ../../packages/fmt-mod/src/modcore.ts
 import {
   C4_PAL_RATE as C4_PAL_RATE2,
   PeriodType as PeriodType2,
@@ -1081,7 +1081,7 @@ function loadDepackedMod(bytes, ctx, name) {
   return mod;
 }
 
-// packages/fmt-mod/src/readevent.ts
+// ../../packages/fmt-mod/src/readevent.ts
 import { Quirk as Quirk2, ReadEventType as ReadEventType3, XMP_KEY_OFF } from "@modplayjs/core";
 import {
   isToneportaFx,
@@ -1261,11 +1261,11 @@ function readEventMod(core, e, chn) {
   }
 }
 
-// packages/fmt-mod/src/index.ts
+// ../../packages/fmt-mod/src/index.ts
 import { readEventFt2 as readEventFt23 } from "@modplayjs/core";
 import { readEventSt3 as readEventSt32 } from "@modplayjs/core";
 
-// packages/fmt-mod/src/hmn.ts
+// ../../packages/fmt-mod/src/hmn.ts
 import {
   C4_PAL_RATE as C4_PAL_RATE3,
   EMPTY_EVENT as EMPTY_EVENT3,
@@ -1624,7 +1624,7 @@ function hmnLoad(bytes, ctx) {
   return mod;
 }
 
-// packages/fmt-mod/src/flt.ts
+// ../../packages/fmt-mod/src/flt.ts
 import {
   C4_PAL_RATE as C4_PAL_RATE4,
   EMPTY_EVENT as EMPTY_EVENT4,
@@ -2114,7 +2114,7 @@ var fltPlugin = {
   }
 };
 
-// packages/fmt-mod/src/modWrite.ts
+// ../../packages/fmt-mod/src/modWrite.ts
 var PT_PERIODS = [
   856,
   808,
@@ -2253,7 +2253,7 @@ var modExportPlugin = () => ({
   write: writeMod
 });
 
-// packages/fmt-mod/src/index.ts
+// ../../packages/fmt-mod/src/index.ts
 var plugin = {
   name: "mod",
   test: modTest,

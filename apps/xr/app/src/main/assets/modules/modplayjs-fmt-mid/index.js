@@ -1,4 +1,4 @@
-// packages/fmt-mid/src/tml.ts
+// ../../packages/fmt-mid/src/tml.ts
 var TML_NOTE_OFF = 128;
 var TML_NOTE_ON = 144;
 var TML_KEY_PRESSURE = 160;
@@ -263,7 +263,7 @@ function tml_get_tempo_value(msg) {
   return Tempo[0] << 16 | Tempo[1] << 8 | Tempo[2];
 }
 
-// packages/fmt-mid/src/refmath.ts
+// ../../packages/fmt-mid/src/refmath.ts
 function rm_dd_make(hi, lo) {
   return { hi, lo };
 }
@@ -433,7 +433,7 @@ function rm_expf(x) {
 }
 var f32 = Math.fround;
 
-// packages/fmt-mid/src/tsf.ts
+// ../../packages/fmt-mid/src/tsf.ts
 var f322 = Math.fround;
 var TSF_RENDER_EFFECTSAMPLEBLOCK = 64;
 var TSF_RENDER_SHORTBUFFERBLOCK = 512;
@@ -2353,7 +2353,7 @@ function tsf_channel_midi_control(f, channel, controller, control_value) {
   }
 }
 
-// packages/fmt-mid/src/midplugin.ts
+// ../../packages/fmt-mid/src/midplugin.ts
 var MID_STUB_CHANNELS = 1;
 var MID_STUB_ROWS = 64;
 var MID_DEFAULT_GAIN_DB = -10;

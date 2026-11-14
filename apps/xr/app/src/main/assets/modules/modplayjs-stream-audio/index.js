@@ -1,4 +1,4 @@
-// packages/stream-audio/src/adpcm.ts
+// ../../packages/stream-audio/src/adpcm.ts
 var IMA_STEP_TABLE = [
   7,
   8,
@@ -164,7 +164,7 @@ function decodeImaAdpcmWav(b, channels, dataOffset, dataSize, blockAlign) {
   return out.subarray(0, written * channels);
 }
 
-// packages/stream-audio/src/wav.ts
+// ../../packages/stream-audio/src/wav.ts
 function parseWavHeader(b) {
   if (b.length < 44) return null;
   if (b[0] !== 82 || b[1] !== 73 || b[2] !== 70 || b[3] !== 70) return null;
@@ -238,7 +238,7 @@ function decodeWav(b) {
   return { pcm, channels: info.channels, sampleRate: info.sampleRate };
 }
 
-// packages/stream-audio/src/mp3.ts
+// ../../packages/stream-audio/src/mp3.ts
 import { mp3decInit, mp3decDecodeFrame } from "@modplayjs/fmt-mo3";
 function decodeMp3File(b) {
   const dec = {
@@ -284,7 +284,7 @@ function decodeMp3File(b) {
   return { pcm: all, channels: channels || 1, sampleRate: hz };
 }
 
-// packages/stream-audio/src/ogg.ts
+// ../../packages/stream-audio/src/ogg.ts
 import { stbVorbisOpenMemory, stbVorbisGetFrameFloat } from "@modplayjs/stb-vorbis";
 function decodeOggFile(b) {
   const err = { v: 0 };
@@ -316,7 +316,7 @@ function decodeOggFile(b) {
   return { pcm: all, channels: f.channels, sampleRate: f.sampleRate };
 }
 
-// packages/stream-audio/src/source.ts
+// ../../packages/stream-audio/src/source.ts
 var MAX_DECODED_MS = 20 * 60 * 1e3;
 function detectStreamedFormat(bytes, name) {
   if (bytes.length > 38 && bytes[0] === 69 && bytes[1] === 120 && bytes[2] === 116 && bytes[3] === 101) return null;

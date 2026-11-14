@@ -1,4 +1,4 @@
-// packages/fmt-s3m/src/s3m.ts
+// ../../packages/fmt-s3m/src/s3m.ts
 import {
   C4_NTSC_RATE,
   FLOW_MODE_IT_210,
@@ -692,7 +692,7 @@ var plugin = {
   }
 };
 
-// packages/fmt-s3m/src/s3mWrite.ts
+// ../../packages/fmt-s3m/src/s3mWrite.ts
 var ByteWriter = class {
   buf = new Uint8Array(1024);
   len = 0;

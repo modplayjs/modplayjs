@@ -1,4 +1,4 @@
-// packages/fmt-med/src/mmd1.ts
+// ../../packages/fmt-med/src/mmd1.ts
 import {
   C4_NTSC_RATE as C4_NTSC_RATE2,
   ParseError as ParseError3,
@@ -6,7 +6,7 @@ import {
   ReadEventType
 } from "@modplayjs/core";
 
-// packages/fmt-med/src/mmdCommon.ts
+// ../../packages/fmt-med/src/mmdCommon.ts
 import {
   FX,
   ParseError,
@@ -364,7 +364,7 @@ function copyAdjustName(r, n) {
   return s.replace(/ +$/, "");
 }
 
-// packages/fmt-med/src/instr.ts
+// ../../packages/fmt-med/src/instr.ts
 import {
   C4_NTSC_RATE,
   ParseError as ParseError2,
@@ -837,7 +837,7 @@ function mmdLoadInstrument(st, i, smpIdx) {
   return out;
 }
 
-// packages/fmt-med/src/mmd1.ts
+// ../../packages/fmt-med/src/mmd1.ts
 var XMP_MAX_KEYS = 121;
 function mmd1Test(bytes) {
   if (bytes.length < 4) return false;
@@ -1269,7 +1269,7 @@ function mmd1Load(bytes, ctx) {
   return mod;
 }
 
-// packages/fmt-med/src/mmd3.ts
+// ../../packages/fmt-med/src/mmd3.ts
 import {
   C4_NTSC_RATE as C4_NTSC_RATE3,
   ParseError as ParseError4,
@@ -1676,7 +1676,7 @@ function mmd3Load(bytes, ctx) {
   return mod;
 }
 
-// packages/fmt-med/src/med2.ts
+// ../../packages/fmt-med/src/med2.ts
 import {
   ParseError as ParseError5,
   Quirk as Quirk3,
@@ -1907,7 +1907,7 @@ function periodToNote(period) {
   return Math.round(12 * Math.log(13696 / period) / Math.LN2) + 1;
 }
 
-// packages/fmt-med/src/med3.ts
+// ../../packages/fmt-med/src/med3.ts
 import {
   ParseError as ParseError6,
   Quirk as Quirk4,
@@ -2319,7 +2319,7 @@ function med3Load(bytes, ctx) {
   return mod;
 }
 
-// packages/fmt-med/src/med4.ts
+// ../../packages/fmt-med/src/med4.ts
 import {
   ParseError as ParseError7,
   Quirk as Quirk5,
@@ -3011,7 +3011,7 @@ function med4Load(bytes, ctx) {
   return mod;
 }
 
-// packages/fmt-med/src/readevent.ts
+// ../../packages/fmt-med/src/readevent.ts
 import {
   NoteFlag,
   VolSlideFlag,
@@ -3165,7 +3165,7 @@ function readEventMed(core, e, chn) {
   }
 }
 
-// packages/fmt-med/src/index.ts
+// ../../packages/fmt-med/src/index.ts
 function makePlugin(name, test, load) {
   return {
     name,

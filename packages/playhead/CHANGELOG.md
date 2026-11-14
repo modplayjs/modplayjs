@@ -1,5 +1,11 @@
 # @modplayjs/playhead
 
+## 0.4.0
+
+### Minor Changes
+
+- [`c0bb636`](https://github.com/modplayjs/modplayjs/commit/c0bb636f9c03a7bc56fb6ffab8d7ae05df88d3fa) - - Standard MIDI File plugin — pristine 1:1 TinySoundFont port (direct push)
+
 ## 0.3.0
 
 ### Minor Changes

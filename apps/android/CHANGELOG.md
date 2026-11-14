@@ -1,5 +1,34 @@
 # @modplayjs/android
 
+## 0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`f59898f`](https://github.com/modplayjs/modplayjs/commit/f59898fa3aa1249e14d9ad33ce83548ffcf3db12), [`1ed7086`](https://github.com/modplayjs/modplayjs/commit/1ed70868050181facc1d54e135547715bb58fc18), [`cf084d4`](https://github.com/modplayjs/modplayjs/commit/cf084d4b33606a6e755787e783ba5dd0eff6e4b4), [`c0bb636`](https://github.com/modplayjs/modplayjs/commit/c0bb636f9c03a7bc56fb6ffab8d7ae05df88d3fa)]:
+  - @modplayjs/core@0.3.0
+  - @modplayjs/stream-audio@0.3.0
+  - @modplayjs/dsp-paula@0.3.0
+  - @modplayjs/dsp-softmixer@0.4.0
+  - @modplayjs/fmt-669@0.3.0
+  - @modplayjs/fmt-asylum@0.3.0
+  - @modplayjs/fmt-digi@0.3.0
+  - @modplayjs/fmt-fc@0.3.0
+  - @modplayjs/fmt-ice@0.3.0
+  - @modplayjs/fmt-it@0.3.0
+  - @modplayjs/fmt-med@0.3.0
+  - @modplayjs/fmt-mid@0.3.0
+  - @modplayjs/fmt-mo3@0.3.0
+  - @modplayjs/fmt-mod@0.3.0
+  - @modplayjs/fmt-mtm@0.3.0
+  - @modplayjs/fmt-prowizard@0.3.0
+  - @modplayjs/fmt-s3m@0.3.0
+  - @modplayjs/fmt-sfx@0.3.0
+  - @modplayjs/fmt-sid@0.3.0
+  - @modplayjs/fmt-st@0.3.0
+  - @modplayjs/fmt-stm@0.3.0
+  - @modplayjs/fmt-xm@0.3.0
+  - @modplayjs/out-android@0.4.0
+
 ## 0.2.2
 
 ### Patch Changes
