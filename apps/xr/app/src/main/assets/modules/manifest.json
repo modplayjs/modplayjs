@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-14T21:20:27.714Z",
+  "generated": "2026-11-14T21:41:39.182Z",
   "layout": "modules/<name>/index.js",
   "always": [
     "modplayjs-core",
@@ -231,8 +231,8 @@
     "modplayjs-out-android": {
       "specifier": "@modplayjs/out-android",
       "asset": "modplayjs-out-android/index.js",
-      "bytes": 3481,
-      "sha256": "8a0b74e396559d8c69727cc6850ee0b9f375d423ada03bbfcb4d4a87c5bcb1e9",
+      "bytes": 3576,
+      "sha256": "73a5c319f1e8cbf25508ff208f0b971d631ae60f89f03cb5422199df0259c8a8",
       "version": "0.3.1",
       "imports": []
     },

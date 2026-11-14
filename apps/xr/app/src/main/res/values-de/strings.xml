@@ -177,4 +177,17 @@
     <string name="xr_details_empty">leer</string>
     <string name="xr_scene_note">Raumdaten werden einmal zum Platzieren des Rings gelesen und verlassen die Brille nie.</string>
     <string name="xr_scene_denied">Raum-Berechtigung abgelehnt: der Ring bleibt bei 1 m um dich. Musik, Panels und Audio laufen unverändert.</string>
+    <string name="xr_test_wall">Test-Panel (Akustik-Dämpfer)</string>
+    <string name="xr_test_wall_title">Akustik Test-Panel</string>
+    <string name="xr_test_wall_subtitle">Schallschatten-Tester</string>
+    <string name="xr_test_wall_instructions">Positioniere dieses Panel zwischen deinem Kopf und einer Instrumenten-Kugel, um die Schalldämpfung in Echtzeit zu testen.</string>
+    <string name="xr_test_wall_hint">Spawnt ein greifbares Test-Panel im Raum, um den Schallschatten-Effekt vor den Channel Markern zu testen.</string>
+    <string name="xr_panel_occlusion">UI-Panels dämpfen Schall</string>
+    <string name="xr_panel_occlusion_on">Alle UI-Panels blockieren und dämpfen dahinterliegende Kanäle.</string>
+    <string name="xr_panel_occlusion_off">Standard-UI-Panels sind schalltransparent. Nur das Akustik-Test-Panel dämpft Schall.</string>
+    <string name="xr_occlusion_mode">Dämpfungs-Profil</string>
+    <string name="xr_occ_realistic">Realistisch (Holz)</string>
+    <string name="xr_occ_heavy">Stark (Bunker/Mute)</string>
+    <string name="xr_occ_realistic_hint">Simuliert echte Raumakustik: Mitten &amp; Höhen werden gedämpft (-12 dB), Bass beugt sich um das Panel.</string>
+    <string name="xr_occ_heavy_hint">Spiele-Style Dämpfung: Mitten &amp; Höhen werden zu 100% stummgeschaltet, Bass stark abgesenkt (-18 dB).</string>
 </resources>

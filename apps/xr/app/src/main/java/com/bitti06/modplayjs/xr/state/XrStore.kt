@@ -93,6 +93,7 @@ object XrStore {
     private var wasLoaded = false
     private var playlist: Playlist? = null
     private var library: Library? = null
+    private var panelOcclusion = false
     private val overlays = MutableStateFlow(Overlays())
 
     var host: XrHost? = null
@@ -195,6 +196,8 @@ object XrStore {
                 ringFollowsHead = p?.isRingFollowsHead() ?: false,
                 ringFollowMode = p?.ringFollowMode()?.name ?: "WORLD",
                 ringTilts = p?.isRingTilts() ?: false,
+                panelOcclusion = panelOcclusion,
+                occlusionMode = p?.spatialOcclusionMode() ?: 0,
             )
     }
 
@@ -308,6 +311,16 @@ object XrStore {
         host?.setPassthrough(on)
     }
 
+    fun setPanelOcclusion(on: Boolean) {
+        panelOcclusion = on
+        refresh()
+    }
+
+    fun setOcclusionMode(mode: Int) {
+        player?.setSpatialOcclusionMode(mode)
+        refresh()
+    }
+
     // ---- Overlays --------------------------------------------------------
 
     fun toggleLibrary() {
@@ -316,6 +329,10 @@ object XrStore {
 
     fun toggleSettings() {
         toggle(overlays.value.copy(settings = !overlays.value.settings))
+    }
+
+    fun toggleTestWall() {
+        toggle(overlays.value.copy(testWall = !overlays.value.testWall))
     }
 
     fun toggleQueue() {

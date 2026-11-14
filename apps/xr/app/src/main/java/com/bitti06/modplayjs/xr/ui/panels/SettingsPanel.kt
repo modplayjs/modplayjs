@@ -3,11 +3,14 @@ package com.bitti06.modplayjs.xr.ui.panels
 import android.app.LocaleManager
 import android.content.Context
 import android.os.LocaleList
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,7 +23,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +51,14 @@ import com.bitti06.modplayjs.xr.ui.panel.StepperRow
 import com.bitti06.modplayjs.xr.ui.panel.ToggleRow
 import java.util.Locale
 
+private enum class SettingsTab(val icon: String, @get:StringRes val label: Int) {
+    Spatial("🔊", R.string.xr_section_spatial),
+    Playback("🎵", R.string.xr_section_playback),
+    Mixer("🎛️", R.string.xr_section_mixer),
+    Appearance("🎨", R.string.xr_section_appearance),
+    System("ℹ️", R.string.xr_section_about),
+}
+
 @Composable
 fun SettingsPanel() {
     val context = LocalContext.current
@@ -56,6 +66,8 @@ fun SettingsPanel() {
     val playback = state.player
     val settings = state.settings
     val libraryVersion by XrStore.libraryVersion.collectAsState()
+    var activeTab by remember { mutableStateOf(SettingsTab.Spatial) }
+
     var radius by remember(state.radius) { mutableFloatStateOf(state.radius) }
     var radiusManual by remember(state.radiusManual) { mutableStateOf(state.radiusManual) }
     var treeCount by remember(libraryVersion) { mutableIntStateOf(XrStore.treeUris().size) }
@@ -70,446 +82,508 @@ fun SettingsPanel() {
     }
 
     PanelScaffold(title = stringResource(R.string.xr_settings)) {
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
+        Column(
+            modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
         ) {
-            item {
-                Section(stringResource(R.string.xr_section_spatial)) {
-                    ToggleRow(stringResource(R.string.xr_spatial_audio), playback.spatialEnabled) {
-                        XrStore.setSpatialEnabled(!playback.spatialEnabled)
-                    }
-                    if (!playback.spatialAvailable) {
-                        MetaText(stringResource(R.string.xr_spatial_unavailable), PanelTokens.AccentWarm)
-                    } else if (playback.layout.isNotBlank()) {
-                        MetaText(
-                            stringResource(R.string.xr_spatial_objects, playback.channels, playback.layout),
-                        )
-                    }
-                    OptionRow(
-                        stringResource(R.string.xr_layout),
-                        listOf(
-                            Option(stringResource(R.string.xr_layout_pan), "panned"),
-                            Option(stringResource(R.string.xr_layout_front180), "front180"),
-                            Option(stringResource(R.string.xr_layout_full360), "full360"),
-                            Option(stringResource(R.string.xr_layout_lrlr), "lrlr"),
-                            Option(stringResource(R.string.xr_layout_lrrl), "lrrl"),
-                            Option(stringResource(R.string.xr_layout_dome), "spatial3d"),
-                        ),
-                        settings.mixer.layout,
-                    ) { XrStore.setLayout(it) }
-                    ToggleRow(stringResource(R.string.xr_passthrough), state.passthrough) {
-                        XrStore.setPassthrough(!state.passthrough)
-                    }
-                    val sceneAccess by SceneBridge.access.collectAsState()
-                    if (sceneAccess != SceneAccess.PENDING) {
-                        MetaText(
-                            stringResource(
-                                if (sceneAccess == SceneAccess.GRANTED) {
-                                    R.string.xr_scene_note
-                                } else {
-                                    R.string.xr_scene_denied
-                                },
-                            ),
-                        )
-                    }
-                    StepperRow(stringResource(R.string.xr_ring), String.format(Locale.US, "%.1f m", radius)) { step ->
-                        radius = (radius + step).coerceIn(0.8f, 5.0f)
-                        radiusManual = true
-                        XrStore.setRadius(radius)
-                    }
-                    if (radiusManual) {
-                        Chip(stringResource(R.string.xr_auto)) {
-                            XrStore.resetRadiusAuto()
-                            radiusManual = false
-                        }
-                    }
-                    OptionRow(
-                        stringResource(R.string.xr_ring_follow),
-                        listOf(
-                            Option(stringResource(R.string.xr_ring_world), "WORLD"),
-                            Option(stringResource(R.string.xr_ring_sticky), "STICKY"),
-                            Option(stringResource(R.string.xr_ring_locked), "LOCKED"),
-                        ),
-                        state.ringFollowMode,
-                    ) { mode ->
-                        XrStore.setRingFollow(
-                            com.bitti06.modplayjs.xr.play.RingFollow.entries
-                                .firstOrNull { it.name == mode } ?: com.bitti06.modplayjs.xr.play.RingFollow.WORLD,
-                        )
-                    }
-                    MetaText(
-                        stringResource(
-                            when (state.ringFollowMode) {
-                                "STICKY" -> R.string.xr_ring_sticky_hint
-                                "LOCKED" -> R.string.xr_ring_follow_hint
-                                else -> R.string.xr_ring_world_hint
-                            },
-                        ),
-                    )
-                    ToggleRow(
-                        stringResource(R.string.xr_ring_tilt),
-                        state.ringTilts,
+            // Header Tab Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(PanelTokens.RadiusSmall))
+                    .background(PanelTokens.SurfaceSunken)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                SettingsTab.entries.forEach { tab ->
+                    val selected = activeTab == tab
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(PanelTokens.RadiusSmall))
+                            .background(if (selected) PanelTokens.Accent else Color.Transparent)
+                            .clickable { activeTab = tab }
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        XrStore.setRingTilts(!state.ringTilts)
-                    }
-                    MetaText(stringResource(R.string.xr_ring_tilt_hint))
-                    StepperRow(
-                        stringResource(R.string.xr_room_wet),
-                        "${state.reverbWet} %",
-                    ) { step ->
-                        XrStore.setSpatialWet(state.reverbWet + if (step > 0) 5 else -5)
-                    }
-                    StepperRow(
-                        stringResource(R.string.xr_source_width),
-                        "${state.sourceSpread.toInt()}°",
-                    ) { step ->
-                        XrStore.setSpatialSpread(state.sourceSpread + if (step > 0) 5f else -5f)
-                    }
-                    ToggleRow(stringResource(R.string.xr_free_layout), state.freeLayout) {
-                        XrStore.setFreeLayout(!state.freeLayout)
-                    }
-                    MetaText(
-                        stringResource(
-                            if (state.freeLayout) R.string.xr_free_hint else R.string.xr_stationary_hint,
-                        ),
-                    )
-                    if (state.freeLayout) {
-                        Chip(stringResource(R.string.xr_layout_reset)) { XrStore.resetLayout() }
-                    }
-                    ToggleRow(stringResource(R.string.xr_source_markers), playback.debugSources) {
-                        XrStore.setDebugSources(!playback.debugSources)
-                    }
-                    if (playback.debugSources) {
-                        ToggleRow(stringResource(R.string.xr_grab_sources), settings.view.grabSources) {
-                            set { s -> s.copy(view = s.view.copy(grabSources = !s.view.grabSources)) }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(tab.icon, fontSize = PanelTokens.Body)
+                            Text(
+                                stringResource(tab.label),
+                                fontSize = PanelTokens.Body,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selected) PanelTokens.OnAccent else PanelTokens.Text,
+                                maxLines = 1,
+                            )
                         }
                     }
-                    if (playback.azimuths.isNotEmpty()) {
-                        MetaText(
-                            playback.azimuths.joinToString("  ") { "${it.toInt()}°" },
-                            PanelTokens.AccentWarm,
-                        )
-                    }
                 }
             }
 
-            item {
-                Section(stringResource(R.string.xr_section_playback)) {
-                    OptionRow(
-                        stringResource(R.string.xr_repeat),
-                        listOf(
-                            Option(stringResource(R.string.xr_off), "off"),
-                            Option(stringResource(R.string.xr_all), "all"),
-                            Option(stringResource(R.string.xr_one), "one"),
-                        ),
-                        settings.playback.repeat,
-                    ) { set { s -> s.copy(playback = s.playback.copy(repeat = it)) } }
-                    ToggleRow(stringResource(R.string.xr_shuffle), settings.playback.shuffle) {
-                        set { s -> s.copy(playback = s.playback.copy(shuffle = !s.playback.shuffle)) }
+            // Tab Content Body
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.spacedBy(PanelTokens.GapSm),
+            ) {
+                when (activeTab) {
+                    SettingsTab.Spatial -> {
+                        item {
+                            Section(stringResource(R.string.xr_section_spatial)) {
+                                ToggleRow(stringResource(R.string.xr_spatial_audio), playback.spatialEnabled) {
+                                    XrStore.setSpatialEnabled(!playback.spatialEnabled)
+                                }
+                                if (!playback.spatialAvailable) {
+                                    MetaText(stringResource(R.string.xr_spatial_unavailable), PanelTokens.AccentWarm)
+                                } else if (playback.layout.isNotBlank()) {
+                                    MetaText(
+                                        stringResource(R.string.xr_spatial_objects, playback.channels, playback.layout),
+                                    )
+                                }
+                                OptionRow(
+                                    stringResource(R.string.xr_layout),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_layout_pan), "panned"),
+                                        Option(stringResource(R.string.xr_layout_front180), "front180"),
+                                        Option(stringResource(R.string.xr_layout_full360), "full360"),
+                                        Option(stringResource(R.string.xr_layout_lrlr), "lrlr"),
+                                        Option(stringResource(R.string.xr_layout_lrrl), "lrrl"),
+                                    ),
+                                    settings.mixer.layout,
+                                ) { XrStore.setLayout(it) }
+                                ToggleRow(stringResource(R.string.xr_passthrough), state.passthrough) {
+                                    XrStore.setPassthrough(!state.passthrough)
+                                }
+                                val sceneAccess by SceneBridge.access.collectAsState()
+                                if (sceneAccess != SceneAccess.PENDING) {
+                                    MetaText(
+                                        stringResource(
+                                            if (sceneAccess == SceneAccess.GRANTED) {
+                                                R.string.xr_scene_note
+                                            } else {
+                                                R.string.xr_scene_denied
+                                            },
+                                        ),
+                                    )
+                                }
+                                StepperRow(stringResource(R.string.xr_ring), String.format(Locale.US, "%.1f m", radius)) { step ->
+                                    radius = (radius + step).coerceIn(0.8f, 5.0f)
+                                    radiusManual = true
+                                    XrStore.setRadius(radius)
+                                }
+                                if (radiusManual) {
+                                    Chip(stringResource(R.string.xr_auto)) {
+                                        XrStore.resetRadiusAuto()
+                                        radiusManual = false
+                                    }
+                                }
+                                OptionRow(
+                                    stringResource(R.string.xr_ring_follow),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_ring_world), "WORLD"),
+                                        Option(stringResource(R.string.xr_ring_sticky), "STICKY"),
+                                        Option(stringResource(R.string.xr_ring_locked), "LOCKED"),
+                                    ),
+                                    state.ringFollowMode,
+                                ) { mode ->
+                                    XrStore.setRingFollow(
+                                        com.bitti06.modplayjs.xr.play.RingFollow.entries
+                                            .firstOrNull { it.name == mode } ?: com.bitti06.modplayjs.xr.play.RingFollow.WORLD,
+                                    )
+                                }
+                                MetaText(
+                                    stringResource(
+                                        when (state.ringFollowMode) {
+                                            "STICKY" -> R.string.xr_ring_sticky_hint
+                                            "LOCKED" -> R.string.xr_ring_follow_hint
+                                            else -> R.string.xr_ring_world_hint
+                                        },
+                                    ),
+                                )
+                                ToggleRow(
+                                    stringResource(R.string.xr_ring_tilt),
+                                    state.ringTilts,
+                                ) {
+                                    XrStore.setRingTilts(!state.ringTilts)
+                                }
+                                MetaText(stringResource(R.string.xr_ring_tilt_hint))
+                                StepperRow(
+                                    stringResource(R.string.xr_room_wet),
+                                    "${state.reverbWet} %",
+                                ) { step ->
+                                    XrStore.setSpatialWet(state.reverbWet + if (step > 0) 5 else -5)
+                                }
+                                StepperRow(
+                                    stringResource(R.string.xr_source_width),
+                                    "${state.sourceSpread.toInt()}°",
+                                ) { step ->
+                                    XrStore.setSpatialSpread(state.sourceSpread + if (step > 0) 5f else -5f)
+                                }
+                                ToggleRow(stringResource(R.string.xr_free_layout), state.freeLayout) {
+                                    XrStore.setFreeLayout(!state.freeLayout)
+                                }
+                                MetaText(
+                                    stringResource(
+                                        if (state.freeLayout) R.string.xr_free_hint else R.string.xr_stationary_hint,
+                                    ),
+                                )
+                                if (state.freeLayout) {
+                                    Chip(stringResource(R.string.xr_layout_reset)) { XrStore.resetLayout() }
+                                }
+                                ToggleRow(stringResource(R.string.xr_source_markers), playback.debugSources) {
+                                    XrStore.setDebugSources(!playback.debugSources)
+                                }
+                                if (playback.debugSources) {
+                                    ToggleRow(stringResource(R.string.xr_grab_sources), settings.view.grabSources) {
+                                        set { s -> s.copy(view = s.view.copy(grabSources = !s.view.grabSources)) }
+                                    }
+                                }
+                                ToggleRow(stringResource(R.string.xr_test_wall), state.overlays.testWall) {
+                                    XrStore.toggleTestWall()
+                                }
+                                if (state.overlays.testWall) {
+                                    MetaText(stringResource(R.string.xr_test_wall_hint))
+                                }
+                                ToggleRow(stringResource(R.string.xr_panel_occlusion), state.panelOcclusion) {
+                                    XrStore.setPanelOcclusion(!state.panelOcclusion)
+                                }
+                                MetaText(
+                                    stringResource(
+                                        if (state.panelOcclusion) R.string.xr_panel_occlusion_on else R.string.xr_panel_occlusion_off,
+                                    ),
+                                )
+                                OptionRow(
+                                    stringResource(R.string.xr_occlusion_mode),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_occ_realistic), "0"),
+                                        Option(stringResource(R.string.xr_occ_heavy), "1"),
+                                    ),
+                                    state.occlusionMode.toString(),
+                                ) { modeStr ->
+                                    XrStore.setOcclusionMode(modeStr.toIntOrNull() ?: 0)
+                                }
+                                MetaText(
+                                    stringResource(
+                                        if (state.occlusionMode == 1) R.string.xr_occ_heavy_hint else R.string.xr_occ_realistic_hint,
+                                    ),
+                                )
+                                if (playback.azimuths.isNotEmpty()) {
+                                    MetaText(
+                                        playback.azimuths.joinToString("  ") { "${it.toInt()}°" },
+                                        PanelTokens.AccentWarm,
+                                    )
+                                }
+                            }
+                        }
                     }
-                    ToggleRow(stringResource(R.string.xr_auto_advance), settings.playback.autoAdvance) {
-                        set { s -> s.copy(playback = s.playback.copy(autoAdvance = !s.playback.autoAdvance)) }
-                    }
-                    ToggleRow(stringResource(R.string.xr_jam), settings.playback.jamMode) {
-                        XrStore.setJamMode(!settings.playback.jamMode)
-                    }
-                }
-            }
 
-            item {
-                Section(stringResource(R.string.xr_section_audio)) {
-                    // Stereo-only: in spatial mode there is one width control
-                    // (source width), and panSeparation is folded into it.
-                    if (playback.canPan && !state.spatialEnabled) {
-                        StepperRow(stringResource(R.string.xr_pan), "${settings.transport.panSeparation}") { step ->
-                            set { s ->
-                                s.copy(
-                                    transport = s.transport.copy(
-                                        panSeparation =
-                                            (s.transport.panSeparation + (step * 10).toInt()).coerceIn(0, 200),
+                    SettingsTab.Playback -> {
+                        item {
+                            Section(stringResource(R.string.xr_section_playback)) {
+                                OptionRow(
+                                    stringResource(R.string.xr_repeat),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_off), "off"),
+                                        Option(stringResource(R.string.xr_all), "all"),
+                                        Option(stringResource(R.string.xr_one), "one"),
+                                    ),
+                                    settings.playback.repeat,
+                                ) { set { s -> s.copy(playback = s.playback.copy(repeat = it)) } }
+                                ToggleRow(stringResource(R.string.xr_shuffle), settings.playback.shuffle) {
+                                    set { s -> s.copy(playback = s.playback.copy(shuffle = !s.playback.shuffle)) }
+                                }
+                                ToggleRow(stringResource(R.string.xr_auto_advance), settings.playback.autoAdvance) {
+                                    set { s -> s.copy(playback = s.playback.copy(autoAdvance = !s.playback.autoAdvance)) }
+                                }
+                                ToggleRow(stringResource(R.string.xr_jam), settings.playback.jamMode) {
+                                    XrStore.setJamMode(!settings.playback.jamMode)
+                                }
+                            }
+                        }
+                        item {
+                            Section(stringResource(R.string.xr_section_audio)) {
+                                if (playback.canPan) {
+                                    StepperRow(stringResource(R.string.xr_pan), "${settings.transport.panSeparation}") { step ->
+                                        set { s ->
+                                            s.copy(
+                                                transport = s.transport.copy(
+                                                    panSeparation =
+                                                        (s.transport.panSeparation + (step * 10).toInt()).coerceIn(0, 100),
+                                                ),
+                                            )
+                                        }
+                                    }
+                                }
+                                OptionRow(
+                                    stringResource(R.string.xr_interpolation),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_interp_none), "0"),
+                                        Option(stringResource(R.string.xr_interp_linear), "1"),
+                                        Option(stringResource(R.string.xr_interp_sinc), "2"),
+                                    ),
+                                    settings.transport.interpolation.toString(),
+                                ) { set { s -> s.copy(transport = s.transport.copy(interpolation = it.toInt())) } }
+                                StepperRow(stringResource(R.string.xr_voices), "${settings.transport.numVoices}") { step ->
+                                    set { s ->
+                                        s.copy(
+                                            transport = s.transport.copy(
+                                                numVoices = (s.transport.numVoices + (step * 4).toInt()).coerceIn(4, 128),
+                                            ),
+                                        )
+                                    }
+                                }
+                                StepperRow(stringResource(R.string.xr_tempo), String.format(Locale.US, "%.2f×", settings.transport.tempoFactor)) { step ->
+                                    set { s ->
+                                        s.copy(
+                                            transport = s.transport.copy(
+                                                tempoFactor = (s.transport.tempoFactor + step * 0.05).coerceIn(0.25, 4.0),
+                                            ),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    SettingsTab.Mixer -> {
+                        item {
+                            Section(stringResource(R.string.xr_section_mixer)) {
+                                if (!playback.canMixer) {
+                                    MetaText(stringResource(R.string.xr_mixer_unavailable))
+                                }
+                                OptionRow(
+                                    stringResource(R.string.xr_mode),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_mixer_xmp), "libxmp"),
+                                        Option(stringResource(R.string.xr_mixer_paula), "paula"),
+                                    ),
+                                    settings.mixer.mode,
+                                ) { set { s -> s.copy(mixer = s.mixer.copy(mode = it)) } }
+                                OptionRow(
+                                    stringResource(R.string.xr_filter),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_led_off), "a500"),
+                                        Option(stringResource(R.string.xr_led_on), "a500led"),
+                                    ),
+                                    settings.mixer.amigaFilter,
+                                ) { set { s -> s.copy(mixer = s.mixer.copy(amigaFilter = it)) } }
+                            }
+                        }
+                        item {
+                            Section(stringResource(R.string.xr_section_sid)) {
+                                OptionRow(
+                                    stringResource(R.string.xr_chip),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_chip_6581), "6581"),
+                                        Option(stringResource(R.string.xr_chip_8580), "8580"),
+                                    ),
+                                    settings.sid.model.toString(),
+                                ) { set { s -> s.copy(sid = s.sid.copy(model = it.toInt())) } }
+                                OptionRow(
+                                    stringResource(R.string.xr_video),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_video_pal), "1"),
+                                        Option(stringResource(R.string.xr_video_ntsc), "0"),
+                                    ),
+                                    (settings.sid.videoStandard ?: 1).toString(),
+                                ) { set { s -> s.copy(sid = s.sid.copy(videoStandard = it.toInt())) } }
+                                OptionRow(
+                                    stringResource(R.string.xr_quality),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_light), "light"),
+                                        Option(stringResource(R.string.xr_hq), "hq"),
+                                        Option(stringResource(R.string.xr_sinc), "sinc"),
+                                    ),
+                                    settings.sid.quality,
+                                ) { set { s -> s.copy(sid = s.sid.copy(quality = it)) } }
+                                OptionRow(
+                                    stringResource(R.string.xr_channels),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_mono), "0"),
+                                        Option(stringResource(R.string.xr_stereo), "1"),
+                                        Option(stringResource(R.string.xr_narrow), "3"),
+                                    ),
+                                    settings.sid.stereo.toString(),
+                                ) { set { s -> s.copy(sid = s.sid.copy(stereo = it.toInt())) } }
+                                StepperRow(stringResource(R.string.xr_volume), "${settings.sid.volume}") { step ->
+                                    set { s ->
+                                        s.copy(
+                                            sid = s.sid.copy(volume = (s.sid.volume + (step * 16).toInt()).coerceIn(0, 255)),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    SettingsTab.Appearance -> {
+                        item {
+                            Section(stringResource(R.string.xr_section_appearance)) {
+                                MetaText(stringResource(R.string.xr_theme_note))
+                                ToggleRow(stringResource(R.string.xr_channel_strip), settings.view.showChannelStrip) {
+                                    set { s -> s.copy(view = s.view.copy(showChannelStrip = !s.view.showChannelStrip)) }
+                                }
+                                ToggleRow(stringResource(R.string.xr_pattern_view), settings.view.patternView) {
+                                    set { s -> s.copy(view = s.view.copy(patternView = !s.view.patternView)) }
+                                }
+                                ToggleRow(stringResource(R.string.xr_follow), settings.view.follow) {
+                                    set { s -> s.copy(view = s.view.copy(follow = !s.view.follow)) }
+                                }
+                                ToggleRow(stringResource(R.string.xr_strip_dots), settings.view.stripDots) {
+                                    set { s -> s.copy(view = s.view.copy(stripDots = !s.view.stripDots)) }
+                                }
+                                ToggleRow(stringResource(R.string.xr_sample_lengths), settings.view.sampleLengths) {
+                                    set { s -> s.copy(view = s.view.copy(sampleLengths = !s.view.sampleLengths)) }
+                                }
+                                ToggleRow(stringResource(R.string.xr_loop_marker), settings.view.sampleLoopFlags) {
+                                    set { s -> s.copy(view = s.view.copy(sampleLoopFlags = !s.view.sampleLoopFlags)) }
+                                }
+                                SwatchRow(stringResource(R.string.xr_color_note), settings.view.patternColors.note) { argb ->
+                                    set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(note = argb))) }
+                                }
+                                SwatchRow(stringResource(R.string.xr_color_instrument), settings.view.patternColors.instrument) { argb ->
+                                    set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(instrument = argb))) }
+                                }
+                                SwatchRow(stringResource(R.string.xr_color_volume), settings.view.patternColors.volume) { argb ->
+                                    set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(volume = argb))) }
+                                }
+                                SwatchRow(stringResource(R.string.xr_color_effect), settings.view.patternColors.effect) { argb ->
+                                    set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(effect = argb))) }
+                                }
+                                OptionRow(
+                                    stringResource(R.string.xr_visualizer),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_vis_off), "off"),
+                                        Option(stringResource(R.string.xr_vis_levels), "spectrum"),
+                                        Option(stringResource(R.string.xr_vis_wave), "waveform"),
+                                        Option(stringResource(R.string.xr_vis_both), "both"),
+                                    ),
+                                    settings.view.visualizer,
+                                ) { set { s -> s.copy(view = s.view.copy(visualizer = it)) } }
+                            }
+                        }
+                        item {
+                            Section(stringResource(R.string.xr_section_language)) {
+                                OptionRow(
+                                    stringResource(R.string.xr_app_language),
+                                    listOf(
+                                        Option(stringResource(R.string.xr_lang_system), "sys"),
+                                        Option(stringResource(R.string.xr_lang_de), "de"),
+                                        Option(stringResource(R.string.xr_lang_en), "en"),
+                                    ),
+                                    currentLocaleTag(context),
+                                ) { setLocale(context, it) }
+                            }
+                        }
+                    }
+
+                    SettingsTab.System -> {
+                        item {
+                            Section(stringResource(R.string.xr_section_library)) {
+                                MetaText(
+                                    stringResource(
+                                        R.string.xr_library_summary,
+                                        treeCount,
+                                        pickedCount,
+                                        favoriteCount,
+                                        ignoredCount,
+                                    ),
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm)) {
+                                    Chip(stringResource(R.string.xr_add_folder)) { XrStore.pickFolder() }
+                                    Chip(stringResource(R.string.xr_clear_ignored)) { XrStore.clearIgnored() }
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm)) {
+                                    if (state.player.loaded) {
+                                        Chip(stringResource(R.string.xr_details)) { XrStore.toggleDetails() }
+                                    }
+                                    if (ignored) {
+                                        Chip(stringResource(R.string.xr_ignored)) { XrStore.toggleIgnored() }
+                                    }
+                                }
+                                for (tree in trees) {
+                                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            tree.lastPathSegment ?: tree.toString(),
+                                            fontSize = PanelTokens.Body,
+                                            color = PanelTokens.Text,
+                                            maxLines = 1,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Text(
+                                            "✕",
+                                            fontSize = PanelTokens.Body,
+                                            color = PanelTokens.Error,
+                                            modifier = Modifier
+                                                .clickable { XrStore.removeTree(tree) }
+                                                .padding(horizontal = PanelTokens.GapSm),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        item {
+                            Section(stringResource(R.string.xr_section_diagnostics)) {
+                                MetaText(
+                                    stringResource(
+                                        R.string.xr_diag_line,
+                                        stringResource(
+                                            if (state.engineAvailable) R.string.xr_engine_v8 else R.string.xr_engine_missing,
+                                        ),
+                                        state.sessionId,
+                                        playback.channels,
                                     ),
                                 )
                             }
                         }
-                    }
-                    // Walls and room volumes always reflect; the panels are
-                    // the switchable part (six box faces per panel).
-                    ToggleRow(stringResource(R.string.xr_reflect_panels), settings.mixer.reflectPanels) {
-                        set { s -> s.copy(mixer = s.mixer.copy(reflectPanels = !s.mixer.reflectPanels)) }
-                    }
-                    OptionRow(
-                        stringResource(R.string.xr_interpolation),
-                        listOf(
-                            Option(stringResource(R.string.xr_interp_none), "0"),
-                            Option(stringResource(R.string.xr_interp_linear), "1"),
-                            Option(stringResource(R.string.xr_interp_sinc), "2"),
-                        ),
-                        settings.transport.interpolation.toString(),
-                    ) { set { s -> s.copy(transport = s.transport.copy(interpolation = it.toInt())) } }
-                    StepperRow(stringResource(R.string.xr_voices), "${settings.transport.numVoices}") { step ->
-                        set { s ->
-                            s.copy(
-                                transport = s.transport.copy(
-                                    numVoices = (s.transport.numVoices + (step * 4).toInt()).coerceIn(4, 64),
-                                ),
-                            )
-                        }
-                    }
-                    StepperRow(stringResource(R.string.xr_tempo), String.format("%.2f×", settings.transport.tempoFactor)) { step ->
-                        set { s ->
-                            s.copy(
-                                transport = s.transport.copy(
-                                    tempoFactor = (s.transport.tempoFactor + step * 0.05).coerceIn(0.25, 4.0),
-                                ),
-                            )
-                        }
-                    }
-                }
-            }
+                        item {
+                            Section(stringResource(R.string.xr_section_engine)) {
+                                val engineContext = LocalContext.current
+                                val updateStatus by EngineUpdater.status.collectAsState()
+                                val installed = remember(updateStatus) { EngineUpdater.installedVersion(engineContext) }
+                                val configured = remember(updateStatus) { EngineUpdater.configured(engineContext) }
 
-            item {
-                Section(stringResource(R.string.xr_section_mixer)) {
-                    if (!playback.canMixer) {
-                        MetaText(stringResource(R.string.xr_mixer_unavailable))
-                    }
-                    OptionRow(
-                        stringResource(R.string.xr_mode),
-                        listOf(
-                            Option(stringResource(R.string.xr_mixer_xmp), "libxmp"),
-                            Option(stringResource(R.string.xr_mixer_paula), "paula"),
-                        ),
-                        settings.mixer.mode,
-                        enabled = playback.canMixerMode,
-                    ) { set { s -> s.copy(mixer = s.mixer.copy(mode = it)) } }
-                    OptionRow(
-                        stringResource(R.string.xr_filter),
-                        listOf(
-                            Option(stringResource(R.string.xr_led_off), "a500"),
-                            Option(stringResource(R.string.xr_led_on), "a500led"),
-                        ),
-                        settings.mixer.amigaFilter,
-                        enabled = playback.canAmigaFilter,
-                    ) { set { s -> s.copy(mixer = s.mixer.copy(amigaFilter = it)) } }
-                }
-            }
-
-            item {
-                Section(stringResource(R.string.xr_section_sid)) {
-                    OptionRow(
-                        stringResource(R.string.xr_chip),
-                        listOf(
-                            Option(stringResource(R.string.xr_chip_6581), "6581"),
-                            Option(stringResource(R.string.xr_chip_8580), "8580"),
-                        ),
-                        settings.sid.model.toString(),
-                    ) { set { s -> s.copy(sid = s.sid.copy(model = it.toInt())) } }
-                    OptionRow(
-                        stringResource(R.string.xr_video),
-                        listOf(
-                            Option(stringResource(R.string.xr_video_pal), "1"),
-                            Option(stringResource(R.string.xr_video_ntsc), "0"),
-                        ),
-                        (settings.sid.videoStandard ?: 1).toString(),
-                    ) { set { s -> s.copy(sid = s.sid.copy(videoStandard = it.toInt())) } }
-                    OptionRow(
-                        stringResource(R.string.xr_quality),
-                        listOf(
-                            Option(stringResource(R.string.xr_light), "light"),
-                            Option(stringResource(R.string.xr_hq), "hq"),
-                            Option(stringResource(R.string.xr_sinc), "sinc"),
-                        ),
-                        settings.sid.quality,
-                    ) { set { s -> s.copy(sid = s.sid.copy(quality = it)) } }
-                    OptionRow(
-                        stringResource(R.string.xr_channels),
-                        listOf(
-                            Option(stringResource(R.string.xr_mono), "0"),
-                            Option(stringResource(R.string.xr_stereo), "1"),
-                            Option(stringResource(R.string.xr_narrow), "3"),
-                        ),
-                        settings.sid.stereo.toString(),
-                    ) { set { s -> s.copy(sid = s.sid.copy(stereo = it.toInt())) } }
-                    StepperRow(stringResource(R.string.xr_volume), "${settings.sid.volume}") { step ->
-                        set { s ->
-                            s.copy(
-                                sid = s.sid.copy(volume = (s.sid.volume + (step * 16).toInt()).coerceIn(0, 255)),
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                Section(stringResource(R.string.xr_section_appearance)) {
-                    MetaText(stringResource(R.string.xr_theme_note))
-                    ToggleRow(stringResource(R.string.xr_channel_strip), settings.view.showChannelStrip) {
-                        set { s -> s.copy(view = s.view.copy(showChannelStrip = !s.view.showChannelStrip)) }
-                    }
-                    ToggleRow(stringResource(R.string.xr_pattern_view), settings.view.patternView) {
-                        set { s -> s.copy(view = s.view.copy(patternView = !s.view.patternView)) }
-                    }
-                    ToggleRow(stringResource(R.string.xr_follow), settings.view.follow) {
-                        set { s -> s.copy(view = s.view.copy(follow = !s.view.follow)) }
-                    }
-                    ToggleRow(stringResource(R.string.xr_strip_dots), settings.view.stripDots) {
-                        set { s -> s.copy(view = s.view.copy(stripDots = !s.view.stripDots)) }
-                    }
-                    ToggleRow(stringResource(R.string.xr_sample_lengths), settings.view.sampleLengths) {
-                        set { s -> s.copy(view = s.view.copy(sampleLengths = !s.view.sampleLengths)) }
-                    }
-                    ToggleRow(stringResource(R.string.xr_loop_marker), settings.view.sampleLoopFlags) {
-                        set { s -> s.copy(view = s.view.copy(sampleLoopFlags = !s.view.sampleLoopFlags)) }
-                    }
-                    SwatchRow(stringResource(R.string.xr_color_note), settings.view.patternColors.note) { argb ->
-                        set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(note = argb))) }
-                    }
-                    SwatchRow(stringResource(R.string.xr_color_instrument), settings.view.patternColors.instrument) { argb ->
-                        set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(instrument = argb))) }
-                    }
-                    SwatchRow(stringResource(R.string.xr_color_volume), settings.view.patternColors.volume) { argb ->
-                        set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(volume = argb))) }
-                    }
-                    SwatchRow(stringResource(R.string.xr_color_effect), settings.view.patternColors.effect) { argb ->
-                        set { s -> s.copy(view = s.view.copy(patternColors = s.view.patternColors.copy(effect = argb))) }
-                    }
-                    OptionRow(
-                        stringResource(R.string.xr_visualizer),
-                        listOf(
-                            Option(stringResource(R.string.xr_vis_off), "off"),
-                            Option(stringResource(R.string.xr_vis_levels), "spectrum"),
-                            Option(stringResource(R.string.xr_vis_wave), "waveform"),
-                            Option(stringResource(R.string.xr_vis_both), "both"),
-                        ),
-                        settings.view.visualizer,
-                    ) { set { s -> s.copy(view = s.view.copy(visualizer = it)) } }
-                }
-            }
-
-            item {
-                Section(stringResource(R.string.xr_section_library)) {
-                    MetaText(
-                        stringResource(
-                            R.string.xr_library_summary,
-                            treeCount,
-                            pickedCount,
-                            favoriteCount,
-                            ignoredCount,
-                        ),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm)) {
-                        Chip(stringResource(R.string.xr_add_folder)) { XrStore.pickFolder() }
-                        Chip(stringResource(R.string.xr_clear_ignored)) { XrStore.clearIgnored() }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapSm)) {
-                        if (state.player.loaded) {
-                            Chip(stringResource(R.string.xr_details)) { XrStore.toggleDetails() }
-                        }
-                        if (state.queue.tracks.isNotEmpty()) {
-                            Chip(stringResource(R.string.xr_queue)) { XrStore.toggleQueue() }
-                        }
-                        if (ignored) {
-                            Chip(stringResource(R.string.xr_ignored)) { XrStore.toggleIgnored() }
-                        }
-                    }
-                    for (tree in trees) {
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                tree.lastPathSegment ?: tree.toString(),
-                                fontSize = PanelTokens.Body,
-                                color = PanelTokens.Text,
-                                maxLines = 1,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                "✕",
-                                fontSize = PanelTokens.Body,
-                                color = PanelTokens.Error,
-                                modifier = Modifier
-                                    .clickable { XrStore.removeTree(tree) }
-                                    .padding(horizontal = PanelTokens.GapSm),
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                Section(stringResource(R.string.xr_section_diagnostics)) {
-                    MetaText(
-                        stringResource(
-                            R.string.xr_diag_line,
-                            stringResource(
-                                if (state.engineAvailable) R.string.xr_engine_v8 else R.string.xr_engine_missing,
-                            ),
-                            state.sessionId,
-                            playback.channels,
-                        ),
-                    )
-                }
-            }
-
-            item {
-                // Engine modules: the decoder/mixer layer, not songs. The
-                // catalog is checked on demand; nothing downloads by itself.
-                Section(stringResource(R.string.xr_section_engine)) {
-                    val engineContext = LocalContext.current
-                    val updateStatus by EngineUpdater.status.collectAsState()
-                    val installed = remember(updateStatus) { EngineUpdater.installedVersion(engineContext) }
-                    val configured = remember(updateStatus) { EngineUpdater.configured(engineContext) }
-
-                    MetaText(
-                        when (val status = updateStatus) {
-                            is EngineUpdater.Status.Idle ->
-                                stringResource(
-                                    R.string.xr_engine_modules_line,
-                                    ModuleCatalog.formats().size,
-                                    installed ?: stringResource(R.string.xr_engine_bundled),
+                                MetaText(
+                                    when (val status = updateStatus) {
+                                        is EngineUpdater.Status.Idle ->
+                                            stringResource(
+                                                R.string.xr_engine_modules_line,
+                                                ModuleCatalog.formats().size,
+                                                installed ?: stringResource(R.string.xr_engine_bundled),
+                                            )
+                                        is EngineUpdater.Status.Checking -> stringResource(R.string.xr_engine_checking)
+                                        is EngineUpdater.Status.Downloading ->
+                                            stringResource(R.string.xr_engine_downloading, status.done, status.total)
+                                        is EngineUpdater.Status.UpToDate ->
+                                            stringResource(R.string.xr_engine_uptodate, EngineUpdater.installedVersion(engineContext) ?: "—")
+                                        is EngineUpdater.Status.Installed ->
+                                            stringResource(R.string.xr_engine_installed, status.files, status.version)
+                                        is EngineUpdater.Status.Failed ->
+                                            stringResource(R.string.xr_engine_failed, status.message)
+                                    },
                                 )
-                            is EngineUpdater.Status.Checking -> stringResource(R.string.xr_engine_checking)
-                            is EngineUpdater.Status.Downloading ->
-                                stringResource(R.string.xr_engine_downloading, status.done, status.total)
-                            is EngineUpdater.Status.UpToDate ->
-                                stringResource(R.string.xr_engine_uptodate, EngineUpdater.installedVersion(engineContext) ?: "—")
-                            is EngineUpdater.Status.Installed ->
-                                stringResource(R.string.xr_engine_installed, status.files, status.version)
-                            is EngineUpdater.Status.Failed ->
-                                stringResource(R.string.xr_engine_failed, status.message)
-                        },
-                    )
-                    if (!configured) {
-                        MetaText(stringResource(R.string.xr_engine_no_catalog), PanelTokens.AccentWarm)
-                    } else {
-                        Chip(stringResource(R.string.xr_engine_check)) {
-                            EngineUpdater.check(engineContext)
+                                if (!configured) {
+                                    MetaText(stringResource(R.string.xr_engine_no_catalog), PanelTokens.AccentWarm)
+                                } else {
+                                    Chip(stringResource(R.string.xr_engine_check)) {
+                                        EngineUpdater.check(engineContext)
+                                    }
+                                }
+                            }
+                        }
+                        item {
+                            Section(stringResource(R.string.xr_section_licenses)) {
+                                MetaText(stringResource(R.string.xr_licenses_text))
+                            }
+                        }
+                        item {
+                            Section(stringResource(R.string.xr_section_about)) {
+                                MetaText(stringResource(R.string.xr_about_line, BuildConfig.VERSION_NAME))
+                            }
                         }
                     }
-                }
-            }
-
-            item {
-                Section(stringResource(R.string.xr_section_language)) {
-                    OptionRow(
-                        stringResource(R.string.xr_app_language),
-                        listOf(
-                            Option(stringResource(R.string.xr_lang_system), "sys"),
-                            Option(stringResource(R.string.xr_lang_de), "de"),
-                            Option(stringResource(R.string.xr_lang_en), "en"),
-                        ),
-                        currentLocaleTag(context),
-                    ) { setLocale(context, it) }
-                }
-            }
-
-            item {
-                Section(stringResource(R.string.xr_section_licenses)) {
-                    MetaText(stringResource(R.string.xr_licenses_text))
-                }
-            }
-
-            item {
-                Section(stringResource(R.string.xr_section_about)) {
-                    MetaText(stringResource(R.string.xr_about_line, BuildConfig.VERSION_NAME))
                 }
             }
         }

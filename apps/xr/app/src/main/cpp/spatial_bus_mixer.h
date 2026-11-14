@@ -48,6 +48,9 @@ public:
     /** 0 disables the reverb, 100 is full wet. */
     void setWet(int percent);
 
+    /** 0 = Realistisch (Holz -12dB/1800Hz), 1 = Stark (Bunker -100%/400Hz). */
+    void setOcclusionMode(int mode);
+
     /**
      * Per-source parameters, called whenever they may have changed (10 Hz).
      * Layout per source: azimuthDeg, elevationDeg, distanceM, gain, spreadDeg,
@@ -197,6 +200,7 @@ private:
 
     SourceRuntime src_[kMaxSources];
     int sourceCount_ = 0;
+    int occlusionMode_ = 0; // 0 = Realistic, 1 = Heavy/Bunker
 
     std::vector<float> lowSum_;         // [kSubBlock]
     std::vector<float> scratchLow_;

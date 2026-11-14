@@ -177,4 +177,17 @@
     <string name="xr_details_empty">empty</string>
     <string name="xr_scene_note">Room data is read once to place the ring and never leaves the headset.</string>
     <string name="xr_scene_denied">Room permission denied: the ring stays at 1 m around you. Music, panels and audio are unaffected.</string>
+    <string name="xr_test_wall">Test Absorber Panel</string>
+    <string name="xr_test_wall_title">Acoustic Test Panel</string>
+    <string name="xr_test_wall_subtitle">Sound Occlusion Tester</string>
+    <string name="xr_test_wall_instructions">Position this panel between your head and any Channel Marker sphere to test acoustic absorption and high-frequency dampening in real time.</string>
+    <string name="xr_test_wall_hint">Spawns a moveable test panel in the room to test real-time sound occlusion in front of channel markers.</string>
+    <string name="xr_panel_occlusion">UI Panels Occlude Sound</string>
+    <string name="xr_panel_occlusion_on">All UI panels block and dampen sound sources behind them.</string>
+    <string name="xr_panel_occlusion_off">Standard UI panels are acoustically transparent. Only the Test Absorber Panel dampens sound.</string>
+    <string name="xr_occlusion_mode">Dampening Profile</string>
+    <string name="xr_occ_realistic">Realistic (Wood)</string>
+    <string name="xr_occ_heavy">Heavy (Bunker/Mute)</string>
+    <string name="xr_occ_realistic_hint">Simulates physical room acoustics: highs &amp; mids are dampened (-12 dB), bass diffracts around panels.</string>
+    <string name="xr_occ_heavy_hint">Game-style heavy muting: highs &amp; mids are 100% muted, bass is cut off (-18 dB).</string>
 </resources>

@@ -401,6 +401,11 @@ Java_com_bitti06_modplayjs_engine_V8Engine_nativeSetSpatialWet(JNIEnv*, jobject,
     if (g_busMixer) g_busMixer->setWet(percent);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_bitti06_modplayjs_engine_V8Engine_nativeSetSpatialOcclusionMode(JNIEnv*, jobject, jint mode) {
+    if (g_busMixer) g_busMixer->setOcclusionMode(mode);
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_bitti06_modplayjs_engine_V8Engine_nativeMixSpatial(
         JNIEnv* env, jobject, jfloatArray stems, jint sources, jint frames) {

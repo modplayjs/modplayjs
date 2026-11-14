@@ -18,6 +18,7 @@ data class Overlays(
     val queue: Boolean = false,
     val ignored: Boolean = false,
     val details: Boolean = true,
+    val testWall: Boolean = false,
 )
 
 /**
@@ -69,4 +70,8 @@ data class XrState(
     val ringFollowMode: String = "WORLD",
     /** The ring plane follows the head pitch, for reclined listening. */
     val ringTilts: Boolean = false,
+    /** Standard UI panels block sound behind them. False = only Test Absorber Panel occludes. */
+    val panelOcclusion: Boolean = false,
+    /** 0 = Realistisch (Holz -12dB/1800Hz), 1 = Stark (Bunker -100%/400Hz). */
+    val occlusionMode: Int = 0,
 )

@@ -167,6 +167,10 @@ void SpatialBusMixer::setWet(int percent) {
     wet_ = clampf(float(percent) / 100.f, 0.f, 1.f);
 }
 
+void SpatialBusMixer::setOcclusionMode(int mode) {
+    occlusionMode_ = std::clamp(mode, 0, 1);
+}
+
 void SpatialBusMixer::updateReverbDirections() {
     for (int b = 0; b < buses_; ++b) {
         busCos_[b] = busDirZ_[b];    // AmbiX X: front
@@ -345,17 +349,23 @@ void SpatialBusMixer::setSources(const float* params, int count) {
         const float g = gain * distanceGain;
 
         SourceRuntime& rt = src_[s];
-        // The high path takes the full occlusion; the bass is only gently
-        // attenuated, because low frequencies diffract around a panel instead
-        // of stopping at it.
-        rt.tgtHigh = g * (1.f - 0.75f * occ);
-        rt.tgtLow = g * (1.f - 0.35f * occ);
-
-        // Air absorption and occlusion set the corner of the one-pole.
-        const float fcAir = 1500.f + 18500.f * std::exp(-dist / 12.f);
-        const float fcOcc = 8000.f * (1.f - occ) + 600.f * occ;
-        const float fc = clampf(std::min(fcAir, fcOcc), 300.f, 20000.f);
-        rt.airCoef = clampf(1.f - std::exp(-2.f * kPi * fc / float(sampleRate_)), 0.f, 1.f);
+        if (occlusionMode_ == 1) {
+            // Heavy / Bunker Mode: total high/mid mute (-100%), -18 dB bass drop (-90%), 400 Hz cutoff
+            rt.tgtHigh = g * (1.f - 1.00f * occ);
+            rt.tgtLow = g * (1.f - 0.90f * occ);
+            const float fcAir = 1500.f + 18500.f * std::exp(-dist / 12.f);
+            const float fcOcc = 16000.f * (1.f - occ) + 400.f * occ;
+            const float fc = clampf(std::min(fcAir, fcOcc), 300.f, 20000.f);
+            rt.airCoef = clampf(1.f - std::exp(-2.f * kPi * fc / float(sampleRate_)), 0.f, 1.f);
+        } else {
+            // Realistic Mode: acoustic wood/baffle absorber (-12 dB high, -3 dB low, 1800 Hz cutoff)
+            rt.tgtHigh = g * (1.f - 0.75f * occ);
+            rt.tgtLow = g * (1.f - 0.30f * occ);
+            const float fcAir = 1500.f + 18500.f * std::exp(-dist / 12.f);
+            const float fcOcc = 16000.f * (1.f - occ) + 1800.f * occ;
+            const float fc = clampf(std::min(fcAir, fcOcc), 400.f, 20000.f);
+            rt.airCoef = clampf(1.f - std::exp(-2.f * kPi * fc / float(sampleRate_)), 0.f, 1.f);
+        }
 
         rebuildPans(s, az, el, spread);
     }

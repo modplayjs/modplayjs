@@ -49,7 +49,7 @@ class StageAnchor {
             Pose(
                 Vector3(head.t.x, head.t.y, head.t.z),
                 Quaternion(
-                    Math.toDegrees(pitch.toDouble()).toFloat(),
+                    0f,
                     Math.toDegrees(HeadFrames.yawOf(head.q).toDouble()).toFloat(),
                     0f,
                 ),

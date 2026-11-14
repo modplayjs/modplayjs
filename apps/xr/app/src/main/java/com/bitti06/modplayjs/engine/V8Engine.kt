@@ -155,6 +155,10 @@ class V8Engine(
         if (handle != 0L) nativeSetSpatialWet(percent)
     }
 
+    fun setSpatialOcclusionMode(mode: Int) {
+        if (handle != 0L) nativeSetSpatialOcclusionMode(mode)
+    }
+
     /** Mixes the stems into the bus buffers. Returns 0 on success. */
     fun mixSpatial(stems: FloatArray, sources: Int, frames: Int): Int =
         if (handle == 0L) -1 else nativeMixSpatial(stems, sources, frames)
@@ -214,6 +218,8 @@ class V8Engine(
     )
 
     private external fun nativeSetSpatialWet(percent: Int)
+
+    private external fun nativeSetSpatialOcclusionMode(mode: Int)
 
     private external fun nativeMixSpatial(stems: FloatArray, sources: Int, frames: Int): Int
 

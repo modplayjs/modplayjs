@@ -24,6 +24,8 @@ import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.Vector3
 import com.meta.spatial.runtime.Scene
+import com.meta.spatial.isdk.IsdkGrabbable
+import com.meta.spatial.isdk.IsdkGrabState
 import com.meta.spatial.spatialaudio.AudioSessionId
 import com.meta.spatial.spatialaudio.AudioType
 import com.meta.spatial.spatialaudio.SoundfieldOrientation
@@ -214,6 +216,7 @@ class XrPlayer(
     /** Last ring geometry written to the bus entities. */
     private var placedRadius = -1f
     private var placedLayout = ""
+    @Volatile private var occlusionMode = prefs.getInt(KEY_OCCLUSION_MODE, 0)
 
     /**
      * True while a ring↔dome switch is moving the 32 bus entities. The mixer
@@ -1201,16 +1204,13 @@ class XrPlayer(
     }
 
     /**
-     * Fit one direction to the room: the base radius clamped by the wall
-     * behind it. Unknown bins (no room scan yet) keep the base radius.
+     * Fit the ring to the room: in Stationary mode, keeps the full user-configured radius;
+     * in Free/Follow mode, fits along MRUK room boundaries.
      */
     private fun fitRadius(azimuth: Float, base: Float): Float {
-        if (wallDistances.isEmpty()) return base
-        var az = azimuth % 360f
-        if (az < 0f) az += 360f
-        val wall = wallDistances[((az / WALL_BIN_DEG).toInt()).coerceIn(0, wallDistances.size - 1)]
-        if (wall <= 0f) return base
-        return minOf(base, wall - WALL_MARGIN).coerceAtLeast(RING_MIN_RADIUS)
+        if (wallDistances.isEmpty() || ringFollow == RingFollow.WORLD) return base
+        val minWall = wallDistances.filter { it > 0f }.minOrNull() ?: return base
+        return minOf(base, minWall - WALL_MARGIN).coerceAtLeast(RING_MIN_RADIUS)
     }
 
     /**
@@ -1424,10 +1424,10 @@ class XrPlayer(
         mainHandler.post {
             for (i in 0 until minOf(channels, markers.size)) {
                 val p = positions[i]
-                markers[i].setComponent(Transform(Pose(p)))
                 val dx = listenerPos.x - p.x
                 val dz = listenerPos.z - p.z
                 val yawDeg = Math.toDegrees(kotlin.math.atan2(dx.toDouble(), dz.toDouble())).toFloat()
+                markers[i].setComponent(Transform(Pose(p, Quaternion(0f, yawDeg, 0f))))
                 val labelPose = Pose(Vector3(p.x, p.y + MARKER_LABEL_OFFSET, p.z), Quaternion(0f, yawDeg, 0f))
                 markerLabels.getOrNull(i)?.setComponent(Transform(labelPose))
             }
@@ -1581,6 +1581,15 @@ class XrPlayer(
         return if (out.size > MAX_REFL_TAPS) out.subList(0, MAX_REFL_TAPS) else out
     }
 
+    fun setSpatialOcclusionMode(mode: Int) {
+        val v = mode.coerceIn(0, 1)
+        occlusionMode = v
+        prefs.edit { putInt(KEY_OCCLUSION_MODE, v) }
+        submit { engine?.setSpatialOcclusionMode(v) }
+    }
+
+    fun spatialOcclusionMode(): Int = occlusionMode
+
     /**
      * Hand the mixer one parameter row per channel.
      *
@@ -1603,10 +1612,18 @@ class XrPlayer(
         val cx = ringCenterX
         val cz = ringCenterZ
         val cy = ringY
-        val cY = kotlin.math.cos(ringYawRad)
-        val sY = kotlin.math.sin(ringYawRad)
-        val cT = kotlin.math.cos(tiltApplied)
-        val sT = kotlin.math.sin(tiltApplied)
+        val isFollow = ringFollow != RingFollow.WORLD
+        val refX = if (isFollow) listener.x else cx
+        val refY = if (isFollow) listener.y else cy
+        val refZ = if (isFollow) listener.z else cz
+
+        val yawRad = if (isFollow) headYaw else ringYawRad
+        val tiltRad = if (isFollow) headPitch else tiltApplied
+        val cY = kotlin.math.cos(yawRad)
+        val sY = kotlin.math.sin(yawRad)
+        val cT = kotlin.math.cos(tiltRad)
+        val sT = kotlin.math.sin(tiltRad)
+
         val refl = FloatArray(channels * REFL_STRIDE)
         for (i in 0 until channels) {
             val position =
@@ -1618,22 +1635,16 @@ class XrPlayer(
                     cy,
                 )
 
-            val dx = position.x - listener.x
-            val dy = position.y - listener.y
-            val dz = position.z - listener.z
+            val dx = position.x - refX
+            val dy = position.y - refY
+            val dz = position.z - refZ
             val distance = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
 
-            // Direction in the stage frame: undo the ring yaw and the tilt, so
-            // the native panner works in the same local frame as the bus
-            // directions it was given. Using the listener made a fixed marker
-            // slide across the ring while walking.
-            val rx = position.x - cx
-            val ry = position.y - cy
-            val rz = position.z - cz
-            val vx = rx * cY - rz * sY
-            val vz = rx * sY + rz * cY
-            val vy = ry * cT - vz * sT
-            val vz2 = ry * sT + vz * cT
+            // Direction in reference frame:
+            val vx = dx * cY - dz * sY
+            val vz = dx * sY + dz * cY
+            val vy = dy * cT - vz * sT
+            val vz2 = dy * sT + vz * cT
             val horizontal = kotlin.math.sqrt(vx * vx + vz2 * vz2)
             val azimuth = Math.toDegrees(kotlin.math.atan2(vx.toDouble(), vz2.toDouble())).toFloat()
             val elevation = Math.toDegrees(kotlin.math.atan2(vy.toDouble(), horizontal.toDouble())).toFloat()
@@ -1677,12 +1688,18 @@ class XrPlayer(
         val channels = minOf(spatialInfo.channels, MAX_SOURCES)
         val next = arrayOfNulls<Vector3>(MAX_SOURCES)
         for (i in 0 until minOf(channels, markers.size)) {
-            val t = runCatching { markers[i].getComponent<Transform>() }.getOrNull() ?: continue
-            try {
-                val p = t.transform.t
-                next[i] = Vector3(p.x, p.y, p.z)
-            } finally {
-                runCatching { t.recycle() }
+            val marker = markers[i]
+            val isdk = runCatching { marker.tryGetComponent<IsdkGrabbable>() }.getOrNull()
+            val isGrabbed = isdk?.grabState == IsdkGrabState.Grabbed
+            runCatching { isdk?.recycle() }
+            if (isGrabbed) {
+                val t = runCatching { marker.getComponent<Transform>() }.getOrNull() ?: continue
+                try {
+                    val p = t.transform.t
+                    next[i] = Vector3(p.x, p.y, p.z)
+                } finally {
+                    runCatching { t.recycle() }
+                }
             }
         }
         grabOverrides = next
@@ -2005,10 +2022,14 @@ class XrPlayer(
             labelYaw = FloatArray(positions.size) { Float.NaN }
             labelPoints.clear()
             for (i in positions.indices) {
+                val dx = listenerPos.x - positions[i].x
+                val dz = listenerPos.z - positions[i].z
+                val yawDeg = Math.toDegrees(kotlin.math.atan2(dx.toDouble(), dz.toDouble())).toFloat()
+
                 val components = ArrayList<ComponentBase>()
                 components += Mesh("mesh://sphere".toUri(), collision)
                 components += Sphere(MARKER_SPHERE_RADIUS)
-                components += Transform(Pose(positions[i]))
+                components += Transform(Pose(positions[i], Quaternion(0f, yawDeg, 0f)))
                 components += Scale(Vector3(MARKER_MIN, MARKER_MIN, MARKER_MIN))
                 components += Material().apply {
                     baseColor = colors[i]
@@ -2035,9 +2056,6 @@ class XrPlayer(
                     Text3D.create("CH ${(i + 1).toString().padStart(2, '0')}"),
                     MeshCollision.NoCollision,
                 )
-                val dx = listenerPos.x - positions[i].x
-                val dz = listenerPos.z - positions[i].z
-                val yawDeg = Math.toDegrees(kotlin.math.atan2(dx.toDouble(), dz.toDouble())).toFloat()
                 labelComponents += Transform(
                     Pose(Vector3(positions[i].x, positions[i].y + MARKER_LABEL_OFFSET, positions[i].z), Quaternion(0f, yawDeg, 0f)),
                 )
@@ -2428,6 +2446,7 @@ class XrPlayer(
         private const val KEY_RING_FOLLOW = "ringFollowsHead"
         private const val KEY_RING_FOLLOW_MODE = "ringFollowMode"
         private const val KEY_RING_TILT = "ringTiltsWithHead"
+        private const val KEY_OCCLUSION_MODE = "occlusionMode"
 
         private const val RING_HEIGHT_STEP = 0.05f
 
