@@ -313,8 +313,31 @@ class Library(private val context: Context) {
             }
             root.put("folders", foldersArray)
 
+            // The tree set the scan walked: the cache is only trusted when it
+            // still matches the folders the user has open (see cacheIsFresh).
+            val treesArray = org.json.JSONArray()
+            for (uri in treeUris()) treesArray.put(uri.toString())
+            root.put("trees", treesArray)
+
             prefs.edit().putString(KEY_CACHED_SCAN, root.toString()).apply()
         }
+    }
+
+    /**
+     * True when the cached scan was taken over exactly the tree set that is
+     * open now. A folder added or removed invalidates it; files changing
+     * inside a folder do not - that is what the manual rescan is for.
+     */
+    fun cacheIsFresh(): Boolean {
+        val raw = prefs.getString(KEY_CACHED_SCAN, null) ?: return false
+        return runCatching {
+            val root = org.json.JSONObject(raw)
+            val trees = root.optJSONArray("trees") ?: return false
+            val cached = ArrayList<String>(trees.length())
+            for (i in 0 until trees.length()) cached += trees.getString(i)
+            val current = treeUris().map { it.toString() }
+            cached.size == current.size && cached.toSet() == current.toSet()
+        }.getOrDefault(false)
     }
 
     private fun walk(

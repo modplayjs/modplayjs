@@ -114,6 +114,12 @@ object XrStore {
         scope.launch(Dispatchers.IO) {
             val cached = library.loadCachedScan()
             if (cached != null && cached.tracks.isNotEmpty()) _libraryTracks.value = cached
+            // Walk the trees only when the library can have changed: no cache,
+            // or a different tree set than the cache was taken over. Files
+            // changing inside a folder need the manual rescan (library panel);
+            // every add/remove tree and restore rescan explicitly already.
+            val fresh = cached != null && cached.tracks.isNotEmpty() && library.cacheIsFresh()
+            if (!fresh) rescan()
         }
         refresh(freeLayout.value, passthrough.value)
 
@@ -156,7 +162,6 @@ object XrStore {
                 _scanItem.value = ""
             }
         }
-        rescan()
     }
 
     /** Re-read every source with the values the state already carries. */
