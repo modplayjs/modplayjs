@@ -71,6 +71,9 @@
       "@modplayjs/fmt-sid": [
         "./packages/fmt-sid/src/index.ts"
       ],
+      "@modplayjs/fmt-mid": [
+        "./packages/fmt-mid/src/index.ts"
+      ],
       "@modplayjs/fmt-fc": [
         "./packages/fmt-fc/src/index.ts"
       ],
