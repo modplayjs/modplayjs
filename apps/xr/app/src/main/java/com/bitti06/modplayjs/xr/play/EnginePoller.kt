@@ -41,7 +41,6 @@ class EnginePoller(private val scope: CoroutineScope) {
     )
 
     private var cachedTrackDetail: XrPlayer.TrackDetail? = null
-    private var cachedDetailKey: Triple<String, Boolean, Boolean>? = null
     private var cachedDetails: List<Pair<String, String>> = emptyList()
     private var cachedMessage = ""
     private var cachedCaps = CapsInfo()
@@ -101,13 +100,14 @@ class EnginePoller(private val scope: CoroutineScope) {
         val caps = snap?.get("capabilities") as? JsonObject
 
         if (track != null) {
-            // Reformat details when track title or view options change.
-            val trackTitle = track["title"]?.jsonPrimitive?.content ?: track["filename"]?.jsonPrimitive?.content ?: ""
-            val detailKey = Triple(trackTitle, input.settings.view.sampleLengths, input.settings.view.sampleLoopFlags)
-            if (cachedTrackDetail == null || cachedDetailKey != detailKey) {
-                cachedTrackDetail = readTrackDetail(track, input.settings.view)
-                cachedDetailKey = detailKey
-            }
+            // Rebuild the detail every poll — cheap next to the JSON parse of
+            // the same lists — and keep the previous instance when it compares
+            // equal: the details panel keys its remember() on the lists, so a
+            // fresh instance per poll would recompose it at poll rate. (The old
+            // key was only the two view flags, so a new track whose flags were
+            // unchanged kept the previous track's instruments and samples.)
+            val fresh = readTrackDetail(track, input.settings.view)
+            cachedTrackDetail = if (fresh == cachedTrackDetail) cachedTrackDetail else fresh
             cachedDetails = track.entries
                 .filterNot { (k, v) ->
                     k in setOf("instrumentList", "sampleList", "orderList", "artwork") ||
