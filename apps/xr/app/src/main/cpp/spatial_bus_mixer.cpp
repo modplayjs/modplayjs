@@ -66,12 +66,9 @@ void SpatialBusMixer::mixOne(const float* src, float* dst, int n, float gain) {
 
 namespace {
 inline float softClip(float x) {
-    const float ax = std::fabs(x);
-    if (ax <= 1.f / 3.f) return 2.f * x;
-    if (ax >= 2.f / 3.f) return x > 0.f ? 1.f : -1.f;
-    const float t = 2.f - 3.f * ax;
-    const float y = (3.f - t * t) * (1.f / 3.f);
-    return x > 0.f ? y : -y;
+    if (x <= -1.2f) return -1.f;
+    if (x >= 1.2f) return 1.f;
+    return x - (x * x * x) * (1.f / 3.f);
 }
 } // namespace
 

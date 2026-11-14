@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
 import com.bitti06.modplayjs.engine.ModuleCatalog
 import com.bitti06.modplayjs.xr.input.ControllerInputSystem
+import com.bitti06.modplayjs.xr.input.PushPullGrabSystem
 import com.bitti06.modplayjs.xr.library.Library
 import com.bitti06.modplayjs.xr.library.Playlist
 import com.bitti06.modplayjs.xr.layout.PanelAnimator
@@ -249,6 +250,17 @@ class XrActivity : AppSystemActivity(), XrHost {
         // VRC.Quest.Input.1 (menu button) and the visible laser: both are the
         // app's job under the Interaction SDK.
         systemManager.registerSystem(ControllerInputSystem { XrStore.toggleSettings() })
+        systemManager.registerSystem(
+            PushPullGrabSystem(
+                getTargets = {
+                    val list = ArrayList<Entity>()
+                    list.addAll(panelHost.entities.values)
+                    list.addAll(player.markerEntities)
+                    list
+                },
+                getHeadPose = { readHeadPose() },
+            ),
+        )
         Log.i(TAG, "input: isdk=${isdkSystem?.active} cursor=${cursorSystem != null}")
 
         panelHost =

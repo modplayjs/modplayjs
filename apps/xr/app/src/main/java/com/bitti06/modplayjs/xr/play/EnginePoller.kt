@@ -41,7 +41,7 @@ class EnginePoller(private val scope: CoroutineScope) {
     )
 
     private var cachedTrackDetail: XrPlayer.TrackDetail? = null
-    private var cachedDetailKey: Pair<Boolean, Boolean>? = null
+    private var cachedDetailKey: Triple<String, Boolean, Boolean>? = null
     private var cachedDetails: List<Pair<String, String>> = emptyList()
     private var cachedMessage = ""
     private var cachedCaps = CapsInfo()
@@ -101,9 +101,9 @@ class EnginePoller(private val scope: CoroutineScope) {
         val caps = snap?.get("capabilities") as? JsonObject
 
         if (track != null) {
-            // The sample list is the expensive part of the track object, so it
-            // is only reformatted when a view option that shapes it changes.
-            val detailKey = input.settings.view.sampleLengths to input.settings.view.sampleLoopFlags
+            // Reformat details when track title or view options change.
+            val trackTitle = track["title"]?.jsonPrimitive?.content ?: track["filename"]?.jsonPrimitive?.content ?: ""
+            val detailKey = Triple(trackTitle, input.settings.view.sampleLengths, input.settings.view.sampleLoopFlags)
             if (cachedTrackDetail == null || cachedDetailKey != detailKey) {
                 cachedTrackDetail = readTrackDetail(track, input.settings.view)
                 cachedDetailKey = detailKey

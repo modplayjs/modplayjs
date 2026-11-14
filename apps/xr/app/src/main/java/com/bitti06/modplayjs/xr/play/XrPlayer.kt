@@ -260,6 +260,9 @@ class XrPlayer(
     /** Last yaw written per label, radians; a still head writes nothing. */
     private var labelYaw = FloatArray(0)
 
+    val markerEntities: List<Entity>
+        get() = markers
+
     /** Grabbed marker positions, copied on the main thread for the mixer. */
     @Volatile
     private var grabOverrides: Array<Vector3?> = arrayOfNulls(MAX_SOURCES)
@@ -1412,9 +1415,11 @@ class XrPlayer(
             for (i in 0 until minOf(channels, markers.size)) {
                 val p = positions[i]
                 markers[i].setComponent(Transform(Pose(p)))
-                val label = Vector3(p.x, p.y + MARKER_LABEL_OFFSET, p.z)
-                if (i < labelPoints.size) labelPoints[i] = label
-                markerLabels.getOrNull(i)?.let { setLabelPose(it, label, i) }
+                val dx = listenerPos.x - p.x
+                val dz = listenerPos.z - p.z
+                val yawDeg = Math.toDegrees(kotlin.math.atan2(dx.toDouble(), dz.toDouble())).toFloat()
+                val labelPose = Pose(Vector3(p.x, p.y + MARKER_LABEL_OFFSET, p.z), Quaternion(0f, yawDeg, 0f))
+                markerLabels.getOrNull(i)?.setComponent(Transform(labelPose))
             }
         }
     }
@@ -1858,8 +1863,11 @@ class XrPlayer(
                     Text3D.create("CH ${(i + 1).toString().padStart(2, '0')}"),
                     MeshCollision.NoCollision,
                 )
+                val dx = listenerPos.x - positions[i].x
+                val dz = listenerPos.z - positions[i].z
+                val yawDeg = Math.toDegrees(kotlin.math.atan2(dx.toDouble(), dz.toDouble())).toFloat()
                 labelComponents += Transform(
-                    Pose(Vector3(positions[i].x, positions[i].y + MARKER_LABEL_OFFSET, positions[i].z)),
+                    Pose(Vector3(positions[i].x, positions[i].y + MARKER_LABEL_OFFSET, positions[i].z), Quaternion(0f, yawDeg, 0f)),
                 )
                 labelComponents += Scale(Vector3(MARKER_LABEL_SCALE, MARKER_LABEL_SCALE, MARKER_LABEL_SCALE))
                 labelComponents += Material().apply {

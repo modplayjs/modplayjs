@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Slider
@@ -222,30 +224,45 @@ fun NowPlayingPanel() {
             )
         }
 
-        if (state.settings.view.showChannelStrip && playback.channels in 1..16) {
-            Row(horizontalArrangement = Arrangement.spacedBy(PanelTokens.GapXs)) {
-                for (i in 0 until playback.channels) {
+        if (state.settings.view.showChannelStrip && playback.channels > 0) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                items(playback.channels) { i ->
                     val muted = playback.muted.contains(i)
-                    Text(
-                        (i + 1).toString().padStart(2, '0'),
-                        fontSize = PanelTokens.Mono,
-                        fontFamily = FontFamily.Monospace,
-                        color =
-                            when {
-                                playback.solo == i -> PanelTokens.AccentAlt
-                                muted -> PanelTokens.TextFaint
-                                playback.spatialEnabled && i < playback.azimuths.size -> PanelTokens.AccentWarm
-                                else -> PanelTokens.TextDim
-                            },
+                    val isSolo = playback.solo == i
+                    Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(PanelTokens.SurfaceRaised)
+                            .background(
+                                when {
+                                    isSolo -> PanelTokens.AccentAlt
+                                    muted -> PanelTokens.SurfaceSunken
+                                    else -> PanelTokens.SurfaceRaised
+                                },
+                            )
                             .combinedClickable(
                                 onClick = { XrStore.toggleMute(i) },
                                 onLongClick = { XrStore.toggleSolo(i) },
                             )
-                            .padding(horizontal = PanelTokens.GapXs, vertical = 2.dp),
-                    )
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            (i + 1).toString().padStart(2, '0'),
+                            fontSize = PanelTokens.Mono,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = if (isSolo || !muted) FontWeight.Bold else FontWeight.Normal,
+                            color = when {
+                                isSolo -> PanelTokens.OnAccent
+                                muted -> PanelTokens.TextFaint
+                                playback.spatialEnabled && i < playback.azimuths.size -> PanelTokens.Accent
+                                else -> PanelTokens.TextDim
+                            },
+                        )
+                    }
                 }
             }
         }
